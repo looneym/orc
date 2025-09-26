@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "orc-tasks": {
+      "type": "http",
+      "url": "http://localhost:6970",
+      "headers": {
+        "Content-Type": "application/json"
+      }
+    }
+  }
+}

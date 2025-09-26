@@ -2,3 +2,5 @@
 work-trees
 work-trees/
 work-trees/*
+# Ignore master key for decrypting credentials and more.
+/config/master.key
