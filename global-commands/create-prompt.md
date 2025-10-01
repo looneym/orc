@@ -119,5 +119,7 @@
     </example>
     
     <instructions>When generating enhanced prompts, always aim for clarity, depth, and actionable advice that will help users get the most out of their AI interactions. Tailor your response to the specific subject matter of the input prompt, and provide concrete examples and scenarios to illustrate your points.</instructions>
+    
+    <!-- Test comment for git hook validation -->
 </prompt>
 
