@@ -4,28 +4,48 @@
 
 ORC coordinates development workflow through universal commands, lightweight planning, and efficient worktree orchestration. One command system accessible everywhere, one planning approach that scales, one coordination layer that just works.
 
-## What ORC Provides
+## Command System Architecture
 
-**🎯 Universal Commands** - Access your development toolkit from any Claude Code session  
-**📋 Lightweight Planning** - Simple 3-state planning without ceremony  
-**🌳 Clean Worktrees** - Isolated development environments with automated setup
+**Central Management + Global Access**
+- Commands stored in `global-commands/` (universal) and `.claude/commands/` (ORC-specific)
+- Symlinked to `~/.claude/commands/` for global availability via git post-commit hook
+- Single source of truth - update once, available everywhere
+
+**Automatic Symlink Management**
+```bash
+# Git post-commit hook automatically maintains symlinks:
+~/.claude/commands/bootstrap.md -> /Users/looneym/src/orc/global-commands/bootstrap.md
+~/.claude/commands/tech-plan.md -> /Users/looneym/src/orc/global-commands/tech-plan.md
+# ORC-specific commands stay local to .claude/commands/
+```
+
+## Available Commands
+
+**Planning & Organization**
+- `/tech-plan` - Create structured technical plans with lightweight templates
+- `/bootstrap` - Load project context and recent work for new Claude sessions  
+- `/janitor` - Local worktree maintenance and tech plan lifecycle management
+
+**Development Workflow**
+- `/worktree` - Create development environments from existing tech plans
+- `/cleanup` - Intelligent worktree and TMux cleanup with safety recommendations
+- `/commit` - Automatic conventional commits with intelligent staging
+
+**Specialized Tools**  
+- `/create-prompt` - Advanced prompt engineering and quality assessment
+- `/rails-debug` - Generate Rails console debugging code with error handling
 
 ## Quick Examples
 
 ```bash
 # Universal commands work everywhere
-/tech-plan new-investigation     # Create focused tech plan
-/bootstrap                       # Load project context  
-/janitor                         # Maintain and cleanup
+/tech-plan feature-name          # Create focused tech plan
+/worktree                        # Select plan and create worktree
+/bootstrap                       # Load project context in investigation
 
 # Simple planning workflow
 tech-plans/backlog/     → in-progress/     → archive/
    (future work)        (active projects)    (completed)
-
-# Clean worktree setup
-git worktree add ~/src/worktrees/ml-feature-repo -b ml/feature
-cd ~/src/worktrees/ml-feature-repo
-# Automated tech plan integration via symlinks
 ```
 
 ## How It Works
