@@ -54,14 +54,6 @@ tech-plans/backlog/     → in-progress/     → archive/
 **Plans** (`tech-plans/`) flow through backlog → in-progress → archive states  
 **Worktrees** link to plans via symlinks for integrated development
 
-## Documentation & Architecture
-
-Complete technical documentation, architecture details, and implementation guides available in the `docs/` directory.
-
-## Experimental Work
-
-The `experimental/` directory contains prototypes and experimental systems, including an MCP task management server for potential future integration.
-
 ---
 
 **Orchestrator Claude Coordinates. Investigation Claude Implements. El Presidente Commands.**
