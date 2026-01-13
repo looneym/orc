@@ -8,6 +8,7 @@ work-trees/*
 
 # Go build artifacts
 /bin/
+/orc
 *.exe
 *.exe~
 *.dll
