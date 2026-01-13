@@ -125,3 +125,31 @@ func UpdateMissionStatus(id, status string) error {
 
 	return err
 }
+
+// UpdateMission updates the title and/or description of a mission
+func UpdateMission(id, title, description string) error {
+	database, err := db.GetDB()
+	if err != nil {
+		return err
+	}
+
+	// Build dynamic query based on what's being updated
+	query := "UPDATE missions SET updated_at = CURRENT_TIMESTAMP"
+	args := []interface{}{}
+
+	if title != "" {
+		query += ", title = ?"
+		args = append(args, title)
+	}
+
+	if description != "" {
+		query += ", description = ?"
+		args = append(args, sql.NullString{String: description, Valid: true})
+	}
+
+	query += " WHERE id = ?"
+	args = append(args, id)
+
+	_, err = database.Exec(query, args...)
+	return err
+}

@@ -40,14 +40,14 @@ This provides a global view of all work across ORC.`,
 			fmt.Println("📊 ORC Summary - Open Work")
 			fmt.Println()
 
-			// Display each mission with its operations
-			for _, mission := range openMissions {
+			// Display each mission with its operations in tree format
+			for i, mission := range openMissions {
 				// Display mission
 				statusEmoji := getStatusEmoji(mission.Status)
 				fmt.Printf("%s %s - %s [%s]\n", statusEmoji, mission.ID, mission.Title, mission.Status)
 
 				if mission.Description.Valid && mission.Description.String != "" {
-					fmt.Printf("   %s\n", mission.Description.String)
+					fmt.Printf("│   %s\n", mission.Description.String)
 				}
 
 				// Get operations for this mission
@@ -65,17 +65,60 @@ This provides a global view of all work across ORC.`,
 				}
 
 				if len(activeOps) > 0 {
-					fmt.Println()
-					for _, op := range activeOps {
+					for j, op := range activeOps {
 						opEmoji := getStatusEmoji(op.Status)
-						fmt.Printf("   %s %s - %s [%s]\n", opEmoji, op.ID, op.Title, op.Status)
+
+						// Determine tree characters
+						var prefix string
+						if j < len(activeOps)-1 {
+							prefix = "├── "
+						} else {
+							prefix = "└── "
+						}
+
+						fmt.Printf("│\n│%s%s %s - %s [%s]\n", prefix, opEmoji, op.ID, op.Title, op.Status)
+
+						// Get work orders for this operation
+						workOrders, err := models.ListWorkOrders(op.ID, "")
+						if err == nil && len(workOrders) > 0 {
+							var activeWOs []*models.WorkOrder
+							for _, wo := range workOrders {
+								if wo.Status != "complete" && wo.Status != "cancelled" {
+									activeWOs = append(activeWOs, wo)
+								}
+							}
+
+							if len(activeWOs) > 0 {
+								for k, wo := range activeWOs {
+									woEmoji := getStatusEmoji(wo.Status)
+									var woPrefix string
+									if j < len(activeOps)-1 {
+										woPrefix = "│   "
+									} else {
+										woPrefix = "    "
+									}
+									if k < len(activeWOs)-1 {
+										woPrefix += "├── "
+									} else {
+										woPrefix += "└── "
+									}
+									fmt.Printf("│%s%s %s - %s [%s]\n", woPrefix, woEmoji, wo.ID, wo.Title, wo.Status)
+								}
+							}
+						}
 					}
 				} else {
-					fmt.Println("   (No active operations)")
+					fmt.Println("│")
+					fmt.Println("└── (No active operations)")
 				}
 
-				fmt.Println()
+				// Add spacing between missions
+				if i < len(openMissions)-1 {
+					fmt.Println()
+				}
 			}
+
+			fmt.Println()
 
 			// Show open expeditions
 			expeditions, err := models.ListExpeditions()

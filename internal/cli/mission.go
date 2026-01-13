@@ -113,17 +113,43 @@ var missionCompleteCmd = &cobra.Command{
 	},
 }
 
+var missionUpdateCmd = &cobra.Command{
+	Use:   "update [mission-id]",
+	Short: "Update mission title and/or description",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		id := args[0]
+		title, _ := cmd.Flags().GetString("title")
+		description, _ := cmd.Flags().GetString("description")
+
+		if title == "" && description == "" {
+			return fmt.Errorf("must specify at least --title or --description")
+		}
+
+		err := models.UpdateMission(id, title, description)
+		if err != nil {
+			return fmt.Errorf("failed to update mission: %w", err)
+		}
+
+		fmt.Printf("✓ Mission %s updated\n", id)
+		return nil
+	},
+}
+
 // MissionCmd returns the mission command
 func MissionCmd() *cobra.Command {
 	// Add flags
 	missionCreateCmd.Flags().StringP("description", "d", "", "Mission description")
 	missionListCmd.Flags().StringP("status", "s", "", "Filter by status (active, paused, complete, archived)")
+	missionUpdateCmd.Flags().StringP("title", "t", "", "New mission title")
+	missionUpdateCmd.Flags().StringP("description", "d", "", "New mission description")
 
 	// Add subcommands
 	missionCmd.AddCommand(missionCreateCmd)
 	missionCmd.AddCommand(missionListCmd)
 	missionCmd.AddCommand(missionShowCmd)
 	missionCmd.AddCommand(missionCompleteCmd)
+	missionCmd.AddCommand(missionUpdateCmd)
 
 	return missionCmd
 }
