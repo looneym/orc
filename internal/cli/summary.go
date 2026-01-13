@@ -46,10 +46,6 @@ This provides a global view of all work across ORC.`,
 				statusEmoji := getStatusEmoji(mission.Status)
 				fmt.Printf("%s %s - %s [%s]\n", statusEmoji, mission.ID, mission.Title, mission.Status)
 
-				if mission.Description.Valid && mission.Description.String != "" {
-					fmt.Printf("│   %s\n", mission.Description.String)
-				}
-
 				// Get operations for this mission
 				operations, err := models.ListOperations(mission.ID, "")
 				if err != nil {
@@ -76,7 +72,7 @@ This provides a global view of all work across ORC.`,
 							prefix = "└── "
 						}
 
-						fmt.Printf("│\n│%s%s %s - %s [%s]\n", prefix, opEmoji, op.ID, op.Title, op.Status)
+						fmt.Printf("%s%s %s - %s [%s]\n", prefix, opEmoji, op.ID, op.Title, op.Status)
 
 						// Get work orders for this operation
 						workOrders, err := models.ListWorkOrders(op.ID, "")
@@ -102,13 +98,12 @@ This provides a global view of all work across ORC.`,
 									} else {
 										woPrefix += "└── "
 									}
-									fmt.Printf("│%s%s %s - %s [%s]\n", woPrefix, woEmoji, wo.ID, wo.Title, wo.Status)
+									fmt.Printf("%s%s %s - %s [%s]\n", woPrefix, woEmoji, wo.ID, wo.Title, wo.Status)
 								}
 							}
 						}
 					}
 				} else {
-					fmt.Println("│")
 					fmt.Println("└── (No active operations)")
 				}
 
