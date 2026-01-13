@@ -1,105 +1,189 @@
 package cli
 
 import (
+	"encoding/json"
 	"fmt"
+	"os"
+	"os/exec"
+	"strings"
 
 	"github.com/looneym/orc/internal/models"
 	"github.com/spf13/cobra"
 )
 
+type Metadata struct {
+	CurrentHandoffID   *string `json:"current_handoff_id"`
+	LastUpdated        *string `json:"last_updated"`
+	ActiveMissionID    *string `json:"active_mission_id"`
+	ActiveOperationID  *string `json:"active_operation_id"`
+	ActiveWorkOrderID  *string `json:"active_work_order_id"`
+	ActiveExpeditionID *string `json:"active_expedition_id"`
+}
+
 // StatusCmd returns the status command
 func StatusCmd() *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "status",
-		Short: "Show ORC status overview",
-		Long:  `Display an overview of all expeditions, groves, and work orders.`,
+		Short: "Show current work context from metadata.json",
+		Long: `Display the current work context based on metadata.json:
+- Active mission, operation, work order, expedition
+- Latest handoff note
+- Git status (if in git repository)
+
+This provides a focused view of "where am I right now?"`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			fmt.Println("🌲 ORC Forest Factory Status")
-			fmt.Println()
-
-			// Count expeditions by status
-			expeditions, err := models.ListExpeditions()
+			// Read metadata.json
+			homeDir, err := os.UserHomeDir()
 			if err != nil {
-				return fmt.Errorf("failed to list expeditions: %w", err)
+				return fmt.Errorf("failed to get home directory: %w", err)
 			}
 
-			statusCounts := make(map[string]int)
-			for _, exp := range expeditions {
-				statusCounts[exp.Status]++
-			}
-
-			fmt.Printf("Expeditions: %d total\n", len(expeditions))
-			if len(expeditions) > 0 {
-				for status, count := range statusCounts {
-					fmt.Printf("  - %s: %d\n", status, count)
-				}
-			}
-			fmt.Println()
-
-			// Count groves by status
-			groves, err := models.ListGroves()
+			metadataPath := fmt.Sprintf("%s/.orc/metadata.json", homeDir)
+			data, err := os.ReadFile(metadataPath)
 			if err != nil {
-				return fmt.Errorf("failed to list groves: %w", err)
+				return fmt.Errorf("failed to read metadata.json: %w\nHint: Run 'orc init' if you haven't initialized ORC yet", err)
 			}
 
-			groveStatusCounts := make(map[string]int)
-			for _, grove := range groves {
-				groveStatusCounts[grove.Status]++
+			var metadata Metadata
+			if err := json.Unmarshal(data, &metadata); err != nil {
+				return fmt.Errorf("failed to parse metadata.json: %w", err)
 			}
 
-			fmt.Printf("Groves: %d total\n", len(groves))
-			if len(groves) > 0 {
-				for status, count := range groveStatusCounts {
-					fmt.Printf("  - %s: %d\n", status, count)
-				}
-			}
+			fmt.Println("🎯 ORC Status - Current Context")
 			fmt.Println()
 
-			// Count work orders by status
-			orders, err := models.ListWorkOrders("", "")
-			if err != nil {
-				return fmt.Errorf("failed to list work orders: %w", err)
-			}
-
-			orderStatusCounts := make(map[string]int)
-			for _, wo := range orders {
-				orderStatusCounts[wo.Status]++
-			}
-
-			fmt.Printf("Work Orders: %d total\n", len(orders))
-			if len(orders) > 0 {
-				for status, count := range orderStatusCounts {
-					fmt.Printf("  - %s: %d\n", status, count)
-				}
-			}
-			fmt.Println()
-
-			// Show active expeditions
-			var activeExpeditions []*models.Expedition
-			for _, exp := range expeditions {
-				if exp.Status == "active" {
-					activeExpeditions = append(activeExpeditions, exp)
-				}
-			}
-
-			if len(activeExpeditions) > 0 {
-				fmt.Println("Active Expeditions:")
-				for _, exp := range activeExpeditions {
-					fmt.Printf("  - %s: %s", exp.ID, exp.Name)
-					if exp.AssignedIMP.Valid {
-						fmt.Printf(" (IMP: %s)", exp.AssignedIMP.String)
+			// Display active mission
+			if metadata.ActiveMissionID != nil && *metadata.ActiveMissionID != "" {
+				mission, err := models.GetMission(*metadata.ActiveMissionID)
+				if err != nil {
+					fmt.Printf("❌ Mission: %s (error loading: %v)\n", *metadata.ActiveMissionID, err)
+				} else {
+					fmt.Printf("🎯 Mission: %s - %s [%s]\n", mission.ID, mission.Title, mission.Status)
+					if mission.Description.Valid && mission.Description.String != "" {
+						fmt.Printf("   %s\n", mission.Description.String)
 					}
+				}
+			} else {
+				fmt.Println("🎯 Mission: (none active)")
+			}
+			fmt.Println()
+
+			// Display active operation
+			if metadata.ActiveOperationID != nil && *metadata.ActiveOperationID != "" {
+				operation, err := models.GetOperation(*metadata.ActiveOperationID)
+				if err != nil {
+					fmt.Printf("❌ Operation: %s (error loading: %v)\n", *metadata.ActiveOperationID, err)
+				} else {
+					fmt.Printf("⚙️  Operation: %s - %s [%s]\n", operation.ID, operation.Title, operation.Status)
+					if operation.Description.Valid && operation.Description.String != "" {
+						fmt.Printf("   %s\n", operation.Description.String)
+					}
+				}
+			} else {
+				fmt.Println("⚙️  Operation: (none active)")
+			}
+			fmt.Println()
+
+			// Display active work order
+			if metadata.ActiveWorkOrderID != nil && *metadata.ActiveWorkOrderID != "" {
+				workOrder, err := models.GetWorkOrder(*metadata.ActiveWorkOrderID)
+				if err != nil {
+					fmt.Printf("❌ Work Order: %s (error loading: %v)\n", *metadata.ActiveWorkOrderID, err)
+				} else {
+					fmt.Printf("📋 Work Order: %s - %s [%s]\n", workOrder.ID, workOrder.Title, workOrder.Status)
+					if workOrder.Description.Valid && workOrder.Description.String != "" {
+						fmt.Printf("   %s\n", workOrder.Description.String)
+					}
+					if workOrder.AssignedImp.Valid && workOrder.AssignedImp.String != "" {
+						fmt.Printf("   IMP: %s\n", workOrder.AssignedImp.String)
+					}
+				}
+			} else {
+				fmt.Println("📋 Work Order: (none active)")
+			}
+			fmt.Println()
+
+			// Display active expedition
+			if metadata.ActiveExpeditionID != nil && *metadata.ActiveExpeditionID != "" {
+				expedition, err := models.GetExpedition(*metadata.ActiveExpeditionID)
+				if err != nil {
+					fmt.Printf("❌ Expedition: %s (error loading: %v)\n", *metadata.ActiveExpeditionID, err)
+				} else {
+					fmt.Printf("🌲 Expedition: %s - %s [%s]\n", expedition.ID, expedition.Name, expedition.Status)
+					if expedition.AssignedIMP.Valid && expedition.AssignedIMP.String != "" {
+						fmt.Printf("   IMP: %s\n", expedition.AssignedIMP.String)
+					}
+					if expedition.WorkOrderID.Valid && expedition.WorkOrderID.String != "" {
+						fmt.Printf("   Work Order: %s\n", expedition.WorkOrderID.String)
+					}
+				}
+			} else {
+				fmt.Println("🌲 Expedition: (none active)")
+			}
+			fmt.Println()
+
+			// Display latest handoff
+			if metadata.CurrentHandoffID != nil && *metadata.CurrentHandoffID != "" {
+				handoff, err := models.GetHandoff(*metadata.CurrentHandoffID)
+				if err != nil {
+					fmt.Printf("❌ Latest Handoff: %s (error loading: %v)\n", *metadata.CurrentHandoffID, err)
+				} else {
+					fmt.Printf("📝 Latest Handoff: %s\n", handoff.ID)
+					fmt.Printf("   Created: %s\n", handoff.CreatedAt.Format("2006-01-02 15:04:05"))
 					fmt.Println()
+					fmt.Println("--- HANDOFF NOTE ---")
+					fmt.Println(handoff.HandoffNote)
+					fmt.Println("--- END HANDOFF ---")
+				}
+			} else {
+				fmt.Println("📝 Latest Handoff: (none)")
+			}
+			fmt.Println()
+
+			// Show git status if in git repo
+			if isGitRepo() {
+				fmt.Println("📂 Git Status:")
+				gitStatus, err := getGitStatus()
+				if err != nil {
+					fmt.Printf("   (error: %v)\n", err)
+				} else {
+					// Indent git status output
+					lines := strings.Split(strings.TrimSpace(gitStatus), "\n")
+					for _, line := range lines {
+						fmt.Printf("   %s\n", line)
+					}
 				}
 				fmt.Println()
 			}
 
-			if len(expeditions) == 0 && len(groves) == 0 && len(orders) == 0 {
-				fmt.Println("No activity yet. Get started:")
-				fmt.Println("  orc expedition create \"My First Expedition\"")
+			if metadata.LastUpdated != nil && *metadata.LastUpdated != "" {
+				fmt.Printf("Last updated: %s\n", *metadata.LastUpdated)
 			}
 
 			return nil
 		},
 	}
+
+	return cmd
+}
+
+func isGitRepo() bool {
+	cmd := exec.Command("git", "rev-parse", "--git-dir")
+	err := cmd.Run()
+	return err == nil
+}
+
+func getGitStatus() (string, error) {
+	cmd := exec.Command("git", "status", "--short")
+	output, err := cmd.Output()
+	if err != nil {
+		return "", err
+	}
+
+	status := string(output)
+	if status == "" {
+		return "   (clean - no changes)", nil
+	}
+
+	return status, nil
 }
