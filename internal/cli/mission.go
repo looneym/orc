@@ -2,7 +2,11 @@ package cli
 
 import (
 	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
 
+	"github.com/looneym/orc/internal/context"
 	"github.com/looneym/orc/internal/models"
 	"github.com/spf13/cobra"
 )
@@ -82,15 +86,140 @@ var missionShowCmd = &cobra.Command{
 		}
 		fmt.Println()
 
-		// List operations under this mission
-		operations, err := models.ListOperations(id, "")
-		if err == nil && len(operations) > 0 {
-			fmt.Println("Operations:")
-			for _, op := range operations {
-				fmt.Printf("  - %s [%s] %s\n", op.ID, op.Status, op.Title)
+		// List work orders under this mission
+		workOrders, err := models.ListWorkOrders(id, "")
+		if err == nil && len(workOrders) > 0 {
+			fmt.Println("Work Orders:")
+			for _, wo := range workOrders {
+				fmt.Printf("  - %s [%s] %s\n", wo.ID, wo.Status, wo.Title)
 			}
 			fmt.Println()
 		}
+
+		// List groves for this mission
+		groves, err := models.GetGrovesByMission(id)
+		if err == nil && len(groves) > 0 {
+			fmt.Println("Groves:")
+			for _, g := range groves {
+				fmt.Printf("  - %s: %s [%s]\n", g.ID, g.Name, g.Status)
+			}
+			fmt.Println()
+		}
+
+		return nil
+	},
+}
+
+var missionStartCmd = &cobra.Command{
+	Use:   "start [mission-id]",
+	Short: "Start a mission workspace with TMux session",
+	Long: `Create a mission workspace with .orc-mission marker and TMux session.
+
+This command:
+1. Creates a workspace directory for the mission
+2. Writes .orc-mission marker file for deputy context detection
+3. Queries database for active groves
+4. Creates TMux session with deputy pane and grove panes
+5. Materializes git worktrees for groves if needed
+
+Examples:
+  orc mission start MISSION-001
+  orc mission start MISSION-001 --workspace ~/work/mission-001`,
+	Args: cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		missionID := args[0]
+		workspacePath, _ := cmd.Flags().GetString("workspace")
+
+		// Check if we're in ORC source directory
+		if context.IsOrcSourceDirectory() {
+			return fmt.Errorf("cannot start mission in ORC source directory - please run from another location")
+		}
+
+		// Get mission from DB
+		mission, err := models.GetMission(missionID)
+		if err != nil {
+			return fmt.Errorf("failed to get mission: %w", err)
+		}
+
+		// Default workspace path
+		if workspacePath == "" {
+			home, err := os.UserHomeDir()
+			if err != nil {
+				return fmt.Errorf("failed to get home directory: %w", err)
+			}
+			workspacePath = filepath.Join(home, "missions", missionID)
+		}
+
+		// Create workspace directory
+		if err := os.MkdirAll(workspacePath, 0755); err != nil {
+			return fmt.Errorf("failed to create workspace: %w", err)
+		}
+
+		// Write .orc-mission marker file
+		if err := context.WriteMissionContext(workspacePath, missionID); err != nil {
+			return fmt.Errorf("failed to write mission context: %w", err)
+		}
+
+		fmt.Printf("✓ Created mission workspace at: %s\n", workspacePath)
+		fmt.Printf("  Mission: %s - %s\n", mission.ID, mission.Title)
+		fmt.Println()
+
+		// Get active groves for this mission
+		groves, err := models.GetGrovesByMission(missionID)
+		if err != nil {
+			return fmt.Errorf("failed to get groves: %w", err)
+		}
+
+		// Create TMux session
+		sessionName := fmt.Sprintf("orc-%s", missionID)
+
+		fmt.Printf("Creating TMux session: %s\n", sessionName)
+
+		// Create session with first window (deputy ORC)
+		createCmd := exec.Command("tmux", "new-session", "-d", "-s", sessionName, "-c", workspacePath)
+		if err := createCmd.Run(); err != nil {
+			return fmt.Errorf("failed to create TMux session: %w", err)
+		}
+
+		// Rename first window
+		renameCmd := exec.Command("tmux", "rename-window", "-t", fmt.Sprintf("%s:0", sessionName), "deputy")
+		renameCmd.Run()
+
+		fmt.Printf("  ✓ Created window: deputy (mission control)\n")
+
+		// Create window for each grove
+		for i, grove := range groves {
+			windowName := grove.Name
+
+			// Create new window
+			newWindowCmd := exec.Command("tmux", "new-window", "-t", sessionName, "-n", windowName, "-c", grove.Path)
+			if err := newWindowCmd.Run(); err != nil {
+				fmt.Printf("  ⚠️  Warning: Could not create window for grove %s: %v\n", grove.ID, err)
+				continue
+			}
+
+			// Check if grove path exists, if not try to materialize worktree
+			if _, err := os.Stat(grove.Path); os.IsNotExist(err) {
+				fmt.Printf("  ℹ️  Grove %s worktree not found at %s\n", grove.ID, grove.Path)
+				fmt.Printf("      Run 'orc grove create %s --repos <repo-names>' to materialize\n", grove.Name)
+			} else {
+				fmt.Printf("  ✓ Created window %d: %s (%s)\n", i+1, windowName, grove.ID)
+			}
+		}
+
+		if len(groves) == 0 {
+			fmt.Println("  ℹ️  No groves found for this mission")
+			fmt.Printf("     Create groves with: orc grove create <name> --mission %s --repos <repo-names>\n", missionID)
+		}
+
+		fmt.Println()
+		fmt.Printf("Mission workspace ready!\n")
+		fmt.Printf("Attach to session: tmux attach -t %s\n", sessionName)
+		fmt.Println()
+		fmt.Println("When inside the session:")
+		fmt.Println("  - Deputy ORC commands automatically scoped to this mission")
+		fmt.Println("  - Switch windows: Ctrl+b then window number")
+		fmt.Println("  - Detach session: Ctrl+b then d")
 
 		return nil
 	},
@@ -109,6 +238,23 @@ var missionCompleteCmd = &cobra.Command{
 		}
 
 		fmt.Printf("✓ Mission %s marked as complete\n", id)
+		return nil
+	},
+}
+
+var missionArchiveCmd = &cobra.Command{
+	Use:   "archive [mission-id]",
+	Short: "Archive a completed mission",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		id := args[0]
+
+		err := models.UpdateMissionStatus(id, "archived")
+		if err != nil {
+			return fmt.Errorf("failed to archive mission: %w", err)
+		}
+
+		fmt.Printf("✓ Mission %s archived\n", id)
 		return nil
 	},
 }
@@ -141,6 +287,7 @@ func MissionCmd() *cobra.Command {
 	// Add flags
 	missionCreateCmd.Flags().StringP("description", "d", "", "Mission description")
 	missionListCmd.Flags().StringP("status", "s", "", "Filter by status (active, paused, complete, archived)")
+	missionStartCmd.Flags().StringP("workspace", "w", "", "Custom workspace path (default: ~/missions/MISSION-ID)")
 	missionUpdateCmd.Flags().StringP("title", "t", "", "New mission title")
 	missionUpdateCmd.Flags().StringP("description", "d", "", "New mission description")
 
@@ -148,7 +295,9 @@ func MissionCmd() *cobra.Command {
 	missionCmd.AddCommand(missionCreateCmd)
 	missionCmd.AddCommand(missionListCmd)
 	missionCmd.AddCommand(missionShowCmd)
+	missionCmd.AddCommand(missionStartCmd)
 	missionCmd.AddCommand(missionCompleteCmd)
+	missionCmd.AddCommand(missionArchiveCmd)
 	missionCmd.AddCommand(missionUpdateCmd)
 
 	return missionCmd

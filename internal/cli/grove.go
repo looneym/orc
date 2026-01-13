@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"text/tabwriter"
 
+	"github.com/looneym/orc/internal/context"
 	"github.com/looneym/orc/internal/models"
 	"github.com/spf13/cobra"
 )
@@ -50,9 +51,14 @@ Examples:
 		RunE: func(cmd *cobra.Command, args []string) error {
 			name := args[0]
 
-			// Default mission to MISSION-001
+			// Smart default: use deputy context if available, otherwise MISSION-001
 			if missionID == "" {
-				missionID = "MISSION-001"
+				if ctxMissionID := context.GetContextMissionID(); ctxMissionID != "" {
+					missionID = ctxMissionID
+					fmt.Printf("ℹ️  Using mission from context: %s\n", missionID)
+				} else {
+					missionID = "MISSION-001"
+				}
 			}
 
 			// Default base path

@@ -3,6 +3,7 @@ package cli
 import (
 	"fmt"
 
+	"github.com/looneym/orc/internal/context"
 	"github.com/looneym/orc/internal/models"
 	"github.com/spf13/cobra"
 )
@@ -24,9 +25,14 @@ var workOrderCreateCmd = &cobra.Command{
 		contextRef, _ := cmd.Flags().GetString("context-ref")
 		parentID, _ := cmd.Flags().GetString("parent")
 
-		// Default to MISSION-001 if not specified
+		// Smart default: use deputy context if available, otherwise MISSION-001
 		if missionID == "" {
-			missionID = "MISSION-001"
+			if ctxMissionID := context.GetContextMissionID(); ctxMissionID != "" {
+				missionID = ctxMissionID
+				fmt.Printf("ℹ️  Using mission from context: %s\n", missionID)
+			} else {
+				missionID = "MISSION-001"
+			}
 		}
 
 		wo, err := models.CreateWorkOrder(missionID, title, description, contextRef, parentID)
@@ -52,6 +58,13 @@ var workOrderListCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		missionID, _ := cmd.Flags().GetString("mission")
 		status, _ := cmd.Flags().GetString("status")
+
+		// Smart default: use deputy context if available and no mission specified
+		if missionID == "" {
+			if ctxMissionID := context.GetContextMissionID(); ctxMissionID != "" {
+				missionID = ctxMissionID
+			}
+		}
 
 		orders, err := models.ListWorkOrders(missionID, status)
 		if err != nil {
