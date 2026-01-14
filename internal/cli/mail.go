@@ -65,11 +65,11 @@ Examples:
 			}
 
 			// Determine mission ID for message
-			// Master ORC messages use recipient's mission ID
-			// Deputies/IMPs use their own mission ID
+			// Messages must be scoped to a mission for database storage
 			missionID := identity.MissionID
+
 			if identity.Type == agent.AgentTypeMaster {
-				// For master, need to extract mission from recipient
+				// Master sending: use recipient's mission ID
 				if recipientIdentity.Type == agent.AgentTypeDeputy {
 					missionID = recipientIdentity.ID // Deputy ID is mission ID
 				} else if recipientIdentity.Type == agent.AgentTypeIMP {
@@ -85,7 +85,12 @@ Examples:
 						missionID = recipientIdentity.MissionID
 					}
 				}
+			} else if recipientIdentity.Type == agent.AgentTypeMaster {
+				// Sending TO master: use sender's mission ID
+				// (Deputies/IMPs reporting up to master)
+				missionID = identity.MissionID
 			}
+			// Otherwise: deputy/IMP to deputy/IMP, use sender's mission ID (already set)
 
 			// Create message
 			message, err := models.CreateMessage(

@@ -30,32 +30,55 @@ type AgentIdentity struct {
 
 // GetCurrentAgentID detects the current agent identity based on working directory context
 func GetCurrentAgentID() (*AgentIdentity, error) {
-	// First check if we're master ORC by checking tmux session name
-	// Master ORC runs in "ORC" session, deputies run in "orc-MISSION-XXX" sessions
-	tmuxSession := os.Getenv("TMUX")
-	if tmuxSession != "" {
-		// Extract session name from TMUX env var (format: /tmp/tmux-501/default,12345,0)
-		// We need to ask tmux for the actual session name
-		sessionName := getCurrentTmuxSession()
-		if sessionName == "ORC" {
-			// Master ORC - not a deputy, special case
-			return &AgentIdentity{
-				Type:      AgentTypeMaster,
-				ID:        "ORC",
-				FullID:    "MASTER-ORC",
-				MissionID: "", // Master doesn't belong to a mission
-			}, nil
-		}
-	}
-
-	// Check mission context
+	// Check mission context first
 	missionCtx, err := context.DetectMissionContext()
 	if err != nil {
 		return nil, fmt.Errorf("failed to detect mission context: %w", err)
 	}
 
+	// If we're NOT in a mission context, check if we're master ORC
 	if missionCtx == nil {
+		tmuxSession := os.Getenv("TMUX")
+		if tmuxSession != "" {
+			sessionName := getCurrentTmuxSession()
+			if sessionName == "ORC" {
+				// Master ORC working outside mission contexts
+				return &AgentIdentity{
+					Type:      AgentTypeMaster,
+					ID:        "ORC",
+					FullID:    "MASTER-ORC",
+					MissionID: "", // Master doesn't belong to a mission
+				}, nil
+			}
+		}
 		return nil, fmt.Errorf("no agent context detected - not in a mission workspace or grove")
+	}
+
+	// We're in a mission context - check tmux to see if we're master visiting
+	// or an actual deputy for this mission
+	tmuxSession := os.Getenv("TMUX")
+	if tmuxSession != "" {
+		sessionName := getCurrentTmuxSession()
+		// Master ORC session, but working in a mission directory
+		if sessionName == "ORC" {
+			// Master visiting mission - use mission for scoping but identify as master
+			return &AgentIdentity{
+				Type:      AgentTypeMaster,
+				ID:        "ORC",
+				FullID:    "MASTER-ORC",
+				MissionID: missionCtx.MissionID, // Use mission for message scoping
+			}, nil
+		}
+		// Deputy session for this specific mission
+		if sessionName == fmt.Sprintf("orc-%s", missionCtx.MissionID) {
+			// Actual deputy for this mission
+			return &AgentIdentity{
+				Type:      AgentTypeDeputy,
+				ID:        missionCtx.MissionID,
+				FullID:    fmt.Sprintf("DEPUTY-%s", missionCtx.MissionID),
+				MissionID: missionCtx.MissionID,
+			}, nil
+		}
 	}
 
 	cwd, err := os.Getwd()
@@ -111,6 +134,13 @@ func ParseAgentID(agentID string) (*AgentIdentity, error) {
 	id := parts[1]
 
 	switch agentType {
+	case AgentTypeMaster:
+		return &AgentIdentity{
+			Type:      AgentTypeMaster,
+			ID:        id,
+			FullID:    agentID,
+			MissionID: "", // Master doesn't belong to a specific mission
+		}, nil
 	case AgentTypeDeputy:
 		return &AgentIdentity{
 			Type:      AgentTypeDeputy,
