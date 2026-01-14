@@ -64,13 +64,36 @@ Examples:
 				subject = "(no subject)"
 			}
 
+			// Determine mission ID for message
+			// Master ORC messages use recipient's mission ID
+			// Deputies/IMPs use their own mission ID
+			missionID := identity.MissionID
+			if identity.Type == agent.AgentTypeMaster {
+				// For master, need to extract mission from recipient
+				if recipientIdentity.Type == agent.AgentTypeDeputy {
+					missionID = recipientIdentity.ID // Deputy ID is mission ID
+				} else if recipientIdentity.Type == agent.AgentTypeIMP {
+					// Need to look up grove to get mission ID
+					if recipientIdentity.MissionID == "" {
+						// Try to extract from grove
+						grove, err := models.GetGrove(recipientIdentity.ID)
+						if err != nil {
+							return fmt.Errorf("failed to resolve IMP mission: %w", err)
+						}
+						missionID = grove.MissionID
+					} else {
+						missionID = recipientIdentity.MissionID
+					}
+				}
+			}
+
 			// Create message
 			message, err := models.CreateMessage(
 				identity.FullID,
 				recipientIdentity.FullID,
 				subject,
 				body,
-				identity.MissionID,
+				missionID,
 			)
 			if err != nil {
 				return fmt.Errorf("failed to create message: %w", err)

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -14,6 +15,7 @@ import (
 type AgentType string
 
 const (
+	AgentTypeMaster AgentType = "MASTER"
 	AgentTypeDeputy AgentType = "DEPUTY"
 	AgentTypeIMP    AgentType = "IMP"
 )
@@ -28,7 +30,25 @@ type AgentIdentity struct {
 
 // GetCurrentAgentID detects the current agent identity based on working directory context
 func GetCurrentAgentID() (*AgentIdentity, error) {
-	// Check mission context first
+	// First check if we're master ORC by checking tmux session name
+	// Master ORC runs in "ORC" session, deputies run in "orc-MISSION-XXX" sessions
+	tmuxSession := os.Getenv("TMUX")
+	if tmuxSession != "" {
+		// Extract session name from TMUX env var (format: /tmp/tmux-501/default,12345,0)
+		// We need to ask tmux for the actual session name
+		sessionName := getCurrentTmuxSession()
+		if sessionName == "ORC" {
+			// Master ORC - not a deputy, special case
+			return &AgentIdentity{
+				Type:      AgentTypeMaster,
+				ID:        "ORC",
+				FullID:    "MASTER-ORC",
+				MissionID: "", // Master doesn't belong to a mission
+			}, nil
+		}
+	}
+
+	// Check mission context
 	missionCtx, err := context.DetectMissionContext()
 	if err != nil {
 		return nil, fmt.Errorf("failed to detect mission context: %w", err)
@@ -112,6 +132,16 @@ func ParseAgentID(agentID string) (*AgentIdentity, error) {
 	}
 }
 
+// getCurrentTmuxSession returns the current tmux session name, or empty string if not in tmux
+func getCurrentTmuxSession() string {
+	cmd := exec.Command("tmux", "display-message", "-p", "#S")
+	out, err := cmd.Output()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(out))
+}
+
 // ResolveTMuxTarget converts an agent ID to a tmux target string
 func ResolveTMuxTarget(agentID string, groveName string) (string, error) {
 	identity, err := ParseAgentID(agentID)
@@ -122,6 +152,11 @@ func ResolveTMuxTarget(agentID string, groveName string) (string, error) {
 	if identity.Type == AgentTypeDeputy {
 		// Deputy always in window 1, pane 1
 		return fmt.Sprintf("orc-%s:1.1", identity.ID), nil
+	}
+
+	if identity.Type == AgentTypeMaster {
+		// Master ORC in ORC session, window 1, pane 1
+		return "ORC:1.1", nil
 	}
 
 	// For IMP, need grove name and mission ID
