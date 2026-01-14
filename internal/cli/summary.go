@@ -44,6 +44,7 @@ This provides a global view of all work across ORC.`,
 				// Display mission
 				statusEmoji := getStatusEmoji(mission.Status)
 				fmt.Printf("%s %s - %s [%s]\n", statusEmoji, mission.ID, mission.Title, mission.Status)
+				fmt.Println("│") // Empty line with vertical continuation after mission header
 
 				// Get work orders for this mission
 				workOrders, err := models.ListWorkOrders(mission.ID, "")
@@ -110,19 +111,29 @@ This provides a global view of all work across ORC.`,
 							}
 							fmt.Printf("%s%s %s - %s [%s]%s\n", childPrefix, childEmoji, child.ID, child.Title, child.Status, childGroveInfo)
 						}
-						// Empty line after each epic
-						fmt.Println()
+						// Empty line after each epic with vertical continuation
+						fmt.Println("│")
 					}
 
 					// Display standalone work orders with empty lines between them
-					for _, wo := range standalone {
+					for j, wo := range standalone {
 						woEmoji := getStatusEmoji(wo.Status)
 						groveInfo := ""
 						if wo.AssignedGroveID.Valid {
 							groveInfo = fmt.Sprintf(" [Grove: %s]", wo.AssignedGroveID.String)
 						}
-						fmt.Printf("└── %s %s - %s [%s]%s\n", woEmoji, wo.ID, wo.Title, wo.Status, groveInfo)
-						fmt.Println()
+						// Use └── for last standalone, ├── for others
+						var prefix string
+						if j < len(standalone)-1 {
+							prefix = "├── "
+						} else {
+							prefix = "└── "
+						}
+						fmt.Printf("%s%s %s - %s [%s]%s\n", prefix, woEmoji, wo.ID, wo.Title, wo.Status, groveInfo)
+						// Add vertical continuation line between standalone orders (not after last)
+						if j < len(standalone)-1 {
+							fmt.Println("│")
+						}
 					}
 				} else {
 					fmt.Println("└── (No active work orders)")
