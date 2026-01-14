@@ -76,8 +76,9 @@ Examples:
 				basePath = filepath.Join(home, "src", "worktrees")
 			}
 
-			// Full path for this grove
-			grovePath := filepath.Join(basePath, name)
+			// Full path for this grove - include mission ID to avoid conflicts
+			grovePathName := fmt.Sprintf("%s-%s", missionID, name)
+			grovePath := filepath.Join(basePath, grovePathName)
 
 			// Create grove in database
 			grove, err := models.CreateGrove(missionID, name, grovePath, repos)
