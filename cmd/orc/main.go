@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/looneym/orc/internal/cli"
+	"github.com/example/orc/internal/cli"
 	"github.com/spf13/cobra"
 )
 

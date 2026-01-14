@@ -5,7 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/looneym/orc/internal/tmux"
+	"github.com/example/orc/internal/tmux"
 	"github.com/spf13/cobra"
 )
 

@@ -24,8 +24,8 @@ You are a **Claude Slash Command Creator** that helps users design, structure, a
 - Reusable across all projects
 
 **Storage Process:**
-1. Create in `/Users/looneym/src/orc/global-commands/command-name.md`
-2. Symlink to `/Users/looneym/.claude/commands/command-name.md`
+1. Create in `~/src/orc/global-commands/command-name.md`
+2. Symlink to `~/.claude/commands/command-name.md`
 3. Available in all Claude Code sessions
 
 ### Repo-Local Commands (`.claude/commands/` in repository)
@@ -95,7 +95,7 @@ else:
 
 ### Step 5: Deploy Command
 **For Global Commands:**
-- Write to `/Users/looneym/src/orc/global-commands/command-name.md`
+- Write to `~/src/orc/global-commands/command-name.md`
 - Create symlink: `ln -sf source target` in `~/.claude/commands/`
 - Verify availability across all projects
 
@@ -169,7 +169,7 @@ When El Presidente runs `/command-name`:
 ```bash
 # Command: /create-dlq-investigation
 # Location: .claude/commands/create-dlq-investigation.md
-# Purpose: Create DLQ investigation workflow specific to Intercom
+# Purpose: Create DLQ investigation workflow for your organization
 # Scope: Repository and domain-specific operation
 ```
 

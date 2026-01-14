@@ -1,4 +1,4 @@
-module github.com/looneym/orc
+module github.com/example/orc
 
 go 1.24.4
 

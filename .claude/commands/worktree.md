@@ -62,7 +62,7 @@ Note: You can run `/tech-plan` in the worktree directory to create a tech plan a
 **Plan Content Analysis**:
 ```bash
 # Read selected tech plan to extract key information
-selected_plan="/Users/looneym/src/orc/tech-plans/backlog/[selected-plan].md"
+selected_plan="~/src/orc/tech-plans/backlog/[selected-plan].md"
 cat "$selected_plan"
 ```
 
@@ -75,31 +75,31 @@ cat "$selected_plan"
 **Repository Validation**:
 ```bash
 # Verify target repository exists and is accessible
-ls -la /Users/looneym/src/[detected-repository]
-cd /Users/looneym/src/[detected-repository] && git status
+ls -la ~/src/[detected-repository]
+cd ~/src/[detected-repository] && git status
 ```
 
 ### Step 3: Worktree Creation and Setup
 **Naming Convention**:
 - **Pattern**: `ml-[descriptive-problem/feature]-[repo]`
 - **Examples**: 
-  - `ml-dlq-performance-intercom` (performance investigation)
+  - `ml-dlq-performance-webapp` (performance investigation)
   - `ml-auth-migration-infrastructure` (infrastructure changes)
-  - `ml-perfbot-enhancements-intercom` (feature development)
+  - `ml-perfbot-enhancements-webapp` (feature development)
 
 **Worktree Creation Process**:
 ```bash
 # 1. Fetch latest master (preserve current work)
-cd /Users/looneym/src/[repository] && git fetch origin
+cd ~/src/[repository] && git fetch origin
 
 # 2. Create single-repo worktree
-git worktree add /Users/looneym/src/worktrees/ml-[descriptive-name]-[repo] -b ml/[descriptive-name] origin/master
+git worktree add ~/src/worktrees/ml-[descriptive-name]-[repo] -b ml/[descriptive-name] origin/master
 
 # 3. Move tech plan to in-progress and setup symlink
-cd /Users/looneym/src/worktrees/ml-[descriptive-name]-[repo]
-mkdir -p /Users/looneym/src/orc/tech-plans/in-progress/ml-[descriptive-name]-[repo]
-mv "/Users/looneym/src/orc/tech-plans/backlog/[selected-plan].md" "/Users/looneym/src/orc/tech-plans/in-progress/ml-[descriptive-name]-[repo]/"
-ln -sf /Users/looneym/src/orc/tech-plans/in-progress/ml-[descriptive-name]-[repo] .tech-plans
+cd ~/src/worktrees/ml-[descriptive-name]-[repo]
+mkdir -p ~/src/orc/tech-plans/in-progress/ml-[descriptive-name]-[repo]
+mv "~/src/orc/tech-plans/backlog/[selected-plan].md" "~/src/orc/tech-plans/in-progress/ml-[descriptive-name]-[repo]/"
+ln -sf ~/src/orc/tech-plans/in-progress/ml-[descriptive-name]-[repo] .tech-plans
 ```
 
 ### Step 4: Investigation Handoff Preparation
@@ -118,7 +118,7 @@ No custom CLAUDE.md creation needed - investigation Claude will use existing ORC
 **TMux Environment Setup**:
 ```bash
 # Launch standardized development environment
-tmux new-window -n "[short-descriptive-name]" -c "/Users/looneym/src/worktrees/ml-[descriptive-name]-[repo]" \; send-keys "muxup" Enter
+tmux new-window -n "[short-descriptive-name]" -c "~/src/worktrees/ml-[descriptive-name]-[repo]" \; send-keys "muxup" Enter
 ```
 
 **Environment Verification**:
@@ -183,7 +183,7 @@ To get started in the investigation:
 
 ### Repository Selection Guidance
 - **Primary Focus Rule**: Choose the repository where 80%+ of the work will happen
-- **Infrastructure vs Application**: Infrastructure changes go in infrastructure repo, app features in intercom
+- **Infrastructure vs Application**: Infrastructure changes go in infrastructure repo, app features in main-app
 - **Experimental Work**: Use bot-test for proof-of-concepts that might not be committed
 - **Multi-Repo Coordination**: Even if touching multiple repos, choose one primary for worktree focus
 
@@ -215,11 +215,11 @@ To get started in the investigation:
 
 ### Example 1: GitHub Issue Investigation
 ```
-El Presidente: "I need to investigate GitHub issue intercom/intercom#12345 about DLQ performance"
+El Presidente: "I need to investigate GitHub issue example-org/main-repo#12345 about DLQ performance"
 
 Process:
 1. Fetch GitHub issue details using gh CLI
-2. Create worktree: ml-dlq-performance-intercom  
+2. Create worktree: ml-dlq-performance-webapp  
 3. Set up tech plans with issue context
 4. Generate CLAUDE.md with full issue details and resources
 5. Launch tmux window: "dlq-perf"
@@ -233,8 +233,8 @@ El Presidente: "I want to plan the next phase of PerfBot enhancements across mul
 Process:
 1. Identify this as strategic cross-project work
 2. Create tech plan in orc/tech-plans/backlog/
-3. Choose intercom as primary repository for implementation  
-4. Create worktree: ml-perfbot-phase2-intercom
+3. Choose main-app as primary repository for implementation  
+4. Create worktree: ml-perfbot-phase2-webapp
 5. Link strategic plan to worktree context
 6. Focus on coordination and planning rather than immediate implementation
 ```
@@ -284,14 +284,14 @@ git log ml/old-feature-name --since="1 month ago" --oneline
 **Create New Worktree from Old Branch**:
 ```bash
 # Create worktree from existing branch
-git worktree add /Users/looneym/src/worktrees/ml-resumed-[feature]-[repo] ml/old-feature-name
+git worktree add ~/src/worktrees/ml-resumed-[feature]-[repo] ml/old-feature-name
 
 # Move tech plan back to in-progress
-mv "/Users/looneym/src/orc/tech-plans/backlog/[plan-name].md" \
-   "/Users/looneym/src/orc/tech-plans/in-progress/ml-resumed-[feature]-[repo]/"
+mv "~/src/orc/tech-plans/backlog/[plan-name].md" \
+   "~/src/orc/tech-plans/in-progress/ml-resumed-[feature]-[repo]/"
 
 # Launch TMux environment  
-tmux new-window -n "resumed-feature" -c "/Users/looneym/src/worktrees/ml-resumed-[feature]-[repo]"
+tmux new-window -n "resumed-feature" -c "~/src/worktrees/ml-resumed-[feature]-[repo]"
 ```
 
 **Clean Up WIP State**:

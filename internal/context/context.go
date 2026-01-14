@@ -109,7 +109,7 @@ func IsOrcSourceDirectory() bool {
 				if err == nil && len(data) > 0 {
 					// Simple check for orc module name
 					content := string(data)
-					if len(content) > 20 && (content[:20] == "module github.com/lo" || content[:30] == "module github.com/looneym/orc") {
+					if len(content) > 20 && (content[:20] == "module github.com/lo" || content[:30] == "module github.com/example/orc") {
 						return true
 					}
 				}

@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/looneym/orc/internal/context"
-	"github.com/looneym/orc/internal/models"
+	"github.com/example/orc/internal/context"
+	"github.com/example/orc/internal/models"
 	"github.com/spf13/cobra"
 )
 

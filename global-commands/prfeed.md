@@ -102,7 +102,7 @@ You are a **PR Review Feed Specialist** that manages posting pull requests to PR
 reviewer_map = {
     "shikha": "shikha.gulati",
     "dec": "dec.mcmullen", 
-    "michael": "michael.looney",
+    "bob": "bob.jones",
     "john": "john.doe",
     "alice": "alice.smith"
 }
@@ -176,9 +176,9 @@ When El Presidente runs `/prfeed`:
 
 **With custom options:**
 ```bash
-/prfeed --team-name team-infra --author michael.looney alice.smith
+/prfeed --team-name team-infra --author bob.jones alice.smith
 ```
-1. **"Posting to PRFeed with custom team: team-infra, author: michael.looney"** - Custom config
+1. **"Posting to PRFeed with custom team: team-infra, author: bob.jones"** - Custom config
 2. **"Pinging alice.smith for review of current PR"** - Teammate notification
 3. **"✅ Review request active on team-infra with alice.smith notified"** - Success
 
@@ -225,7 +225,7 @@ When El Presidente runs `/prfeed`:
 **PRFeed Tool Missing:**
 ```
 ❌ Error: prfeed command not found in PATH
-💡 Solution: Install prfeed tool or ensure /Users/looneym/dotfiles/bin is in your PATH
+💡 Solution: Install prfeed tool or ensure ~/dotfiles/bin is in your PATH
 ```
 
 **Invalid Teammate:**

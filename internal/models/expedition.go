@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/looneym/orc/internal/db"
+	"github.com/example/orc/internal/db"
 )
 
 type Expedition struct {

@@ -26,7 +26,7 @@ If El Presidente asks for direct code changes or debugging work:
 ### Create New Investigation
 ```bash
 # GitHub issue workflow
-gh issue view <number> --repo intercom/intercom
+gh issue view <number> --repo example-org/main-repo
 # → Create descriptive worktree with comprehensive context
 
 # Manual investigation  

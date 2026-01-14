@@ -49,7 +49,7 @@ Check that `orc` is accessible:
 
 ```bash
 which orc
-# Should show: /Users/looneym/go/bin/orc (or your $GOPATH/bin/orc)
+# Should show: ~/go/bin/orc (or your $GOPATH/bin/orc)
 
 orc --help
 # Should display ORC help

@@ -109,7 +109,7 @@ Content here...
 **GitHub URL Generation**:
 ```bash
 # Repository detection (adapt based on context)
-REPO_BASE="https://github.com/intercom/intercom"
+REPO_BASE="https://github.com/example-org/main-repo"
 BRANCH="master"  # or main, or specific branch
 
 # Convert file path to GitHub URL
@@ -121,8 +121,8 @@ convert_file_reference() {
 ```
 
 **Link Creation Examples**:
-- `app/models/user.rb` → `[app/models/user.rb](https://github.com/intercom/intercom/blob/master/app/models/user.rb)`
-- `./lib/processors/dlq_handler.rb` → `[lib/processors/dlq_handler.rb](https://github.com/intercom/intercom/blob/master/lib/processors/dlq_handler.rb)`
+- `app/models/user.rb` → `[app/models/user.rb](https://github.com/example-org/main-repo/blob/master/app/models/user.rb)`
+- `./lib/processors/dlq_handler.rb` → `[lib/processors/dlq_handler.rb](https://github.com/example-org/main-repo/blob/master/lib/processors/dlq_handler.rb)`
 
 ### Step 4: Content Structure Preservation
 **Markdown Element Handling**:
@@ -234,7 +234,7 @@ detect_repository() {
         echo "$remote_url" | sed -E 's|git@github.com:|https://github.com/|' | sed 's|\.git$||'
     else
         # Default fallback
-        echo "https://github.com/intercom/intercom"
+        echo "https://github.com/example-org/main-repo"
     fi
 }
 ```

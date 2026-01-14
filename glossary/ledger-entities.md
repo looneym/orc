@@ -82,8 +82,8 @@
 **Example**:
 ```
 Mission: "Auth Refactor"
-├── grove-backend (path: ~/src/worktrees/auth-backend, repos: ["intercom"])
-├── grove-frontend (path: ~/src/worktrees/auth-frontend, repos: ["intercom"])
+├── grove-backend (path: ~/src/worktrees/auth-backend, repos: ["main-app"])
+├── grove-frontend (path: ~/src/worktrees/auth-frontend, repos: ["main-app"])
 └── grove-api (path: ~/src/worktrees/auth-api, repos: ["api-service"])
 ```
 

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/looneym/orc/internal/db"
+	"github.com/example/orc/internal/db"
 	"github.com/spf13/cobra"
 )
 

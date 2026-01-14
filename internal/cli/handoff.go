@@ -7,7 +7,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/looneym/orc/internal/models"
+	"github.com/example/orc/internal/models"
 	"github.com/spf13/cobra"
 )
 

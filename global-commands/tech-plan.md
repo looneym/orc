@@ -27,7 +27,7 @@ You're helping collaborators stay organized and deliberate while hacking on some
 
 The tech plan template is centralized in `templates/tech-plan.md` for consistency across all commands.
 
-**Template Location**: `/Users/looneym/src/orc/templates/tech-plan.md`
+**Template Location**: `~/src/orc/templates/tech-plan.md`
 
 **Template Loading**: Load the template content from the centralized location and customize with project-specific details.
 
@@ -43,7 +43,7 @@ The tech plan template is centralized in `templates/tech-plan.md` for consistenc
 6. **Collaborative Refinement**: Explore alternatives, dive into technical details
 
 **File Management**: 
-- **Template Loading**: `cat /Users/looneym/src/orc/templates/tech-plan.md` to get base template
+- **Template Loading**: `cat ~/src/orc/templates/tech-plan.md` to get base template
 - **Project Customization**: Replace `[PROJECT_NAME]` with actual project name
 - **Context Detection**: Check for `.tech-plans/` directory (worktree) vs `tech-plans/` dir (ORC)
 - **Worktree**: Create in `.tech-plans/` (local to investigation, travels with the work)
@@ -52,7 +52,7 @@ The tech plan template is centralized in `templates/tech-plan.md` for consistenc
 - For existing plan updates, use `/janitor tech-plans` instead
 
 **Template Usage**:
-- **Read Template**: Use `@/Users/looneym/src/orc/templates/tech-plan.md` to include template content
+- **Read Template**: Use `@~/src/orc/templates/tech-plan.md` to include template content
 - **Customize**: Replace `[PROJECT_NAME]` with actual project name in the file content
 - **Create File**: Write customized content to appropriate context location
 

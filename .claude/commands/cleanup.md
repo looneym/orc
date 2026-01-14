@@ -26,7 +26,7 @@ You are the master of workspace hygiene - the specialist who ensures El Presiden
 
 **Target Resolution**:
 - **TMux Window Names**: `dlq-bot`, `sqs-tags`, `no-method-error`
-- **Worktree Names**: `ml-dlq-bot`, `ml-dlq-alarm-investigation-intercom`
+- **Worktree Names**: `ml-dlq-bot`, `ml-dlq-alarm-investigation-webapp`
 - **Partial Matching**: `dlq` → resolves to best match
 - **Fuzzy Logic**: Intelligent matching for common variations
 
@@ -71,8 +71,8 @@ You are the master of workspace hygiene - the specialist who ensures El Presiden
 ```bash
 # Resolve target to specific worktree
 # Handle various input formats:
-# - TMux window: "dlq-bot" → "/Users/looneym/src/worktrees/ml-dlq-bot"
-# - Full worktree: "ml-dlq-alarm-investigation-intercom" → exact match
+# - TMux window: "dlq-bot" → "~/src/worktrees/ml-dlq-bot"
+# - Full worktree: "ml-dlq-alarm-investigation-webapp" → exact match
 # - Partial: "dlq" → fuzzy match to most likely candidate
 # - Handle ambiguity with clear user prompts
 ```
@@ -80,14 +80,14 @@ You are the master of workspace hygiene - the specialist who ensures El Presiden
 **For Global Mode**:
 ```bash
 # Scan all active worktrees
-ls -la /Users/looneym/src/worktrees/
+ls -la ~/src/worktrees/
 # Focus on active worktrees only
 ```
 
 #### Step 2: Worktree Activity Assessment
 **For Each Target Worktree**:
 ```bash
-cd /Users/looneym/src/worktrees/[worktree-name]
+cd ~/src/worktrees/[worktree-name]
 
 # Git activity analysis
 git log --oneline -10 --since="1 week ago"
@@ -172,7 +172,7 @@ tmux list-windows -F "#{window_name} #{pane_current_path}"
 Analysis complete! Found 3 cleanup opportunities:
 
 1. ml-dlq-bot → ARCHIVE (completed work, tech plan done)
-2. ml-stale-feature-intercom → BACKLOG (in-progress but stale)
+2. ml-stale-feature-webapp → BACKLOG (in-progress but stale)
 
 Which actions would you like to perform?
 [A]ll, [S]elective, [N]one, [D]etails for specific item?
@@ -184,16 +184,16 @@ Which actions would you like to perform?
 **For Archive Candidates**:
 ```bash
 # Move completed tech plans to archive
-dest_dir="/Users/looneym/src/orc/tech-plans/archive/"
+dest_dir="~/src/orc/tech-plans/archive/"
 ```
 
 #### Step 9: Worktree Cleanup
 ```bash
 # Remove worktree safely
-cd /Users/looneym/src/[repository]
-git worktree remove /Users/looneym/src/worktrees/[worktree-name]
+cd ~/src/[repository]
+git worktree remove ~/src/worktrees/[worktree-name]
 
 # Verify removal
 git worktree list
-ls /Users/looneym/src/worktrees/
+ls ~/src/worktrees/
 ```

@@ -10,9 +10,9 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	"github.com/looneym/orc/internal/context"
-	"github.com/looneym/orc/internal/models"
-	"github.com/looneym/orc/internal/tmux"
+	"github.com/example/orc/internal/context"
+	"github.com/example/orc/internal/models"
+	"github.com/example/orc/internal/tmux"
 	"github.com/spf13/cobra"
 )
 
@@ -49,9 +49,9 @@ This command:
 3. Writes metadata.json for reference
 
 Examples:
-  orc grove create auth-backend --repos intercom --mission MISSION-001
-  orc grove create frontend --repos intercom --mission MISSION-001
-  orc grove create multi --repos intercom,api-service --mission MISSION-002`,
+  orc grove create auth-backend --repos main-app --mission MISSION-001
+  orc grove create frontend --repos main-app --mission MISSION-001
+  orc grove create multi --repos main-app,api-service --mission MISSION-002`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			name := args[0]
@@ -157,7 +157,7 @@ func groveListCmd() *cobra.Command {
 				fmt.Println("No groves found.")
 				fmt.Println()
 				fmt.Println("Create your first grove:")
-				fmt.Println("  orc grove create my-grove --repos intercom --mission MISSION-001")
+				fmt.Println("  orc grove create my-grove --repos main-app --mission MISSION-001")
 				return nil
 			}
 

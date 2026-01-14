@@ -231,7 +231,7 @@ orc init
 ### "orc-canary repository not found"
 ```bash
 cd ~/src
-git clone git@github.com:looneym/orc-canary.git
+git clone git@github.com:example/orc-canary.git
 ```
 
 ### "TMux session already exists"

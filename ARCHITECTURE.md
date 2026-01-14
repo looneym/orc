@@ -69,7 +69,7 @@ orc summary                    # Hierarchical view with pinned items
 
 **Key Commands:**
 ```bash
-orc grove create [name] --repos intercom --mission MISSION-001
+orc grove create [name] --repos main-app --mission MISSION-001
 orc grove list [--mission MISSION-XXX]
 orc grove show GROVE-XXX
 orc grove rename GROVE-XXX new-name
