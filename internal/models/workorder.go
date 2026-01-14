@@ -80,7 +80,7 @@ func CreateWorkOrder(missionID, title, description, contextRef, parentID string)
 
 	_, err = database.Exec(
 		"INSERT INTO work_orders (id, mission_id, title, description, context_ref, parent_id, status) VALUES (?, ?, ?, ?, ?, ?, ?)",
-		id, missionID, title, desc, ctxRef, parent, "backlog",
+		id, missionID, title, desc, ctxRef, parent, "ready",
 	)
 	if err != nil {
 		return nil, err
