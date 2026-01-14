@@ -2,6 +2,8 @@
 
 **Forest Factory Command Center for El Presidente's Development Ecosystem**
 
+![Forest Factory](assets/forest-factory.svg)
+
 ## 🎯 What It Does
 
 ORC 2.0 coordinates multiple Claude agents working across repositories simultaneously. 
