@@ -27,6 +27,8 @@ It coordinates IMPs (Implementation Agents) working in isolated groves (worktree
 	rootCmd.AddCommand(cli.AttachCmd())
 	rootCmd.AddCommand(cli.PrimeCmd())
 	rootCmd.AddCommand(cli.TestCmd())
+	rootCmd.AddCommand(cli.MailCmd())
+	rootCmd.AddCommand(cli.NudgeCmd())
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)

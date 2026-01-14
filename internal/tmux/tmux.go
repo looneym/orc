@@ -218,3 +218,59 @@ func AttachInstructions(sessionName string) string {
 
 	return b.String()
 }
+
+// SendKeysLiteral sends text literally without interpretation
+func (s *Session) SendKeysLiteral(target, text string) error {
+	cmd := exec.Command("tmux", "send-keys", "-t", target, "-l", text)
+	return cmd.Run()
+}
+
+// SendEscape sends the Escape key
+func (s *Session) SendEscape(target string) error {
+	cmd := exec.Command("tmux", "send-keys", "-t", target, "Escape")
+	return cmd.Run()
+}
+
+// SendEnter sends the Enter key
+func (s *Session) SendEnter(target string) error {
+	cmd := exec.Command("tmux", "send-keys", "-t", target, "Enter")
+	return cmd.Run()
+}
+
+// NudgeSession sends a message to a running Claude session using the Gastown pattern
+// This implements the 4-step reliable delivery:
+// 1. Send text literally (no interpretation)
+// 2. Wait 500ms for processing
+// 3. Send Escape to exit vim mode
+// 4. Send Enter to submit
+func NudgeSession(target, message string) error {
+	// Extract session name from target
+	parts := strings.Split(target, ":")
+	if len(parts) == 0 {
+		return fmt.Errorf("invalid target format: %s", target)
+	}
+	session := &Session{Name: parts[0]}
+
+	// Step 1: Send text literally
+	if err := session.SendKeysLiteral(target, message); err != nil {
+		return fmt.Errorf("failed to send message: %w", err)
+	}
+
+	// Step 2: Wait 500ms (critical for reliability)
+	cmd := exec.Command("sleep", "0.5")
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("failed to wait: %w", err)
+	}
+
+	// Step 3: Send Escape for vim mode
+	if err := session.SendEscape(target); err != nil {
+		return fmt.Errorf("failed to send escape: %w", err)
+	}
+
+	// Step 4: Send Enter to submit
+	if err := session.SendEnter(target); err != nil {
+		return fmt.Errorf("failed to send enter: %w", err)
+	}
+
+	return nil
+}
