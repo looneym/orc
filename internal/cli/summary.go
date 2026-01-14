@@ -27,7 +27,7 @@ In deputy context, automatically scopes to current mission (use --all to see all
 			if missionCtx != nil && !showAll {
 				// Deputy context - filter to this mission only
 				filterMissionID = missionCtx.MissionID
-				fmt.Printf("📊 ORC Summary - MISSION %s (Deputy View)\n", filterMissionID)
+				fmt.Printf("📊 ORC Summary - %s (Deputy View)\n", filterMissionID)
 				fmt.Println("💡 Use --all to see all missions")
 			} else {
 				// Master context or --all flag - show everything
@@ -75,29 +75,12 @@ In deputy context, automatically scopes to current mission (use --all to see all
 					return fmt.Errorf("failed to list work orders for %s: %w", mission.ID, err)
 				}
 
-				// Separate pinned and active work orders
-				var pinnedWOs []*models.WorkOrder
+				// Filter to non-complete work orders
 				var activeWOs []*models.WorkOrder
 				for _, wo := range workOrders {
-					if wo.Pinned {
-						pinnedWOs = append(pinnedWOs, wo)
-					} else if wo.Status != "complete" {
+					if wo.Status != "complete" {
 						activeWOs = append(activeWOs, wo)
 					}
-				}
-
-				// Display pinned work orders first (if any)
-				if len(pinnedWOs) > 0 {
-					fmt.Println("📌 Pinned:")
-					for _, wo := range pinnedWOs {
-						woEmoji := getStatusEmoji(wo.Status)
-						groveInfo := ""
-						if wo.AssignedGroveID.Valid {
-							groveInfo = fmt.Sprintf(" [Grove: %s]", wo.AssignedGroveID.String)
-						}
-						fmt.Printf("│   %s %s - %s [%s]%s\n", woEmoji, wo.ID, wo.Title, wo.Status, groveInfo)
-					}
-					fmt.Println("│")
 				}
 
 				if len(activeWOs) > 0 {
@@ -129,6 +112,10 @@ In deputy context, automatically scopes to current mission (use --all to see all
 					// Display epics first with empty lines between them
 					for _, epic := range epics {
 						epicEmoji := getStatusEmoji(epic.Status)
+						// Add pin emoji if pinned
+						if epic.Pinned {
+							epicEmoji = "📌" + epicEmoji
+						}
 						groveInfo := ""
 						if epic.AssignedGroveID.Valid {
 							groveInfo = fmt.Sprintf(" [Grove: %s]", epic.AssignedGroveID.String)
@@ -139,6 +126,10 @@ In deputy context, automatically scopes to current mission (use --all to see all
 						children := childrenMap[epic.ID]
 						for k, child := range children {
 							childEmoji := getStatusEmoji(child.Status)
+							// Add pin emoji if pinned
+							if child.Pinned {
+								childEmoji = "📌" + childEmoji
+							}
 							var childPrefix string
 							if k < len(children)-1 {
 								childPrefix = "│   ├── "
@@ -158,6 +149,10 @@ In deputy context, automatically scopes to current mission (use --all to see all
 					// Display standalone work orders with empty lines between them
 					for j, wo := range standalone {
 						woEmoji := getStatusEmoji(wo.Status)
+						// Add pin emoji if pinned
+						if wo.Pinned {
+							woEmoji = "📌" + woEmoji
+						}
 						groveInfo := ""
 						if wo.AssignedGroveID.Valid {
 							groveInfo = fmt.Sprintf(" [Grove: %s]", wo.AssignedGroveID.String)
