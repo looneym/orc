@@ -180,3 +180,14 @@ func RenameGrove(id, newName string) error {
 
 	return err
 }
+
+// DeleteGrove deletes a grove from the database
+func DeleteGrove(id string) error {
+	database, err := db.GetDB()
+	if err != nil {
+		return err
+	}
+
+	_, err = database.Exec("DELETE FROM groves WHERE id = ?", id)
+	return err
+}

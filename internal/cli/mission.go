@@ -291,6 +291,56 @@ var missionUpdateCmd = &cobra.Command{
 	},
 }
 
+var missionDeleteCmd = &cobra.Command{
+	Use:   "delete [mission-id]",
+	Short: "Delete a mission from the database",
+	Long: `Delete a mission and all associated data from the database.
+
+WARNING: This is a destructive operation. Associated work orders and groves
+will lose their mission reference.
+
+Examples:
+  orc mission delete MISSION-TEST-001
+  orc mission delete MISSION-001 --force`,
+	Args: cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		id := args[0]
+		force, _ := cmd.Flags().GetBool("force")
+
+		// Get mission details before deleting
+		mission, err := models.GetMission(id)
+		if err != nil {
+			return fmt.Errorf("failed to get mission: %w", err)
+		}
+
+		// Check for associated work orders and groves
+		workOrders, _ := models.ListWorkOrders(id, "")
+		groves, _ := models.GetGrovesByMission(id)
+
+		if !force && (len(workOrders) > 0 || len(groves) > 0) {
+			fmt.Printf("⚠️  Mission %s has associated data:\n", id)
+			if len(workOrders) > 0 {
+				fmt.Printf("  - %d work orders\n", len(workOrders))
+			}
+			if len(groves) > 0 {
+				fmt.Printf("  - %d groves\n", len(groves))
+			}
+			fmt.Println()
+			fmt.Println("Use --force to delete anyway")
+			return fmt.Errorf("mission has associated data")
+		}
+
+		// Delete the mission
+		err = models.DeleteMission(id)
+		if err != nil {
+			return fmt.Errorf("failed to delete mission: %w", err)
+		}
+
+		fmt.Printf("✓ Deleted mission %s: %s\n", mission.ID, mission.Title)
+		return nil
+	},
+}
+
 // MissionCmd returns the mission command
 func MissionCmd() *cobra.Command {
 	// Add flags
@@ -299,6 +349,7 @@ func MissionCmd() *cobra.Command {
 	missionStartCmd.Flags().StringP("workspace", "w", "", "Custom workspace path (default: ~/missions/MISSION-ID)")
 	missionUpdateCmd.Flags().StringP("title", "t", "", "New mission title")
 	missionUpdateCmd.Flags().StringP("description", "d", "", "New mission description")
+	missionDeleteCmd.Flags().BoolP("force", "f", false, "Force delete even with associated data")
 
 	// Add subcommands
 	missionCmd.AddCommand(missionCreateCmd)
@@ -308,6 +359,7 @@ func MissionCmd() *cobra.Command {
 	missionCmd.AddCommand(missionCompleteCmd)
 	missionCmd.AddCommand(missionArchiveCmd)
 	missionCmd.AddCommand(missionUpdateCmd)
+	missionCmd.AddCommand(missionDeleteCmd)
 
 	return missionCmd
 }

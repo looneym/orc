@@ -29,6 +29,7 @@ func GroveCmd() *cobra.Command {
 	cmd.AddCommand(groveShowCmd())
 	cmd.AddCommand(groveRenameCmd())
 	cmd.AddCommand(groveOpenCmd())
+	cmd.AddCommand(groveDeleteCmd())
 
 	return cmd
 }
@@ -268,6 +269,74 @@ Examples:
 	}
 
 	cmd.Flags().BoolVar(&updateMetadata, "update-metadata", false, "Also update metadata.json file (optional)")
+
+	return cmd
+}
+
+func groveDeleteCmd() *cobra.Command {
+	var force bool
+	var removeWorktree bool
+
+	cmd := &cobra.Command{
+		Use:   "delete [grove-id]",
+		Short: "Delete a grove from the database",
+		Long: `Delete a grove from the database and optionally remove its worktree.
+
+WARNING: This is a destructive operation. By default, only the database record
+is removed. Use --remove-worktree to also delete the git worktree.
+
+Examples:
+  orc grove delete GROVE-001
+  orc grove delete GROVE-001 --remove-worktree
+  orc grove delete GROVE-TEST-001 --force --remove-worktree`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			groveID := args[0]
+
+			// Get grove details before deleting
+			grove, err := models.GetGrove(groveID)
+			if err != nil {
+				return fmt.Errorf("failed to get grove: %w", err)
+			}
+
+			// Remove worktree if requested
+			if removeWorktree {
+				if _, err := os.Stat(grove.Path); err == nil {
+					fmt.Printf("Removing worktree at: %s\n", grove.Path)
+
+					// Try to remove git worktree first
+					if err := exec.Command("git", "worktree", "remove", grove.Path, "--force").Run(); err != nil {
+						fmt.Printf("  ⚠️  Warning: git worktree remove failed: %v\n", err)
+						fmt.Printf("  Attempting direct directory removal...\n")
+
+						// Fall back to direct directory removal
+						if err := os.RemoveAll(grove.Path); err != nil {
+							return fmt.Errorf("failed to remove worktree directory: %w", err)
+						}
+					}
+					fmt.Printf("  ✓ Worktree removed\n")
+				} else {
+					fmt.Printf("  ℹ️  Worktree not found at %s (already removed)\n", grove.Path)
+				}
+			}
+
+			// Delete from database
+			if err := models.DeleteGrove(groveID); err != nil {
+				return fmt.Errorf("failed to delete grove from database: %w", err)
+			}
+
+			fmt.Printf("✓ Deleted grove %s: %s\n", grove.ID, grove.Name)
+			if !removeWorktree {
+				fmt.Printf("  ℹ️  Worktree still exists at: %s\n", grove.Path)
+				fmt.Printf("     Use --remove-worktree to delete it\n")
+			}
+
+			return nil
+		},
+	}
+
+	cmd.Flags().BoolVarP(&force, "force", "f", false, "Force delete even with errors")
+	cmd.Flags().BoolVar(&removeWorktree, "remove-worktree", false, "Also remove the git worktree directory")
 
 	return cmd
 }
