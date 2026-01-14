@@ -3,20 +3,38 @@ package cli
 import (
 	"fmt"
 
+	"github.com/looneym/orc/internal/context"
 	"github.com/looneym/orc/internal/models"
 	"github.com/spf13/cobra"
 )
 
 // SummaryCmd returns the summary command
 func SummaryCmd() *cobra.Command {
-	return &cobra.Command{
+	var showAll bool
+
+	cmd := &cobra.Command{
 		Use:   "summary",
 		Short: "Show summary of all open missions and work orders",
 		Long: `Display a high-level overview of all work in progress:
 - Open missions with their work orders
 
-This provides a global view of all work across ORC.`,
+In deputy context, automatically scopes to current mission (use --all to see all missions).`,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// Check if we're in a deputy ORC context
+			missionCtx, _ := context.DetectMissionContext()
+			var filterMissionID string
+
+			if missionCtx != nil && !showAll {
+				// Deputy context - filter to this mission only
+				filterMissionID = missionCtx.MissionID
+				fmt.Printf("📊 ORC Summary - MISSION %s (Deputy View)\n", filterMissionID)
+				fmt.Println("💡 Use --all to see all missions")
+			} else {
+				// Master context or --all flag - show everything
+				fmt.Println("📊 ORC Summary - Open Work")
+			}
+			fmt.Println()
+
 			// Get all non-complete missions
 			missions, err := models.ListMissions("")
 			if err != nil {
@@ -27,17 +45,22 @@ This provides a global view of all work across ORC.`,
 			var openMissions []*models.Mission
 			for _, m := range missions {
 				if m.Status != "complete" && m.Status != "archived" {
+					// If in deputy context and not showing all, filter to this mission
+					if filterMissionID != "" && m.ID != filterMissionID {
+						continue
+					}
 					openMissions = append(openMissions, m)
 				}
 			}
 
 			if len(openMissions) == 0 {
-				fmt.Println("No open missions")
+				if filterMissionID != "" {
+					fmt.Printf("No open work orders for %s\n", filterMissionID)
+				} else {
+					fmt.Println("No open missions")
+				}
 				return nil
 			}
-
-			fmt.Println("📊 ORC Summary - Open Work")
-			fmt.Println()
 
 			// Display each mission with its work orders in tree format
 			for i, mission := range openMissions {
@@ -167,6 +190,10 @@ This provides a global view of all work across ORC.`,
 			return nil
 		},
 	}
+
+	cmd.Flags().BoolVarP(&showAll, "all", "a", false, "Show all missions (override deputy scoping)")
+
+	return cmd
 }
 
 func getStatusEmoji(status string) string {
