@@ -36,25 +36,26 @@ This provides a focused view of "where am I right now?"`,
 			var activeMissionID *string
 
 			if missionCtx != nil {
-				// Deputy context - check for local .orc/metadata.json in current directory first (IMP),
-				// then fall back to workspace .orc/metadata.json (deputy)
-				cwd, _ := os.Getwd()
-				localMetadataPath := fmt.Sprintf("%s/.orc/metadata.json", cwd)
-				data, err := os.ReadFile(localMetadataPath)
+				// Deputy context - check workspace .orc/metadata.json first (has active context),
+				// then current directory .orc/metadata.json (might be grove metadata)
+				workspaceMetadataPath := fmt.Sprintf("%s/.orc/metadata.json", missionCtx.WorkspacePath)
+				data, err := os.ReadFile(workspaceMetadataPath)
 				if err != nil {
-					// No metadata in current dir, try workspace path
-					localMetadataPath = fmt.Sprintf("%s/.orc/metadata.json", missionCtx.WorkspacePath)
+					// No workspace metadata, try current directory
+					cwd, _ := os.Getwd()
+					localMetadataPath := fmt.Sprintf("%s/.orc/metadata.json", cwd)
 					data, err = os.ReadFile(localMetadataPath)
 				}
 
 				if err == nil {
-					// Local metadata exists - use it
-					if err := json.Unmarshal(data, &metadata); err != nil {
-						return fmt.Errorf("failed to parse local metadata.json: %w", err)
+					// Try to parse as context metadata (has active_mission_id)
+					if err := json.Unmarshal(data, &metadata); err == nil {
+						activeMissionID = metadata.ActiveMissionID
 					}
-					activeMissionID = metadata.ActiveMissionID
-				} else {
-					// No local metadata anywhere - just use mission from .orc-mission file
+				}
+
+				// If still no active mission, use mission from .orc-mission file
+				if activeMissionID == nil || *activeMissionID == "" {
 					activeMissionID = &missionCtx.MissionID
 				}
 				fmt.Println("🎯 ORC Status - Deputy Context")
