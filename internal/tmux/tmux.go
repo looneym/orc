@@ -242,7 +242,7 @@ func (s *Session) SendEnter(target string) error {
 // 1. Send text literally (no interpretation)
 // 2. Wait 500ms for processing
 // 3. Send Escape to exit vim mode
-// 4. Send Enter to submit
+// 4. Send Enter to submit (with retry logic)
 func NudgeSession(target, message string) error {
 	// Extract session name from target
 	parts := strings.Split(target, ":")
@@ -267,10 +267,23 @@ func NudgeSession(target, message string) error {
 		return fmt.Errorf("failed to send escape: %w", err)
 	}
 
-	// Step 4: Send Enter to submit
-	if err := session.SendEnter(target); err != nil {
-		return fmt.Errorf("failed to send enter: %w", err)
+	// Extra 100ms wait after Escape (from Gastown fix)
+	cmd = exec.Command("sleep", "0.1")
+	_ = cmd.Run()
+
+	// Step 4: Send Enter to submit with retry (critical fix from Gastown issue #307)
+	var lastErr error
+	for attempt := 0; attempt < 3; attempt++ {
+		if attempt > 0 {
+			cmd := exec.Command("sleep", "0.2")
+			_ = cmd.Run()
+		}
+		if err := session.SendEnter(target); err != nil {
+			lastErr = err
+			continue
+		}
+		return nil
 	}
 
-	return nil
+	return fmt.Errorf("failed to send Enter after 3 attempts: %w", lastErr)
 }
