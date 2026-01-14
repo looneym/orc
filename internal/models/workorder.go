@@ -150,7 +150,7 @@ func ListWorkOrders(missionID, status string) ([]*WorkOrder, error) {
 	return orders, nil
 }
 
-// ClaimWorkOrder assigns a work order to a grove and marks it as in_progress
+// ClaimWorkOrder assigns a work order to a grove and marks it as implement
 func ClaimWorkOrder(id, groveID string) error {
 	database, err := db.GetDB()
 	if err != nil {
@@ -163,7 +163,7 @@ func ClaimWorkOrder(id, groveID string) error {
 	}
 
 	_, err = database.Exec(
-		"UPDATE work_orders SET status = 'in_progress', assigned_grove_id = ?, claimed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+		"UPDATE work_orders SET status = 'implement', assigned_grove_id = ?, claimed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
 		groveIDNullable, id,
 	)
 

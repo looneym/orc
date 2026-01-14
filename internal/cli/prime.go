@@ -88,7 +88,7 @@ func runPrime(cmd *cobra.Command, args []string) error {
 			}
 
 			// Get active work order
-			workOrders, err := models.ListWorkOrders(missionCtx.MissionID, "in_progress")
+			workOrders, err := models.ListWorkOrders(missionCtx.MissionID, "implement")
 			if err == nil && len(workOrders) > 0 {
 				wo := workOrders[0]
 				output.WriteString(fmt.Sprintf("### Active Work: %s\n\n", wo.ID))

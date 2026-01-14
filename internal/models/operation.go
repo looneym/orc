@@ -52,7 +52,7 @@ func CreateOperation(missionID, title, description string) (*Operation, error) {
 
 	_, err = database.Exec(
 		"INSERT INTO operations (id, mission_id, title, description, status) VALUES (?, ?, ?, ?, ?)",
-		id, missionID, title, desc, "backlog",
+		id, missionID, title, desc, "ready",
 	)
 	if err != nil {
 		return nil, err

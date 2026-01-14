@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS work_orders (
 	title TEXT NOT NULL,
 	description TEXT,
 	type TEXT CHECK(type IN ('research', 'implementation', 'fix', 'documentation', 'maintenance')),
-	status TEXT NOT NULL CHECK(status IN ('backlog', 'next', 'in_progress', 'complete')) DEFAULT 'backlog',
+	status TEXT NOT NULL CHECK(status IN ('ready', 'design', 'implement', 'deploy', 'blocked', 'paused', 'complete')) DEFAULT 'ready',
 	priority TEXT CHECK(priority IN ('low', 'medium', 'high')),
 	parent_id TEXT,
 	assigned_grove_id TEXT,

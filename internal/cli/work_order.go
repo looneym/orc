@@ -156,7 +156,7 @@ var workOrderClaimCmd = &cobra.Command{
 		} else {
 			fmt.Printf("✓ Work order %s claimed by IMP-UNKNOWN\n", id)
 		}
-		fmt.Printf("  Status: in_progress\n")
+		fmt.Printf("  Status: implement\n")
 		return nil
 	},
 }
@@ -296,7 +296,7 @@ func WorkOrderCmd() *cobra.Command {
 	workOrderCreateCmd.Flags().StringP("parent", "p", "", "Parent work order ID (for creating sub-tasks)")
 
 	workOrderListCmd.Flags().StringP("mission", "m", "", "Filter by mission ID")
-	workOrderListCmd.Flags().StringP("status", "s", "", "Filter by status (backlog, next, in_progress, complete)")
+	workOrderListCmd.Flags().StringP("status", "s", "", "Filter by status (ready, design, implement, deploy, blocked, paused, complete)")
 
 	workOrderClaimCmd.Flags().StringP("grove", "g", "", "Grove ID claiming the work order")
 
