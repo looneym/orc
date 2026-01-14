@@ -6,10 +6,13 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"text/tabwriter"
 
 	"github.com/looneym/orc/internal/context"
 	"github.com/looneym/orc/internal/models"
+	"github.com/looneym/orc/internal/tmux"
 	"github.com/spf13/cobra"
 )
 
@@ -25,6 +28,7 @@ func GroveCmd() *cobra.Command {
 	cmd.AddCommand(groveListCmd())
 	cmd.AddCommand(groveShowCmd())
 	cmd.AddCommand(groveRenameCmd())
+	cmd.AddCommand(groveOpenCmd())
 
 	return cmd
 }
@@ -259,6 +263,90 @@ Examples:
 	cmd.Flags().BoolVar(&updateMetadata, "update-metadata", false, "Also update metadata.json file (optional)")
 
 	return cmd
+}
+
+func groveOpenCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "open [grove-id]",
+		Short: "Open a grove in a new TMux window",
+		Long: `Open a grove by creating a new TMux window with IMP workspace layout.
+
+Creates a new window in the current TMux session with:
+- Pane 1 (left): vim
+- Pane 2 (top right): claude (IMP)
+- Pane 3 (bottom right): shell
+
+All panes start in the grove's working directory.
+
+Examples:
+  orc grove open GROVE-001
+  orc grove open GROVE-002`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			groveID := args[0]
+
+			// Get grove from database
+			grove, err := models.GetGrove(groveID)
+			if err != nil {
+				return fmt.Errorf("failed to get grove: %w", err)
+			}
+
+			// Check if grove path exists
+			if _, err := os.Stat(grove.Path); os.IsNotExist(err) {
+				return fmt.Errorf("grove worktree not found at %s\nRun 'orc grove create %s --repos <repo-names>' to materialize", grove.Path, grove.Name)
+			}
+
+			// Check if in TMux session
+			if os.Getenv("TMUX") == "" {
+				return fmt.Errorf("not in a TMux session\nRun this command from within a TMux session")
+			}
+
+			// Get current TMux session name
+			sessionNameBytes, err := exec.Command("tmux", "display-message", "-p", "#S").Output()
+			if err != nil {
+				return fmt.Errorf("failed to detect TMux session name: %w", err)
+			}
+			sessionName := strings.TrimSpace(string(sessionNameBytes))
+
+			// Create session object
+			session := &tmux.Session{Name: sessionName}
+
+			// Get next window index by listing current windows
+			windowsOutput, err := exec.Command("tmux", "list-windows", "-t", sessionName, "-F", "#{window_index}").Output()
+			if err != nil {
+				return fmt.Errorf("failed to list windows: %w", err)
+			}
+
+			// Parse window indices to find the next available
+			var maxIndex int
+			lines := strings.Split(strings.TrimSpace(string(windowsOutput)), "\n")
+			for _, line := range lines {
+				if idx, err := strconv.Atoi(strings.TrimSpace(line)); err == nil && idx > maxIndex {
+					maxIndex = idx
+				}
+			}
+			nextIndex := maxIndex + 1
+
+			// Create grove window with IMP layout
+			_, err = session.CreateGroveWindow(nextIndex, grove.Name, grove.Path)
+			if err != nil {
+				return fmt.Errorf("failed to create grove window: %w", err)
+			}
+
+			fmt.Printf("✓ Opened grove %s (%s)\n", grove.ID, grove.Name)
+			fmt.Printf("  Window: %s:%s\n", sessionName, grove.Name)
+			fmt.Printf("  Path: %s\n", grove.Path)
+			fmt.Println()
+			fmt.Printf("Layout:\n")
+			fmt.Printf("  Pane 1 (left): vim\n")
+			fmt.Printf("  Pane 2 (top right): claude (IMP)\n")
+			fmt.Printf("  Pane 3 (bottom right): shell\n")
+			fmt.Println()
+			fmt.Printf("Switch to window: Ctrl+b then w (select from list)\n")
+
+			return nil
+		},
+	}
 }
 
 // createWorktree attempts to create a git worktree for a repo
