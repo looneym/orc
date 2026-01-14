@@ -56,9 +56,8 @@ orc summary
 - Single source of truth - update once, available everywhere
 
 **Key Commands**
-- `/handoff` - Create handoff with automatic session restart
-- `/g-bootstrap` - Full context restoration (ledger + Graphiti + disk)
-- `orc prime` - Lightweight context injection
+- `/handoff` - Create handoff for session continuity
+- `orc prime` - Lightweight context injection (auto-runs on SessionStart)
 - `orc status --handoff` - View latest handoff
 
 ---

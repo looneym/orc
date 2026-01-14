@@ -27,7 +27,6 @@ Output includes:
 - Active work order (if any)
 - Latest handoff note (brief)
 
-This is NOT a replacement for /g-bootstrap (which provides full context).
 This is for automatic injection after /clear to maintain basic orientation.
 
 Examples:
@@ -105,7 +104,7 @@ func runPrime(cmd *cobra.Command, args []string) error {
 				noteLines := strings.Split(ho.HandoffNote, "\n")
 				if len(noteLines) > 5 {
 					output.WriteString(strings.Join(noteLines[:5], "\n"))
-					output.WriteString("\n\n*(Use `/g-bootstrap` for full context)*\n\n")
+					output.WriteString("\n\n*(Showing first 5 lines)*\n\n")
 				} else {
 					output.WriteString(ho.HandoffNote)
 					output.WriteString("\n\n")
@@ -115,13 +114,11 @@ func runPrime(cmd *cobra.Command, args []string) error {
 	} else {
 		output.WriteString("**Context**: Master orchestrator (global)\n\n")
 		output.WriteString("Run `orc mission list` to see available missions.\n\n")
-		output.WriteString("Use `/g-bootstrap` to load full session context.\n")
 	}
 
 	// Footer note
 	output.WriteString("\n---\n")
 	output.WriteString("💡 **Note**: This is lightweight orientation context.\n")
-	output.WriteString("   For full context (Graphiti memory + deep analysis), use `/g-bootstrap`\n")
 
 	// Truncate to max lines if needed
 	fullOutput := output.String()
@@ -129,7 +126,7 @@ func runPrime(cmd *cobra.Command, args []string) error {
 		lines := strings.Split(fullOutput, "\n")
 		if len(lines) > maxLines {
 			lines = lines[:maxLines]
-			lines = append(lines, "...", "", "*(Output truncated - use /g-bootstrap for full context)*")
+			lines = append(lines, "...", "", "*(Output truncated to max lines)*")
 		}
 		fullOutput = strings.Join(lines, "\n")
 	}
