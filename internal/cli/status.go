@@ -36,11 +36,30 @@ This provides a focused view of "where am I right now?"`,
 			var activeMissionID *string
 
 			if missionCtx != nil {
-				// Deputy context - use mission from .orc-mission file
-				activeMissionID = &missionCtx.MissionID
+				// Deputy context - check for local .orc/metadata.json in current directory first (IMP),
+				// then fall back to workspace .orc/metadata.json (deputy)
+				cwd, _ := os.Getwd()
+				localMetadataPath := fmt.Sprintf("%s/.orc/metadata.json", cwd)
+				data, err := os.ReadFile(localMetadataPath)
+				if err != nil {
+					// No metadata in current dir, try workspace path
+					localMetadataPath = fmt.Sprintf("%s/.orc/metadata.json", missionCtx.WorkspacePath)
+					data, err = os.ReadFile(localMetadataPath)
+				}
+
+				if err == nil {
+					// Local metadata exists - use it
+					if err := json.Unmarshal(data, &metadata); err != nil {
+						return fmt.Errorf("failed to parse local metadata.json: %w", err)
+					}
+					activeMissionID = metadata.ActiveMissionID
+				} else {
+					// No local metadata anywhere - just use mission from .orc-mission file
+					activeMissionID = &missionCtx.MissionID
+				}
 				fmt.Println("🎯 ORC Status - Deputy Context")
 			} else {
-				// Master context - read from metadata.json
+				// Master context - read from global metadata.json
 				homeDir, err := os.UserHomeDir()
 				if err != nil {
 					return fmt.Errorf("failed to get home directory: %w", err)
