@@ -60,6 +60,19 @@ CREATE TABLE IF NOT EXISTS handoffs (
 	FOREIGN KEY (active_grove_id) REFERENCES groves(id)
 );
 
+-- Messages (Agent mail system)
+CREATE TABLE IF NOT EXISTS messages (
+	id TEXT PRIMARY KEY,
+	sender TEXT NOT NULL,
+	recipient TEXT NOT NULL,
+	subject TEXT NOT NULL,
+	body TEXT NOT NULL,
+	timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+	read INTEGER DEFAULT 0,
+	mission_id TEXT NOT NULL,
+	FOREIGN KEY (mission_id) REFERENCES missions(id)
+);
+
 -- Create indexes for common queries
 CREATE INDEX IF NOT EXISTS idx_missions_status ON missions(status);
 CREATE INDEX IF NOT EXISTS idx_work_orders_mission ON work_orders(mission_id);
@@ -68,6 +81,9 @@ CREATE INDEX IF NOT EXISTS idx_work_orders_parent ON work_orders(parent_id);
 CREATE INDEX IF NOT EXISTS idx_groves_mission ON groves(mission_id);
 CREATE INDEX IF NOT EXISTS idx_groves_status ON groves(status);
 CREATE INDEX IF NOT EXISTS idx_handoffs_created ON handoffs(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_messages_recipient ON messages(recipient, read);
+CREATE INDEX IF NOT EXISTS idx_messages_mission ON messages(mission_id);
+CREATE INDEX IF NOT EXISTS idx_messages_timestamp ON messages(timestamp DESC);
 `
 
 // InitSchema creates the database schema

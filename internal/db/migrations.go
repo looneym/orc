@@ -6,7 +6,7 @@ import (
 )
 
 // schemaVersion tracks the current schema version
-const currentSchemaVersion = 4
+const currentSchemaVersion = 5
 
 // Migration represents a database migration
 type Migration struct {
@@ -36,6 +36,11 @@ var migrations = []Migration{
 		Version: 4,
 		Name:    "add_pinned_field_to_work_orders",
 		Up:      migrationV4,
+	},
+	{
+		Version: 5,
+		Name:    "add_messages_table_for_agent_mail",
+		Up:      migrationV5,
 	},
 }
 
@@ -409,6 +414,40 @@ func migrationV4(db *sql.DB) error {
 	`)
 	if err != nil {
 		return fmt.Errorf("failed to add pinned column: %w", err)
+	}
+
+	return nil
+}
+
+// migrationV5 adds messages table for agent mail system
+func migrationV5(db *sql.DB) error {
+	// Create messages table for async agent communication
+	// Agents: DEPUTY-{MISSION-ID} and IMP-{GROVE-ID}
+	_, err := db.Exec(`
+		CREATE TABLE messages (
+			id TEXT PRIMARY KEY,
+			sender TEXT NOT NULL,
+			recipient TEXT NOT NULL,
+			subject TEXT NOT NULL,
+			body TEXT NOT NULL,
+			timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+			read INTEGER DEFAULT 0,
+			mission_id TEXT NOT NULL,
+			FOREIGN KEY (mission_id) REFERENCES missions(id)
+		)
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to create messages table: %w", err)
+	}
+
+	// Create indexes for performance
+	_, err = db.Exec(`
+		CREATE INDEX idx_messages_recipient ON messages(recipient, read);
+		CREATE INDEX idx_messages_mission ON messages(mission_id);
+		CREATE INDEX idx_messages_timestamp ON messages(timestamp DESC);
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to create messages indexes: %w", err)
 	}
 
 	return nil
