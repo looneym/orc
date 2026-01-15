@@ -52,6 +52,16 @@ func CreateWorkOrder(missionID, title, description, contextRef, parentID string)
 		if exists == 0 {
 			return nil, fmt.Errorf("parent work order %s not found", parentID)
 		}
+
+		// Enforce flat hierarchy: reject if parent itself has a parent (would create 3 levels)
+		var parentOfParent sql.NullString
+		err = database.QueryRow("SELECT parent_id FROM work_orders WHERE id = ?", parentID).Scan(&parentOfParent)
+		if err != nil {
+			return nil, err
+		}
+		if parentOfParent.Valid {
+			return nil, fmt.Errorf("cannot create nested epics\nChildren cannot have children (2 level max: epic → children)")
+		}
 	}
 
 	// Generate work order ID
@@ -286,7 +296,7 @@ func GetChildWorkOrders(parentID string) ([]*WorkOrder, error) {
 		return nil, err
 	}
 
-	query := "SELECT id, mission_id, title, description, type, status, priority, parent_id, assigned_grove_id, context_ref, created_at, updated_at, claimed_at, completed_at FROM work_orders WHERE parent_id = ? ORDER BY created_at ASC"
+	query := "SELECT id, mission_id, title, description, type, status, priority, parent_id, assigned_grove_id, context_ref, pinned, created_at, updated_at, claimed_at, completed_at FROM work_orders WHERE parent_id = ? ORDER BY created_at ASC"
 
 	rows, err := database.Query(query, parentID)
 	if err != nil {
@@ -381,4 +391,132 @@ func AssignWorkOrderToGrove(workOrderID, groveID string) error {
 	)
 
 	return err
+}
+
+// IsEpic checks if a work order is an epic (has children)
+func IsEpic(workOrderID string) (bool, error) {
+	children, err := GetChildWorkOrders(workOrderID)
+	if err != nil {
+		return false, err
+	}
+	return len(children) > 0, nil
+}
+
+// GetWorkOrdersByGrove retrieves all work orders assigned to a grove
+func GetWorkOrdersByGrove(groveID string) ([]*WorkOrder, error) {
+	database, err := db.GetDB()
+	if err != nil {
+		return nil, err
+	}
+
+	query := "SELECT id, mission_id, title, description, type, status, priority, parent_id, assigned_grove_id, context_ref, pinned, created_at, updated_at, claimed_at, completed_at FROM work_orders WHERE assigned_grove_id = ?"
+	rows, err := database.Query(query, groveID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var orders []*WorkOrder
+	for rows.Next() {
+		wo := &WorkOrder{}
+		err := rows.Scan(&wo.ID, &wo.MissionID, &wo.Title, &wo.Description, &wo.Type, &wo.Status, &wo.Priority, &wo.ParentID, &wo.AssignedGroveID, &wo.ContextRef, &wo.Pinned, &wo.CreatedAt, &wo.UpdatedAt, &wo.ClaimedAt, &wo.CompletedAt)
+		if err != nil {
+			return nil, err
+		}
+		orders = append(orders, wo)
+	}
+
+	return orders, nil
+}
+
+// ValidateGroveAvailability checks if a grove is available for epic assignment
+func ValidateGroveAvailability(groveID string) error {
+	// Get all work orders assigned to this grove
+	wos, err := GetWorkOrdersByGrove(groveID)
+	if err != nil {
+		return err
+	}
+
+	if len(wos) == 0 {
+		return nil // Grove available
+	}
+
+	// Check if all existing assignments share same parent (epic)
+	var firstParent sql.NullString
+	firstParent = wos[0].ParentID
+
+	for _, wo := range wos {
+		// If work order has no parent, it's an epic itself
+		if !wo.ParentID.Valid {
+			return fmt.Errorf("grove already assigned to epic %s", wo.ID)
+		}
+
+		// Check if all children belong to same parent
+		if wo.ParentID != firstParent {
+			return fmt.Errorf("grove already assigned to different epic")
+		}
+	}
+
+	// If we get here, all work orders belong to same epic
+	// Check if that epic is the one we're trying to assign
+	return nil
+}
+
+// AssignEpicToGrove assigns entire epic (parent + all children) to grove
+func AssignEpicToGrove(epicID, groveID string) error {
+	// 1. Get the epic work order
+	epic, err := GetWorkOrder(epicID)
+	if err != nil {
+		return fmt.Errorf("epic not found: %w", err)
+	}
+
+	// 2. Verify it's a top-level work order (no parent)
+	if epic.ParentID.Valid {
+		parent, _ := GetWorkOrder(epic.ParentID.String)
+		return fmt.Errorf("%s is a child work order\nAssign the parent epic instead: %s", epicID, parent.ID)
+	}
+
+	// 3. Verify epic is in ready status
+	if epic.Status != "ready" {
+		return fmt.Errorf("epic must be in 'ready' status (current: %s)", epic.Status)
+	}
+
+	// 4. Verify grove is available (no other epics assigned)
+	err = ValidateGroveAvailability(groveID)
+	if err != nil {
+		return err
+	}
+
+	// 5. Get all children
+	children, err := GetChildWorkOrders(epicID)
+	if err != nil {
+		return fmt.Errorf("failed to get child work orders: %w", err)
+	}
+
+	// 6. Validate flat hierarchy (no nested epics)
+	for _, child := range children {
+		grandchildren, err := GetChildWorkOrders(child.ID)
+		if err != nil {
+			return fmt.Errorf("failed to validate hierarchy: %w", err)
+		}
+		if len(grandchildren) > 0 {
+			return fmt.Errorf("epic has nested children - not supported\nFlatten hierarchy to 2 levels before assigning")
+		}
+	}
+
+	// 7. Assign parent (epic)
+	err = AssignWorkOrderToGrove(epicID, groveID)
+	if err != nil {
+		return fmt.Errorf("failed to assign epic: %w", err)
+	}
+
+	// 8. Assign all children
+	for _, child := range children {
+		err = AssignWorkOrderToGrove(child.ID, groveID)
+		if err != nil {
+			return fmt.Errorf("failed to assign child %s: %w", child.ID, err)
+		}
+	}
+
+	return nil
 }

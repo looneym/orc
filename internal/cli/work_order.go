@@ -477,29 +477,41 @@ func claimAndReportWorkOrder(id string) error {
 }
 
 var workOrderAssignCmd = &cobra.Command{
-	Use:   "assign [work-order-id]",
-	Short: "Assign a work order to a grove",
-	Long: `Assign a work order to a grove for implementation.
+	Use:   "assign [epic-id]",
+	Short: "Assign an epic to a grove",
+	Long: `Assign an EPIC (work order with optional children) to a grove.
 
-This writes a .orc/assigned-work.json file to the grove directory and updates
-the work order status from 'ready' to 'implement'.
+All top-level work orders (work orders without a parent) are treated as epics
+and can be assigned to groves. The entire epic (parent + all children) is
+assigned to the grove for implementation.
+
+1:1:1 relationship: one grove can only work on one epic at a time.
+
+This writes a .orc/assigned-work.json file with epic details and updates
+the epic status from 'ready' to 'implement'.
 
 Examples:
-  orc work-order assign WO-140 --grove GROVE-009`,
+  orc work-order assign WO-132 --grove GROVE-009`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		workOrderID := args[0]
+		epicID := args[0]
 		groveID, _ := cmd.Flags().GetString("grove")
 
 		// Get work order
-		wo, err := models.GetWorkOrder(workOrderID)
+		wo, err := models.GetWorkOrder(epicID)
 		if err != nil {
 			return fmt.Errorf("work order not found: %w", err)
 		}
 
+		// Check if it's a child (has parent) - reject
+		if wo.ParentID.Valid {
+			parent, _ := models.GetWorkOrder(wo.ParentID.String)
+			return fmt.Errorf("%s is a child work order\nAssign the parent epic instead: orc work-order assign %s --grove %s", epicID, parent.ID, groveID)
+		}
+
 		// Verify ready status
 		if wo.Status != "ready" {
-			return fmt.Errorf("work order must be in 'ready' status (current: %s)", wo.Status)
+			return fmt.Errorf("epic must be in 'ready' status (current: %s)", wo.Status)
 		}
 
 		// Get grove
@@ -508,21 +520,33 @@ Examples:
 			return fmt.Errorf("grove not found: %w", err)
 		}
 
-		// Write assignment file
-		err = models.WriteAssignment(grove.Path, wo, "MASTER-ORC")
+		// Get children (may be empty for standalone epics)
+		children, err := models.GetChildWorkOrders(epicID)
+		if err != nil {
+			return fmt.Errorf("failed to get child work orders: %w", err)
+		}
+
+		// Assign epic + all children to grove
+		err = models.AssignEpicToGrove(epicID, groveID)
+		if err != nil {
+			return fmt.Errorf("failed to assign epic: %w", err)
+		}
+
+		// Write epic assignment file
+		err = models.WriteEpicAssignment(grove.Path, wo, children, "MASTER-ORC")
 		if err != nil {
 			return fmt.Errorf("failed to write assignment: %w", err)
 		}
 
-		// Update work order in database
-		err = models.AssignWorkOrderToGrove(workOrderID, groveID)
-		if err != nil {
-			return fmt.Errorf("failed to update work order: %w", err)
+		fmt.Printf("✓ Assigned epic %s to %s\n", epicID, groveID)
+		fmt.Printf("  Epic: %s\n", wo.Title)
+		if len(children) > 0 {
+			fmt.Printf("  Children: %d work orders\n", len(children))
+		} else {
+			fmt.Printf("  Children: none (standalone epic)\n")
 		}
-
-		fmt.Printf("✓ Assigned %s to %s\n", workOrderID, groveID)
 		fmt.Printf("  Assignment written to: %s/.orc/assigned-work.json\n", grove.Path)
-		fmt.Printf("  Work order status: ready → implement\n")
+		fmt.Printf("  Epic status: ready → implement\n")
 		fmt.Println()
 		fmt.Printf("💡 IMP can check assignment:\n")
 		fmt.Printf("   cd %s\n", grove.Path)
@@ -533,11 +557,11 @@ Examples:
 
 var workOrderCheckAssignmentCmd = &cobra.Command{
 	Use:   "check-assignment",
-	Short: "Check if this grove has an assigned work order",
-	Long: `Check if the current grove has an assigned work order.
+	Short: "Check if this grove has an assigned epic",
+	Long: `Check if the current grove has an assigned epic.
 
 IMPs use this to discover what work they should be doing. The assignment
-is stored in .orc/assigned-work.json.
+is stored in .orc/assigned-work.json with epic details and child work orders.
 
 This command is automatically run by the SessionStart hook when an IMP starts.
 
@@ -549,27 +573,76 @@ Examples:
 			return fmt.Errorf("failed to get current directory: %w", err)
 		}
 
-		assignment, err := models.ReadAssignment(cwd)
+		// Try to read as epic assignment
+		epicAssignment, err := models.ReadEpicAssignment(cwd)
 		if err != nil {
 			fmt.Println("✓ No work assignment found")
 			return nil
 		}
 
-		fmt.Printf("📋 Assigned Work Order: %s\n", assignment.WorkOrderID)
-		fmt.Printf("   Title: %s\n", assignment.Title)
-		fmt.Printf("   Status: %s\n", assignment.Status)
-		fmt.Printf("   Mission: %s\n", assignment.MissionID)
-		fmt.Printf("   Assigned: %s\n", assignment.AssignedAt)
-		fmt.Printf("   By: %s\n", assignment.AssignedBy)
+		fmt.Printf("🌳 Epic Assignment: %s\n", epicAssignment.EpicID)
+		fmt.Printf("   Title: %s\n", epicAssignment.EpicTitle)
+		fmt.Printf("   Mission: %s\n", epicAssignment.MissionID)
+		fmt.Printf("   Assigned: %s\n", epicAssignment.AssignedAt)
+		fmt.Printf("   By: %s\n", epicAssignment.AssignedBy)
 		fmt.Println()
 
-		if assignment.Description != "" {
-			fmt.Printf("Description:\n%s\n\n", assignment.Description)
+		if epicAssignment.EpicDescription != "" {
+			fmt.Printf("Description:\n%s\n\n", epicAssignment.EpicDescription)
 		}
 
-		fmt.Printf("💡 To update status:\n")
+		// Show progress
+		p := epicAssignment.Progress
+		if p.TotalChildren > 0 {
+			percentage := (float64(p.Completed) / float64(p.TotalChildren)) * 100
+			fmt.Printf("📊 Progress: %d/%d complete (%.0f%%)\n\n", p.Completed, p.TotalChildren, percentage)
+
+			fmt.Println("Child Work Orders:")
+			for _, child := range epicAssignment.ChildWorkOrders {
+				var statusIcon string
+				var statusText string
+				switch child.Status {
+				case "complete":
+					statusIcon = "✅"
+					statusText = "[complete]"
+				case "implement", "in_progress":
+					statusIcon = "🔄"
+					statusText = "[in_progress] ← Currently working"
+				case "ready":
+					statusIcon = "📦"
+					statusText = "[ready]"
+				default:
+					statusIcon = "❓"
+					statusText = fmt.Sprintf("[%s]", child.Status)
+				}
+				fmt.Printf("  %s %s: %s %s\n", statusIcon, child.WorkOrderID, child.Title, statusText)
+			}
+			fmt.Println()
+
+			// Find next ready task
+			var nextReady *models.ChildWorkOrderInfo
+			for _, child := range epicAssignment.ChildWorkOrders {
+				if child.Status == "ready" {
+					nextReady = &child
+					break
+				}
+			}
+
+			if nextReady != nil {
+				fmt.Printf("💡 To work on next task:\n")
+				fmt.Printf("   orc work-order claim %s\n", nextReady.WorkOrderID)
+				fmt.Printf("   # Do the work\n")
+				fmt.Printf("   orc work-order complete %s\n", nextReady.WorkOrderID)
+				fmt.Println()
+			}
+		} else {
+			fmt.Println("Standalone epic (no child work orders)")
+			fmt.Println()
+		}
+
+		fmt.Printf("💡 To update epic status:\n")
 		fmt.Printf("   orc work-order update-assignment --status in_progress\n")
-		fmt.Printf("   orc work-order update-assignment --status complete\n")
+		fmt.Printf("   orc work-order update-assignment --status complete (when all children done)\n")
 		fmt.Println()
 
 		return nil
@@ -578,8 +651,8 @@ Examples:
 
 var workOrderUpdateAssignmentCmd = &cobra.Command{
 	Use:   "update-assignment",
-	Short: "Update the status of the current grove's work assignment",
-	Long: `Update the status of the work assignment in the current grove.
+	Short: "Update the status of the current grove's epic assignment",
+	Long: `Update the status of the epic assignment in the current grove.
 
 This updates the .orc/assigned-work.json file with the new status.
 
@@ -606,27 +679,28 @@ Examples:
 			return fmt.Errorf("failed to get current directory: %w", err)
 		}
 
-		assignment, err := models.ReadAssignment(cwd)
+		// Read epic assignment
+		epicAssignment, err := models.ReadEpicAssignment(cwd)
 		if err != nil {
-			return fmt.Errorf("no assignment found in this grove: %w", err)
+			return fmt.Errorf("no epic assignment found in this grove: %w", err)
 		}
 
-		// Update assignment file
-		err = models.UpdateAssignmentStatus(cwd, status)
+		// Update epic assignment file
+		err = models.UpdateEpicAssignmentStatus(cwd, status)
 		if err != nil {
-			return fmt.Errorf("failed to update assignment: %w", err)
+			return fmt.Errorf("failed to update epic assignment: %w", err)
 		}
 
-		fmt.Printf("✓ Assignment status updated: %s → %s\n", assignment.Status, status)
-		fmt.Printf("  Work Order: %s\n", assignment.WorkOrderID)
+		fmt.Printf("✓ Epic assignment status updated: %s → %s\n", epicAssignment.Status, status)
+		fmt.Printf("  Epic: %s\n", epicAssignment.EpicID)
 		fmt.Println()
 
 		if status == "complete" {
 			fmt.Printf("💡 Next steps:\n")
 			fmt.Printf("   1. Send mail to MASTER-ORC:\n")
-			fmt.Printf("      orc mail send MASTER-ORC --subject \"%s Complete\" --body \"Work completed\"\n", assignment.WorkOrderID)
-			fmt.Printf("   2. MASTER-ORC verifies and marks complete:\n")
-			fmt.Printf("      orc work-order complete %s\n", assignment.WorkOrderID)
+			fmt.Printf("      orc mail send MASTER-ORC --subject \"%s Epic Complete\" --body \"All tasks completed\"\n", epicAssignment.EpicID)
+			fmt.Printf("   2. MASTER-ORC verifies and marks epic complete:\n")
+			fmt.Printf("      orc work-order complete %s\n", epicAssignment.EpicID)
 		}
 
 		return nil
