@@ -11,7 +11,15 @@ import (
 	"github.com/example/orc/internal/context"
 	"github.com/example/orc/internal/models"
 	"github.com/example/orc/internal/tmux"
+	"github.com/fatih/color"
 	"github.com/spf13/cobra"
+)
+
+// Color helpers for plan output
+var (
+	colorExists = color.New(color.FgBlue).SprintFunc()
+	colorCreate = color.New(color.FgGreen).SprintFunc()
+	colorDelete = color.New(color.FgRed).SprintFunc()
 )
 
 var missionCmd = &cobra.Command{
@@ -420,25 +428,25 @@ Examples:
 
 		// Check mission workspace
 		if _, err := os.Stat(workspacePath); os.IsNotExist(err) {
-			plan = append(plan, fmt.Sprintf("CREATE mission workspace: %s", workspacePath))
+			plan = append(plan, fmt.Sprintf("%s mission workspace: %s", colorCreate("CREATE"), workspacePath))
 		} else {
-			plan = append(plan, fmt.Sprintf("EXISTS mission workspace: %s", workspacePath))
+			plan = append(plan, fmt.Sprintf("%s mission workspace: %s", colorExists("EXISTS"), workspacePath))
 		}
 
 		// Check mission config
 		missionConfigPath := filepath.Join(workspacePath, ".orc", "config.json")
 		if _, err := os.Stat(missionConfigPath); os.IsNotExist(err) {
-			plan = append(plan, fmt.Sprintf("CREATE mission config: %s", missionConfigPath))
+			plan = append(plan, fmt.Sprintf("%s mission config: %s", colorCreate("CREATE"), missionConfigPath))
 		} else {
-			plan = append(plan, fmt.Sprintf("EXISTS mission config: %s", missionConfigPath))
+			plan = append(plan, fmt.Sprintf("%s mission config: %s", colorExists("EXISTS"), missionConfigPath))
 		}
 
 		// Check groves directory
 		grovesDir := filepath.Join(workspacePath, "groves")
 		if _, err := os.Stat(grovesDir); os.IsNotExist(err) {
-			plan = append(plan, fmt.Sprintf("CREATE groves directory: %s", grovesDir))
+			plan = append(plan, fmt.Sprintf("%s groves directory: %s", colorCreate("CREATE"), grovesDir))
 		} else {
-			plan = append(plan, fmt.Sprintf("EXISTS groves directory: %s", grovesDir))
+			plan = append(plan, fmt.Sprintf("%s groves directory: %s", colorExists("EXISTS"), grovesDir))
 		}
 
 		// Plan for each grove
@@ -464,12 +472,12 @@ Examples:
 				} else if !currentExists && !desiredExists {
 					plan = append(plan, fmt.Sprintf("MISSING grove %s: %s (needs materialization)", grove.ID, desiredPath))
 				} else if desiredExists {
-					plan = append(plan, fmt.Sprintf("EXISTS grove %s: %s", grove.ID, desiredPath))
+					plan = append(plan, fmt.Sprintf("%s grove %s: %s", colorExists("EXISTS"), grove.ID, desiredPath))
 					plan = append(plan, fmt.Sprintf("UPDATE DB path for %s: %s → %s", grove.ID, currentPath, desiredPath))
 				}
 			} else {
 				if currentExists {
-					plan = append(plan, fmt.Sprintf("EXISTS grove %s: %s", grove.ID, desiredPath))
+					plan = append(plan, fmt.Sprintf("%s grove %s: %s", colorExists("EXISTS"), grove.ID, desiredPath))
 				} else {
 					plan = append(plan, fmt.Sprintf("MISSING grove %s: %s (needs materialization)", grove.ID, desiredPath))
 				}
@@ -478,16 +486,16 @@ Examples:
 			// Check grove config
 			groveConfigPath := filepath.Join(desiredPath, ".orc", "config.json")
 			if _, err := os.Stat(groveConfigPath); os.IsNotExist(err) {
-				plan = append(plan, fmt.Sprintf("CREATE grove config: %s", groveConfigPath))
+				plan = append(plan, fmt.Sprintf("%s grove config: %s", colorCreate("CREATE"), groveConfigPath))
 			} else {
-				plan = append(plan, fmt.Sprintf("EXISTS grove config: %s", groveConfigPath))
+				plan = append(plan, fmt.Sprintf("%s grove config: %s", colorExists("EXISTS"), groveConfigPath))
 			}
 		}
 
 		// Check for old .orc-mission files to clean up
 		oldMissionFile := filepath.Join(workspacePath, ".orc-mission")
 		if _, err := os.Stat(oldMissionFile); err == nil {
-			plan = append(plan, fmt.Sprintf("DELETE old .orc-mission: %s", oldMissionFile))
+			plan = append(plan, fmt.Sprintf("%s old .orc-mission: %s", colorDelete("DELETE"), oldMissionFile))
 		}
 
 		// Plan TMux session if requested
@@ -496,13 +504,13 @@ Examples:
 			plan = append(plan, "TMux Session:")
 			sessionName := fmt.Sprintf("orc-%s", missionID)
 			if tmux.SessionExists(sessionName) {
-				plan = append(plan, fmt.Sprintf("  EXISTS session: %s", sessionName))
+				plan = append(plan, fmt.Sprintf("  %s session: %s", colorExists("EXISTS"), sessionName))
 			} else {
-				plan = append(plan, fmt.Sprintf("  CREATE session: %s", sessionName))
+				plan = append(plan, fmt.Sprintf("  %s session: %s", colorCreate("CREATE"), sessionName))
 				for i, grove := range groves {
 					grovePath := filepath.Join(grovesDir, grove.Name)
 					if _, err := os.Stat(grovePath); err == nil {
-						plan = append(plan, fmt.Sprintf("  CREATE window %d (%s): 3 panes in %s - Grove %s IMP", i+1, grove.Name, grovePath, grove.ID))
+						plan = append(plan, fmt.Sprintf("  %s window %d (%s): 3 panes in %s - Grove %s IMP", colorCreate("CREATE"), i+1, grove.Name, grovePath, grove.ID))
 					}
 				}
 			}
