@@ -14,8 +14,8 @@ func SummaryCmd() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "summary",
-		Short: "Show summary of all open missions and work orders",
-		Long: `Show a hierarchical summary of missions and their work orders.
+		Short: "Show summary of all open missions, epics, and tasks",
+		Long: `Show a hierarchical summary of missions with their epics, rabbit holes, and tasks.
 
 Filtering:
   --scope all      Show all missions (default)
@@ -87,68 +87,43 @@ Examples:
 
 			if len(openMissions) == 0 {
 				if filterMissionID != "" {
-					fmt.Printf("No open work orders for %s\n", filterMissionID)
+					fmt.Printf("No open epics for %s\n", filterMissionID)
 				} else {
 					fmt.Println("No open missions")
 				}
 				return nil
 			}
 
-			// Display each mission with its work orders in tree format
+			// Display each mission with its epics in tree format
 			for i, mission := range openMissions {
 				// Display mission
 				statusEmoji := getStatusEmoji(mission.Status)
 				fmt.Printf("%s %s - %s [%s]\n", statusEmoji, mission.ID, mission.Title, mission.Status)
 				fmt.Println("│") // Empty line with vertical continuation after mission header
 
-				// Get work orders for this mission
-				workOrders, err := models.ListWorkOrders(mission.ID, "")
+				// Get epics for this mission
+				epics, err := models.ListEpics(mission.ID, "")
 				if err != nil {
-					return fmt.Errorf("failed to list work orders for %s: %w", mission.ID, err)
+					return fmt.Errorf("failed to list epics for %s: %w", mission.ID, err)
 				}
 
-				// Filter to non-complete work orders
-				var activeWOs []*models.WorkOrder
-				for _, wo := range workOrders {
+				// Filter to non-complete epics
+				var activeEpics []*models.Epic
+				for _, epic := range epics {
 					// Always hide complete
-					if wo.Status == "complete" {
+					if epic.Status == "complete" {
 						continue
 					}
 					// Hide if in hide list
-					if hideMap[wo.Status] {
+					if hideMap[epic.Status] {
 						continue
 					}
-					activeWOs = append(activeWOs, wo)
+					activeEpics = append(activeEpics, epic)
 				}
 
-				if len(activeWOs) > 0 {
-					// Build children map
-					childrenMap := make(map[string][]*models.WorkOrder)
-					for _, wo := range activeWOs {
-						if wo.ParentID.Valid {
-							children := childrenMap[wo.ParentID.String]
-							children = append(children, wo)
-							childrenMap[wo.ParentID.String] = children
-						}
-					}
-
-					// Separate epics (have children) from standalone
-					epics := []*models.WorkOrder{}
-					standalone := []*models.WorkOrder{}
-					for _, wo := range activeWOs {
-						if wo.ParentID.Valid {
-							// This is a child, skip
-							continue
-						}
-						if len(childrenMap[wo.ID]) > 0 {
-							epics = append(epics, wo)
-						} else {
-							standalone = append(standalone, wo)
-						}
-					}
-
-					// Display epics first with empty lines between them
-					for _, epic := range epics {
+				if len(activeEpics) > 0 {
+					// Display epics with their children
+					for j, epic := range activeEpics {
 						epicEmoji := getStatusEmoji(epic.Status)
 						// Add pin emoji if pinned
 						if epic.Pinned {
@@ -158,58 +133,154 @@ Examples:
 						if epic.AssignedGroveID.Valid {
 							groveInfo = fmt.Sprintf(" [Grove: %s]", epic.AssignedGroveID.String)
 						}
-						fmt.Printf("├── %s %s - %s [%s]%s\n", epicEmoji, epic.ID, epic.Title, epic.Status, groveInfo)
 
-						// Display children (no empty lines between children)
-						children := childrenMap[epic.ID]
-						for k, child := range children {
-							childEmoji := getStatusEmoji(child.Status)
-							// Add pin emoji if pinned
-							if child.Pinned {
-								childEmoji = "📌" + childEmoji
-							}
-							var childPrefix string
-							if k < len(children)-1 {
-								childPrefix = "│   ├── "
-							} else {
-								childPrefix = "│   └── "
-							}
-							childGroveInfo := ""
-							if child.AssignedGroveID.Valid {
-								childGroveInfo = fmt.Sprintf(" [Grove: %s]", child.AssignedGroveID.String)
-							}
-							fmt.Printf("%s%s %s - %s [%s]%s\n", childPrefix, childEmoji, child.ID, child.Title, child.Status, childGroveInfo)
-						}
-						// Empty line after each epic with vertical continuation
-						fmt.Println("│")
-					}
-
-					// Display standalone work orders with empty lines between them
-					for j, wo := range standalone {
-						woEmoji := getStatusEmoji(wo.Status)
-						// Add pin emoji if pinned
-						if wo.Pinned {
-							woEmoji = "📌" + woEmoji
-						}
-						groveInfo := ""
-						if wo.AssignedGroveID.Valid {
-							groveInfo = fmt.Sprintf(" [Grove: %s]", wo.AssignedGroveID.String)
-						}
-						// Use └── for last standalone, ├── for others
+						// Use └── for last epic, ├── for others
 						var prefix string
-						if j < len(standalone)-1 {
+						if j < len(activeEpics)-1 {
 							prefix = "├── "
 						} else {
 							prefix = "└── "
 						}
-						fmt.Printf("%s%s %s - %s [%s]%s\n", prefix, woEmoji, wo.ID, wo.Title, wo.Status, groveInfo)
-						// Add vertical continuation line between standalone orders (not after last)
-						if j < len(standalone)-1 {
+						fmt.Printf("%s%s %s - %s [%s]%s\n", prefix, epicEmoji, epic.ID, epic.Title, epic.Status, groveInfo)
+
+						// Check if epic has rabbit holes or direct tasks
+						hasRH, _ := models.HasRabbitHoles(epic.ID)
+						isLastEpic := j == len(activeEpics)-1
+
+						if hasRH {
+							// Epic has rabbit holes
+							rabbitHoles, err := models.ListRabbitHoles(epic.ID, "")
+							if err == nil {
+								var activeRHs []*models.RabbitHole
+								for _, rh := range rabbitHoles {
+									if rh.Status != "complete" && !hideMap[rh.Status] {
+										activeRHs = append(activeRHs, rh)
+									}
+								}
+
+								for k, rh := range activeRHs {
+									rhEmoji := getStatusEmoji(rh.Status)
+									if rh.Pinned {
+										rhEmoji = "📌" + rhEmoji
+									}
+
+									var rhPrefix string
+									isLastRH := k == len(activeRHs)-1
+									if isLastEpic {
+										if isLastRH {
+											rhPrefix = "    └── "
+										} else {
+											rhPrefix = "    ├── "
+										}
+									} else {
+										if isLastRH {
+											rhPrefix = "│   └── "
+										} else {
+											rhPrefix = "│   ├── "
+										}
+									}
+
+									fmt.Printf("%s%s %s - %s [%s]\n", rhPrefix, rhEmoji, rh.ID, rh.Title, rh.Status)
+
+									// Display tasks under rabbit hole
+									tasks, err := models.GetRabbitHoleTasks(rh.ID)
+									if err == nil {
+										var activeTasks []*models.Task
+										for _, task := range tasks {
+											if task.Status != "complete" && !hideMap[task.Status] {
+												activeTasks = append(activeTasks, task)
+											}
+										}
+
+										for t, task := range activeTasks {
+											taskEmoji := getStatusEmoji(task.Status)
+											if task.Pinned {
+												taskEmoji = "📌" + taskEmoji
+											}
+
+											var taskPrefix string
+											isLastTask := t == len(activeTasks)-1
+
+											if isLastEpic {
+												if isLastRH {
+													if isLastTask {
+														taskPrefix = "        └── "
+													} else {
+														taskPrefix = "        ├── "
+													}
+												} else {
+													if isLastTask {
+														taskPrefix = "    │   └── "
+													} else {
+														taskPrefix = "    │   ├── "
+													}
+												}
+											} else {
+												if isLastRH {
+													if isLastTask {
+														taskPrefix = "│       └── "
+													} else {
+														taskPrefix = "│       ├── "
+													}
+												} else {
+													if isLastTask {
+														taskPrefix = "│   │   └── "
+													} else {
+														taskPrefix = "│   │   ├── "
+													}
+												}
+											}
+
+											fmt.Printf("%s%s %s - %s [%s]\n", taskPrefix, taskEmoji, task.ID, task.Title, task.Status)
+										}
+									}
+								}
+							}
+						} else {
+							// Epic has direct tasks
+							tasks, err := models.GetDirectTasks(epic.ID)
+							if err == nil {
+								var activeTasks []*models.Task
+								for _, task := range tasks {
+									if task.Status != "complete" && !hideMap[task.Status] {
+										activeTasks = append(activeTasks, task)
+									}
+								}
+
+								for k, task := range activeTasks {
+									taskEmoji := getStatusEmoji(task.Status)
+									if task.Pinned {
+										taskEmoji = "📌" + taskEmoji
+									}
+
+									var taskPrefix string
+									isLastTask := k == len(activeTasks)-1
+									if isLastEpic {
+										if isLastTask {
+											taskPrefix = "    └── "
+										} else {
+											taskPrefix = "    ├── "
+										}
+									} else {
+										if isLastTask {
+											taskPrefix = "│   └── "
+										} else {
+											taskPrefix = "│   ├── "
+										}
+									}
+
+									fmt.Printf("%s%s %s - %s [%s]\n", taskPrefix, taskEmoji, task.ID, task.Title, task.Status)
+								}
+							}
+						}
+
+						// Add vertical continuation line between epics (not after last)
+						if j < len(activeEpics)-1 {
 							fmt.Println("│")
 						}
 					}
 				} else {
-					fmt.Println("└── (No active work orders)")
+					fmt.Println("└── (No active epics)")
 				}
 
 				// Add spacing between missions
@@ -226,7 +297,7 @@ Examples:
 
 	cmd.Flags().BoolVarP(&showAll, "all", "a", false, "Show all missions (override deputy scoping)")
 	cmd.Flags().StringP("scope", "s", "all", "Scope: 'all' or 'current'")
-	cmd.Flags().StringSlice("hide", []string{}, "Hide work orders with these statuses (comma-separated: paused,blocked)")
+	cmd.Flags().StringSlice("hide", []string{}, "Hide items with these statuses (comma-separated: paused,blocked)")
 
 	return cmd
 }

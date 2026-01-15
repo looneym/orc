@@ -12,25 +12,62 @@ CREATE TABLE IF NOT EXISTS missions (
 	completed_at DATETIME
 );
 
--- Work Orders (Individual tasks) - Flat hierarchy under missions
-CREATE TABLE IF NOT EXISTS work_orders (
+-- Epics (Top-level work containers)
+CREATE TABLE IF NOT EXISTS epics (
 	id TEXT PRIMARY KEY,
+	mission_id TEXT NOT NULL,
+	title TEXT NOT NULL,
+	description TEXT,
+	status TEXT NOT NULL CHECK(status IN ('ready', 'design', 'implement', 'deploy', 'blocked', 'paused', 'complete')) DEFAULT 'ready',
+	priority TEXT CHECK(priority IN ('low', 'medium', 'high')),
+	assigned_grove_id TEXT,
+	context_ref TEXT,
+	pinned INTEGER DEFAULT 0,
+	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+	updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+	completed_at DATETIME,
+	FOREIGN KEY (mission_id) REFERENCES missions(id),
+	FOREIGN KEY (assigned_grove_id) REFERENCES groves(id)
+);
+
+-- Rabbit Holes (Optional grouping layer within epics)
+CREATE TABLE IF NOT EXISTS rabbit_holes (
+	id TEXT PRIMARY KEY,
+	epic_id TEXT NOT NULL,
+	title TEXT NOT NULL,
+	description TEXT,
+	status TEXT NOT NULL CHECK(status IN ('ready', 'design', 'implement', 'deploy', 'blocked', 'paused', 'complete')) DEFAULT 'ready',
+	priority TEXT CHECK(priority IN ('low', 'medium', 'high')),
+	pinned INTEGER DEFAULT 0,
+	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+	updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+	completed_at DATETIME,
+	FOREIGN KEY (epic_id) REFERENCES epics(id) ON DELETE CASCADE
+);
+
+-- Tasks (Atomic units of work)
+CREATE TABLE IF NOT EXISTS tasks (
+	id TEXT PRIMARY KEY,
+	epic_id TEXT,
+	rabbit_hole_id TEXT,
 	mission_id TEXT NOT NULL,
 	title TEXT NOT NULL,
 	description TEXT,
 	type TEXT CHECK(type IN ('research', 'implementation', 'fix', 'documentation', 'maintenance')),
 	status TEXT NOT NULL CHECK(status IN ('ready', 'design', 'implement', 'deploy', 'blocked', 'paused', 'complete')) DEFAULT 'ready',
 	priority TEXT CHECK(priority IN ('low', 'medium', 'high')),
-	parent_id TEXT,
 	assigned_grove_id TEXT,
 	context_ref TEXT,
+	pinned INTEGER DEFAULT 0,
 	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 	updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 	claimed_at DATETIME,
 	completed_at DATETIME,
+	FOREIGN KEY (epic_id) REFERENCES epics(id) ON DELETE CASCADE,
+	FOREIGN KEY (rabbit_hole_id) REFERENCES rabbit_holes(id) ON DELETE CASCADE,
 	FOREIGN KEY (mission_id) REFERENCES missions(id),
-	FOREIGN KEY (parent_id) REFERENCES work_orders(id),
-	FOREIGN KEY (assigned_grove_id) REFERENCES groves(id)
+	FOREIGN KEY (assigned_grove_id) REFERENCES groves(id),
+	CHECK ((epic_id IS NOT NULL AND rabbit_hole_id IS NULL) OR (epic_id IS NULL AND rabbit_hole_id IS NOT NULL))
 );
 
 -- Groves (Physical workspaces) - Mission-level worktrees
@@ -75,9 +112,16 @@ CREATE TABLE IF NOT EXISTS messages (
 
 -- Create indexes for common queries
 CREATE INDEX IF NOT EXISTS idx_missions_status ON missions(status);
-CREATE INDEX IF NOT EXISTS idx_work_orders_mission ON work_orders(mission_id);
-CREATE INDEX IF NOT EXISTS idx_work_orders_status ON work_orders(status);
-CREATE INDEX IF NOT EXISTS idx_work_orders_parent ON work_orders(parent_id);
+CREATE INDEX IF NOT EXISTS idx_epics_mission ON epics(mission_id);
+CREATE INDEX IF NOT EXISTS idx_epics_status ON epics(status);
+CREATE INDEX IF NOT EXISTS idx_epics_grove ON epics(assigned_grove_id);
+CREATE INDEX IF NOT EXISTS idx_rabbit_holes_epic ON rabbit_holes(epic_id);
+CREATE INDEX IF NOT EXISTS idx_rabbit_holes_status ON rabbit_holes(status);
+CREATE INDEX IF NOT EXISTS idx_tasks_epic ON tasks(epic_id);
+CREATE INDEX IF NOT EXISTS idx_tasks_rabbit_hole ON tasks(rabbit_hole_id);
+CREATE INDEX IF NOT EXISTS idx_tasks_mission ON tasks(mission_id);
+CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
+CREATE INDEX IF NOT EXISTS idx_tasks_grove ON tasks(assigned_grove_id);
 CREATE INDEX IF NOT EXISTS idx_groves_mission ON groves(mission_id);
 CREATE INDEX IF NOT EXISTS idx_groves_status ON groves(status);
 CREATE INDEX IF NOT EXISTS idx_handoffs_created ON handoffs(created_at DESC);

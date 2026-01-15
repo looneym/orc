@@ -86,12 +86,17 @@ func runPrime(cmd *cobra.Command, args []string) error {
 				}
 			}
 
-			// Get active work order
-			workOrders, err := models.ListWorkOrders(missionCtx.MissionID, "implement")
-			if err == nil && len(workOrders) > 0 {
-				wo := workOrders[0]
-				output.WriteString(fmt.Sprintf("### Active Work: %s\n\n", wo.ID))
-				output.WriteString(fmt.Sprintf("**%s** [%s]\n\n", wo.Title, wo.Status))
+			// Get active tasks
+			tasks, err := models.ListTasks("", "", "implement")
+			if err == nil && len(tasks) > 0 {
+				// Filter to current mission
+				for _, task := range tasks {
+					if task.MissionID == missionCtx.MissionID {
+						output.WriteString(fmt.Sprintf("### Active Work: %s\n\n", task.ID))
+						output.WriteString(fmt.Sprintf("**%s** [%s]\n\n", task.Title, task.Status))
+						break
+					}
+				}
 			}
 
 			// Get latest handoff
