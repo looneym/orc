@@ -33,6 +33,12 @@ func colorizeTag(tagName string) string {
 	return c.Sprintf("[%s]", tagName)
 }
 
+// colorizeGrove wraps grove info with color (cyan for visibility)
+func colorizeGrove(groveName, groveID string) string {
+	c := color.New(color.FgCyan)
+	return c.Sprintf("[Grove: %s (%s)]", groveName, groveID)
+}
+
 // getIDColor returns a deterministic color for an ID type (TASK, EPIC, RH, MISSION)
 // Uses FNV-1a hash on the ID prefix to ensure all IDs of same type have same color
 func getIDColor(idType string) *color.Color {
@@ -218,7 +224,14 @@ Examples:
 						}
 						groveInfo := ""
 						if epic.AssignedGroveID.Valid {
-							groveInfo = fmt.Sprintf(" [Grove: %s]", epic.AssignedGroveID.String)
+							// Look up grove name from database
+							grove, err := models.GetGrove(epic.AssignedGroveID.String)
+							if err == nil {
+								groveInfo = " " + colorizeGrove(grove.Name, grove.ID)
+							} else {
+								// Fallback to just ID if grove lookup fails
+								groveInfo = fmt.Sprintf(" [Grove: %s]", epic.AssignedGroveID.String)
+							}
 						}
 
 						// Use └── for last epic, ├── for others
