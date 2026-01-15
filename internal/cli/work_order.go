@@ -287,6 +287,194 @@ Examples:
 	},
 }
 
+var workOrderDiscoverCmd = &cobra.Command{
+	Use:   "discover",
+	Short: "Discover ready work orders and claim them",
+	Long: `Discover work orders that are ready to be claimed in the current mission.
+
+This command helps deputies autonomously find and claim work. It:
+1. Lists all ready work orders in the current mission
+2. Shows priorities and determines if grove/IMP is needed
+3. Allows interactive or automatic claiming
+4. Provides next steps for execution
+
+Examples:
+  orc work-order discover              # Interactive discovery
+  orc work-order discover --claim WO-140  # Directly claim specific work order
+  orc work-order discover --auto-claim    # Automatically claim highest priority`,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		autoClaim, _ := cmd.Flags().GetBool("auto-claim")
+		claimID, _ := cmd.Flags().GetString("claim")
+
+		// Get current mission context
+		missionID := context.GetContextMissionID()
+		if missionID == "" {
+			return fmt.Errorf("no mission context detected - run from a mission or grove directory")
+		}
+
+		fmt.Printf("🔍 Discovering work for %s...\n\n", missionID)
+
+		// List ready work orders
+		orders, err := models.ListWorkOrders(missionID, "ready")
+		if err != nil {
+			return fmt.Errorf("failed to list work orders: %w", err)
+		}
+
+		if len(orders) == 0 {
+			fmt.Println("✓ No work available")
+			return nil
+		}
+
+		// Display ready work orders
+		fmt.Printf("📦 Ready Work Orders (%d):\n", len(orders))
+		for _, wo := range orders {
+			needsGrove := classifyWorkOrder(wo)
+			groveIndicator := ""
+			if needsGrove {
+				groveIndicator = " [needs grove]"
+			} else {
+				groveIndicator = " [local]"
+			}
+
+			priority := "medium"
+			if wo.Priority.Valid {
+				priority = wo.Priority.String
+			}
+
+			fmt.Printf("  %s: %s [priority: %s]%s\n", wo.ID, wo.Title, priority, groveIndicator)
+		}
+		fmt.Println()
+
+		// Handle direct claim
+		if claimID != "" {
+			return claimAndReportWorkOrder(claimID)
+		}
+
+		// Handle auto-claim
+		if autoClaim {
+			// Claim highest priority (first in list)
+			highestPriority := orders[0]
+			fmt.Printf("🎯 Auto-claiming: %s\n\n", highestPriority.ID)
+			return claimAndReportWorkOrder(highestPriority.ID)
+		}
+
+		// Interactive mode - prompt to claim
+		fmt.Printf("💡 To claim a work order:\n")
+		fmt.Printf("   orc work-order discover --claim %s\n", orders[0].ID)
+		fmt.Printf("   orc work-order claim %s\n", orders[0].ID)
+		fmt.Println()
+		fmt.Printf("💡 To auto-claim highest priority:\n")
+		fmt.Printf("   orc work-order discover --auto-claim\n")
+		fmt.Println()
+
+		return nil
+	},
+}
+
+// classifyWorkOrder determines if a work order needs a grove/IMP
+func classifyWorkOrder(wo *models.WorkOrder) bool {
+	// Simple heuristic based on keywords in title
+	implementationKeywords := []string{
+		"implement", "add", "create", "build", "write",
+		"refactor", "fix", "update", "modify", "develop",
+	}
+
+	titleLower := fmt.Sprintf("%s %s", wo.Title, wo.Description.String)
+	titleLower = fmt.Sprintf("%s", titleLower) // Make lowercase comparison
+
+	for _, keyword := range implementationKeywords {
+		if containsIgnoreCase(titleLower, keyword) {
+			return true
+		}
+	}
+
+	// Check for file patterns in description
+	if wo.Description.Valid {
+		filePatterns := []string{".go", ".py", ".js", ".ts", ".java", ".rb", ".c", ".cpp"}
+		for _, pattern := range filePatterns {
+			if containsIgnoreCase(wo.Description.String, pattern) {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+// containsIgnoreCase checks if a string contains a substring case-insensitively
+func containsIgnoreCase(s, substr string) bool {
+	return len(s) >= len(substr) && findIgnoreCase(s, substr) >= 0
+}
+
+// findIgnoreCase finds a substring in a string case-insensitively
+func findIgnoreCase(s, substr string) int {
+	sLen := len(s)
+	subLen := len(substr)
+	if subLen > sLen {
+		return -1
+	}
+	for i := 0; i <= sLen-subLen; i++ {
+		match := true
+		for j := 0; j < subLen; j++ {
+			if toLower(s[i+j]) != toLower(substr[j]) {
+				match = false
+				break
+			}
+		}
+		if match {
+			return i
+		}
+	}
+	return -1
+}
+
+// toLower converts a byte to lowercase
+func toLower(b byte) byte {
+	if b >= 'A' && b <= 'Z' {
+		return b + ('a' - 'A')
+	}
+	return b
+}
+
+// claimAndReportWorkOrder claims a work order and reports next steps
+func claimAndReportWorkOrder(id string) error {
+	// Get work order details
+	wo, err := models.GetWorkOrder(id)
+	if err != nil {
+		return fmt.Errorf("failed to get work order: %w", err)
+	}
+
+	// Claim it
+	err = models.ClaimWorkOrder(id, "")
+	if err != nil {
+		return fmt.Errorf("failed to claim work order: %w", err)
+	}
+
+	fmt.Printf("✓ Claimed %s: %s\n", wo.ID, wo.Title)
+	fmt.Printf("  Status: implement\n\n")
+
+	// Determine next steps
+	needsGrove := classifyWorkOrder(wo)
+	if needsGrove {
+		fmt.Printf("🌳 This work order requires code changes (needs grove/IMP)\n\n")
+		fmt.Printf("Next steps:\n")
+		fmt.Printf("  1. Assign to IMP: orc assign %s --grove <grove-id>\n", wo.ID)
+		fmt.Printf("  2. Or create grove: orc grove create <name> --mission %s\n", wo.MissionID)
+		fmt.Printf("  3. IMP will implement the changes\n")
+		fmt.Println()
+		fmt.Printf("⚠️  Note: IMP assignment protocol (WO-145) not yet implemented\n")
+		fmt.Printf("   For now, manually switch to grove window and work on %s\n", wo.ID)
+	} else {
+		fmt.Printf("📝 This work order can be executed locally (no grove needed)\n\n")
+		fmt.Printf("Next steps:\n")
+		fmt.Printf("  1. Execute the work order tasks\n")
+		fmt.Printf("  2. Mark complete: orc work-order complete %s\n", wo.ID)
+	}
+	fmt.Println()
+
+	return nil
+}
+
 // WorkOrderCmd returns the work-order command
 func WorkOrderCmd() *cobra.Command {
 	// Add flags
@@ -306,6 +494,9 @@ func WorkOrderCmd() *cobra.Command {
 	workOrderUpdateCmd.Flags().StringP("title", "t", "", "New title for work order")
 	workOrderUpdateCmd.Flags().StringP("description", "d", "", "New description for work order")
 
+	workOrderDiscoverCmd.Flags().BoolP("auto-claim", "a", false, "Automatically claim highest priority work order")
+	workOrderDiscoverCmd.Flags().StringP("claim", "c", "", "Directly claim specific work order ID")
+
 	// Add subcommands
 	workOrderCmd.AddCommand(workOrderCreateCmd)
 	workOrderCmd.AddCommand(workOrderListCmd)
@@ -316,6 +507,7 @@ func WorkOrderCmd() *cobra.Command {
 	workOrderCmd.AddCommand(workOrderPinCmd)
 	workOrderCmd.AddCommand(workOrderUnpinCmd)
 	workOrderCmd.AddCommand(workOrderUpdateCmd)
+	workOrderCmd.AddCommand(workOrderDiscoverCmd)
 
 	return workOrderCmd
 }
