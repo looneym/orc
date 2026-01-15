@@ -164,6 +164,40 @@ var rabbitHoleUpdateCmd = &cobra.Command{
 	},
 }
 
+var rabbitHolePinCmd = &cobra.Command{
+	Use:   "pin [rabbit-hole-id]",
+	Short: "Pin rabbit hole to keep it visible",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		rhID := args[0]
+
+		err := models.PinRabbitHole(rhID)
+		if err != nil {
+			return fmt.Errorf("failed to pin rabbit hole: %w", err)
+		}
+
+		fmt.Printf("✓ Rabbit hole %s pinned 📌\n", rhID)
+		return nil
+	},
+}
+
+var rabbitHoleUnpinCmd = &cobra.Command{
+	Use:   "unpin [rabbit-hole-id]",
+	Short: "Unpin rabbit hole",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		rhID := args[0]
+
+		err := models.UnpinRabbitHole(rhID)
+		if err != nil {
+			return fmt.Errorf("failed to unpin rabbit hole: %w", err)
+		}
+
+		fmt.Printf("✓ Rabbit hole %s unpinned\n", rhID)
+		return nil
+	},
+}
+
 func init() {
 	// rabbit-hole create flags
 	rabbitHoleCreateCmd.Flags().String("epic", "", "Epic ID (required)")
@@ -184,6 +218,8 @@ func init() {
 	rabbitHoleCmd.AddCommand(rabbitHoleShowCmd)
 	rabbitHoleCmd.AddCommand(rabbitHoleCompleteCmd)
 	rabbitHoleCmd.AddCommand(rabbitHoleUpdateCmd)
+	rabbitHoleCmd.AddCommand(rabbitHolePinCmd)
+	rabbitHoleCmd.AddCommand(rabbitHoleUnpinCmd)
 }
 
 // RabbitHoleCmd returns the rabbit-hole command

@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS missions (
 	title TEXT NOT NULL,
 	description TEXT,
 	status TEXT NOT NULL CHECK(status IN ('active', 'paused', 'complete', 'archived')) DEFAULT 'active',
+	pinned INTEGER DEFAULT 0,
 	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 	updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 	completed_at DATETIME

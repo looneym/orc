@@ -6,7 +6,7 @@ import (
 )
 
 // schemaVersion tracks the current schema version
-const currentSchemaVersion = 6
+const currentSchemaVersion = 7
 
 // Migration represents a database migration
 type Migration struct {
@@ -46,6 +46,11 @@ var migrations = []Migration{
 		Version: 6,
 		Name:    "convert_work_orders_to_epics_rabbit_holes_tasks",
 		Up:      migrationV6,
+	},
+	{
+		Version: 7,
+		Name:    "add_pinned_field_to_missions",
+		Up:      migrationV7,
 	},
 }
 
@@ -627,6 +632,19 @@ func migrationV6(db *sql.DB) error {
 	_, err = db.Exec(`DROP TABLE work_orders`)
 	if err != nil {
 		return fmt.Errorf("failed to drop work_orders table: %w", err)
+	}
+
+	return nil
+}
+
+// migrationV7 adds pinned field to missions table
+func migrationV7(db *sql.DB) error {
+	// Add pinned column to missions table
+	_, err := db.Exec(`
+		ALTER TABLE missions ADD COLUMN pinned INTEGER DEFAULT 0
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to add pinned column to missions: %w", err)
 	}
 
 	return nil

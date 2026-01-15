@@ -209,6 +209,17 @@ func ClaimTask(id, groveID string) error {
 
 // CompleteTask marks a task as complete
 func CompleteTask(id string) error {
+	// First, get task to check if pinned
+	task, err := GetTask(id)
+	if err != nil {
+		return err
+	}
+
+	// Prevent completing pinned task
+	if task.Pinned {
+		return fmt.Errorf("Cannot complete pinned task %s. Unpin first with: orc task unpin %s", id, id)
+	}
+
 	database, err := db.GetDB()
 	if err != nil {
 		return err

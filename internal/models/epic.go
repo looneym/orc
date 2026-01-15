@@ -133,6 +133,17 @@ func ListEpics(missionID, status string) ([]*Epic, error) {
 
 // CompleteEpic marks an epic as complete
 func CompleteEpic(id string) error {
+	// First, get epic to check if pinned
+	epic, err := GetEpic(id)
+	if err != nil {
+		return err
+	}
+
+	// Prevent completing pinned epic
+	if epic.Pinned {
+		return fmt.Errorf("Cannot complete pinned epic %s. Unpin first with: orc epic unpin %s", id, id)
+	}
+
 	database, err := db.GetDB()
 	if err != nil {
 		return err

@@ -136,6 +136,17 @@ func ListRabbitHoles(epicID, status string) ([]*RabbitHole, error) {
 
 // CompleteRabbitHole marks a rabbit hole as complete
 func CompleteRabbitHole(id string) error {
+	// First, get rabbit hole to check if pinned
+	rh, err := GetRabbitHole(id)
+	if err != nil {
+		return err
+	}
+
+	// Prevent completing pinned rabbit hole
+	if rh.Pinned {
+		return fmt.Errorf("Cannot complete pinned rabbit hole %s. Unpin first with: orc rabbit-hole unpin %s", id, id)
+	}
+
 	database, err := db.GetDB()
 	if err != nil {
 		return err
@@ -183,6 +194,56 @@ func UpdateRabbitHole(id, title, description string) error {
 			description, id,
 		)
 	}
+
+	return err
+}
+
+// PinRabbitHole pins a rabbit hole to keep it visible
+func PinRabbitHole(id string) error {
+	database, err := db.GetDB()
+	if err != nil {
+		return err
+	}
+
+	// Verify rabbit hole exists
+	var exists int
+	err = database.QueryRow("SELECT COUNT(*) FROM rabbit_holes WHERE id = ?", id).Scan(&exists)
+	if err != nil {
+		return err
+	}
+	if exists == 0 {
+		return fmt.Errorf("rabbit hole %s not found", id)
+	}
+
+	_, err = database.Exec(
+		"UPDATE rabbit_holes SET pinned = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+		id,
+	)
+
+	return err
+}
+
+// UnpinRabbitHole unpins a rabbit hole
+func UnpinRabbitHole(id string) error {
+	database, err := db.GetDB()
+	if err != nil {
+		return err
+	}
+
+	// Verify rabbit hole exists
+	var exists int
+	err = database.QueryRow("SELECT COUNT(*) FROM rabbit_holes WHERE id = ?", id).Scan(&exists)
+	if err != nil {
+		return err
+	}
+	if exists == 0 {
+		return fmt.Errorf("rabbit hole %s not found", id)
+	}
+
+	_, err = database.Exec(
+		"UPDATE rabbit_holes SET pinned = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+		id,
+	)
 
 	return err
 }

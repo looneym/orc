@@ -13,6 +13,7 @@ type Mission struct {
 	Title       string
 	Description sql.NullString
 	Status      string
+	Pinned      bool
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
 	CompletedAt sql.NullTime
@@ -59,9 +60,9 @@ func GetMission(id string) (*Mission, error) {
 
 	m := &Mission{}
 	err = database.QueryRow(
-		"SELECT id, title, description, status, created_at, updated_at, completed_at FROM missions WHERE id = ?",
+		"SELECT id, title, description, status, pinned, created_at, updated_at, completed_at FROM missions WHERE id = ?",
 		id,
-	).Scan(&m.ID, &m.Title, &m.Description, &m.Status, &m.CreatedAt, &m.UpdatedAt, &m.CompletedAt)
+	).Scan(&m.ID, &m.Title, &m.Description, &m.Status, &m.Pinned, &m.CreatedAt, &m.UpdatedAt, &m.CompletedAt)
 
 	if err != nil {
 		return nil, err
@@ -77,7 +78,7 @@ func ListMissions(status string) ([]*Mission, error) {
 		return nil, err
 	}
 
-	query := "SELECT id, title, description, status, created_at, updated_at, completed_at FROM missions"
+	query := "SELECT id, title, description, status, pinned, created_at, updated_at, completed_at FROM missions"
 	args := []interface{}{}
 
 	if status != "" {
@@ -96,7 +97,7 @@ func ListMissions(status string) ([]*Mission, error) {
 	var missions []*Mission
 	for rows.Next() {
 		m := &Mission{}
-		err := rows.Scan(&m.ID, &m.Title, &m.Description, &m.Status, &m.CreatedAt, &m.UpdatedAt, &m.CompletedAt)
+		err := rows.Scan(&m.ID, &m.Title, &m.Description, &m.Status, &m.Pinned, &m.CreatedAt, &m.UpdatedAt, &m.CompletedAt)
 		if err != nil {
 			return nil, err
 		}
@@ -108,6 +109,21 @@ func ListMissions(status string) ([]*Mission, error) {
 
 // UpdateMissionStatus updates the status of a mission
 func UpdateMissionStatus(id, status string) error {
+	// First, get mission to check if pinned
+	mission, err := GetMission(id)
+	if err != nil {
+		return err
+	}
+
+	// Prevent completing or archiving pinned mission
+	if mission.Pinned && (status == "complete" || status == "archived") {
+		action := "complete"
+		if status == "archived" {
+			action = "archive"
+		}
+		return fmt.Errorf("Cannot %s pinned mission %s. Unpin first with: orc mission unpin %s", action, id, id)
+	}
+
 	database, err := db.GetDB()
 	if err != nil {
 		return err
@@ -151,6 +167,56 @@ func UpdateMission(id, title, description string) error {
 	args = append(args, id)
 
 	_, err = database.Exec(query, args...)
+	return err
+}
+
+// PinMission pins a mission to keep it visible
+func PinMission(id string) error {
+	database, err := db.GetDB()
+	if err != nil {
+		return err
+	}
+
+	// Verify mission exists
+	var exists int
+	err = database.QueryRow("SELECT COUNT(*) FROM missions WHERE id = ?", id).Scan(&exists)
+	if err != nil {
+		return err
+	}
+	if exists == 0 {
+		return fmt.Errorf("mission %s not found", id)
+	}
+
+	_, err = database.Exec(
+		"UPDATE missions SET pinned = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+		id,
+	)
+
+	return err
+}
+
+// UnpinMission unpins a mission
+func UnpinMission(id string) error {
+	database, err := db.GetDB()
+	if err != nil {
+		return err
+	}
+
+	// Verify mission exists
+	var exists int
+	err = database.QueryRow("SELECT COUNT(*) FROM missions WHERE id = ?", id).Scan(&exists)
+	if err != nil {
+		return err
+	}
+	if exists == 0 {
+		return fmt.Errorf("mission %s not found", id)
+	}
+
+	_, err = database.Exec(
+		"UPDATE missions SET pinned = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+		id,
+	)
+
 	return err
 }
 

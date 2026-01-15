@@ -346,6 +346,40 @@ Examples:
 	},
 }
 
+var missionPinCmd = &cobra.Command{
+	Use:   "pin [mission-id]",
+	Short: "Pin mission to keep it visible",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		id := args[0]
+
+		err := models.PinMission(id)
+		if err != nil {
+			return fmt.Errorf("failed to pin mission: %w", err)
+		}
+
+		fmt.Printf("✓ Mission %s pinned 📌\n", id)
+		return nil
+	},
+}
+
+var missionUnpinCmd = &cobra.Command{
+	Use:   "unpin [mission-id]",
+	Short: "Unpin mission",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		id := args[0]
+
+		err := models.UnpinMission(id)
+		if err != nil {
+			return fmt.Errorf("failed to unpin mission: %w", err)
+		}
+
+		fmt.Printf("✓ Mission %s unpinned\n", id)
+		return nil
+	},
+}
+
 // MissionCmd returns the mission command
 func MissionCmd() *cobra.Command {
 	// Add flags
@@ -365,6 +399,8 @@ func MissionCmd() *cobra.Command {
 	missionCmd.AddCommand(missionArchiveCmd)
 	missionCmd.AddCommand(missionUpdateCmd)
 	missionCmd.AddCommand(missionDeleteCmd)
+	missionCmd.AddCommand(missionPinCmd)
+	missionCmd.AddCommand(missionUnpinCmd)
 
 	return missionCmd
 }
