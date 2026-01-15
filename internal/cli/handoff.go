@@ -6,7 +6,9 @@ import (
 	"io"
 	"os"
 	"strings"
+	"time"
 
+	"github.com/example/orc/internal/config"
 	"github.com/example/orc/internal/models"
 	"github.com/spf13/cobra"
 )
@@ -101,11 +103,11 @@ Examples:
 			fmt.Printf("  Work Orders: %s\n", handoff.ActiveWorkOrders.String)
 		}
 
-		// Update metadata file
+		// Update global state config
 		if err := updateMetadata(handoff); err != nil {
-			fmt.Printf("  Warning: Failed to update metadata.json: %v\n", err)
+			fmt.Printf("  Warning: Failed to update .orc/config.json: %v\n", err)
 		} else {
-			fmt.Printf("  Updated: .orc/metadata.json\n")
+			fmt.Printf("  Updated: .orc/config.json\n")
 		}
 
 		return nil
@@ -186,34 +188,40 @@ var handoffListCmd = &cobra.Command{
 	},
 }
 
-// updateMetadata updates the .orc/metadata.json file with the latest handoff
+// updateMetadata updates the .orc/config.json file with global state
 func updateMetadata(handoff *models.Handoff) error {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return err
 	}
 
-	orcDir := fmt.Sprintf("%s/.orc", homeDir)
-	metadataPath := fmt.Sprintf("%s/metadata.json", orcDir)
-
-	metadata := map[string]interface{}{
-		"current_handoff_id": handoff.ID,
-		"last_updated":       handoff.CreatedAt.Format("2006-01-02T15:04:05Z"),
-	}
-
+	activeMissionID := ""
 	if handoff.ActiveMissionID.Valid {
-		metadata["active_mission_id"] = handoff.ActiveMissionID.String
+		activeMissionID = handoff.ActiveMissionID.String
 	}
+
+	// Parse active work orders if present
+	activeWorkOrders := []string{}
 	if handoff.ActiveWorkOrders.Valid {
-		metadata["active_work_orders"] = handoff.ActiveWorkOrders.String
+		// Work orders stored as comma-separated string
+		workOrdersStr := handoff.ActiveWorkOrders.String
+		if workOrdersStr != "" {
+			activeWorkOrders = strings.Split(workOrdersStr, ",")
+		}
 	}
 
-	data, err := json.MarshalIndent(metadata, "", "  ")
-	if err != nil {
-		return err
+	cfg := &config.Config{
+		Version: "1.0",
+		Type:    config.TypeGlobal,
+		State: &config.StateConfig{
+			ActiveMissionID:  activeMissionID,
+			CurrentHandoffID: handoff.ID,
+			LastUpdated:      time.Now().Format(time.RFC3339),
+			ActiveWorkOrders: activeWorkOrders,
+		},
 	}
 
-	return os.WriteFile(metadataPath, data, 0644)
+	return config.SaveConfig(homeDir, cfg)
 }
 
 // HandoffCmd returns the handoff command

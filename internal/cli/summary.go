@@ -44,7 +44,7 @@ Examples:
 				// Get current mission from context
 				missionCtx, _ := context.DetectMissionContext()
 				if missionCtx == nil || missionCtx.MissionID == "" {
-					return fmt.Errorf("--scope current requires being in a mission context (no .orc-mission file found)")
+					return fmt.Errorf("--scope current requires being in a mission context (no .orc/config.json found)")
 				}
 				filterMissionID = missionCtx.MissionID
 				fmt.Printf("📊 ORC Summary - %s (Current Mission)\n", filterMissionID)
