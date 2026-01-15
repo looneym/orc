@@ -9,7 +9,7 @@ You are executing a comprehensive integration test of the ORC orchestration syst
 
 ## Your Mission
 
-Execute a 7-phase orchestration test that proves ORC can autonomously coordinate multiple Claude agents to complete real development tasks. This is the ultimate validation of the system.
+Execute a 8-phase orchestration test that proves ORC can autonomously coordinate multiple Claude agents to complete real development tasks. This is the ultimate validation of the system.
 
 ## Critical Rules
 
@@ -18,7 +18,7 @@ Execute a 7-phase orchestration test that proves ORC can autonomously coordinate
 3. **Write progress to turns/** - Document every phase in markdown files
 4. **Use helper scripts** - They're in scripts/ directory for verification tasks
 5. **Handle errors gracefully** - If a checkpoint fails, document it and decide whether to continue or abort
-6. **Generate final report** - turns/07-final-report.md with complete results
+6. **Generate final report** - turns/08-final-report.md with complete results
 
 ## Test Configuration
 
@@ -28,6 +28,35 @@ Load configuration from `config.json` in this skill directory. Key parameters:
 - Canary repo: `~/src/orc-canary`
 - Test workload: POST /echo endpoint implementation
 - Timeout: 30 minutes max
+
+## Phase 0: Pre-flight Checks
+
+**Goal**: Validate environment before starting test
+
+### Tasks
+
+1. Run environment validation:
+   ```bash
+   orc doctor
+   ```
+2. Verify Claude Code workspace trust is configured
+3. Check that both ~/src/worktrees and ~/src/missions are in additionalDirectories
+
+### Validation Checkpoints (2 total)
+
+- [ ] `orc doctor` exits with code 0 (all checks pass)
+- [ ] Both ~/src/worktrees and ~/src/missions are trusted directories
+
+### Output
+
+Write `turns/00-preflight.md` with:
+- orc doctor output
+- Validation results (✓ or ✗ for each checkpoint)
+- Status: PASS or FAIL
+
+**If any checkpoint fails, ABORT immediately with setup instructions**
+
+The test cannot proceed without proper workspace trust configuration. Direct user to INSTALL.md for fix instructions.
 
 ## Phase 1: Environment Setup
 
@@ -324,7 +353,7 @@ Write `turns/05-validation.md` with:
 
 Write `turns/06-final-report.md` and `turns/results.json`
 
-Exit with code 0 if all 25 checkpoints passed, otherwise exit with code 1
+Exit with code 0 if all 27 checkpoints passed, otherwise exit with code 1
 
 ## Helper Scripts Reference
 
@@ -363,7 +392,7 @@ Located in `scripts/` directory:
 ## Success Criteria
 
 **Overall test PASSES if**:
-- All 25 checkpoints pass (4+5+4+3+4+5)
+- All 27 checkpoints pass (2+4+5+4+3+4+5)
 - POST /echo endpoint implemented correctly
 - Tests pass
 - Manual test works

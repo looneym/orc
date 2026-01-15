@@ -55,6 +55,11 @@ Examples:
   orc grove create multi --repos main-app,api-service --mission MISSION-002`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// Validate Claude workspace trust before creating grove
+			if err := validateClaudeWorkspaceTrust(); err != nil {
+				return fmt.Errorf("Claude workspace trust validation failed:\n\n%w\n\nRun 'orc doctor' for detailed diagnostics", err)
+			}
+
 			name := args[0]
 
 			// Smart default: use deputy context if available, otherwise MISSION-001

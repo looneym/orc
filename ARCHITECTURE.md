@@ -405,6 +405,28 @@ go build -o orc cmd/orc/main.go
 # Binary available at: ./orc
 ```
 
+### Prerequisites
+
+**Claude Code Workspace Trust**
+
+ORC requires Claude Code to trust specific directories where it creates workspaces.
+
+Add to `~/.claude/settings.json`:
+```json
+{
+  "permissions": {
+    "additionalDirectories": [
+      "~/src/worktrees",
+      "~/src/missions"
+    ]
+  }
+}
+```
+
+**Validation**: Run `orc doctor` to verify configuration.
+
+**See**: INSTALL.md for detailed setup instructions.
+
 ### Initialize ORC
 ```bash
 orc init    # Creates ~/.orc/ directory and initializes database

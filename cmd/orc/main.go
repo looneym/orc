@@ -18,6 +18,7 @@ It coordinates IMPs (Implementation Agents) working in isolated groves (worktree
 
 	// Add subcommands
 	rootCmd.AddCommand(cli.InitCmd())
+	rootCmd.AddCommand(cli.DoctorCmd())
 	rootCmd.AddCommand(cli.MissionCmd())
 	rootCmd.AddCommand(cli.WorkOrderCmd())
 	rootCmd.AddCommand(cli.GroveCmd())

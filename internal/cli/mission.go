@@ -135,6 +135,11 @@ Examples:
 			return fmt.Errorf("cannot start mission in ORC source directory - please run from another location")
 		}
 
+		// Validate Claude workspace trust before creating mission workspace
+		if err := validateClaudeWorkspaceTrust(); err != nil {
+			return fmt.Errorf("Claude workspace trust validation failed:\n\n%w\n\nRun 'orc doctor' for detailed diagnostics", err)
+		}
+
 		// Get mission from DB
 		mission, err := models.GetMission(missionID)
 		if err != nil {
