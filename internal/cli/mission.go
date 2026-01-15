@@ -1,10 +1,12 @@
 package cli
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"github.com/example/orc/internal/agent"
 	"github.com/example/orc/internal/config"
@@ -20,7 +22,38 @@ var (
 	colorExists = color.New(color.FgBlue).SprintFunc()
 	colorCreate = color.New(color.FgGreen).SprintFunc()
 	colorDelete = color.New(color.FgRed).SprintFunc()
+	colorDim    = color.New(color.Faint).SprintFunc()
 )
+
+// readJSONConfig reads a JSON config file and returns its pretty-printed contents
+func readJSONConfig(path string) (string, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "", err
+	}
+
+	// Parse and re-format for consistent display
+	var parsed interface{}
+	if err := json.Unmarshal(data, &parsed); err != nil {
+		return "", err
+	}
+
+	formatted, err := json.MarshalIndent(parsed, "       ", "  ")
+	if err != nil {
+		return "", err
+	}
+
+	return string(formatted), nil
+}
+
+// formatConfigContent formats JSON config content with indentation for plan display
+func formatConfigContent(content string) []string {
+	lines := []string{}
+	for _, line := range strings.Split(content, "\n") {
+		lines = append(lines, colorDim(line))
+	}
+	return lines
+}
 
 var missionCmd = &cobra.Command{
 	Use:   "mission",
@@ -420,33 +453,67 @@ Examples:
 			return fmt.Errorf("failed to load groves: %w", err)
 		}
 
-		fmt.Printf("Mission: %s - %s\n", mission.ID, mission.Title)
-		fmt.Printf("Groves in DB: %d\n\n", len(groves))
-
 		// Phase 2: Analyze current state and generate plan
-		var plan []string
+		var dbState []string
+		var infraPlan []string
+		var tmuxPlan []string
 
+		// Section 1: Database State
+		dbState = append(dbState, fmt.Sprintf("Mission: %s - %s", colorDim(mission.ID), mission.Title))
+		dbState = append(dbState, fmt.Sprintf("  Workspace: %s", workspacePath))
+		dbState = append(dbState, fmt.Sprintf("  Created: %s", mission.CreatedAt.Format("2006-01-02 15:04:05")))
+		dbState = append(dbState, "")
+		dbState = append(dbState, fmt.Sprintf("Groves in DB: %d", len(groves)))
+		for _, grove := range groves {
+			dbState = append(dbState, fmt.Sprintf("  %s - %s", colorDim(grove.ID), grove.Name))
+			dbState = append(dbState, fmt.Sprintf("    Path: %s", grove.Path))
+			if grove.Repos.Valid && grove.Repos.String != "" && grove.Repos.String != "[]" {
+				dbState = append(dbState, fmt.Sprintf("    Repos: %s", grove.Repos.String))
+			}
+			dbState = append(dbState, fmt.Sprintf("    Status: %s", grove.Status))
+		}
+
+		// Section 2: Infrastructure Plan
 		// Check mission workspace
 		if _, err := os.Stat(workspacePath); os.IsNotExist(err) {
-			plan = append(plan, fmt.Sprintf("%s mission workspace: %s", colorCreate("CREATE"), workspacePath))
+			infraPlan = append(infraPlan, fmt.Sprintf("%s mission workspace: %s", colorCreate("CREATE"), workspacePath))
 		} else {
-			plan = append(plan, fmt.Sprintf("%s mission workspace: %s", colorExists("EXISTS"), workspacePath))
+			infraPlan = append(infraPlan, fmt.Sprintf("%s mission workspace: %s", colorExists("EXISTS"), workspacePath))
 		}
 
 		// Check mission config
 		missionConfigPath := filepath.Join(workspacePath, ".orc", "config.json")
 		if _, err := os.Stat(missionConfigPath); os.IsNotExist(err) {
-			plan = append(plan, fmt.Sprintf("%s mission config: %s", colorCreate("CREATE"), missionConfigPath))
+			infraPlan = append(infraPlan, fmt.Sprintf("%s mission config: %s", colorCreate("CREATE"), missionConfigPath))
+			// Show what will be created
+			expectedConfig := fmt.Sprintf(`{
+  "version": "1.0",
+  "type": "mission",
+  "mission": {
+    "mission_id": "%s",
+    "workspace_path": "%s",
+    "created_at": "<timestamp>"
+  }
+}`, missionID, workspacePath)
+			for _, line := range formatConfigContent(expectedConfig) {
+				infraPlan = append(infraPlan, line)
+			}
 		} else {
-			plan = append(plan, fmt.Sprintf("%s mission config: %s", colorExists("EXISTS"), missionConfigPath))
+			infraPlan = append(infraPlan, fmt.Sprintf("%s mission config: %s", colorExists("EXISTS"), missionConfigPath))
+			// Show current contents
+			if contents, err := readJSONConfig(missionConfigPath); err == nil {
+				for _, line := range formatConfigContent(contents) {
+					infraPlan = append(infraPlan, line)
+				}
+			}
 		}
 
 		// Check groves directory
 		grovesDir := filepath.Join(workspacePath, "groves")
 		if _, err := os.Stat(grovesDir); os.IsNotExist(err) {
-			plan = append(plan, fmt.Sprintf("%s groves directory: %s", colorCreate("CREATE"), grovesDir))
+			infraPlan = append(infraPlan, fmt.Sprintf("%s groves directory: %s", colorCreate("CREATE"), grovesDir))
 		} else {
-			plan = append(plan, fmt.Sprintf("%s groves directory: %s", colorExists("EXISTS"), grovesDir))
+			infraPlan = append(infraPlan, fmt.Sprintf("%s groves directory: %s", colorExists("EXISTS"), grovesDir))
 		}
 
 		// Plan for each grove
@@ -468,60 +535,102 @@ Examples:
 
 			if currentPath != desiredPath {
 				if currentExists && !desiredExists {
-					plan = append(plan, fmt.Sprintf("MOVE grove %s: %s → %s", grove.ID, currentPath, desiredPath))
+					infraPlan = append(infraPlan, fmt.Sprintf("MOVE grove %s: %s → %s", grove.ID, currentPath, desiredPath))
 				} else if !currentExists && !desiredExists {
-					plan = append(plan, fmt.Sprintf("MISSING grove %s: %s (needs materialization)", grove.ID, desiredPath))
+					infraPlan = append(infraPlan, fmt.Sprintf("MISSING grove %s: %s (needs materialization)", grove.ID, desiredPath))
 				} else if desiredExists {
-					plan = append(plan, fmt.Sprintf("%s grove %s: %s", colorExists("EXISTS"), grove.ID, desiredPath))
-					plan = append(plan, fmt.Sprintf("UPDATE DB path for %s: %s → %s", grove.ID, currentPath, desiredPath))
+					infraPlan = append(infraPlan, fmt.Sprintf("%s grove %s: %s", colorExists("EXISTS"), grove.ID, desiredPath))
+					infraPlan = append(infraPlan, fmt.Sprintf("UPDATE DB path for %s: %s → %s", grove.ID, currentPath, desiredPath))
 				}
 			} else {
 				if currentExists {
-					plan = append(plan, fmt.Sprintf("%s grove %s: %s", colorExists("EXISTS"), grove.ID, desiredPath))
+					infraPlan = append(infraPlan, fmt.Sprintf("%s grove %s: %s", colorExists("EXISTS"), grove.ID, desiredPath))
 				} else {
-					plan = append(plan, fmt.Sprintf("MISSING grove %s: %s (needs materialization)", grove.ID, desiredPath))
+					infraPlan = append(infraPlan, fmt.Sprintf("MISSING grove %s: %s (needs materialization)", grove.ID, desiredPath))
 				}
 			}
 
 			// Check grove config
 			groveConfigPath := filepath.Join(desiredPath, ".orc", "config.json")
 			if _, err := os.Stat(groveConfigPath); os.IsNotExist(err) {
-				plan = append(plan, fmt.Sprintf("%s grove config: %s", colorCreate("CREATE"), groveConfigPath))
+				infraPlan = append(infraPlan, fmt.Sprintf("%s grove config: %s", colorCreate("CREATE"), groveConfigPath))
+				// Show what will be created
+				reposJSON := "[]"
+				if grove.Repos.Valid && grove.Repos.String != "" {
+					reposJSON = grove.Repos.String
+				}
+				expectedConfig := fmt.Sprintf(`{
+  "version": "1.0",
+  "type": "grove",
+  "grove": {
+    "grove_id": "%s",
+    "mission_id": "%s",
+    "name": "%s",
+    "repos": %s,
+    "created_at": "<timestamp>"
+  }
+}`, grove.ID, grove.MissionID, grove.Name, reposJSON)
+				for _, line := range formatConfigContent(expectedConfig) {
+					infraPlan = append(infraPlan, line)
+				}
 			} else {
-				plan = append(plan, fmt.Sprintf("%s grove config: %s", colorExists("EXISTS"), groveConfigPath))
+				infraPlan = append(infraPlan, fmt.Sprintf("%s grove config: %s", colorExists("EXISTS"), groveConfigPath))
+				// Show current contents
+				if contents, err := readJSONConfig(groveConfigPath); err == nil {
+					for _, line := range formatConfigContent(contents) {
+						infraPlan = append(infraPlan, line)
+					}
+				}
 			}
 		}
 
 		// Check for old .orc-mission files to clean up
 		oldMissionFile := filepath.Join(workspacePath, ".orc-mission")
 		if _, err := os.Stat(oldMissionFile); err == nil {
-			plan = append(plan, fmt.Sprintf("%s old .orc-mission: %s", colorDelete("DELETE"), oldMissionFile))
+			infraPlan = append(infraPlan, fmt.Sprintf("%s old .orc-mission: %s", colorDelete("DELETE"), oldMissionFile))
 		}
 
-		// Plan TMux session if requested
+		// Section 3: TMux Plan
 		if createTmux {
-			plan = append(plan, "")
-			plan = append(plan, "TMux Session:")
 			sessionName := fmt.Sprintf("orc-%s", missionID)
 			if tmux.SessionExists(sessionName) {
-				plan = append(plan, fmt.Sprintf("  %s session: %s", colorExists("EXISTS"), sessionName))
+				tmuxPlan = append(tmuxPlan, fmt.Sprintf("%s session: %s", colorExists("EXISTS"), sessionName))
 			} else {
-				plan = append(plan, fmt.Sprintf("  %s session: %s", colorCreate("CREATE"), sessionName))
+				tmuxPlan = append(tmuxPlan, fmt.Sprintf("%s session: %s", colorCreate("CREATE"), sessionName))
 				for i, grove := range groves {
 					grovePath := filepath.Join(grovesDir, grove.Name)
 					if _, err := os.Stat(grovePath); err == nil {
-						plan = append(plan, fmt.Sprintf("  %s window %d (%s): 3 panes in %s - Grove %s IMP", colorCreate("CREATE"), i+1, grove.Name, grovePath, grove.ID))
+						tmuxPlan = append(tmuxPlan, fmt.Sprintf("%s window %d (%s): 3 panes in %s - Grove %s IMP", colorCreate("CREATE"), i+1, grove.Name, grovePath, grove.ID))
 					}
 				}
 			}
 		}
 
-		// Phase 3: Show plan
+		// Phase 3: Show plan (combine all sections)
 		fmt.Println("📋 Plan:\n")
-		for _, step := range plan {
-			fmt.Printf("  %s\n", step)
+
+		// Section 1: Database State
+		fmt.Println(color.New(color.Bold).Sprint("Database State:"))
+		for _, line := range dbState {
+			fmt.Printf("  %s\n", line)
 		}
 		fmt.Println()
+
+		// Section 2: Infrastructure
+		fmt.Println(color.New(color.Bold).Sprint("Infrastructure:"))
+		for _, line := range infraPlan {
+			fmt.Printf("  %s\n", line)
+		}
+		fmt.Println()
+
+		// Section 3: TMux (if requested)
+		if createTmux && len(tmuxPlan) > 0 {
+			fmt.Println(color.New(color.Bold).Sprint("TMux Session:"))
+			for _, line := range tmuxPlan {
+				fmt.Printf("  %s\n", line)
+			}
+			fmt.Println()
+		}
 
 		// Phase 4: Ask for confirmation
 		fmt.Print("Apply changes? [y/N]: ")
