@@ -481,34 +481,9 @@ Examples:
 			infraPlan = append(infraPlan, fmt.Sprintf("%s mission workspace: %s", colorExists("EXISTS"), workspacePath))
 		}
 
-		// Check mission config
-		missionConfigPath := filepath.Join(workspacePath, ".orc", "config.json")
-		if _, err := os.Stat(missionConfigPath); os.IsNotExist(err) {
-			infraPlan = append(infraPlan, fmt.Sprintf("%s mission config: %s", colorCreate("CREATE"), missionConfigPath))
-			// Show what will be created
-			expectedConfig := fmt.Sprintf(`{
-  "version": "1.0",
-  "type": "mission",
-  "mission": {
-    "mission_id": "%s",
-    "workspace_path": "%s",
-    "created_at": "<timestamp>"
-  }
-}`, missionID, workspacePath)
-			for _, line := range formatConfigContent(expectedConfig) {
-				infraPlan = append(infraPlan, line)
-			}
-		} else {
-			infraPlan = append(infraPlan, fmt.Sprintf("%s mission config: %s", colorExists("EXISTS"), missionConfigPath))
-			// Show current contents
-			if contents, err := readJSONConfig(missionConfigPath); err == nil {
-				for _, line := range formatConfigContent(contents) {
-					infraPlan = append(infraPlan, line)
-				}
-			}
-		}
-
 		// Check groves directory
+		// Note: No mission-level config needed - missions are just container directories
+		// Only groves need config files to mark IMP territory
 		grovesDir := filepath.Join(workspacePath, "groves")
 		if _, err := os.Stat(grovesDir); os.IsNotExist(err) {
 			infraPlan = append(infraPlan, fmt.Sprintf("%s groves directory: %s", colorCreate("CREATE"), grovesDir))
@@ -644,25 +619,15 @@ Examples:
 		// Phase 5: Apply changes
 		fmt.Println("\n🚀 Applying changes...\n")
 
-		// Create mission workspace
+		// Create mission workspace (just a container directory)
 		if err := os.MkdirAll(workspacePath, 0755); err != nil {
 			return fmt.Errorf("failed to create mission workspace: %w", err)
 		}
 		fmt.Printf("✓ Mission workspace ready\n")
 
-		// Create .orc directory
-		orcDir := filepath.Join(workspacePath, ".orc")
-		if err := os.MkdirAll(orcDir, 0755); err != nil {
-			return fmt.Errorf("failed to create .orc directory: %w", err)
-		}
-
-		// Write mission config
-		if err := context.WriteMissionContext(workspacePath, missionID); err != nil {
-			return fmt.Errorf("failed to write mission config: %w", err)
-		}
-		fmt.Printf("✓ Mission config written\n")
-
 		// Create groves directory
+		// Note: No mission-level config needed - missions are just containers
+		// Only groves get .orc/config.json to mark IMP territory
 		if err := os.MkdirAll(grovesDir, 0755); err != nil {
 			return fmt.Errorf("failed to create groves directory: %w", err)
 		}
