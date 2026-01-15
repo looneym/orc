@@ -452,7 +452,7 @@ func migrationV4(db *sql.DB) error {
 // migrationV5 adds messages table for agent mail system
 func migrationV5(db *sql.DB) error {
 	// Create messages table for async agent communication
-	// Agents: DEPUTY-{MISSION-ID} and IMP-{GROVE-ID}
+	// Agents: ORC and IMP-{GROVE-ID}
 	_, err := db.Exec(`
 		CREATE TABLE messages (
 			id TEXT PRIMARY KEY,

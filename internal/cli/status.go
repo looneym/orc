@@ -31,7 +31,7 @@ func StatusCmd() *cobra.Command {
 
 This provides a focused view of "where am I right now?"`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Check if we're in a deputy ORC context first
+			// Check if we're in a mission context first
 			missionCtx, _ := context.DetectMissionContext()
 			var metadata Metadata
 			var activeMissionID *string

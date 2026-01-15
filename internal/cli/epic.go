@@ -25,7 +25,7 @@ var epicCreateCmd = &cobra.Command{
 		description, _ := cmd.Flags().GetString("description")
 		contextRef, _ := cmd.Flags().GetString("context-ref")
 
-		// Smart default: use deputy context if available
+		// Smart default: use mission context if available
 		if missionID == "" {
 			if ctxMissionID := context.GetContextMissionID(); ctxMissionID != "" {
 				missionID = ctxMissionID
@@ -458,7 +458,7 @@ func writeEpicAssignment(groveDir string, epic *models.Epic) error {
 			rabbitHoles = append(rabbitHoles, rh)
 		}
 
-		return models.WriteEpicAssignmentWithRabbitHoles(groveDir, epic, rabbitHoles, "MASTER-ORC")
+		return models.WriteEpicAssignmentWithRabbitHoles(groveDir, epic, rabbitHoles, "ORC")
 	} else {
 		// Get direct tasks
 		tasks, err := models.GetDirectTasks(epic.ID)
@@ -466,7 +466,7 @@ func writeEpicAssignment(groveDir string, epic *models.Epic) error {
 			return err
 		}
 
-		return models.WriteEpicAssignmentWithTasks(groveDir, epic, tasks, "MASTER-ORC")
+		return models.WriteEpicAssignmentWithTasks(groveDir, epic, tasks, "ORC")
 	}
 }
 

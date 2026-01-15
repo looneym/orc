@@ -14,10 +14,10 @@ func MailCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "mail",
 		Short: "Inter-agent mail system",
-		Long: `Send and receive messages between deputy and IMP agents.
+		Long: `Send and receive messages between ORC and IMP agents.
 
 Messages are async and persistent in the ORC database.
-Agent identity is auto-detected from context (deputy or grove).`,
+Agent identity is auto-detected from context (ORC repo or grove).`,
 	}
 
 	cmd.AddCommand(mailSendCmd())
@@ -34,11 +34,11 @@ func mailSendCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "send <body>",
 		Short: "Send a message to another agent",
-		Long: `Send a message to a deputy or IMP agent.
+		Long: `Send a message to ORC or an IMP agent.
 
 Examples:
   orc mail send "Please review PR #42" --to IMP-GROVE-001 --subject "Code Review"
-  orc mail send "Task complete" --to DEPUTY-MISSION-001 --subject "Update"`,
+  orc mail send "Task complete" --to ORC --subject "Update"`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			body := args[0]
@@ -68,11 +68,9 @@ Examples:
 			// Messages must be scoped to a mission for database storage
 			missionID := identity.MissionID
 
-			if identity.Type == agent.AgentTypeMaster {
-				// Master sending: use recipient's mission ID
-				if recipientIdentity.Type == agent.AgentTypeDeputy {
-					missionID = recipientIdentity.ID // Deputy ID is mission ID
-				} else if recipientIdentity.Type == agent.AgentTypeIMP {
+			if identity.Type == agent.AgentTypeORC {
+				// ORC sending: use recipient's mission ID (must be IMP)
+				if recipientIdentity.Type == agent.AgentTypeIMP {
 					// Need to look up grove to get mission ID
 					if recipientIdentity.MissionID == "" {
 						// Try to extract from grove
@@ -84,13 +82,14 @@ Examples:
 					} else {
 						missionID = recipientIdentity.MissionID
 					}
+				} else {
+					return fmt.Errorf("ORC can only send to IMP agents")
 				}
-			} else if recipientIdentity.Type == agent.AgentTypeMaster {
-				// Sending TO master: use sender's mission ID
-				// (Deputies/IMPs reporting up to master)
+			} else if recipientIdentity.Type == agent.AgentTypeORC {
+				// Sending TO ORC: use sender's mission ID (IMPs reporting to ORC)
 				missionID = identity.MissionID
 			}
-			// Otherwise: deputy/IMP to deputy/IMP, use sender's mission ID (already set)
+			// Otherwise: IMP to IMP, use sender's mission ID (already set)
 
 			// Create message
 			message, err := models.CreateMessage(

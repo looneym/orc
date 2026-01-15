@@ -166,7 +166,7 @@ Examples:
 				if hideMap[m.Status] {
 					continue
 				}
-				// If in deputy context and not showing all, filter to this mission
+				// If in mission context and not showing all, filter to this mission
 				if filterMissionID != "" && m.ID != filterMissionID {
 					continue
 				}
@@ -432,7 +432,7 @@ Examples:
 		},
 	}
 
-	cmd.Flags().BoolVarP(&showAll, "all", "a", false, "Show all missions (override deputy scoping)")
+	cmd.Flags().BoolVarP(&showAll, "all", "a", false, "Show all missions (override mission scoping)")
 	cmd.Flags().StringP("mission", "m", "", "Mission filter: mission ID or 'current' for context mission")
 	cmd.Flags().StringSlice("hide", []string{}, "Hide items with these statuses (comma-separated: paused,blocked)")
 	cmd.Flags().Bool("expand", false, "Expand rabbit holes to show all tasks")

@@ -113,13 +113,13 @@ var missionShowCmd = &cobra.Command{
 var missionStartCmd = &cobra.Command{
 	Use:   "start [mission-id]",
 	Short: "Start a mission workspace with TMux session",
-	Long: `Create a mission workspace with .orc-mission marker and TMux session.
+	Long: `Create a mission workspace with .orc/config.json and TMux session.
 
 This command:
 1. Creates a workspace directory for the mission
-2. Writes .orc-mission marker file for deputy context detection
+2. Writes .orc/config.json for mission context detection
 3. Queries database for active groves
-4. Creates TMux session with deputy pane and grove panes
+4. Creates TMux session with ORC pane and grove panes
 5. Materializes git worktrees for groves if needed
 
 Examples:
@@ -160,9 +160,9 @@ Examples:
 			return fmt.Errorf("failed to create workspace: %w", err)
 		}
 
-		// Write .orc-mission marker file
+		// Write .orc/config.json for mission context
 		if err := context.WriteMissionContext(workspacePath, missionID); err != nil {
-			return fmt.Errorf("failed to write mission context: %w", err)
+			return fmt.Errorf("failed to write mission config: %w", err)
 		}
 
 		fmt.Printf("✓ Created mission workspace at: %s\n", workspacePath)

@@ -32,9 +32,8 @@ func debugSessionInfoCmd() *cobra.Command {
 
 Shows:
 - Current working directory
-- Mission context (.orc-mission marker)
-- Deputy context (workspace metadata)
-- Grove context (grove metadata)
+- Mission context (.orc/config.json)
+- Grove context (.orc/config.json with grove config)
 - Environment variables (TMUX, etc.)
 
 Useful for debugging context detection issues.
@@ -53,22 +52,22 @@ Examples:
 			fmt.Printf("Current Directory:\n")
 			fmt.Printf("  %s\n\n", cwd)
 
-			// Check for .orc-mission marker
-			fmt.Printf("Mission Context (.orc-mission):\n")
+			// Check for mission config
+			fmt.Printf("Mission Context (.orc/config.json):\n")
 			missionCtx, err := context.DetectMissionContext()
 			if err == nil && missionCtx != nil {
-				markerPath := filepath.Join(missionCtx.WorkspacePath, ".orc-mission")
-				fmt.Printf("  ✓ Found: %s\n", markerPath)
+				configPath := filepath.Join(missionCtx.WorkspacePath, ".orc", "config.json")
+				fmt.Printf("  ✓ Found: %s\n", configPath)
 				fmt.Printf("  Mission ID: %s\n", missionCtx.MissionID)
 				fmt.Printf("  Workspace: %s\n\n", missionCtx.WorkspacePath)
 
-				// Read and display .orc-mission content
-				data, err := os.ReadFile(markerPath)
+				// Read and display .orc/config.json content
+				data, err := os.ReadFile(configPath)
 				if err == nil {
 					fmt.Printf("  Content:\n")
-					var marker map[string]interface{}
-					if err := json.Unmarshal(data, &marker); err == nil {
-						formatted, _ := json.MarshalIndent(marker, "    ", "  ")
+					var cfg map[string]interface{}
+					if err := json.Unmarshal(data, &cfg); err == nil {
+						formatted, _ := json.MarshalIndent(cfg, "    ", "  ")
 						fmt.Printf("    %s\n\n", string(formatted))
 					} else {
 						fmt.Printf("    %s\n\n", string(data))
@@ -145,9 +144,8 @@ func debugValidateContextCmd() *cobra.Command {
 		Long: `Validate that a directory has proper ORC context markers and metadata.
 
 Checks:
-- .orc-mission marker exists and is valid JSON
-- .orc/metadata.json exists and is valid JSON
-- Mission ID is consistent across files
+- .orc/config.json exists and is valid JSON
+- Mission ID or grove ID is present
 - Directory structure is correct
 
 Useful for debugging mission workspace setup and grove creation issues.
@@ -175,43 +173,8 @@ Examples:
 
 			validationPassed := true
 
-			// Check 1: .orc-mission marker
-			fmt.Printf("1. .orc-mission marker\n")
-			missionMarkerPath := filepath.Join(absDir, ".orc-mission")
-			if data, err := os.ReadFile(missionMarkerPath); err == nil {
-				fmt.Printf("   ✓ File exists: %s\n", missionMarkerPath)
-
-				// Validate JSON
-				var marker map[string]interface{}
-				if err := json.Unmarshal(data, &marker); err == nil {
-					fmt.Printf("   ✓ Valid JSON\n")
-
-					// Check for mission_id field
-					if missionID, ok := marker["mission_id"].(string); ok && missionID != "" {
-						fmt.Printf("   ✓ mission_id present: %s\n", missionID)
-					} else {
-						fmt.Printf("   ✗ mission_id missing or invalid\n")
-						validationPassed = false
-					}
-
-					// Check for workspace_path field
-					if workspacePath, ok := marker["workspace_path"].(string); ok && workspacePath != "" {
-						fmt.Printf("   ✓ workspace_path present: %s\n", workspacePath)
-					} else {
-						fmt.Printf("   ⚠️  workspace_path missing (optional)\n")
-					}
-				} else {
-					fmt.Printf("   ✗ Invalid JSON: %v\n", err)
-					validationPassed = false
-				}
-			} else {
-				fmt.Printf("   ✗ File not found: %s\n", missionMarkerPath)
-				validationPassed = false
-			}
-			fmt.Println()
-
-			// Check 2: .orc directory
-			fmt.Printf("2. .orc directory\n")
+			// Check 1: .orc directory
+			fmt.Printf("1. .orc directory\n")
 			orcDir := filepath.Join(absDir, ".orc")
 			if info, err := os.Stat(orcDir); err == nil {
 				if info.IsDir() {
@@ -226,9 +189,9 @@ Examples:
 			}
 			fmt.Println()
 
-			// Check 3: .orc/metadata.json
-			fmt.Printf("3. .orc/metadata.json\n")
-			metadataPath := filepath.Join(orcDir, "metadata.json")
+			// Check 2: .orc/config.json
+			fmt.Printf("2. .orc/config.json\n")
+			metadataPath := filepath.Join(orcDir, "config.json")
 			if data, err := os.ReadFile(metadataPath); err == nil {
 				fmt.Printf("   ✓ File exists: %s\n", metadataPath)
 

@@ -1,8 +1,6 @@
 package context
 
 import (
-	"encoding/json"
-	"fmt"
 	"os"
 	"path/filepath"
 	"time"
@@ -18,10 +16,8 @@ type MissionContext struct {
 	CreatedAt     time.Time `json:"created_at"`
 }
 
-const markerFileName = ".orc-mission"
-
 // DetectMissionContext checks if we're in a mission context
-// by looking for .orc/config.json (or legacy .orc-mission) in current directory or parents
+// by looking for .orc/config.json in current directory or parents
 func DetectMissionContext() (*MissionContext, error) {
 	// Start from current directory
 	dir, err := os.Getwd()
@@ -53,21 +49,6 @@ func DetectMissionContext() (*MissionContext, error) {
 	}
 }
 
-// ReadMissionContext reads and parses a .orc-mission file
-func ReadMissionContext(path string) (*MissionContext, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read mission context: %w", err)
-	}
-
-	var ctx MissionContext
-	if err := json.Unmarshal(data, &ctx); err != nil {
-		return nil, fmt.Errorf("failed to parse mission context: %w", err)
-	}
-
-	return &ctx, nil
-}
-
 // WriteMissionContext creates a .orc/config.json file for mission context
 func WriteMissionContext(workspacePath, missionID string) error {
 	return WriteMissionConfig(workspacePath, missionID, false)
@@ -89,7 +70,7 @@ func WriteMissionConfig(workspacePath, missionID string, isMaster bool) error {
 	return config.SaveConfig(workspacePath, cfg)
 }
 
-// GetContextMissionID returns the mission ID from context, or empty string if not in deputy context
+// GetContextMissionID returns the mission ID from context, or empty string if not in mission context
 func GetContextMissionID() string {
 	ctx, err := DetectMissionContext()
 	if err != nil || ctx == nil {
@@ -98,14 +79,15 @@ func GetContextMissionID() string {
 	return ctx.MissionID
 }
 
-// IsDeputyContext returns true if we're running in a deputy ORC context
+// IsDeputyContext returns true if we're running in a mission context
+// Deprecated: Use DetectMissionContext() != nil instead
 func IsDeputyContext() bool {
 	ctx, _ := DetectMissionContext()
 	return ctx != nil
 }
 
 // IsOrcSourceDirectory checks if the current directory is the ORC source code directory
-// Used to prevent deputy ORCs from modifying the orchestrator source
+// Used to prevent accidental modification of the orchestrator source by IMPs
 func IsOrcSourceDirectory() bool {
 	// Check for key ORC source files
 	markers := []string{"cmd/orc/main.go", "internal/db/schema.go", "go.mod"}

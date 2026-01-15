@@ -20,7 +20,7 @@ This sends the message immediately to the agent's input, as if they typed it.
 The agent must be running in a tmux session for this to work.
 
 Examples:
-  orc nudge DEPUTY-MISSION-001 "Check your mail - urgent task"
+  orc nudge ORC "Check your mail - urgent task"
   orc nudge IMP-GROVE-001 "Tests are failing, need fix ASAP"`,
 		Args: cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -51,7 +51,7 @@ Examples:
 				// Update identity with mission ID for session check
 				identity.MissionID = grove.MissionID
 			} else {
-				// Deputy
+				// ORC
 				target, err = agent.ResolveTMuxTarget(agentID, "")
 				if err != nil {
 					return fmt.Errorf("failed to resolve target: %w", err)

@@ -49,7 +49,7 @@ func groveCreateCmd() *cobra.Command {
 This command:
 1. Creates a grove record in the database
 2. Creates git worktree(s) for specified repos
-3. Writes .orc/config.json (grove config) and .orc-mission marker
+3. Writes .orc/config.json (grove config)
 
 Examples:
   orc grove create auth-backend --repos main-app --mission MISSION-001
@@ -64,7 +64,7 @@ Examples:
 
 			name := args[0]
 
-			// Smart default: use deputy context if available, otherwise MISSION-001
+			// Smart default: use mission context if available, otherwise MISSION-001
 			if missionID == "" {
 				if ctxMissionID := context.GetContextMissionID(); ctxMissionID != "" {
 					missionID = ctxMissionID
@@ -120,18 +120,11 @@ Examples:
 				fmt.Println()
 			}
 
-			// Write .orc/config.json (grove config)
+			// Write .orc/config.json (grove config - includes mission context)
 			if err := writeGroveMetadata(grove); err != nil {
 				fmt.Printf("  ⚠️  Warning: Could not write .orc/config.json: %v\n", err)
 			} else {
-				fmt.Printf("  ✓ Wrote .orc/config.json\n")
-			}
-
-			// Write .orc-mission marker so IMP can detect mission context
-			if err := context.WriteMissionContext(grovePath, missionID); err != nil {
-				fmt.Printf("  ⚠️  Warning: Could not write .orc-mission marker: %v\n", err)
-			} else {
-				fmt.Printf("  ✓ Wrote .orc-mission marker\n")
+				fmt.Printf("  ✓ Wrote .orc/config.json (grove config + mission context)\n")
 			}
 
 			fmt.Println()

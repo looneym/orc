@@ -14,90 +14,30 @@ import (
 type AgentType string
 
 const (
-	AgentTypeMaster AgentType = "MASTER"
-	AgentTypeDeputy AgentType = "DEPUTY"
-	AgentTypeIMP    AgentType = "IMP"
+	AgentTypeORC AgentType = "ORC"
+	AgentTypeIMP AgentType = "IMP"
 )
 
 // AgentIdentity represents a parsed agent ID
 type AgentIdentity struct {
 	Type      AgentType
-	ID        string // Mission ID for deputy, Grove ID for IMP
-	FullID    string // Complete ID like "DEPUTY-MISSION-001" or "IMP-GROVE-001"
-	MissionID string // Mission ID (same as ID for deputy, extracted from grove for IMP)
+	ID        string // "ORC" for orchestrator, Grove ID for IMP
+	FullID    string // Complete ID like "ORC" or "IMP-GROVE-001"
+	MissionID string // Mission ID (empty for ORC outside mission, populated for IMP)
 }
 
 // GetCurrentAgentID detects the current agent identity based on working directory context
+// Simple logic: If in grove → IMP, otherwise → ORC
 func GetCurrentAgentID() (*AgentIdentity, error) {
-	// Check mission context first
-	missionCtx, err := context.DetectMissionContext()
-	if err != nil {
-		return nil, fmt.Errorf("failed to detect mission context: %w", err)
-	}
-
-	// If we're NOT in a mission context, check if we're master ORC
-	if missionCtx == nil {
-		tmuxSession := os.Getenv("TMUX")
-		if tmuxSession != "" {
-			sessionName := getCurrentTmuxSession()
-			if sessionName == "ORC" {
-				// Master ORC working outside mission contexts
-				return &AgentIdentity{
-					Type:      AgentTypeMaster,
-					ID:        "ORC",
-					FullID:    "MASTER-ORC",
-					MissionID: "", // Master doesn't belong to a mission
-				}, nil
-			}
-		}
-		return nil, fmt.Errorf("no agent context detected - not in a mission workspace or grove")
-	}
-
-	// We're in a mission context - check tmux to see if we're master visiting
-	// or an actual deputy for this mission
-	tmuxSession := os.Getenv("TMUX")
-	if tmuxSession != "" {
-		sessionName := getCurrentTmuxSession()
-		// Master ORC session, but working in a mission directory
-		if sessionName == "ORC" {
-			// Master visiting mission - use mission for scoping but identify as master
-			return &AgentIdentity{
-				Type:      AgentTypeMaster,
-				ID:        "ORC",
-				FullID:    "MASTER-ORC",
-				MissionID: missionCtx.MissionID, // Use mission for message scoping
-			}, nil
-		}
-		// Deputy session for this specific mission
-		if sessionName == fmt.Sprintf("orc-%s", missionCtx.MissionID) {
-			// Actual deputy for this mission
-			return &AgentIdentity{
-				Type:      AgentTypeDeputy,
-				ID:        missionCtx.MissionID,
-				FullID:    fmt.Sprintf("DEPUTY-%s", missionCtx.MissionID),
-				MissionID: missionCtx.MissionID,
-			}, nil
-		}
-	}
-
 	cwd, err := os.Getwd()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get working directory: %w", err)
 	}
 
-	// If at workspace root, we're deputy
-	if cwd == missionCtx.WorkspacePath {
-		return &AgentIdentity{
-			Type:      AgentTypeDeputy,
-			ID:        missionCtx.MissionID,
-			FullID:    fmt.Sprintf("DEPUTY-%s", missionCtx.MissionID),
-			MissionID: missionCtx.MissionID,
-		}, nil
-	}
-
-	// Otherwise check for grove config
+	// Check for grove config first (most specific)
 	cfg, err := config.LoadConfigWithFallback(cwd)
 	if err == nil && cfg.Type == config.TypeGrove {
+		// We're in a grove - this is an IMP
 		return &AgentIdentity{
 			Type:      AgentTypeIMP,
 			ID:        cfg.Grove.GroveID,
@@ -106,40 +46,43 @@ func GetCurrentAgentID() (*AgentIdentity, error) {
 		}, nil
 	}
 
-	// Fallback: in mission context but not at workspace root = deputy
+	// Not in a grove - we're ORC (orchestrator)
+	// ORC can work anywhere: mission workspaces, ORC repo, anywhere
+	missionCtx, _ := context.DetectMissionContext()
+	missionID := ""
+	if missionCtx != nil {
+		missionID = missionCtx.MissionID
+	}
+
 	return &AgentIdentity{
-		Type:      AgentTypeDeputy,
-		ID:        missionCtx.MissionID,
-		FullID:    fmt.Sprintf("DEPUTY-%s", missionCtx.MissionID),
-		MissionID: missionCtx.MissionID,
+		Type:      AgentTypeORC,
+		ID:        "ORC",
+		FullID:    "ORC",
+		MissionID: missionID, // Populated if in mission context, empty otherwise
 	}, nil
 }
 
-// ParseAgentID parses an agent ID string like "DEPUTY-MISSION-001" or "IMP-GROVE-001"
+// ParseAgentID parses an agent ID string like "ORC" or "IMP-GROVE-001"
 func ParseAgentID(agentID string) (*AgentIdentity, error) {
+	// Special case: ORC has no parts
+	if agentID == "ORC" {
+		return &AgentIdentity{
+			Type:      AgentTypeORC,
+			ID:        "ORC",
+			FullID:    "ORC",
+			MissionID: "", // ORC can work across missions
+		}, nil
+	}
+
 	parts := strings.SplitN(agentID, "-", 2)
 	if len(parts) != 2 {
-		return nil, fmt.Errorf("invalid agent ID format: %s (expected TYPE-ID)", agentID)
+		return nil, fmt.Errorf("invalid agent ID format: %s (expected ORC or IMP-GROVE-ID)", agentID)
 	}
 
 	agentType := AgentType(parts[0])
 	id := parts[1]
 
 	switch agentType {
-	case AgentTypeMaster:
-		return &AgentIdentity{
-			Type:      AgentTypeMaster,
-			ID:        id,
-			FullID:    agentID,
-			MissionID: "", // Master doesn't belong to a specific mission
-		}, nil
-	case AgentTypeDeputy:
-		return &AgentIdentity{
-			Type:      AgentTypeDeputy,
-			ID:        id,
-			FullID:    agentID,
-			MissionID: id,
-		}, nil
 	case AgentTypeIMP:
 		// For IMP, we need to extract mission ID from grove ID
 		// Grove IDs are like GROVE-001, we need to look up the mission
@@ -150,7 +93,7 @@ func ParseAgentID(agentID string) (*AgentIdentity, error) {
 			FullID: agentID,
 		}, nil
 	default:
-		return nil, fmt.Errorf("unknown agent type: %s", agentType)
+		return nil, fmt.Errorf("unknown agent type: %s (expected ORC or IMP)", agentType)
 	}
 }
 
@@ -171,13 +114,8 @@ func ResolveTMuxTarget(agentID string, groveName string) (string, error) {
 		return "", err
 	}
 
-	if identity.Type == AgentTypeDeputy {
-		// Deputy always in window 1, pane 1
-		return fmt.Sprintf("orc-%s:1.1", identity.ID), nil
-	}
-
-	if identity.Type == AgentTypeMaster {
-		// Master ORC in ORC session, window 1, pane 1
+	if identity.Type == AgentTypeORC {
+		// ORC always in ORC session, window 1, pane 1
 		return "ORC:1.1", nil
 	}
 

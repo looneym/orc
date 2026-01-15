@@ -121,46 +121,8 @@ func (c *Config) Validate() error {
 	return nil
 }
 
-// LoadConfigWithFallback tries new config.json first, falls back to legacy files
+// LoadConfigWithFallback loads config from .orc/config.json
+// Name kept for compatibility with callers, but no longer has fallback behavior
 func LoadConfigWithFallback(dir string) (*Config, error) {
-	// Try new format first
-	cfg, err := LoadConfig(dir)
-	if err == nil {
-		return cfg, nil
-	}
-
-	// Fall back to legacy .orc-mission
-	return loadLegacyOrcMission(dir)
-}
-
-// loadLegacyOrcMission reads old .orc-mission format and converts
-func loadLegacyOrcMission(dir string) (*Config, error) {
-	path := filepath.Join(dir, ".orc-mission")
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("no config found (tried config.json and .orc-mission): %w", err)
-	}
-
-	var legacy struct {
-		MissionID     string `json:"mission_id"`
-		WorkspacePath string `json:"workspace_path"`
-		CreatedAt     string `json:"created_at"`
-		IsMaster      bool   `json:"is_master"`
-	}
-
-	if err := json.Unmarshal(data, &legacy); err != nil {
-		return nil, fmt.Errorf("failed to parse legacy .orc-mission: %w", err)
-	}
-
-	// Convert to new format
-	return &Config{
-		Version: "1.0",
-		Type:    TypeMission,
-		Mission: &MissionConfig{
-			MissionID:     legacy.MissionID,
-			WorkspacePath: legacy.WorkspacePath,
-			IsMaster:      legacy.IsMaster,
-			CreatedAt:     legacy.CreatedAt,
-		},
-	}, nil
+	return LoadConfig(dir)
 }
