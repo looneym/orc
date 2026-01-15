@@ -689,6 +689,13 @@ Examples:
 				} else {
 					fmt.Printf("✓ Grove %s config written\n", grove.ID)
 				}
+
+				// Write Claude settings to override enterprise plugins
+				if err := writeClaudeSettings(desiredPath); err != nil {
+					fmt.Printf("  ⚠️  Could not write Claude settings for grove %s: %v\n", grove.ID, err)
+				} else {
+					fmt.Printf("✓ Grove %s Claude settings written\n", grove.ID)
+				}
 			}
 
 			// Update DB path if changed
@@ -864,6 +871,39 @@ func writeGroveConfig(grovePath string, grove *models.Grove) error {
 	}
 
 	return config.SaveConfig(grovePath, cfg)
+}
+
+// writeClaudeSettings creates a .claude/settings.json file in the grove directory
+// to override global Claude Code settings that may be forced by enterprise plugins
+func writeClaudeSettings(grovePath string) error {
+	claudeDir := filepath.Join(grovePath, ".claude")
+	if err := os.MkdirAll(claudeDir, 0755); err != nil {
+		return fmt.Errorf("failed to create .claude directory: %w", err)
+	}
+
+	// Project-level settings override global settings and enterprise plugins
+	// This ensures IMPs boot in normal mode, not forced plan mode
+	settings := map[string]interface{}{
+		"permissions": map[string]interface{}{
+			"defaultMode": "default", // Override any global plan mode setting
+		},
+		"enabledPlugins": map[string]bool{
+			"developer-tools@intercom-plugins": false, // Disable if it forces plan mode
+		},
+		"hooks": map[string]interface{}{}, // Clear any forced hooks
+	}
+
+	data, err := json.MarshalIndent(settings, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal settings: %w", err)
+	}
+
+	settingsPath := filepath.Join(claudeDir, "settings.json")
+	if err := os.WriteFile(settingsPath, data, 0644); err != nil {
+		return fmt.Errorf("failed to write settings.json: %w", err)
+	}
+
+	return nil
 }
 
 var missionPinCmd = &cobra.Command{
