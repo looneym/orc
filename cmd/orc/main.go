@@ -12,14 +12,17 @@ func main() {
 	rootCmd := &cobra.Command{
 		Use:   "orc",
 		Short: "ORC - Orchestrator for Forest Factory missions",
-		Long: `ORC is a CLI tool for managing missions, groves, and work orders.
+		Long: `ORC is a CLI tool for managing missions, groves, epics, and tasks.
 It coordinates IMPs (Implementation Agents) working in isolated groves (worktrees).`,
 	}
 
 	// Add subcommands
 	rootCmd.AddCommand(cli.InitCmd())
+	rootCmd.AddCommand(cli.DoctorCmd())
 	rootCmd.AddCommand(cli.MissionCmd())
-	rootCmd.AddCommand(cli.WorkOrderCmd())
+	rootCmd.AddCommand(cli.EpicCmd())
+	rootCmd.AddCommand(cli.RabbitHoleCmd())
+	rootCmd.AddCommand(cli.TaskCmd())
 	rootCmd.AddCommand(cli.GroveCmd())
 	rootCmd.AddCommand(cli.HandoffCmd())
 	rootCmd.AddCommand(cli.SummaryCmd())
@@ -27,6 +30,8 @@ It coordinates IMPs (Implementation Agents) working in isolated groves (worktree
 	rootCmd.AddCommand(cli.AttachCmd())
 	rootCmd.AddCommand(cli.PrimeCmd())
 	rootCmd.AddCommand(cli.TestCmd())
+	rootCmd.AddCommand(cli.MailCmd())
+	rootCmd.AddCommand(cli.NudgeCmd())
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)

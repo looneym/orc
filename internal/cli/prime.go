@@ -16,10 +16,14 @@ func PrimeCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "prime",
 		Short: "Output lightweight context for session priming",
-		Long: `Generate concise context snapshot for injecting into new Claude sessions.
+		Long: `Generate concise context snapshot for Claude agents on startup.
 
-Designed for SessionStart hook injection after /clear - provides just enough
-context to orient the new session without overwhelming it.
+NOTE: Originally designed for SessionStart hook injection, but hooks are currently
+broken in Claude Code v2.1.7. ORC now uses direct prompt pattern when starting agents:
+  claude "Run orc prime"
+
+This command detects the agent's location (grove/mission/global) and provides
+appropriate context automatically.
 
 Output includes:
 - Current location (cwd)
@@ -27,8 +31,10 @@ Output includes:
 - Active work order (if any)
 - Latest handoff note (brief)
 
-This is NOT a replacement for /g-bootstrap (which provides full context).
-This is for automatic injection after /clear to maintain basic orientation.
+Still useful for:
+- Manual context refresh during long sessions
+- Debugging and understanding mission context
+- Testing what would be injected via hooks (if they worked)
 
 Examples:
   orc prime
@@ -87,12 +93,17 @@ func runPrime(cmd *cobra.Command, args []string) error {
 				}
 			}
 
-			// Get active work order
-			workOrders, err := models.ListWorkOrders(missionCtx.MissionID, "in_progress")
-			if err == nil && len(workOrders) > 0 {
-				wo := workOrders[0]
-				output.WriteString(fmt.Sprintf("### Active Work: %s\n\n", wo.ID))
-				output.WriteString(fmt.Sprintf("**%s** [%s]\n\n", wo.Title, wo.Status))
+			// Get active tasks
+			tasks, err := models.ListTasks("", "", "implement")
+			if err == nil && len(tasks) > 0 {
+				// Filter to current mission
+				for _, task := range tasks {
+					if task.MissionID == missionCtx.MissionID {
+						output.WriteString(fmt.Sprintf("### Active Work: %s\n\n", task.ID))
+						output.WriteString(fmt.Sprintf("**%s** [%s]\n\n", task.Title, task.Status))
+						break
+					}
+				}
 			}
 
 			// Get latest handoff
@@ -105,7 +116,7 @@ func runPrime(cmd *cobra.Command, args []string) error {
 				noteLines := strings.Split(ho.HandoffNote, "\n")
 				if len(noteLines) > 5 {
 					output.WriteString(strings.Join(noteLines[:5], "\n"))
-					output.WriteString("\n\n*(Use `/g-bootstrap` for full context)*\n\n")
+					output.WriteString("\n\n*(Showing first 5 lines)*\n\n")
 				} else {
 					output.WriteString(ho.HandoffNote)
 					output.WriteString("\n\n")
@@ -115,13 +126,11 @@ func runPrime(cmd *cobra.Command, args []string) error {
 	} else {
 		output.WriteString("**Context**: Master orchestrator (global)\n\n")
 		output.WriteString("Run `orc mission list` to see available missions.\n\n")
-		output.WriteString("Use `/g-bootstrap` to load full session context.\n")
 	}
 
 	// Footer note
 	output.WriteString("\n---\n")
 	output.WriteString("💡 **Note**: This is lightweight orientation context.\n")
-	output.WriteString("   For full context (Graphiti memory + deep analysis), use `/g-bootstrap`\n")
 
 	// Truncate to max lines if needed
 	fullOutput := output.String()
@@ -129,7 +138,7 @@ func runPrime(cmd *cobra.Command, args []string) error {
 		lines := strings.Split(fullOutput, "\n")
 		if len(lines) > maxLines {
 			lines = lines[:maxLines]
-			lines = append(lines, "...", "", "*(Output truncated - use /g-bootstrap for full context)*")
+			lines = append(lines, "...", "", "*(Output truncated to max lines)*")
 		}
 		fullOutput = strings.Join(lines, "\n")
 	}

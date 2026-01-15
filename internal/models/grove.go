@@ -91,6 +91,26 @@ func GetGrove(id string) (*Grove, error) {
 	return grove, nil
 }
 
+// GetGroveByPath retrieves a grove by its file path
+func GetGroveByPath(path string) (*Grove, error) {
+	database, err := db.GetDB()
+	if err != nil {
+		return nil, err
+	}
+
+	grove := &Grove{}
+	err = database.QueryRow(
+		"SELECT id, mission_id, name, path, repos, status, created_at, updated_at FROM groves WHERE path = ?",
+		path,
+	).Scan(&grove.ID, &grove.MissionID, &grove.Name, &grove.Path, &grove.Repos, &grove.Status, &grove.CreatedAt, &grove.UpdatedAt)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return grove, nil
+}
+
 // ListGroves retrieves all groves, optionally filtered by mission
 func ListGroves(missionID string) ([]*Grove, error) {
 	database, err := db.GetDB()

@@ -129,6 +129,26 @@ TMux Session: "Mission Name" (orc-MISSION-XXX)
 - All panes CD into grove directory
 - Easy context switching between coordination and implementation
 
+**Agent Starting Pattern:**
+ORC uses **direct prompt injection** when starting Claude agents in TMux:
+
+```bash
+claude "Run `orc prime`"
+```
+
+This pattern replaces SessionStart hooks (which are broken in Claude Code v2.1.7). When agents start:
+1. TMux sends the command with prompt: `claude "Run \`orc prime\`"`
+2. Claude receives the prompt and executes `orc prime`
+3. `orc prime` detects the agent's location (grove/mission/global) and provides appropriate context
+4. Agent begins work with full context immediately
+
+**Benefits:**
+- Reliable context injection (not dependent on broken hooks)
+- Immediate agent activation
+- Clear, explicit agent instructions
+- Easier debugging (command visible in TMux history)
+- Works consistently across all agent types (IMPs, Deputies, Master ORC)
+
 ---
 
 ## Technology Stack
@@ -404,6 +424,28 @@ cd ~/src/orc
 go build -o orc cmd/orc/main.go
 # Binary available at: ./orc
 ```
+
+### Prerequisites
+
+**Claude Code Workspace Trust**
+
+ORC requires Claude Code to trust specific directories where it creates workspaces.
+
+Add to `~/.claude/settings.json`:
+```json
+{
+  "permissions": {
+    "additionalDirectories": [
+      "~/src/worktrees",
+      "~/src/missions"
+    ]
+  }
+}
+```
+
+**Validation**: Run `orc doctor` to verify configuration.
+
+**See**: INSTALL.md for detailed setup instructions.
 
 ### Initialize ORC
 ```bash

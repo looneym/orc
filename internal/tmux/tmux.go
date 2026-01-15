@@ -49,8 +49,8 @@ func (s *Session) CreateDeputyWindow() (*Window, error) {
 		return nil, fmt.Errorf("failed to rename deputy window: %w", err)
 	}
 
-	// Launch claude in the deputy pane
-	if err := s.SendKeys(target, "claude"); err != nil {
+	// Launch claude in the deputy pane with orc prime prompt
+	if err := s.SendKeys(target, "claude \"Run the orc prime command to get context\""); err != nil {
 		return nil, fmt.Errorf("failed to launch claude: %w", err)
 	}
 
@@ -90,9 +90,9 @@ func (s *Session) CreateMasterOrcWindow(workingDir string) error {
 	// Pane 2 (top right): vim
 	// Pane 3 (bottom right): shell
 
-	// Launch claude in pane 1 (left)
+	// Launch claude in pane 1 (left) with orc prime prompt
 	pane1 := fmt.Sprintf("%s.1", target)
-	if err := s.SendKeys(pane1, "claude"); err != nil {
+	if err := s.SendKeys(pane1, "claude \"Run the orc prime command to get context\""); err != nil {
 		return fmt.Errorf("failed to launch claude: %w", err)
 	}
 
@@ -147,9 +147,9 @@ func (s *Session) CreateGroveWindow(index int, name, workingDir string) (*Window
 		return nil, fmt.Errorf("failed to launch vim: %w", err)
 	}
 
-	// Launch claude in pane 2 (top right - IMP)
+	// Launch claude in pane 2 (top right - IMP) with orc prime prompt
 	pane2 := fmt.Sprintf("%s.2", target)
-	if err := s.SendKeys(pane2, "claude"); err != nil {
+	if err := s.SendKeys(pane2, "claude \"Run the orc prime command to get context\""); err != nil {
 		return nil, fmt.Errorf("failed to launch claude IMP: %w", err)
 	}
 
@@ -217,4 +217,73 @@ func AttachInstructions(sessionName string) string {
 	b.WriteString("  List windows: Ctrl+b then w\n")
 
 	return b.String()
+}
+
+// SendKeysLiteral sends text literally without interpretation
+func (s *Session) SendKeysLiteral(target, text string) error {
+	cmd := exec.Command("tmux", "send-keys", "-t", target, "-l", text)
+	return cmd.Run()
+}
+
+// SendEscape sends the Escape key
+func (s *Session) SendEscape(target string) error {
+	cmd := exec.Command("tmux", "send-keys", "-t", target, "Escape")
+	return cmd.Run()
+}
+
+// SendEnter sends the Enter key
+func (s *Session) SendEnter(target string) error {
+	cmd := exec.Command("tmux", "send-keys", "-t", target, "Enter")
+	return cmd.Run()
+}
+
+// NudgeSession sends a message to a running Claude session using the Gastown pattern
+// This implements the 4-step reliable delivery:
+// 1. Send text literally (no interpretation)
+// 2. Wait 500ms for processing
+// 3. Send Escape to exit vim mode
+// 4. Send Enter to submit (with retry logic)
+func NudgeSession(target, message string) error {
+	// Extract session name from target
+	parts := strings.Split(target, ":")
+	if len(parts) == 0 {
+		return fmt.Errorf("invalid target format: %s", target)
+	}
+	session := &Session{Name: parts[0]}
+
+	// Step 1: Send text literally
+	if err := session.SendKeysLiteral(target, message); err != nil {
+		return fmt.Errorf("failed to send message: %w", err)
+	}
+
+	// Step 2: Wait 500ms (critical for reliability)
+	cmd := exec.Command("sleep", "0.5")
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("failed to wait: %w", err)
+	}
+
+	// Step 3: Send Escape for vim mode
+	if err := session.SendEscape(target); err != nil {
+		return fmt.Errorf("failed to send escape: %w", err)
+	}
+
+	// Extra 100ms wait after Escape (from Gastown fix)
+	cmd = exec.Command("sleep", "0.1")
+	_ = cmd.Run()
+
+	// Step 4: Send Enter to submit with retry (critical fix from Gastown issue #307)
+	var lastErr error
+	for attempt := 0; attempt < 3; attempt++ {
+		if attempt > 0 {
+			cmd := exec.Command("sleep", "0.2")
+			_ = cmd.Run()
+		}
+		if err := session.SendEnter(target); err != nil {
+			lastErr = err
+			continue
+		}
+		return nil
+	}
+
+	return fmt.Errorf("failed to send Enter after 3 attempts: %w", lastErr)
 }

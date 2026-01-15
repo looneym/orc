@@ -9,7 +9,9 @@ import (
 	"strconv"
 	"strings"
 	"text/tabwriter"
+	"time"
 
+	"github.com/example/orc/internal/config"
 	"github.com/example/orc/internal/context"
 	"github.com/example/orc/internal/models"
 	"github.com/example/orc/internal/tmux"
@@ -47,7 +49,7 @@ func groveCreateCmd() *cobra.Command {
 This command:
 1. Creates a grove record in the database
 2. Creates git worktree(s) for specified repos
-3. Writes metadata.json for reference
+3. Writes .orc/config.json (grove config) and .orc-mission marker
 
 Examples:
   orc grove create auth-backend --repos main-app --mission MISSION-001
@@ -55,6 +57,11 @@ Examples:
   orc grove create multi --repos main-app,api-service --mission MISSION-002`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// Validate Claude workspace trust before creating grove
+			if err := validateClaudeWorkspaceTrust(); err != nil {
+				return fmt.Errorf("Claude workspace trust validation failed:\n\n%w\n\nRun 'orc doctor' for detailed diagnostics", err)
+			}
+
 			name := args[0]
 
 			// Smart default: use deputy context if available, otherwise MISSION-001
@@ -76,8 +83,9 @@ Examples:
 				basePath = filepath.Join(home, "src", "worktrees")
 			}
 
-			// Full path for this grove
-			grovePath := filepath.Join(basePath, name)
+			// Full path for this grove - include mission ID to avoid conflicts
+			grovePathName := fmt.Sprintf("%s-%s", missionID, name)
+			grovePath := filepath.Join(basePath, grovePathName)
 
 			// Create grove in database
 			grove, err := models.CreateGrove(missionID, name, grovePath, repos)
@@ -112,11 +120,11 @@ Examples:
 				fmt.Println()
 			}
 
-			// Write metadata.json (reference only)
+			// Write .orc/config.json (grove config)
 			if err := writeGroveMetadata(grove); err != nil {
-				fmt.Printf("  ⚠️  Warning: Could not write metadata.json: %v\n", err)
+				fmt.Printf("  ⚠️  Warning: Could not write .orc/config.json: %v\n", err)
 			} else {
-				fmt.Printf("  ✓ Wrote metadata.json\n")
+				fmt.Printf("  ✓ Wrote .orc/config.json\n")
 			}
 
 			// Write .orc-mission marker so IMP can detect mission context
@@ -248,19 +256,19 @@ Examples:
 			fmt.Printf("✓ Grove %s renamed\n", id)
 			fmt.Printf("  %s → %s\n", oldName, newName)
 
-			// Update metadata.json if requested
+			// Update .orc/config.json if requested
 			if updateMetadata {
 				// Reload grove with new name
 				grove, err = models.GetGrove(id)
 				if err != nil {
-					fmt.Printf("  ⚠️  Warning: Could not reload grove for metadata update: %v\n", err)
+					fmt.Printf("  ⚠️  Warning: Could not reload grove for config update: %v\n", err)
 					return nil
 				}
 
 				if err := writeGroveMetadata(grove); err != nil {
-					fmt.Printf("  ⚠️  Warning: Could not update metadata.json: %v\n", err)
+					fmt.Printf("  ⚠️  Warning: Could not update .orc/config.json: %v\n", err)
 				} else {
-					fmt.Printf("  ✓ Updated metadata.json\n")
+					fmt.Printf("  ✓ Updated .orc/config.json\n")
 				}
 			}
 
@@ -452,35 +460,28 @@ func createWorktree(repo, branch, targetPath string) error {
 	return nil
 }
 
-// writeGroveMetadata writes metadata.json for reference (database is source of truth)
+// writeGroveMetadata writes .orc/config.json with type="grove"
 func writeGroveMetadata(grove *models.Grove) error {
-	metadata := map[string]interface{}{
-		"grove_id":   grove.ID,
-		"mission_id": grove.MissionID,
-		"name":       grove.Name,
-		"repos":      []string{},
-		"created_at": grove.CreatedAt,
-	}
-
 	// Parse repos JSON if present
+	repos := []string{}
 	if grove.Repos.Valid {
-		repos := []string{}
-		if err := json.Unmarshal([]byte(grove.Repos.String), &repos); err == nil {
-			metadata["repos"] = repos
+		if err := json.Unmarshal([]byte(grove.Repos.String), &repos); err != nil {
+			// If unmarshal fails, leave as empty slice
+			repos = []string{}
 		}
 	}
 
-	data, err := json.MarshalIndent(metadata, "", "  ")
-	if err != nil {
-		return err
+	cfg := &config.Config{
+		Version: "1.0",
+		Type:    config.TypeGrove,
+		Grove: &config.GroveConfig{
+			GroveID:   grove.ID,
+			MissionID: grove.MissionID,
+			Name:      grove.Name,
+			Repos:     repos,
+			CreatedAt: time.Now().Format(time.RFC3339),
+		},
 	}
 
-	// Write to .orc/ subdirectory
-	orcDir := filepath.Join(grove.Path, ".orc")
-	if err := os.MkdirAll(orcDir, 0755); err != nil {
-		return err
-	}
-
-	metadataPath := filepath.Join(orcDir, "metadata.json")
-	return os.WriteFile(metadataPath, data, 0644)
+	return config.SaveConfig(grove.Path, cfg)
 }

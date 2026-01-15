@@ -1,0 +1,295 @@
+package cli
+
+import (
+	"fmt"
+	"strings"
+
+	"github.com/example/orc/internal/agent"
+	"github.com/example/orc/internal/models"
+	"github.com/spf13/cobra"
+)
+
+// MailCmd returns the mail command
+func MailCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "mail",
+		Short: "Inter-agent mail system",
+		Long: `Send and receive messages between deputy and IMP agents.
+
+Messages are async and persistent in the ORC database.
+Agent identity is auto-detected from context (deputy or grove).`,
+	}
+
+	cmd.AddCommand(mailSendCmd())
+	cmd.AddCommand(mailInboxCmd())
+	cmd.AddCommand(mailReadCmd())
+	cmd.AddCommand(mailConversationCmd())
+
+	return cmd
+}
+
+func mailSendCmd() *cobra.Command {
+	var to, subject string
+
+	cmd := &cobra.Command{
+		Use:   "send <body>",
+		Short: "Send a message to another agent",
+		Long: `Send a message to a deputy or IMP agent.
+
+Examples:
+  orc mail send "Please review PR #42" --to IMP-GROVE-001 --subject "Code Review"
+  orc mail send "Task complete" --to DEPUTY-MISSION-001 --subject "Update"`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			body := args[0]
+
+			// Get current agent identity
+			identity, err := agent.GetCurrentAgentID()
+			if err != nil {
+				return fmt.Errorf("failed to detect agent identity: %w", err)
+			}
+
+			// Validate recipient
+			if to == "" {
+				return fmt.Errorf("--to is required")
+			}
+
+			recipientIdentity, err := agent.ParseAgentID(to)
+			if err != nil {
+				return fmt.Errorf("invalid recipient: %w", err)
+			}
+
+			// Use subject or generate default
+			if subject == "" {
+				subject = "(no subject)"
+			}
+
+			// Determine mission ID for message
+			// Messages must be scoped to a mission for database storage
+			missionID := identity.MissionID
+
+			if identity.Type == agent.AgentTypeMaster {
+				// Master sending: use recipient's mission ID
+				if recipientIdentity.Type == agent.AgentTypeDeputy {
+					missionID = recipientIdentity.ID // Deputy ID is mission ID
+				} else if recipientIdentity.Type == agent.AgentTypeIMP {
+					// Need to look up grove to get mission ID
+					if recipientIdentity.MissionID == "" {
+						// Try to extract from grove
+						grove, err := models.GetGrove(recipientIdentity.ID)
+						if err != nil {
+							return fmt.Errorf("failed to resolve IMP mission: %w", err)
+						}
+						missionID = grove.MissionID
+					} else {
+						missionID = recipientIdentity.MissionID
+					}
+				}
+			} else if recipientIdentity.Type == agent.AgentTypeMaster {
+				// Sending TO master: use sender's mission ID
+				// (Deputies/IMPs reporting up to master)
+				missionID = identity.MissionID
+			}
+			// Otherwise: deputy/IMP to deputy/IMP, use sender's mission ID (already set)
+
+			// Create message
+			message, err := models.CreateMessage(
+				identity.FullID,
+				recipientIdentity.FullID,
+				subject,
+				body,
+				missionID,
+			)
+			if err != nil {
+				return fmt.Errorf("failed to create message: %w", err)
+			}
+
+			fmt.Printf("✓ Message sent: %s\n", message.ID)
+			fmt.Printf("  From: %s\n", identity.FullID)
+			fmt.Printf("  To: %s\n", recipientIdentity.FullID)
+			fmt.Printf("  Subject: %s\n", subject)
+
+			return nil
+		},
+	}
+
+	cmd.Flags().StringVar(&to, "to", "", "Recipient agent ID (e.g., IMP-GROVE-001)")
+	cmd.Flags().StringVar(&subject, "subject", "", "Message subject")
+	cmd.MarkFlagRequired("to")
+
+	return cmd
+}
+
+func mailInboxCmd() *cobra.Command {
+	var all bool
+
+	cmd := &cobra.Command{
+		Use:   "inbox",
+		Short: "View your inbox",
+		Long: `List messages in your inbox.
+
+By default, shows only unread messages.
+Use --all to show all messages.`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			// Get current agent identity
+			identity, err := agent.GetCurrentAgentID()
+			if err != nil {
+				return fmt.Errorf("failed to detect agent identity: %w", err)
+			}
+
+			// Get messages
+			messages, err := models.ListMessages(identity.FullID, !all)
+			if err != nil {
+				return fmt.Errorf("failed to list messages: %w", err)
+			}
+
+			if len(messages) == 0 {
+				if all {
+					fmt.Println("No messages")
+				} else {
+					fmt.Println("No unread messages")
+				}
+				return nil
+			}
+
+			// Display header
+			fmt.Printf("Inbox for %s\n\n", identity.FullID)
+
+			// Display messages
+			for _, msg := range messages {
+				status := "✉"
+				if msg.Read {
+					status = "✓"
+				}
+				fmt.Printf("%s %s [%s]\n", status, msg.ID, msg.Timestamp.Format("2006-01-02 15:04"))
+				fmt.Printf("  From: %s\n", msg.Sender)
+				fmt.Printf("  Subject: %s\n", msg.Subject)
+				fmt.Printf("  Body: %s\n", truncate(msg.Body, 60))
+				fmt.Println()
+			}
+
+			// Display summary
+			unreadCount, _ := models.GetUnreadCount(identity.FullID)
+			fmt.Printf("Total: %d messages (%d unread)\n", len(messages), unreadCount)
+
+			return nil
+		},
+	}
+
+	cmd.Flags().BoolVar(&all, "all", false, "Show all messages (not just unread)")
+
+	return cmd
+}
+
+func mailReadCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "read <message-id>",
+		Short: "Read a specific message",
+		Long: `Display a message and mark it as read.
+
+Example:
+  orc mail read MSG-MISSION-001-005`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			messageID := args[0]
+
+			// Get message
+			message, err := models.GetMessage(messageID)
+			if err != nil {
+				return fmt.Errorf("failed to get message: %w", err)
+			}
+
+			// Display message
+			fmt.Printf("Message: %s\n", message.ID)
+			fmt.Printf("From: %s\n", message.Sender)
+			fmt.Printf("To: %s\n", message.Recipient)
+			fmt.Printf("Subject: %s\n", message.Subject)
+			fmt.Printf("Date: %s\n", message.Timestamp.Format("2006-01-02 15:04:05"))
+			fmt.Printf("\n%s\n", message.Body)
+
+			// Mark as read
+			if !message.Read {
+				if err := models.MarkRead(messageID); err != nil {
+					return fmt.Errorf("failed to mark as read: %w", err)
+				}
+				fmt.Println("\n✓ Marked as read")
+			}
+
+			return nil
+		},
+	}
+
+	return cmd
+}
+
+func mailConversationCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "conversation <agent-id>",
+		Short: "View conversation thread with another agent",
+		Long: `Display all messages between you and another agent.
+
+Example:
+  orc mail conversation IMP-GROVE-001`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			otherAgentID := args[0]
+
+			// Validate other agent ID
+			otherIdentity, err := agent.ParseAgentID(otherAgentID)
+			if err != nil {
+				return fmt.Errorf("invalid agent ID: %w", err)
+			}
+
+			// Get current agent identity
+			identity, err := agent.GetCurrentAgentID()
+			if err != nil {
+				return fmt.Errorf("failed to detect agent identity: %w", err)
+			}
+
+			// Get conversation
+			messages, err := models.GetConversation(identity.FullID, otherIdentity.FullID)
+			if err != nil {
+				return fmt.Errorf("failed to get conversation: %w", err)
+			}
+
+			if len(messages) == 0 {
+				fmt.Printf("No conversation with %s\n", otherIdentity.FullID)
+				return nil
+			}
+
+			// Display header
+			fmt.Printf("Conversation: %s ↔ %s\n\n", identity.FullID, otherIdentity.FullID)
+
+			// Display messages
+			for _, msg := range messages {
+				direction := "→"
+				if msg.Sender == identity.FullID {
+					direction = "→"
+				} else {
+					direction = "←"
+				}
+
+				fmt.Printf("%s [%s] %s\n", direction, msg.Timestamp.Format("2006-01-02 15:04"), msg.Subject)
+				fmt.Printf("  %s\n", msg.Body)
+				fmt.Println()
+			}
+
+			fmt.Printf("Total: %d messages\n", len(messages))
+
+			return nil
+		},
+	}
+
+	return cmd
+}
+
+// truncate truncates a string to maxLen characters
+func truncate(s string, maxLen int) string {
+	// Replace newlines with spaces for display
+	s = strings.ReplaceAll(s, "\n", " ")
+
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen-3] + "..."
+}

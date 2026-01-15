@@ -6,7 +6,9 @@ import (
 	"io"
 	"os"
 	"strings"
+	"time"
 
+	"github.com/example/orc/internal/config"
 	"github.com/example/orc/internal/models"
 	"github.com/spf13/cobra"
 )
@@ -67,7 +69,7 @@ Examples:
 
 		// Get active context from flags
 		missionID, _ := cmd.Flags().GetString("mission")
-		workOrderIDs, _ := cmd.Flags().GetStringSlice("work-orders")
+		taskIDs, _ := cmd.Flags().GetStringSlice("tasks")
 		todosFile, _ := cmd.Flags().GetString("todos")
 		graphitiUUID, _ := cmd.Flags().GetString("graphiti-uuid")
 
@@ -87,7 +89,7 @@ Examples:
 			}
 		}
 
-		handoff, err := models.CreateHandoff(note, missionID, workOrderIDs, todosJSON, graphitiUUID)
+		handoff, err := models.CreateHandoff(note, missionID, taskIDs, todosJSON, graphitiUUID)
 		if err != nil {
 			return fmt.Errorf("failed to create handoff: %w", err)
 		}
@@ -98,14 +100,14 @@ Examples:
 			fmt.Printf("  Mission: %s\n", handoff.ActiveMissionID.String)
 		}
 		if handoff.ActiveWorkOrders.Valid {
-			fmt.Printf("  Work Orders: %s\n", handoff.ActiveWorkOrders.String)
+			fmt.Printf("  Tasks: %s\n", handoff.ActiveWorkOrders.String)
 		}
 
-		// Update metadata file
+		// Update global state config
 		if err := updateMetadata(handoff); err != nil {
-			fmt.Printf("  Warning: Failed to update metadata.json: %v\n", err)
+			fmt.Printf("  Warning: Failed to update .orc/config.json: %v\n", err)
 		} else {
-			fmt.Printf("  Updated: .orc/metadata.json\n")
+			fmt.Printf("  Updated: .orc/config.json\n")
 		}
 
 		return nil
@@ -130,7 +132,7 @@ var handoffShowCmd = &cobra.Command{
 			fmt.Printf("Mission: %s\n", handoff.ActiveMissionID.String)
 		}
 		if handoff.ActiveWorkOrders.Valid {
-			fmt.Printf("Work Orders: %s\n", handoff.ActiveWorkOrders.String)
+			fmt.Printf("Tasks: %s\n", handoff.ActiveWorkOrders.String)
 		}
 		if handoff.GraphitiEpisodeUUID.Valid {
 			fmt.Printf("Graphiti: %s\n", handoff.GraphitiEpisodeUUID.String)
@@ -162,22 +164,22 @@ var handoffListCmd = &cobra.Command{
 			return nil
 		}
 
-		fmt.Printf("\n%-10s %-20s %-15s %-30s\n", "ID", "CREATED", "MISSION", "WORK ORDERS")
+		fmt.Printf("\n%-10s %-20s %-15s %-30s\n", "ID", "CREATED", "MISSION", "TASKS")
 		fmt.Println("─────────────────────────────────────────────────────────────────────────────")
 		for _, h := range handoffs {
 			mission := "-"
 			if h.ActiveMissionID.Valid {
 				mission = h.ActiveMissionID.String
 			}
-			workOrders := "-"
+			tasks := "-"
 			if h.ActiveWorkOrders.Valid {
-				workOrders = h.ActiveWorkOrders.String
+				tasks = h.ActiveWorkOrders.String
 			}
 			fmt.Printf("%-10s %-20s %-15s %-30s\n",
 				h.ID,
 				h.CreatedAt.Format("2006-01-02 15:04"),
 				mission,
-				workOrders,
+				tasks,
 			)
 		}
 		fmt.Println()
@@ -186,34 +188,40 @@ var handoffListCmd = &cobra.Command{
 	},
 }
 
-// updateMetadata updates the .orc/metadata.json file with the latest handoff
+// updateMetadata updates the .orc/config.json file with global state
 func updateMetadata(handoff *models.Handoff) error {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return err
 	}
 
-	orcDir := fmt.Sprintf("%s/.orc", homeDir)
-	metadataPath := fmt.Sprintf("%s/metadata.json", orcDir)
-
-	metadata := map[string]interface{}{
-		"current_handoff_id": handoff.ID,
-		"last_updated":       handoff.CreatedAt.Format("2006-01-02T15:04:05Z"),
-	}
-
+	activeMissionID := ""
 	if handoff.ActiveMissionID.Valid {
-		metadata["active_mission_id"] = handoff.ActiveMissionID.String
+		activeMissionID = handoff.ActiveMissionID.String
 	}
+
+	// Parse active tasks if present
+	activeWorkOrders := []string{}
 	if handoff.ActiveWorkOrders.Valid {
-		metadata["active_work_orders"] = handoff.ActiveWorkOrders.String
+		// Tasks stored as comma-separated string
+		workOrdersStr := handoff.ActiveWorkOrders.String
+		if workOrdersStr != "" {
+			activeWorkOrders = strings.Split(workOrdersStr, ",")
+		}
 	}
 
-	data, err := json.MarshalIndent(metadata, "", "  ")
-	if err != nil {
-		return err
+	cfg := &config.Config{
+		Version: "1.0",
+		Type:    config.TypeGlobal,
+		State: &config.StateConfig{
+			ActiveMissionID:  activeMissionID,
+			CurrentHandoffID: handoff.ID,
+			LastUpdated:      time.Now().Format(time.RFC3339),
+			ActiveWorkOrders: activeWorkOrders,
+		},
 	}
 
-	return os.WriteFile(metadataPath, data, 0644)
+	return config.SaveConfig(homeDir, cfg)
 }
 
 // HandoffCmd returns the handoff command
@@ -223,7 +231,7 @@ func HandoffCmd() *cobra.Command {
 	handoffCreateCmd.Flags().StringP("file", "f", "", "Read handoff note from file")
 	handoffCreateCmd.Flags().Bool("stdin", false, "Read handoff note from stdin")
 	handoffCreateCmd.Flags().StringP("mission", "m", "", "Active mission ID")
-	handoffCreateCmd.Flags().StringSliceP("work-orders", "w", nil, "Comma-separated list of active work order IDs")
+	handoffCreateCmd.Flags().StringSliceP("tasks", "w", nil, "Comma-separated list of active task IDs")
 	handoffCreateCmd.Flags().StringP("todos", "t", "", "Path to todos JSON file")
 	handoffCreateCmd.Flags().StringP("graphiti-uuid", "g", "", "Graphiti episode UUID")
 

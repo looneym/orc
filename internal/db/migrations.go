@@ -6,7 +6,7 @@ import (
 )
 
 // schemaVersion tracks the current schema version
-const currentSchemaVersion = 4
+const currentSchemaVersion = 6
 
 // Migration represents a database migration
 type Migration struct {
@@ -36,6 +36,16 @@ var migrations = []Migration{
 		Version: 4,
 		Name:    "add_pinned_field_to_work_orders",
 		Up:      migrationV4,
+	},
+	{
+		Version: 5,
+		Name:    "add_messages_table_for_agent_mail",
+		Up:      migrationV5,
+	},
+	{
+		Version: 6,
+		Name:    "convert_work_orders_to_epics_rabbit_holes_tasks",
+		Up:      migrationV6,
 	},
 }
 
@@ -409,6 +419,214 @@ func migrationV4(db *sql.DB) error {
 	`)
 	if err != nil {
 		return fmt.Errorf("failed to add pinned column: %w", err)
+	}
+
+	return nil
+}
+
+// migrationV5 adds messages table for agent mail system
+func migrationV5(db *sql.DB) error {
+	// Create messages table for async agent communication
+	// Agents: DEPUTY-{MISSION-ID} and IMP-{GROVE-ID}
+	_, err := db.Exec(`
+		CREATE TABLE messages (
+			id TEXT PRIMARY KEY,
+			sender TEXT NOT NULL,
+			recipient TEXT NOT NULL,
+			subject TEXT NOT NULL,
+			body TEXT NOT NULL,
+			timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+			read INTEGER DEFAULT 0,
+			mission_id TEXT NOT NULL,
+			FOREIGN KEY (mission_id) REFERENCES missions(id)
+		)
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to create messages table: %w", err)
+	}
+
+	// Create indexes for performance
+	_, err = db.Exec(`
+		CREATE INDEX idx_messages_recipient ON messages(recipient, read);
+		CREATE INDEX idx_messages_mission ON messages(mission_id);
+		CREATE INDEX idx_messages_timestamp ON messages(timestamp DESC);
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to create messages indexes: %w", err)
+	}
+
+	return nil
+}
+
+// migrationV6 converts work_orders table to epics, rabbit_holes, and tasks
+func migrationV6(db *sql.DB) error {
+	// Step 1: Create epics table
+	_, err := db.Exec(`
+		CREATE TABLE epics (
+			id TEXT PRIMARY KEY,
+			mission_id TEXT NOT NULL,
+			title TEXT NOT NULL,
+			description TEXT,
+			status TEXT NOT NULL DEFAULT 'ready' CHECK(status IN ('ready', 'design', 'implement', 'deploy', 'blocked', 'paused', 'complete')),
+			priority TEXT CHECK(priority IN ('low', 'medium', 'high')),
+			assigned_grove_id TEXT,
+			context_ref TEXT,
+			pinned INTEGER DEFAULT 0,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			completed_at DATETIME,
+			FOREIGN KEY (mission_id) REFERENCES missions(id),
+			FOREIGN KEY (assigned_grove_id) REFERENCES groves(id)
+		)
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to create epics table: %w", err)
+	}
+
+	// Step 2: Create rabbit_holes table
+	_, err = db.Exec(`
+		CREATE TABLE rabbit_holes (
+			id TEXT PRIMARY KEY,
+			epic_id TEXT NOT NULL,
+			title TEXT NOT NULL,
+			description TEXT,
+			status TEXT NOT NULL DEFAULT 'ready' CHECK(status IN ('ready', 'design', 'implement', 'deploy', 'blocked', 'paused', 'complete')),
+			priority TEXT CHECK(priority IN ('low', 'medium', 'high')),
+			pinned INTEGER DEFAULT 0,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			completed_at DATETIME,
+			FOREIGN KEY (epic_id) REFERENCES epics(id) ON DELETE CASCADE
+		)
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to create rabbit_holes table: %w", err)
+	}
+
+	// Step 3: Create tasks table
+	_, err = db.Exec(`
+		CREATE TABLE tasks (
+			id TEXT PRIMARY KEY,
+			epic_id TEXT,
+			rabbit_hole_id TEXT,
+			mission_id TEXT NOT NULL,
+			title TEXT NOT NULL,
+			description TEXT,
+			type TEXT CHECK(type IN ('research', 'implementation', 'fix', 'documentation', 'maintenance')),
+			status TEXT NOT NULL DEFAULT 'ready' CHECK(status IN ('ready', 'design', 'implement', 'deploy', 'blocked', 'paused', 'complete')),
+			priority TEXT CHECK(priority IN ('low', 'medium', 'high')),
+			assigned_grove_id TEXT,
+			context_ref TEXT,
+			pinned INTEGER DEFAULT 0,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			claimed_at DATETIME,
+			completed_at DATETIME,
+			FOREIGN KEY (epic_id) REFERENCES epics(id) ON DELETE CASCADE,
+			FOREIGN KEY (rabbit_hole_id) REFERENCES rabbit_holes(id) ON DELETE CASCADE,
+			FOREIGN KEY (mission_id) REFERENCES missions(id),
+			FOREIGN KEY (assigned_grove_id) REFERENCES groves(id),
+			CHECK ((epic_id IS NOT NULL AND rabbit_hole_id IS NULL) OR
+			       (epic_id IS NULL AND rabbit_hole_id IS NOT NULL))
+		)
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to create tasks table: %w", err)
+	}
+
+	// Step 4: Migrate top-level work orders (parent_id IS NULL) → epics
+	// Convert WO-001 → EPIC-001
+	_, err = db.Exec(`
+		INSERT INTO epics (
+			id, mission_id, title, description, status, priority,
+			assigned_grove_id, context_ref, pinned, created_at,
+			updated_at, completed_at
+		)
+		SELECT
+			REPLACE(id, 'WO-', 'EPIC-'),
+			mission_id,
+			title,
+			description,
+			status,
+			priority,
+			assigned_grove_id,
+			context_ref,
+			pinned,
+			created_at,
+			updated_at,
+			completed_at
+		FROM work_orders
+		WHERE parent_id IS NULL
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to migrate top-level work orders to epics: %w", err)
+	}
+
+	// Step 5: Migrate child work orders → tasks
+	// Convert WO-010 → TASK-010, parent WO-001 → EPIC-001
+	_, err = db.Exec(`
+		INSERT INTO tasks (
+			id, epic_id, rabbit_hole_id, mission_id, title, description,
+			type, status, priority, assigned_grove_id, context_ref,
+			pinned, created_at, updated_at, claimed_at, completed_at
+		)
+		SELECT
+			REPLACE(id, 'WO-', 'TASK-'),
+			REPLACE(parent_id, 'WO-', 'EPIC-'),
+			NULL,
+			mission_id,
+			title,
+			description,
+			type,
+			status,
+			priority,
+			assigned_grove_id,
+			context_ref,
+			pinned,
+			created_at,
+			updated_at,
+			claimed_at,
+			completed_at
+		FROM work_orders
+		WHERE parent_id IS NOT NULL
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to migrate child work orders to tasks: %w", err)
+	}
+
+	// Step 6: Create indexes for performance
+	_, err = db.Exec(`
+		CREATE INDEX idx_epics_mission ON epics(mission_id);
+		CREATE INDEX idx_epics_status ON epics(status);
+		CREATE INDEX idx_epics_grove ON epics(assigned_grove_id);
+
+		CREATE INDEX idx_rabbit_holes_epic ON rabbit_holes(epic_id);
+		CREATE INDEX idx_rabbit_holes_status ON rabbit_holes(status);
+
+		CREATE INDEX idx_tasks_epic ON tasks(epic_id);
+		CREATE INDEX idx_tasks_rabbit_hole ON tasks(rabbit_hole_id);
+		CREATE INDEX idx_tasks_mission ON tasks(mission_id);
+		CREATE INDEX idx_tasks_status ON tasks(status);
+		CREATE INDEX idx_tasks_grove ON tasks(assigned_grove_id);
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to create indexes: %w", err)
+	}
+
+	// Step 7: Drop old work_orders indexes
+	_, err = db.Exec(`
+		DROP INDEX IF EXISTS idx_work_orders_mission;
+		DROP INDEX IF EXISTS idx_work_orders_status;
+		DROP INDEX IF EXISTS idx_work_orders_parent;
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to drop old indexes: %w", err)
+	}
+
+	// Step 8: Drop work_orders table
+	_, err = db.Exec(`DROP TABLE work_orders`)
+	if err != nil {
+		return fmt.Errorf("failed to drop work_orders table: %w", err)
 	}
 
 	return nil

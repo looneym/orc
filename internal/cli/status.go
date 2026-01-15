@@ -11,10 +11,11 @@ import (
 )
 
 type Metadata struct {
-	CurrentHandoffID  *string `json:"current_handoff_id"`
-	LastUpdated       *string `json:"last_updated"`
-	ActiveMissionID   *string `json:"active_mission_id"`
-	ActiveWorkOrderID *string `json:"active_work_order_id"`
+	CurrentHandoffID  *string  `json:"current_handoff_id"`
+	LastUpdated       *string  `json:"last_updated"`
+	ActiveMissionID   *string  `json:"active_mission_id"`
+	ActiveWorkOrderID *string  `json:"active_work_order_id"` // Legacy field
+	ActiveWorkOrders  []string `json:"active_work_orders"`   // New field (slice of task IDs)
 }
 
 // StatusCmd returns the status command
@@ -25,7 +26,7 @@ func StatusCmd() *cobra.Command {
 		Use:   "status",
 		Short: "Show current work context from metadata.json",
 		Long: `Display the current work context based on metadata.json:
-- Active mission, operation, work order, expedition
+- Active mission, epics, and tasks
 - Latest handoff ID and timestamp (use --handoff to see full note)
 
 This provides a focused view of "where am I right now?"`,
@@ -97,22 +98,22 @@ This provides a focused view of "where am I right now?"`,
 			}
 			fmt.Println()
 
-			// Display active work order
-			if metadata.ActiveWorkOrderID != nil && *metadata.ActiveWorkOrderID != "" {
-				workOrder, err := models.GetWorkOrder(*metadata.ActiveWorkOrderID)
-				if err != nil {
-					fmt.Printf("❌ Work Order: %s (error loading: %v)\n", *metadata.ActiveWorkOrderID, err)
-				} else {
-					fmt.Printf("📋 Work Order: %s - %s [%s]\n", workOrder.ID, workOrder.Title, workOrder.Status)
-					if workOrder.Description.Valid && workOrder.Description.String != "" {
-						fmt.Printf("   %s\n", workOrder.Description.String)
-					}
-					if workOrder.AssignedGroveID.Valid && workOrder.AssignedGroveID.String != "" {
-						fmt.Printf("   Grove: %s\n", workOrder.AssignedGroveID.String)
+			// Display active tasks (from metadata.ActiveWorkOrders)
+			if metadata.ActiveWorkOrders != nil && len(metadata.ActiveWorkOrders) > 0 {
+				fmt.Printf("📋 Active Tasks:\n")
+				for _, taskID := range metadata.ActiveWorkOrders {
+					task, err := models.GetTask(taskID)
+					if err != nil {
+						fmt.Printf("   ❌ %s (error loading: %v)\n", taskID, err)
+					} else {
+						fmt.Printf("   %s - %s [%s]\n", task.ID, task.Title, task.Status)
+						if task.AssignedGroveID.Valid && task.AssignedGroveID.String != "" {
+							fmt.Printf("      Grove: %s\n", task.AssignedGroveID.String)
+						}
 					}
 				}
 			} else {
-				fmt.Println("📋 Work Order: (none active)")
+				fmt.Println("📋 Active Tasks: (none)")
 			}
 			fmt.Println()
 

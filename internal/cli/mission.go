@@ -86,12 +86,12 @@ var missionShowCmd = &cobra.Command{
 		}
 		fmt.Println()
 
-		// List work orders under this mission
-		workOrders, err := models.ListWorkOrders(id, "")
-		if err == nil && len(workOrders) > 0 {
-			fmt.Println("Work Orders:")
-			for _, wo := range workOrders {
-				fmt.Printf("  - %s [%s] %s\n", wo.ID, wo.Status, wo.Title)
+		// List epics under this mission
+		epics, err := models.ListEpics(id, "")
+		if err == nil && len(epics) > 0 {
+			fmt.Println("Epics:")
+			for _, epic := range epics {
+				fmt.Printf("  - %s [%s] %s\n", epic.ID, epic.Status, epic.Title)
 			}
 			fmt.Println()
 		}
@@ -133,6 +133,11 @@ Examples:
 		// Check if we're in ORC source directory
 		if context.IsOrcSourceDirectory() {
 			return fmt.Errorf("cannot start mission in ORC source directory - please run from another location")
+		}
+
+		// Validate Claude workspace trust before creating mission workspace
+		if err := validateClaudeWorkspaceTrust(); err != nil {
+			return fmt.Errorf("Claude workspace trust validation failed:\n\n%w\n\nRun 'orc doctor' for detailed diagnostics", err)
 		}
 
 		// Get mission from DB
@@ -296,7 +301,7 @@ var missionDeleteCmd = &cobra.Command{
 	Short: "Delete a mission from the database",
 	Long: `Delete a mission and all associated data from the database.
 
-WARNING: This is a destructive operation. Associated work orders and groves
+WARNING: This is a destructive operation. Associated epics, tasks, and groves
 will lose their mission reference.
 
 Examples:
@@ -313,14 +318,14 @@ Examples:
 			return fmt.Errorf("failed to get mission: %w", err)
 		}
 
-		// Check for associated work orders and groves
-		workOrders, _ := models.ListWorkOrders(id, "")
+		// Check for associated epics and groves
+		epics, _ := models.ListEpics(id, "")
 		groves, _ := models.GetGrovesByMission(id)
 
-		if !force && (len(workOrders) > 0 || len(groves) > 0) {
+		if !force && (len(epics) > 0 || len(groves) > 0) {
 			fmt.Printf("⚠️  Mission %s has associated data:\n", id)
-			if len(workOrders) > 0 {
-				fmt.Printf("  - %d work orders\n", len(workOrders))
+			if len(epics) > 0 {
+				fmt.Printf("  - %d epics\n", len(epics))
 			}
 			if len(groves) > 0 {
 				fmt.Printf("  - %d groves\n", len(groves))

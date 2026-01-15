@@ -4,9 +4,10 @@
 
 ## Essential Commands
 - **`/tech-plan`** - Create/manage lightweight technical plans
-- **`/bootstrap`** - Load project context from tech plans and git history  
+- **`/bootstrap`** - Load project context from tech plans and git history
 - **`/janitor`** - System maintenance and cleanup operations
 - **`/analyze-prompt`** - Advanced prompt quality assessment
+- **`orc doctor`** - Validate ORC environment and Claude Code configuration
 
 *Complete documentation available in `docs/` directory*
 

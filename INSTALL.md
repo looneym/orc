@@ -17,6 +17,78 @@ Make sure `$GOPATH/bin` is in your `$PATH`:
 export PATH="$HOME/go/bin:$PATH"
 ```
 
+## Claude Code Workspace Trust Setup
+
+ORC requires Claude Code to trust directories where it creates workspaces.
+
+### Required Configuration
+
+Add the following to `~/.claude/settings.json`:
+
+```json
+{
+  "permissions": {
+    "additionalDirectories": [
+      "~/src/worktrees",
+      "~/src/missions"
+    ]
+  }
+}
+```
+
+**Why This is Required:**
+- ORC creates groves (git worktrees) at `~/src/worktrees/`
+- ORC creates mission workspaces at `~/src/missions/`
+- Claude Code instances (deputies and IMPs) must have file access to these directories
+- Without this setting, Claude instances will fail with permission errors
+
+### Verification
+
+Check your current settings:
+```bash
+cat ~/.claude/settings.json | jq '.permissions.additionalDirectories'
+```
+
+Should output:
+```json
+[
+  "~/src/worktrees",
+  "~/src/missions"
+]
+```
+
+Or run the environment health check:
+```bash
+orc doctor
+```
+
+Should show all checks passing.
+
+### Troubleshooting
+
+**Settings file doesn't exist:**
+```bash
+cat > ~/.claude/settings.json <<'EOF'
+{
+  "permissions": {
+    "additionalDirectories": [
+      "~/src/worktrees",
+      "~/src/missions"
+    ]
+  }
+}
+EOF
+```
+
+**Error: Claude instance cannot read/write files in grove or mission**
+- Verify additionalDirectories setting exists
+- Run `orc doctor` to validate configuration
+- Restart Claude instances after updating settings.json
+
+**Permission errors during grove/mission creation:**
+- Run `orc doctor` for detailed diagnostics
+- Follow fix instructions provided by doctor command
+
 ### Manual Installation
 
 To build and install the current version:

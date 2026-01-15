@@ -76,11 +76,15 @@ if cd "$MISSION_DIR" 2>/dev/null; then
                     fi
                 fi
 
-                # TODO: Remove from ORC database when orc grove delete command exists
-                # For now, just note it
-                echo "grove_${GROVE_COUNT}_id=$GROVE_ID"
-                echo "grove_${GROVE_COUNT}_db_cleaned=pending"
-                echo "info=Grove $GROVE_ID not removed from database (orc grove delete not implemented)"
+                # Remove from ORC database
+                if orc grove delete "$GROVE_ID" --force 2>/dev/null; then
+                    echo "grove_${GROVE_COUNT}_id=$GROVE_ID"
+                    echo "grove_${GROVE_COUNT}_db_cleaned=true"
+                else
+                    echo "grove_${GROVE_COUNT}_id=$GROVE_ID"
+                    echo "grove_${GROVE_COUNT}_db_cleaned=false"
+                    echo "warning=Failed to delete grove from database: $GROVE_ID"
+                fi
             fi
         done <<< "$GROVE_LIST"
 
@@ -113,10 +117,13 @@ fi
 # 4. Remove mission from database
 echo "=== Mission Database Cleanup ===" >&2
 
-# TODO: Call orc mission delete when implemented
-# For now, just note it
-echo "mission_db_cleaned=pending"
-echo "info=Mission $MISSION_ID not removed from database (orc mission delete not implemented)"
+if orc mission delete "$MISSION_ID" --force 2>/dev/null; then
+    echo "mission_db_cleaned=true"
+else
+    echo "mission_db_cleaned=false"
+    echo "warning=Failed to delete mission from database"
+    CLEANUP_SUCCESS=false
+fi
 
 # Overall status
 echo "=== Cleanup Complete ===" >&2
