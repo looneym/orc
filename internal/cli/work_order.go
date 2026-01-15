@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/example/orc/internal/context"
 	"github.com/example/orc/internal/models"
@@ -475,6 +476,163 @@ func claimAndReportWorkOrder(id string) error {
 	return nil
 }
 
+var workOrderAssignCmd = &cobra.Command{
+	Use:   "assign [work-order-id]",
+	Short: "Assign a work order to a grove",
+	Long: `Assign a work order to a grove for implementation.
+
+This writes a .orc/assigned-work.json file to the grove directory and updates
+the work order status from 'ready' to 'implement'.
+
+Examples:
+  orc work-order assign WO-140 --grove GROVE-009`,
+	Args: cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		workOrderID := args[0]
+		groveID, _ := cmd.Flags().GetString("grove")
+
+		// Get work order
+		wo, err := models.GetWorkOrder(workOrderID)
+		if err != nil {
+			return fmt.Errorf("work order not found: %w", err)
+		}
+
+		// Verify ready status
+		if wo.Status != "ready" {
+			return fmt.Errorf("work order must be in 'ready' status (current: %s)", wo.Status)
+		}
+
+		// Get grove
+		grove, err := models.GetGrove(groveID)
+		if err != nil {
+			return fmt.Errorf("grove not found: %w", err)
+		}
+
+		// Write assignment file
+		err = models.WriteAssignment(grove.Path, wo, "MASTER-ORC")
+		if err != nil {
+			return fmt.Errorf("failed to write assignment: %w", err)
+		}
+
+		// Update work order in database
+		err = models.AssignWorkOrderToGrove(workOrderID, groveID)
+		if err != nil {
+			return fmt.Errorf("failed to update work order: %w", err)
+		}
+
+		fmt.Printf("✓ Assigned %s to %s\n", workOrderID, groveID)
+		fmt.Printf("  Assignment written to: %s/.orc/assigned-work.json\n", grove.Path)
+		fmt.Printf("  Work order status: ready → implement\n")
+		fmt.Println()
+		fmt.Printf("💡 IMP can check assignment:\n")
+		fmt.Printf("   cd %s\n", grove.Path)
+		fmt.Printf("   orc work-order check-assignment\n")
+		return nil
+	},
+}
+
+var workOrderCheckAssignmentCmd = &cobra.Command{
+	Use:   "check-assignment",
+	Short: "Check if this grove has an assigned work order",
+	Long: `Check if the current grove has an assigned work order.
+
+IMPs use this to discover what work they should be doing. The assignment
+is stored in .orc/assigned-work.json.
+
+This command is automatically run by the SessionStart hook when an IMP starts.
+
+Examples:
+  orc work-order check-assignment`,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		cwd, err := os.Getwd()
+		if err != nil {
+			return fmt.Errorf("failed to get current directory: %w", err)
+		}
+
+		assignment, err := models.ReadAssignment(cwd)
+		if err != nil {
+			fmt.Println("✓ No work assignment found")
+			return nil
+		}
+
+		fmt.Printf("📋 Assigned Work Order: %s\n", assignment.WorkOrderID)
+		fmt.Printf("   Title: %s\n", assignment.Title)
+		fmt.Printf("   Status: %s\n", assignment.Status)
+		fmt.Printf("   Mission: %s\n", assignment.MissionID)
+		fmt.Printf("   Assigned: %s\n", assignment.AssignedAt)
+		fmt.Printf("   By: %s\n", assignment.AssignedBy)
+		fmt.Println()
+
+		if assignment.Description != "" {
+			fmt.Printf("Description:\n%s\n\n", assignment.Description)
+		}
+
+		fmt.Printf("💡 To update status:\n")
+		fmt.Printf("   orc work-order update-assignment --status in_progress\n")
+		fmt.Printf("   orc work-order update-assignment --status complete\n")
+		fmt.Println()
+
+		return nil
+	},
+}
+
+var workOrderUpdateAssignmentCmd = &cobra.Command{
+	Use:   "update-assignment",
+	Short: "Update the status of the current grove's work assignment",
+	Long: `Update the status of the work assignment in the current grove.
+
+This updates the .orc/assigned-work.json file with the new status.
+
+Valid statuses: assigned, in_progress, complete
+
+Examples:
+  orc work-order update-assignment --status in_progress
+  orc work-order update-assignment --status complete`,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		status, _ := cmd.Flags().GetString("status")
+
+		// Validate status
+		validStatuses := map[string]bool{
+			"assigned":    true,
+			"in_progress": true,
+			"complete":    true,
+		}
+		if !validStatuses[status] {
+			return fmt.Errorf("invalid status '%s' (valid: assigned, in_progress, complete)", status)
+		}
+
+		cwd, err := os.Getwd()
+		if err != nil {
+			return fmt.Errorf("failed to get current directory: %w", err)
+		}
+
+		assignment, err := models.ReadAssignment(cwd)
+		if err != nil {
+			return fmt.Errorf("no assignment found in this grove: %w", err)
+		}
+
+		// Update assignment file
+		err = models.UpdateAssignmentStatus(cwd, status)
+		if err != nil {
+			return fmt.Errorf("failed to update assignment: %w", err)
+		}
+
+		fmt.Printf("✓ Assignment status updated: %s → %s\n", assignment.Status, status)
+		fmt.Printf("  Work Order: %s\n", assignment.WorkOrderID)
+		fmt.Println()
+
+		if status == "complete" {
+			fmt.Printf("💡 Next steps:\n")
+			fmt.Printf("   1. Send mail to MASTER-ORC:\n")
+			fmt.Printf("      orc mail send MASTER-ORC --subject \"%s Complete\" --body \"Work completed\"\n", assignment.WorkOrderID)
+			fmt.Printf("   2. MASTER-ORC verifies and marks complete:\n")
+			fmt.Printf("      orc work-order complete %s\n", assignment.WorkOrderID)
+		}
+
+		return nil
+	},
+}
+
 // WorkOrderCmd returns the work-order command
 func WorkOrderCmd() *cobra.Command {
 	// Add flags
@@ -497,6 +655,12 @@ func WorkOrderCmd() *cobra.Command {
 	workOrderDiscoverCmd.Flags().BoolP("auto-claim", "a", false, "Automatically claim highest priority work order")
 	workOrderDiscoverCmd.Flags().StringP("claim", "c", "", "Directly claim specific work order ID")
 
+	workOrderAssignCmd.Flags().StringP("grove", "g", "", "Grove ID to assign work to")
+	workOrderAssignCmd.MarkFlagRequired("grove")
+
+	workOrderUpdateAssignmentCmd.Flags().StringP("status", "s", "", "New status (assigned, in_progress, complete)")
+	workOrderUpdateAssignmentCmd.MarkFlagRequired("status")
+
 	// Add subcommands
 	workOrderCmd.AddCommand(workOrderCreateCmd)
 	workOrderCmd.AddCommand(workOrderListCmd)
@@ -508,6 +672,9 @@ func WorkOrderCmd() *cobra.Command {
 	workOrderCmd.AddCommand(workOrderUnpinCmd)
 	workOrderCmd.AddCommand(workOrderUpdateCmd)
 	workOrderCmd.AddCommand(workOrderDiscoverCmd)
+	workOrderCmd.AddCommand(workOrderAssignCmd)
+	workOrderCmd.AddCommand(workOrderCheckAssignmentCmd)
+	workOrderCmd.AddCommand(workOrderUpdateAssignmentCmd)
 
 	return workOrderCmd
 }

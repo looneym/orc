@@ -356,3 +356,29 @@ func UnpinWorkOrder(id string) error {
 
 	return err
 }
+
+// AssignWorkOrderToGrove assigns a work order to a grove
+func AssignWorkOrderToGrove(workOrderID, groveID string) error {
+	database, err := db.GetDB()
+	if err != nil {
+		return err
+	}
+
+	// Verify work order exists
+	var exists int
+	err = database.QueryRow("SELECT COUNT(*) FROM work_orders WHERE id = ?", workOrderID).Scan(&exists)
+	if err != nil {
+		return err
+	}
+	if exists == 0 {
+		return fmt.Errorf("work order %s not found", workOrderID)
+	}
+
+	// Update work order: status = implement, assigned_grove_id = grove_id
+	_, err = database.Exec(
+		"UPDATE work_orders SET status = 'implement', assigned_grove_id = ?, claimed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+		groveID, workOrderID,
+	)
+
+	return err
+}
