@@ -1,15 +1,26 @@
 ---
 name: test-orchestration
-description: Full real-world orchestration test that creates a test mission, spins up TMux session with deputy + IMPs, assigns real work, monitors progress, validates completion, and generates comprehensive report. Use this to validate the entire ORC multi-agent coordination workflow.
+description: Full real-world orchestration test using MASTER-ORC → IMP direct assignment. Creates mission, epic with tasks, assigns to grove IMP, monitors implementation, validates completion, and generates comprehensive report. Tests the 1:1:1 grove:epic:IMP architecture.
 ---
 
 # Orchestration Test: Full Real-World Multi-Agent Validation
 
-You are executing a comprehensive integration test of the ORC orchestration system. This test validates the ENTIRE multi-agent coordination workflow by creating a real mission, spinning up deputy ORC + IMPs in TMux, assigning them actual development work, and verifying they complete it correctly.
+You are executing a comprehensive integration test of the ORC orchestration system. This test validates the ENTIRE multi-agent coordination workflow by creating a real mission, epic with tasks, assigning to a grove IMP, and verifying completion.
+
+## Current Architecture (No Deputies)
+
+**MASTER-ORC → IMP** direct assignment model:
+- MASTER-ORC (you) coordinates everything from global context
+- Creates mission, epics, tasks
+- Assigns entire epic to grove
+- IMP (Implementation Agent) works in grove with SessionStart hook
+- 1:1:1 relationship: One grove = One epic = One IMP
+
+**NO autonomous deputies** - simplified model
 
 ## Your Mission
 
-Execute a 8-phase orchestration test that proves ORC can autonomously coordinate multiple Claude agents to complete real development tasks. This is the ultimate validation of the system.
+Execute a 6-phase orchestration test that proves ORC can coordinate Claude IMPs to complete real development tasks.
 
 ## Critical Rules
 
@@ -18,7 +29,7 @@ Execute a 8-phase orchestration test that proves ORC can autonomously coordinate
 3. **Write progress to turns/** - Document every phase in markdown files
 4. **Use helper scripts** - They're in scripts/ directory for verification tasks
 5. **Handle errors gracefully** - If a checkpoint fails, document it and decide whether to continue or abort
-6. **Generate final report** - turns/08-final-report.md with complete results
+6. **Generate final report** - turns/06-final-report.md with complete results
 
 ## Test Configuration
 
@@ -60,7 +71,7 @@ The test cannot proceed without proper workspace trust configuration. Direct use
 
 ## Phase 1: Environment Setup
 
-**Goal**: Create test mission and provision workspace
+**Goal**: Create test mission, epic with tasks, and grove
 
 ### Tasks
 
@@ -70,188 +81,143 @@ The test cannot proceed without proper workspace trust configuration. Direct use
    orc mission create "Orchestration Test Mission" \
      --description "Automated orchestration test - validates multi-agent coordination"
    ```
-3. Create mission workspace directory structure:
+3. Create epic:
    ```bash
-   mkdir -p ~/src/missions/{MISSION_ID}/.orc
+   orc epic create "Implement POST /echo endpoint" \
+     --mission {MISSION_ID} \
+     --description "Add echo endpoint to canary app with tests and documentation"
    ```
-4. Write `.orc-mission` marker (JSON format):
-   ```json
-   {
-     "mission_id": "MISSION-TEST-ORC-...",
-     "workspace_path": "~/src/missions/MISSION-TEST-ORC-...",
-     "created_at": "2026-01-14T12:34:56Z"
-   }
+4. Create 4 tasks under epic:
+   ```bash
+   orc task create "Add POST /echo handler to main.go" --epic {EPIC_ID}
+   orc task create "Write unit tests for /echo endpoint" --epic {EPIC_ID}
+   orc task create "Update README with /echo endpoint documentation" --epic {EPIC_ID}
+   orc task create "Run tests and verify implementation" --epic {EPIC_ID}
    ```
-5. Write `.orc/metadata.json`:
-   ```json
-   {
-     "active_mission_id": "MISSION-TEST-ORC-...",
-     "last_updated": "2026-01-14T12:34:56Z"
-   }
+5. Create grove with git worktree:
+   ```bash
+   orc grove create test-canary-{timestamp} \
+     --repos orc-canary \
+     --mission {MISSION_ID}
    ```
 
-### Validation Checkpoints (4 total)
+### Validation Checkpoints (6 total)
 
 - [ ] Mission created with correct ID format (MISSION-TEST-ORC-{timestamp})
-- [ ] Mission workspace directory exists at `~/src/missions/{MISSION_ID}`
-- [ ] `.orc-mission` marker file contains valid JSON with mission_id
-- [ ] `.orc/metadata.json` file contains active_mission_id
+- [ ] Epic created successfully
+- [ ] All 4 tasks created successfully
+- [ ] Grove created successfully
+- [ ] Worktree directory exists at `~/src/worktrees/{mission_id}-test-canary-{timestamp}`
+- [ ] `orc summary` shows epic with 4 tasks
 
 ### Output
 
-Write `turns/00-setup.md` with:
+Write `turns/01-setup.md` with:
 - Mission ID
-- Workspace path
-- All created files
+- Epic ID
+- Task IDs
+- Grove ID and path
 - Validation results (✓ or ✗ for each checkpoint)
 - Status: PASS or FAIL
 
 **If any checkpoint fails, ABORT and write final report**
 
-## Phase 2: Deploy TMux Session
+## Phase 2: Assign Epic to Grove
 
-**Goal**: Create grove from orc-canary and launch full TMux environment
-
-### Tasks
-
-1. Create grove with git worktree:
-   ```bash
-   cd ~/src/missions/{MISSION_ID}
-   orc grove create test-canary-{timestamp} \
-     --repos orc-canary \
-     --mission {MISSION_ID}
-   ```
-2. Verify grove created and worktree exists
-3. Launch TMux session:
-   ```bash
-   tmux new-session -d -s orc-{MISSION_ID} -c ~/src/missions/{MISSION_ID}
-   ```
-4. Create deputy window (pane 0):
-   ```bash
-   tmux rename-window -t orc-{MISSION_ID}:0 deputy
-   tmux send-keys -t orc-{MISSION_ID}:deputy "cd ~/src/missions/{MISSION_ID}" C-m
-   tmux send-keys -t orc-{MISSION_ID}:deputy "claude" C-m
-   ```
-5. Create IMP window with 3-pane layout:
-   ```bash
-   cd ~/src/worktrees/test-canary-{timestamp}
-   orc grove open {GROVE_ID}
-   ```
-   (This creates new window with vim | claude | shell layout)
-
-### Validation Checkpoints (5 total)
-
-- [ ] Grove exists in database (`orc grove list`)
-- [ ] Worktree directory exists at `~/src/worktrees/test-canary-{timestamp}`
-- [ ] TMux session exists (`tmux has-session -t orc-{MISSION_ID}`)
-- [ ] Deputy window exists (`tmux list-windows -t orc-{MISSION_ID} | grep deputy`)
-- [ ] IMP window exists with correct layout (use `scripts/verify-tmux-layout.sh`)
-
-### Output
-
-Write `turns/01-grove-deployed.md` with:
-- Grove ID and path
-- TMux session name
-- Window/pane layout details
-- Validation results
-- Status: PASS or FAIL
-
-**If any checkpoint fails, run cleanup and ABORT**
-
-## Phase 3: Verify Deputy ORC
-
-**Goal**: Ensure deputy ORC is operational and detects mission context correctly
+**Goal**: Assign entire epic (with all tasks) to grove IMP
 
 ### Tasks
 
-1. Run health check script:
+1. Assign epic to grove:
    ```bash
-   ./scripts/check-deputy-health.sh {MISSION_ID}
+   orc epic assign {EPIC_ID} --grove {GROVE_ID}
    ```
-2. Verify context detection by checking deputy pane output
-3. Test `orc status` shows correct mission
-4. Test `orc summary` scopes to mission only
+2. Verify assignment file created:
+   ```bash
+   cat ~/src/worktrees/{mission_id}-test-canary-{timestamp}/.orc/assigned-work.json
+   ```
+3. Verify assignment structure (should have structure="tasks" and tasks array with 4 tasks)
+4. Verify all tasks now have assigned_grove_id in database
 
 ### Validation Checkpoints (4 total)
 
-- [ ] Deputy context detected (check-deputy-health.sh returns OK)
-- [ ] `orc status` shows test mission ID
-- [ ] `orc summary` displays deputy context header
-- [ ] Can create work orders in deputy context
+- [ ] Assignment command succeeds
+- [ ] `.orc/assigned-work.json` file exists in grove
+- [ ] Assignment file has correct structure (epic_id, structure="tasks", tasks array)
+- [ ] All 4 tasks visible in assignment file
 
 ### Output
 
-Write `turns/02-deputy-verified.md` with:
-- Health check results
-- Context detection confirmation
-- Sample orc status/summary output
+Write `turns/02-assignment.md` with:
+- Assignment command output
+- Assignment file contents
 - Validation results
 - Status: PASS or FAIL
 
 **If any checkpoint fails, run cleanup and ABORT**
 
-## Phase 4: Assign Real Work
+## Phase 3: Deploy IMP in TMux
 
-**Goal**: Create work orders for POST /echo endpoint implementation
+**Goal**: Launch IMP Claude instance in TMux window
 
 ### Tasks
 
-1. Create parent work order:
+1. Open grove in TMux (creates new window with 3-pane IMP layout):
    ```bash
-   cd ~/src/missions/{MISSION_ID}
-   orc work-order create "Implement POST /echo endpoint" \
-     --description "Add echo endpoint to canary app with tests and documentation"
+   orc grove open {GROVE_ID}
    ```
-2. Create 4 child work orders (from config.json test_workload.child_wos):
-   - WO-A: Add POST /echo handler to main.go
-   - WO-B: Write unit tests for /echo endpoint
-   - WO-C: Update README with /echo endpoint documentation
-   - WO-D: Run tests and verify implementation
+   This should:
+   - Create new TMux window named after grove
+   - Layout: vim | claude | shell
+   - Claude pane should auto-run SessionStart hook
+   - SessionStart hook should auto-run `orc epic check-assignment`
 
-3. Verify all work orders visible in deputy summary
+2. Verify TMux session exists
+3. Verify IMP window created with correct layout
+4. Check that SessionStart hook displayed assignment
 
-### Validation Checkpoints (3 total)
+### Validation Checkpoints (4 total)
 
-- [ ] Parent work order created successfully
-- [ ] All 4 child work orders created
-- [ ] `orc summary` shows all work orders scoped to test mission
+- [ ] TMux window created successfully
+- [ ] Window has 3 panes (vim | claude | shell layout)
+- [ ] Claude pane shows assignment (SessionStart hook ran)
+- [ ] Assignment shows epic with 4 tasks
 
 ### Output
 
-Write `turns/03-work-assigned.md` with:
-- Parent work order ID and title
-- All child work order IDs and titles
-- orc summary output showing work orders
+Write `turns/03-imp-deployed.md` with:
+- TMux window details
+- Layout verification
+- SessionStart hook output
 - Validation results
 - Status: PASS or FAIL
 
 **If any checkpoint fails, run cleanup and ABORT**
 
-## Phase 5: Monitor Implementation
+## Phase 4: Monitor Implementation
 
-**Goal**: Watch IMPs work on the feature and track progress
+**Goal**: Watch IMP work on tasks and track progress
 
-**NOTE**: This phase is OBSERVATIONAL. You are NOT implementing the feature yourself. You are monitoring the IMP Claude instances working in the TMux panes.
+**NOTE**: This phase is OBSERVATIONAL. You are NOT implementing the feature yourself. You are monitoring the IMP Claude instance working in the TMux pane.
 
 ### Tasks
 
 1. Start monitoring script:
    ```bash
-   ./scripts/monitor-imp-progress.sh orc-{MISSION_ID}
+   ./scripts/monitor-imp-progress.sh {GROVE_ID}
    ```
 2. Check for file changes in grove:
    ```bash
-   cd ~/src/worktrees/test-canary-{timestamp}
+   cd ~/src/worktrees/{mission_id}-test-canary-{timestamp}
    git status
    ```
-3. Periodically check work order status:
+3. Periodically check task status:
    ```bash
-   cd ~/src/missions/{MISSION_ID}
-   orc work-order list
+   orc task list --epic {EPIC_ID}
    ```
 4. Write progress updates to `turns/04-progress-N.md` every 2-3 minutes
 5. Wait until either:
-   - All work orders marked complete, OR
+   - All tasks marked complete, OR
    - Timeout reached (30 minutes), OR
    - Implementation appears stuck (no changes for 10 minutes)
 
@@ -259,7 +225,7 @@ Write `turns/03-work-assigned.md` with:
 
 - [ ] Files modified in grove (main.go, main_test.go, README.md exist)
 - [ ] Git shows uncommitted changes
-- [ ] At least some work orders marked complete
+- [ ] At least some tasks marked complete
 - [ ] No errors visible in IMP pane
 
 ### Output
@@ -267,13 +233,13 @@ Write `turns/03-work-assigned.md` with:
 Write `turns/04-progress-N.md` (multiple files) with:
 - Timestamp
 - Files changed
-- Work order status updates
+- Task status updates
 - IMP activity observations
 - Current state: in_progress, completed, or stuck
 
 **If timeout reached or stuck, proceed to validation anyway to see what was completed**
 
-## Phase 6: Validate Results
+## Phase 5: Validate Results
 
 **Goal**: Test the implemented feature and verify it works correctly
 
@@ -281,14 +247,17 @@ Write `turns/04-progress-N.md` (multiple files) with:
 
 1. Run validation script:
    ```bash
-   ./scripts/validate-feature.sh ~/src/worktrees/test-canary-{timestamp}
+   ./scripts/validate-feature.sh ~/src/worktrees/{mission_id}-test-canary-{timestamp}
    ```
 2. Manual checks:
    - Code compiles: `cd {grove_path} && go build`
    - Tests pass: `go test ./...`
    - Feature works: Start server, run `curl -X POST http://localhost:8080/echo -d '{"message":"test"}'`
    - README updated: Check for /echo documentation
-3. Check work order completion status
+3. Check task completion status:
+   ```bash
+   orc task list --epic {EPIC_ID}
+   ```
 4. Review git changes: `git diff`
 
 ### Validation Checkpoints (5 total)
@@ -297,7 +266,7 @@ Write `turns/04-progress-N.md` (multiple files) with:
 - [ ] `go test ./...` passes (exit code 0)
 - [ ] Manual curl test returns correct JSON response
 - [ ] README.md contains /echo endpoint documentation
-- [ ] Feature meets all requirements from work orders
+- [ ] All tasks marked complete
 
 ### Output
 
@@ -306,11 +275,11 @@ Write `turns/05-validation.md` with:
 - Test results
 - Manual test results (curl output)
 - README verification
-- Work order completion status
+- Task completion status
 - Validation results (how many of 5 checkpoints passed)
 - Status: PASS or FAIL
 
-## Phase 7: Generate Report & Cleanup
+## Phase 6: Generate Report & Cleanup
 
 **Goal**: Create comprehensive final report and clean up test environment
 
@@ -333,10 +302,10 @@ Write `turns/05-validation.md` with:
      "duration_seconds": 627,
      "overall_result": "PASS",
      "phases": {
-       "setup": {"checkpoints_passed": 4, "checkpoints_total": 4, "status": "PASS"},
-       "tmux_deploy": {"checkpoints_passed": 5, "checkpoints_total": 5, "status": "PASS"},
-       "deputy_health": {"checkpoints_passed": 4, "checkpoints_total": 4, "status": "PASS"},
-       "work_assigned": {"checkpoints_passed": 3, "checkpoints_total": 3, "status": "PASS"},
+       "preflight": {"checkpoints_passed": 2, "checkpoints_total": 2, "status": "PASS"},
+       "setup": {"checkpoints_passed": 6, "checkpoints_total": 6, "status": "PASS"},
+       "assignment": {"checkpoints_passed": 4, "checkpoints_total": 4, "status": "PASS"},
+       "imp_deploy": {"checkpoints_passed": 4, "checkpoints_total": 4, "status": "PASS"},
        "implementation": {"checkpoints_passed": 4, "checkpoints_total": 4, "status": "PASS"},
        "validation": {"checkpoints_passed": 5, "checkpoints_total": 5, "status": "PASS"}
      },
@@ -353,37 +322,25 @@ Write `turns/05-validation.md` with:
 
 Write `turns/06-final-report.md` and `turns/results.json`
 
-Exit with code 0 if all 27 checkpoints passed, otherwise exit with code 1
+Exit with code 0 if all 25 checkpoints passed, otherwise exit with code 1
 
 ## Helper Scripts Reference
 
 Located in `scripts/` directory:
 
-1. **verify-tmux-layout.sh** - Verifies TMux session structure
+1. **monitor-imp-progress.sh** - Watches IMP activity
    ```bash
-   ./scripts/verify-tmux-layout.sh orc-{MISSION_ID}
-   # Output: status=OK, session_exists=true, panes=4, layout=valid
+   ./scripts/monitor-imp-progress.sh {GROVE_ID}
+   # Output: tasks=4, completed=2, in_progress=1, ready=1
    ```
 
-2. **check-deputy-health.sh** - Verifies deputy ORC operational
-   ```bash
-   ./scripts/check-deputy-health.sh {MISSION_ID}
-   # Output: status=OK, context=deputy, mission={MISSION_ID}
-   ```
-
-3. **monitor-imp-progress.sh** - Watches IMP activity
-   ```bash
-   ./scripts/monitor-imp-progress.sh orc-{MISSION_ID}
-   # Output: work_orders=4, completed=2, in_progress=1, blocked=0
-   ```
-
-4. **validate-feature.sh** - Tests implemented feature
+2. **validate-feature.sh** - Tests implemented feature
    ```bash
    ./scripts/validate-feature.sh {grove_path}
    # Output: status=OK, build=pass, tests=pass, manual_test=pass
    ```
 
-5. **cleanup-test-env.sh** - Cleans up test environment
+3. **cleanup-test-env.sh** - Cleans up test environment
    ```bash
    ./scripts/cleanup-test-env.sh {MISSION_ID}
    # Output: status=OK, mission_deleted=true, grove_removed=true
@@ -392,14 +349,14 @@ Located in `scripts/` directory:
 ## Success Criteria
 
 **Overall test PASSES if**:
-- All 27 checkpoints pass (2+4+5+4+3+4+5)
+- All 25 checkpoints pass (2+6+4+4+4+5)
 - POST /echo endpoint implemented correctly
 - Tests pass
 - Manual test works
 - Environment cleans up properly
 
 **Overall test FAILS if**:
-- Any critical phase fails (setup, tmux deploy, deputy health, work assignment)
+- Any critical phase fails (preflight, setup, assignment, imp_deploy)
 - Feature validation fails (less than 4/5 checkpoints)
 - Cleanup fails
 
@@ -408,21 +365,21 @@ Located in `scripts/` directory:
 If any phase fails:
 1. Document the failure in the phase's turn file
 2. Decide: Can we continue or must we abort?
-3. If aborting: Skip to Phase 7 (cleanup and final report)
+3. If aborting: Skip to Phase 6 (cleanup and final report)
 4. If continuing: Note the failure and proceed
 
 ## Time Management
 
 - **Total budget**: 30 minutes
-- **Phase 1-4**: Should complete in <5 minutes
-- **Phase 5**: Up to 20 minutes for implementation
-- **Phase 6-7**: <5 minutes
+- **Phase 0-3**: Should complete in <5 minutes
+- **Phase 4**: Up to 20 minutes for implementation
+- **Phase 5-6**: <5 minutes
 
 If you exceed 30 minutes total, proceed to validation and cleanup anyway.
 
 ## Final Note
 
-This is the ultimate test of ORC's orchestration capabilities. If this succeeds, it proves ORC can autonomously coordinate multi-agent development workflows end-to-end.
+This is the ultimate test of ORC's orchestration capabilities. If this succeeds, it proves ORC can autonomously coordinate IMP development workflows end-to-end.
 
 **Execute with precision. Document everything. Generate the comprehensive report.**
 
