@@ -502,7 +502,7 @@ Examples:
 				for i, grove := range groves {
 					grovePath := filepath.Join(grovesDir, grove.Name)
 					if _, err := os.Stat(grovePath); err == nil {
-						plan = append(plan, fmt.Sprintf("  CREATE window %d (%s): 3 panes - Grove %s IMP", i+1, grove.Name, grove.ID))
+						plan = append(plan, fmt.Sprintf("  CREATE window %d (%s): 3 panes in %s - Grove %s IMP", i+1, grove.Name, grovePath, grove.ID))
 					}
 				}
 			}
@@ -622,9 +622,17 @@ Examples:
 				fmt.Printf("  ℹ️  Session %s already exists\n", sessionName)
 				fmt.Printf("     Attach with: tmux attach -t %s\n", sessionName)
 			} else {
-				// Create session (first window created automatically by tmux)
-				// We'll rename it to the first grove
-				session, err := tmux.NewSession(sessionName, workspacePath)
+				// Determine starting directory: use first grove's path if available
+				startDir := workspacePath
+				if len(groves) > 0 {
+					firstGrovePath := filepath.Join(grovesDir, groves[0].Name)
+					if _, err := os.Stat(firstGrovePath); err == nil {
+						startDir = firstGrovePath
+					}
+				}
+
+				// Create session (first window starts in first grove's directory)
+				session, err := tmux.NewSession(sessionName, startDir)
 				if err != nil {
 					return fmt.Errorf("failed to create TMux session: %w", err)
 				}
@@ -637,16 +645,12 @@ Examples:
 					// Check if grove path exists
 					if _, err := os.Stat(grovePath); err == nil {
 						if i == 0 {
-							// First grove: rename the default first window
+							// First grove: rename the default first window and create 3-pane layout
 							target := fmt.Sprintf("%s:1", sessionName)
 							if err := exec.Command("tmux", "rename-window", "-t", target, grove.Name).Run(); err != nil {
 								return fmt.Errorf("failed to rename first window: %w", err)
 							}
-							// Set working directory for first window
-							if err := exec.Command("tmux", "send-keys", "-t", target, fmt.Sprintf("cd %s", grovePath), "C-m").Run(); err != nil {
-								fmt.Printf("  ⚠️  Could not set working directory: %v\n", err)
-							}
-							// Create the 3-pane layout
+							// Create the 3-pane layout (all panes already in grovePath from session creation)
 							target = fmt.Sprintf("%s:%s", sessionName, grove.Name)
 							if err := session.SplitVertical(target, grovePath); err != nil {
 								return fmt.Errorf("failed to split vertical: %w", err)
