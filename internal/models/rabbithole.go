@@ -48,14 +48,14 @@ func CreateRabbitHole(epicID, title, description string) (*RabbitHole, error) {
 		return nil, fmt.Errorf("epic %s already has direct tasks\nCannot add rabbit holes to epic with direct tasks (no mixed children)", epicID)
 	}
 
-	// Generate rabbit hole ID
-	var count int
-	err = database.QueryRow("SELECT COUNT(*) FROM rabbit_holes").Scan(&count)
+	// Generate rabbit hole ID by finding max existing ID
+	var maxID int
+	err = database.QueryRow("SELECT COALESCE(MAX(CAST(SUBSTR(id, 4) AS INTEGER)), 0) FROM rabbit_holes").Scan(&maxID)
 	if err != nil {
 		return nil, err
 	}
 
-	id := fmt.Sprintf("RH-%03d", count+1)
+	id := fmt.Sprintf("RH-%03d", maxID+1)
 
 	var desc sql.NullString
 	if description != "" {

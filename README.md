@@ -57,7 +57,7 @@ orc summary
 
 **Key Commands**
 - `/handoff` - Create handoff for session continuity
-- `orc prime` - Lightweight context injection (auto-runs on SessionStart)
+- `orc prime` - Lightweight context injection (agents auto-run this on startup via direct prompt)
 - `orc status --handoff` - View latest handoff
 
 ---

@@ -81,14 +81,14 @@ func CreateTask(epicID, rabbitHoleID, missionID, title, description, taskType st
 		}
 	}
 
-	// Generate task ID
-	var count int
-	err = database.QueryRow("SELECT COUNT(*) FROM tasks").Scan(&count)
+	// Generate task ID by finding max existing ID
+	var maxID int
+	err = database.QueryRow("SELECT COALESCE(MAX(CAST(SUBSTR(id, 6) AS INTEGER)), 0) FROM tasks").Scan(&maxID)
 	if err != nil {
 		return nil, err
 	}
 
-	id := fmt.Sprintf("TASK-%03d", count+1)
+	id := fmt.Sprintf("TASK-%03d", maxID+1)
 
 	var desc sql.NullString
 	if description != "" {

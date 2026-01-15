@@ -16,10 +16,14 @@ func PrimeCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "prime",
 		Short: "Output lightweight context for session priming",
-		Long: `Generate concise context snapshot for injecting into new Claude sessions.
+		Long: `Generate concise context snapshot for Claude agents on startup.
 
-Designed for SessionStart hook injection after /clear - provides just enough
-context to orient the new session without overwhelming it.
+NOTE: Originally designed for SessionStart hook injection, but hooks are currently
+broken in Claude Code v2.1.7. ORC now uses direct prompt pattern when starting agents:
+  claude "Run orc prime"
+
+This command detects the agent's location (grove/mission/global) and provides
+appropriate context automatically.
 
 Output includes:
 - Current location (cwd)
@@ -27,7 +31,10 @@ Output includes:
 - Active work order (if any)
 - Latest handoff note (brief)
 
-This is for automatic injection after /clear to maintain basic orientation.
+Still useful for:
+- Manual context refresh during long sessions
+- Debugging and understanding mission context
+- Testing what would be injected via hooks (if they worked)
 
 Examples:
   orc prime

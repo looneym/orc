@@ -49,8 +49,8 @@ func (s *Session) CreateDeputyWindow() (*Window, error) {
 		return nil, fmt.Errorf("failed to rename deputy window: %w", err)
 	}
 
-	// Launch claude in the deputy pane
-	if err := s.SendKeys(target, "claude"); err != nil {
+	// Launch claude in the deputy pane with orc prime prompt
+	if err := s.SendKeys(target, "claude \"Run the orc prime command to get context\""); err != nil {
 		return nil, fmt.Errorf("failed to launch claude: %w", err)
 	}
 
@@ -90,9 +90,9 @@ func (s *Session) CreateMasterOrcWindow(workingDir string) error {
 	// Pane 2 (top right): vim
 	// Pane 3 (bottom right): shell
 
-	// Launch claude in pane 1 (left)
+	// Launch claude in pane 1 (left) with orc prime prompt
 	pane1 := fmt.Sprintf("%s.1", target)
-	if err := s.SendKeys(pane1, "claude"); err != nil {
+	if err := s.SendKeys(pane1, "claude \"Run the orc prime command to get context\""); err != nil {
 		return fmt.Errorf("failed to launch claude: %w", err)
 	}
 
@@ -147,9 +147,9 @@ func (s *Session) CreateGroveWindow(index int, name, workingDir string) (*Window
 		return nil, fmt.Errorf("failed to launch vim: %w", err)
 	}
 
-	// Launch claude in pane 2 (top right - IMP)
+	// Launch claude in pane 2 (top right - IMP) with orc prime prompt
 	pane2 := fmt.Sprintf("%s.2", target)
-	if err := s.SendKeys(pane2, "claude"); err != nil {
+	if err := s.SendKeys(pane2, "claude \"Run the orc prime command to get context\""); err != nil {
 		return nil, fmt.Errorf("failed to launch claude IMP: %w", err)
 	}
 

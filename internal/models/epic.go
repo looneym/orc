@@ -40,14 +40,14 @@ func CreateEpic(missionID, title, description, contextRef string) (*Epic, error)
 		return nil, fmt.Errorf("mission %s not found", missionID)
 	}
 
-	// Generate epic ID
-	var count int
-	err = database.QueryRow("SELECT COUNT(*) FROM epics").Scan(&count)
+	// Generate epic ID by finding max existing ID
+	var maxID int
+	err = database.QueryRow("SELECT COALESCE(MAX(CAST(SUBSTR(id, 6) AS INTEGER)), 0) FROM epics").Scan(&maxID)
 	if err != nil {
 		return nil, err
 	}
 
-	id := fmt.Sprintf("EPIC-%03d", count+1)
+	id := fmt.Sprintf("EPIC-%03d", maxID+1)
 
 	var desc sql.NullString
 	if description != "" {
