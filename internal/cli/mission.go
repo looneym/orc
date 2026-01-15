@@ -489,6 +489,25 @@ Examples:
 			plan = append(plan, fmt.Sprintf("DELETE old .orc-mission: %s", oldMissionFile))
 		}
 
+		// Plan TMux session if requested
+		if createTmux {
+			plan = append(plan, "")
+			plan = append(plan, "TMux Session:")
+			sessionName := fmt.Sprintf("orc-%s", missionID)
+			if tmux.SessionExists(sessionName) {
+				plan = append(plan, fmt.Sprintf("  EXISTS session: %s", sessionName))
+			} else {
+				plan = append(plan, fmt.Sprintf("  CREATE session: %s", sessionName))
+				plan = append(plan, "  CREATE window 1 (orc): 3 panes - ORC orchestrator")
+				for i, grove := range groves {
+					grovePath := filepath.Join(grovesDir, grove.Name)
+					if _, err := os.Stat(grovePath); err == nil {
+						plan = append(plan, fmt.Sprintf("  CREATE window %d (%s): 3 panes - Grove %s", i+2, grove.Name, grove.ID))
+					}
+				}
+			}
+		}
+
 		// Phase 3: Show plan
 		fmt.Println("📋 Plan:\n")
 		for _, step := range plan {
