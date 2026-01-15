@@ -6,7 +6,7 @@ import (
 )
 
 // schemaVersion tracks the current schema version
-const currentSchemaVersion = 7
+const currentSchemaVersion = 8
 
 // Migration represents a database migration
 type Migration struct {
@@ -51,6 +51,11 @@ var migrations = []Migration{
 		Version: 7,
 		Name:    "add_pinned_field_to_missions",
 		Up:      migrationV7,
+	},
+	{
+		Version: 8,
+		Name:    "add_tags_and_task_tags_tables",
+		Up:      migrationV8,
 	},
 }
 
@@ -645,6 +650,79 @@ func migrationV7(db *sql.DB) error {
 	`)
 	if err != nil {
 		return fmt.Errorf("failed to add pinned column to missions: %w", err)
+	}
+
+	return nil
+}
+
+// migrationV8 adds tags and task_tags tables for tag system
+func migrationV8(db *sql.DB) error {
+	// Step 1: Create tags table
+	_, err := db.Exec(`
+		CREATE TABLE tags (
+			id TEXT PRIMARY KEY,
+			name TEXT NOT NULL UNIQUE,
+			description TEXT,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		)
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to create tags table: %w", err)
+	}
+
+	// Step 2: Create task_tags junction table
+	_, err = db.Exec(`
+		CREATE TABLE task_tags (
+			id TEXT PRIMARY KEY,
+			task_id TEXT NOT NULL,
+			tag_id TEXT NOT NULL,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,
+			FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE,
+			UNIQUE(task_id, tag_id)
+		)
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to create task_tags table: %w", err)
+	}
+
+	// Step 3: Create indexes for performance
+	_, err = db.Exec(`
+		CREATE INDEX idx_tags_name ON tags(name);
+		CREATE INDEX idx_task_tags_task ON task_tags(task_id);
+		CREATE INDEX idx_task_tags_tag ON task_tags(tag_id);
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to create indexes: %w", err)
+	}
+
+	// Step 4: Seed 10 glossary tags from TASK-192
+	glossaryTags := []struct {
+		id          string
+		name        string
+		description string
+	}{
+		{"TAG-001", "graphiti", "Graphiti memory system integration and functionality"},
+		{"TAG-002", "handoff", "Agent handoff coordination and context transfer"},
+		{"TAG-003", "orc-prime", "ORC Prime orchestrator agent capabilities"},
+		{"TAG-004", "mission-infra", "Mission workspace and infrastructure setup"},
+		{"TAG-005", "desired-state", "Desired state tracking and reconciliation"},
+		{"TAG-006", "tech-plans", "Technical planning and design documentation"},
+		{"TAG-007", "semantic-epic-system", "9-epic semantic knowledge management"},
+		{"TAG-008", "database-schema", "Database migrations and schema changes"},
+		{"TAG-009", "orc-summary", "Summary command display and formatting"},
+		{"TAG-010", "testing", "Test infrastructure and validation"},
+	}
+
+	for _, tag := range glossaryTags {
+		_, err = db.Exec(
+			"INSERT INTO tags (id, name, description) VALUES (?, ?, ?)",
+			tag.id, tag.name, tag.description,
+		)
+		if err != nil {
+			return fmt.Errorf("failed to seed tag %s: %w", tag.name, err)
+		}
 	}
 
 	return nil

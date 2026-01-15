@@ -70,10 +70,39 @@ var taskListCmd = &cobra.Command{
 		epicID, _ := cmd.Flags().GetString("epic")
 		rabbitHoleID, _ := cmd.Flags().GetString("rabbit-hole")
 		status, _ := cmd.Flags().GetString("status")
+		tag, _ := cmd.Flags().GetString("tag")
 
-		tasks, err := models.ListTasks(epicID, rabbitHoleID, status)
-		if err != nil {
-			return fmt.Errorf("failed to list tasks: %w", err)
+		var tasks []*models.Task
+		var err error
+
+		if tag != "" {
+			// Filter by tag
+			tasks, err = models.ListTasksByTag(tag)
+			if err != nil {
+				return fmt.Errorf("failed to list tasks: %w", err)
+			}
+
+			// Apply additional filters if specified
+			var filteredTasks []*models.Task
+			for _, task := range tasks {
+				if epicID != "" && (!task.EpicID.Valid || task.EpicID.String != epicID) {
+					continue
+				}
+				if rabbitHoleID != "" && (!task.RabbitHoleID.Valid || task.RabbitHoleID.String != rabbitHoleID) {
+					continue
+				}
+				if status != "" && task.Status != status {
+					continue
+				}
+				filteredTasks = append(filteredTasks, task)
+			}
+			tasks = filteredTasks
+		} else {
+			// Use normal list
+			tasks, err = models.ListTasks(epicID, rabbitHoleID, status)
+			if err != nil {
+				return fmt.Errorf("failed to list tasks: %w", err)
+			}
 		}
 
 		if len(tasks) == 0 {
@@ -340,6 +369,41 @@ var taskDiscoverCmd = &cobra.Command{
 	},
 }
 
+var taskTagCmd = &cobra.Command{
+	Use:   "tag [task-id] [tag-name]",
+	Short: "Add a tag to a task",
+	Args:  cobra.ExactArgs(2),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		taskID := args[0]
+		tagName := args[1]
+
+		err := models.AddTagToTask(taskID, tagName)
+		if err != nil {
+			return fmt.Errorf("failed to tag task: %w", err)
+		}
+
+		fmt.Printf("✓ Task %s tagged with '%s'\n", taskID, tagName)
+		return nil
+	},
+}
+
+var taskUntagCmd = &cobra.Command{
+	Use:   "untag [task-id]",
+	Short: "Remove tag from a task",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		taskID := args[0]
+
+		err := models.RemoveTagFromTask(taskID)
+		if err != nil {
+			return fmt.Errorf("failed to untag task: %w", err)
+		}
+
+		fmt.Printf("✓ Task %s untagged\n", taskID)
+		return nil
+	},
+}
+
 func init() {
 	// task create flags
 	taskCreateCmd.Flags().String("epic", "", "Epic ID (required if no rabbit-hole)")
@@ -352,6 +416,7 @@ func init() {
 	taskListCmd.Flags().String("epic", "", "Filter by epic")
 	taskListCmd.Flags().String("rabbit-hole", "", "Filter by rabbit hole")
 	taskListCmd.Flags().StringP("status", "s", "", "Filter by status")
+	taskListCmd.Flags().String("tag", "", "Filter by tag")
 
 	// task update flags
 	taskUpdateCmd.Flags().String("title", "", "New title")
@@ -370,6 +435,8 @@ func init() {
 	taskCmd.AddCommand(taskPinCmd)
 	taskCmd.AddCommand(taskUnpinCmd)
 	taskCmd.AddCommand(taskDiscoverCmd)
+	taskCmd.AddCommand(taskTagCmd)
+	taskCmd.AddCommand(taskUntagCmd)
 }
 
 // TaskCmd returns the task command

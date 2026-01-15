@@ -2,12 +2,36 @@ package cli
 
 import (
 	"fmt"
+	"hash/fnv"
 	"strings"
 
 	"github.com/example/orc/internal/context"
 	"github.com/example/orc/internal/models"
+	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 )
+
+// getTagColor returns a deterministic color for a tag name
+// Uses FNV-1a hash to map tag name to one of 256 colors
+func getTagColor(tagName string) *color.Color {
+	// Hash the tag name
+	h := fnv.New32a()
+	h.Write([]byte(tagName))
+	hash := h.Sum32()
+
+	// Map to 256-color range (16-231 are the color cube)
+	// Avoid 0-15 (basic colors) and 232-255 (grayscale) for better visibility
+	colorCode := 16 + (hash % 216) // 216 colors in the color cube
+
+	// Return color with 256-color mode
+	return color.New(color.Attribute(38), color.Attribute(5), color.Attribute(colorCode))
+}
+
+// colorizeTag wraps a tag name in brackets with deterministic color
+func colorizeTag(tagName string) string {
+	c := getTagColor(tagName)
+	return c.Sprintf("[%s]", tagName)
+}
 
 // SummaryCmd returns the summary command
 func SummaryCmd() *cobra.Command {
@@ -235,7 +259,13 @@ Examples:
 													}
 												}
 
-												fmt.Printf("%s%s%s - %s\n", taskPrefix, pinnedEmoji, task.ID, task.Title)
+												tagInfo := ""
+											tag, _ := models.GetTaskTag(task.ID)
+											if tag != nil {
+												tagInfo = " " + colorizeTag(tag.Name)
+											}
+
+											fmt.Printf("%s%s%s - %s%s\n", taskPrefix, pinnedEmoji, task.ID, task.Title, tagInfo)
 											}
 										}
 									} else {
@@ -287,7 +317,13 @@ Examples:
 										}
 									}
 
-									fmt.Printf("%s%s%s - %s\n", taskPrefix, pinnedEmoji, task.ID, task.Title)
+									tagInfo := ""
+									tag, _ := models.GetTaskTag(task.ID)
+									if tag != nil {
+										tagInfo = " " + colorizeTag(tag.Name)
+									}
+
+									fmt.Printf("%s%s%s - %s%s\n", taskPrefix, pinnedEmoji, task.ID, task.Title, tagInfo)
 								}
 							}
 						}
@@ -327,13 +363,20 @@ func summarizeRabbitHoleTasks(rhID string, hideMap map[string]bool) string {
 		return "no tasks"
 	}
 
-	// Count tasks by status
+	// Count tasks by status and collect tags
 	statusCounts := make(map[string]int)
+	tagCounts := make(map[string]int)
 	total := 0
 	for _, task := range tasks {
 		if task.Status != "complete" && !hideMap[task.Status] {
 			statusCounts[task.Status]++
 			total++
+
+			// Get tag for this task
+			tag, _ := models.GetTaskTag(task.ID)
+			if tag != nil {
+				tagCounts[tag.Name]++
+			}
 		}
 	}
 
@@ -359,5 +402,17 @@ func summarizeRabbitHoleTasks(rhID string, hideMap map[string]bool) string {
 		parts = append(parts, fmt.Sprintf("%d paused", count))
 	}
 
-	return fmt.Sprintf("%d tasks: %s", total, strings.Join(parts, ", "))
+	summary := fmt.Sprintf("%d tasks: %s", total, strings.Join(parts, ", "))
+
+	// Add tag counts if any tags present
+	if len(tagCounts) > 0 {
+		tagParts := []string{}
+		for tagName, count := range tagCounts {
+			coloredTag := colorizeTag(tagName)
+			tagParts = append(tagParts, fmt.Sprintf("%s×%d", coloredTag, count))
+		}
+		summary += fmt.Sprintf("; tags: %s", strings.Join(tagParts, ", "))
+	}
+
+	return summary
 }

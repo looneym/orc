@@ -347,3 +347,147 @@ func GetTasksByGrove(groveID string) ([]*Task, error) {
 
 	return tasks, nil
 }
+
+// GetTaskTag retrieves the tag for a task (returns nil if no tag assigned)
+func GetTaskTag(taskID string) (*Tag, error) {
+	database, err := db.GetDB()
+	if err != nil {
+		return nil, err
+	}
+
+	var tagID string
+	err = database.QueryRow(
+		"SELECT tag_id FROM task_tags WHERE task_id = ?",
+		taskID,
+	).Scan(&tagID)
+
+	if err == sql.ErrNoRows {
+		return nil, nil // No tag assigned
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return GetTag(tagID)
+}
+
+// AddTagToTask assigns a tag to a task (enforces one-tag constraint)
+func AddTagToTask(taskID, tagName string) error {
+	database, err := db.GetDB()
+	if err != nil {
+		return err
+	}
+
+	// Verify task exists
+	var exists int
+	err = database.QueryRow("SELECT COUNT(*) FROM tasks WHERE id = ?", taskID).Scan(&exists)
+	if err != nil {
+		return err
+	}
+	if exists == 0 {
+		return fmt.Errorf("task %s not found", taskID)
+	}
+
+	// Get tag by name
+	tag, err := GetTagByName(tagName)
+	if err != nil {
+		return fmt.Errorf("tag '%s' not found", tagName)
+	}
+
+	// Check if task already has a tag
+	existingTag, err := GetTaskTag(taskID)
+	if err != nil {
+		return err
+	}
+	if existingTag != nil {
+		return fmt.Errorf("task %s already has tag '%s' (one tag per task limit)\nRemove existing tag first with: orc task untag %s", taskID, existingTag.Name, taskID)
+	}
+
+	// Generate task_tag ID
+	var count int
+	err = database.QueryRow("SELECT COUNT(*) FROM task_tags").Scan(&count)
+	if err != nil {
+		return err
+	}
+	id := fmt.Sprintf("TT-%03d", count+1)
+
+	// Create task-tag association
+	_, err = database.Exec(
+		"INSERT INTO task_tags (id, task_id, tag_id) VALUES (?, ?, ?)",
+		id, taskID, tag.ID,
+	)
+
+	return err
+}
+
+// RemoveTagFromTask removes the tag from a task
+func RemoveTagFromTask(taskID string) error {
+	database, err := db.GetDB()
+	if err != nil {
+		return err
+	}
+
+	// Verify task exists
+	var exists int
+	err = database.QueryRow("SELECT COUNT(*) FROM tasks WHERE id = ?", taskID).Scan(&exists)
+	if err != nil {
+		return err
+	}
+	if exists == 0 {
+		return fmt.Errorf("task %s not found", taskID)
+	}
+
+	// Check if task has a tag
+	tag, err := GetTaskTag(taskID)
+	if err != nil {
+		return err
+	}
+	if tag == nil {
+		return fmt.Errorf("task %s has no tag assigned", taskID)
+	}
+
+	_, err = database.Exec("DELETE FROM task_tags WHERE task_id = ?", taskID)
+	return err
+}
+
+// ListTasksByTag retrieves all tasks with a specific tag
+func ListTasksByTag(tagName string) ([]*Task, error) {
+	database, err := db.GetDB()
+	if err != nil {
+		return nil, err
+	}
+
+	// Get tag by name
+	tag, err := GetTagByName(tagName)
+	if err != nil {
+		return nil, fmt.Errorf("tag '%s' not found", tagName)
+	}
+
+	query := `
+		SELECT t.id, t.epic_id, t.rabbit_hole_id, t.mission_id, t.title, t.description,
+		       t.type, t.status, t.priority, t.assigned_grove_id, t.context_ref,
+		       t.pinned, t.created_at, t.updated_at, t.claimed_at, t.completed_at
+		FROM tasks t
+		INNER JOIN task_tags tt ON t.id = tt.task_id
+		WHERE tt.tag_id = ?
+		ORDER BY t.created_at ASC
+	`
+
+	rows, err := database.Query(query, tag.ID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var tasks []*Task
+	for rows.Next() {
+		task := &Task{}
+		err := rows.Scan(&task.ID, &task.EpicID, &task.RabbitHoleID, &task.MissionID, &task.Title, &task.Description, &task.Type, &task.Status, &task.Priority, &task.AssignedGroveID, &task.ContextRef, &task.Pinned, &task.CreatedAt, &task.UpdatedAt, &task.ClaimedAt, &task.CompletedAt)
+		if err != nil {
+			return nil, err
+		}
+		tasks = append(tasks, task)
+	}
+
+	return tasks, nil
+}
