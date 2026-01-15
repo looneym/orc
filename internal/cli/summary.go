@@ -15,22 +15,41 @@ func SummaryCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "summary",
 		Short: "Show summary of all open missions and work orders",
-		Long: `Display a high-level overview of all work in progress:
-- Open missions with their work orders
+		Long: `Show a hierarchical summary of missions and their work orders.
 
-In deputy context, automatically scopes to current mission (use --all to see all missions).`,
+Filtering:
+  --scope all      Show all missions (default)
+  --scope current  Show only current mission (requires mission context)
+  --hide paused    Hide paused items
+  --hide blocked   Hide blocked items
+  --hide paused,blocked  Hide multiple statuses
+
+Examples:
+  orc summary                       # all missions, all statuses
+  orc summary --scope current       # current mission only
+  orc summary --hide paused         # hide paused work
+  orc summary --scope current --hide paused,blocked  # focused view`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Check if we're in a deputy ORC context
-			missionCtx, _ := context.DetectMissionContext()
-			var filterMissionID string
+			// Get scope from flag (default: "all")
+			scope, _ := cmd.Flags().GetString("scope")
 
-			if missionCtx != nil && !showAll {
-				// Deputy context - filter to this mission only
+			// Validate scope value
+			if scope != "all" && scope != "current" {
+				return fmt.Errorf("invalid scope: must be 'all' or 'current'")
+			}
+
+			// Determine mission filter based on scope
+			var filterMissionID string
+			if scope == "current" {
+				// Get current mission from context
+				missionCtx, _ := context.DetectMissionContext()
+				if missionCtx == nil || missionCtx.MissionID == "" {
+					return fmt.Errorf("--scope current requires being in a mission context (no .orc-mission file found)")
+				}
 				filterMissionID = missionCtx.MissionID
-				fmt.Printf("📊 ORC Summary - %s (Deputy View)\n", filterMissionID)
-				fmt.Println("💡 Use --all to see all missions")
+				fmt.Printf("📊 ORC Summary - %s (Current Mission)\n", filterMissionID)
 			} else {
-				// Master context or --all flag - show everything
+				// scope == "all"
 				fmt.Println("📊 ORC Summary - Open Work")
 			}
 			fmt.Println()
@@ -41,16 +60,29 @@ In deputy context, automatically scopes to current mission (use --all to see all
 				return fmt.Errorf("failed to list missions: %w", err)
 			}
 
+			// Get hide statuses from flag
+			hideStatuses, _ := cmd.Flags().GetStringSlice("hide")
+			hideMap := make(map[string]bool)
+			for _, status := range hideStatuses {
+				hideMap[status] = true
+			}
+
 			// Filter to open missions (not complete or archived)
 			var openMissions []*models.Mission
 			for _, m := range missions {
-				if m.Status != "complete" && m.Status != "archived" {
-					// If in deputy context and not showing all, filter to this mission
-					if filterMissionID != "" && m.ID != filterMissionID {
-						continue
-					}
-					openMissions = append(openMissions, m)
+				// Always hide complete and archived
+				if m.Status == "complete" || m.Status == "archived" {
+					continue
 				}
+				// Hide if in hide list
+				if hideMap[m.Status] {
+					continue
+				}
+				// If in deputy context and not showing all, filter to this mission
+				if filterMissionID != "" && m.ID != filterMissionID {
+					continue
+				}
+				openMissions = append(openMissions, m)
 			}
 
 			if len(openMissions) == 0 {
@@ -78,9 +110,15 @@ In deputy context, automatically scopes to current mission (use --all to see all
 				// Filter to non-complete work orders
 				var activeWOs []*models.WorkOrder
 				for _, wo := range workOrders {
-					if wo.Status != "complete" {
-						activeWOs = append(activeWOs, wo)
+					// Always hide complete
+					if wo.Status == "complete" {
+						continue
 					}
+					// Hide if in hide list
+					if hideMap[wo.Status] {
+						continue
+					}
+					activeWOs = append(activeWOs, wo)
 				}
 
 				if len(activeWOs) > 0 {
@@ -187,6 +225,8 @@ In deputy context, automatically scopes to current mission (use --all to see all
 	}
 
 	cmd.Flags().BoolVarP(&showAll, "all", "a", false, "Show all missions (override deputy scoping)")
+	cmd.Flags().StringP("scope", "s", "all", "Scope: 'all' or 'current'")
+	cmd.Flags().StringSlice("hide", []string{}, "Hide work orders with these statuses (comma-separated: paused,blocked)")
 
 	return cmd
 }
@@ -196,7 +236,7 @@ func getStatusEmoji(status string) string {
 	case "ready":
 		return "📦"
 	case "paused":
-		return "⏸️"
+		return "💤"
 	case "design":
 		return "📐"
 	case "implement":
