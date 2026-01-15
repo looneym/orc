@@ -6,19 +6,22 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/example/orc/internal/config"
 )
 
-// MissionContext represents the .orc-mission marker file
+// MissionContext represents mission context information
 type MissionContext struct {
 	MissionID     string    `json:"mission_id"`
 	WorkspacePath string    `json:"workspace_path"`
+	IsMaster      bool      `json:"is_master"`
 	CreatedAt     time.Time `json:"created_at"`
 }
 
 const markerFileName = ".orc-mission"
 
-// DetectMissionContext checks if we're in a deputy ORC context
-// by looking for .orc-mission file in current directory or parents
+// DetectMissionContext checks if we're in a mission context
+// by looking for .orc/config.json (or legacy .orc-mission) in current directory or parents
 func DetectMissionContext() (*MissionContext, error) {
 	// Start from current directory
 	dir, err := os.Getwd()
@@ -26,18 +29,24 @@ func DetectMissionContext() (*MissionContext, error) {
 		return nil, err
 	}
 
-	// Walk up directory tree looking for .orc-mission
+	// Walk up directory tree looking for config
 	for {
-		markerPath := filepath.Join(dir, markerFileName)
-		if _, err := os.Stat(markerPath); err == nil {
-			// Found it - read and parse
-			return ReadMissionContext(markerPath)
+		cfg, err := config.LoadConfigWithFallback(dir)
+		if err == nil && cfg.Type == config.TypeMission {
+			// Found mission config - convert to MissionContext
+			createdAt, _ := time.Parse(time.RFC3339, cfg.Mission.CreatedAt)
+			return &MissionContext{
+				MissionID:     cfg.Mission.MissionID,
+				WorkspacePath: cfg.Mission.WorkspacePath,
+				IsMaster:      cfg.Mission.IsMaster,
+				CreatedAt:     createdAt,
+			}, nil
 		}
 
 		// Move to parent directory
 		parent := filepath.Dir(dir)
 		if parent == dir {
-			// Reached filesystem root without finding marker
+			// Reached filesystem root without finding config
 			return nil, nil
 		}
 		dir = parent
@@ -59,25 +68,25 @@ func ReadMissionContext(path string) (*MissionContext, error) {
 	return &ctx, nil
 }
 
-// WriteMissionContext creates a .orc-mission marker file
+// WriteMissionContext creates a .orc/config.json file for mission context
 func WriteMissionContext(workspacePath, missionID string) error {
-	ctx := MissionContext{
-		MissionID:     missionID,
-		WorkspacePath: workspacePath,
-		CreatedAt:     time.Now(),
+	return WriteMissionConfig(workspacePath, missionID, false)
+}
+
+// WriteMissionConfig creates a .orc/config.json file with full control over fields
+func WriteMissionConfig(workspacePath, missionID string, isMaster bool) error {
+	cfg := &config.Config{
+		Version: "1.0",
+		Type:    config.TypeMission,
+		Mission: &config.MissionConfig{
+			MissionID:     missionID,
+			WorkspacePath: workspacePath,
+			IsMaster:      isMaster,
+			CreatedAt:     time.Now().Format(time.RFC3339),
+		},
 	}
 
-	data, err := json.MarshalIndent(ctx, "", "  ")
-	if err != nil {
-		return fmt.Errorf("failed to marshal mission context: %w", err)
-	}
-
-	markerPath := filepath.Join(workspacePath, markerFileName)
-	if err := os.WriteFile(markerPath, data, 0644); err != nil {
-		return fmt.Errorf("failed to write mission context: %w", err)
-	}
-
-	return nil
+	return config.SaveConfig(workspacePath, cfg)
 }
 
 // GetContextMissionID returns the mission ID from context, or empty string if not in deputy context

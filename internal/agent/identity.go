@@ -1,13 +1,13 @@
 package agent
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 
+	"github.com/example/orc/internal/config"
 	"github.com/example/orc/internal/context"
 )
 
@@ -96,22 +96,15 @@ func GetCurrentAgentID() (*AgentIdentity, error) {
 		}, nil
 	}
 
-	// Otherwise check for grove metadata
-	metadataPath := filepath.Join(cwd, ".orc", "metadata.json")
-	data, err := os.ReadFile(metadataPath)
-	if err == nil {
-		var metadata struct {
-			GroveID   string `json:"grove_id"`
-			MissionID string `json:"mission_id"`
-		}
-		if err := json.Unmarshal(data, &metadata); err == nil && metadata.GroveID != "" {
-			return &AgentIdentity{
-				Type:      AgentTypeIMP,
-				ID:        metadata.GroveID,
-				FullID:    fmt.Sprintf("IMP-%s", metadata.GroveID),
-				MissionID: metadata.MissionID,
-			}, nil
-		}
+	// Otherwise check for grove config
+	cfg, err := config.LoadConfigWithFallback(cwd)
+	if err == nil && cfg.Type == config.TypeGrove {
+		return &AgentIdentity{
+			Type:      AgentTypeIMP,
+			ID:        cfg.Grove.GroveID,
+			FullID:    fmt.Sprintf("IMP-%s", cfg.Grove.GroveID),
+			MissionID: cfg.Grove.MissionID,
+		}, nil
 	}
 
 	// Fallback: in mission context but not at workspace root = deputy
