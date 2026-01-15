@@ -201,6 +201,31 @@ func RenameGrove(id, newName string) error {
 	return err
 }
 
+// UpdateGrovePath updates the path of a grove
+func UpdateGrovePath(id, newPath string) error {
+	database, err := db.GetDB()
+	if err != nil {
+		return err
+	}
+
+	// Verify grove exists
+	var exists int
+	err = database.QueryRow("SELECT COUNT(*) FROM groves WHERE id = ?", id).Scan(&exists)
+	if err != nil {
+		return err
+	}
+	if exists == 0 {
+		return fmt.Errorf("grove %s not found", id)
+	}
+
+	_, err = database.Exec(
+		"UPDATE groves SET path = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+		newPath, id,
+	)
+
+	return err
+}
+
 // DeleteGrove deletes a grove from the database
 func DeleteGrove(id string) error {
 	database, err := db.GetDB()

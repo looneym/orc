@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/example/orc/internal/agent"
+	"github.com/example/orc/internal/config"
 	"github.com/example/orc/internal/context"
 	"github.com/example/orc/internal/models"
 	"github.com/example/orc/internal/tmux"
@@ -359,6 +360,261 @@ Examples:
 	},
 }
 
+var missionLaunchCmd = &cobra.Command{
+	Use:   "launch [mission-id]",
+	Short: "Launch mission infrastructure (plan/apply)",
+	Long: `Launch or update mission infrastructure using plan/apply pattern.
+
+This command:
+1. Reads desired state from database (missions, epics, groves)
+2. Analyzes current filesystem state
+3. Generates a plan of changes needed
+4. Shows plan and asks for confirmation
+5. Applies changes to converge filesystem to desired state
+
+Idempotent: Can be run multiple times safely.
+
+Examples:
+  orc mission launch MISSION-002
+  orc mission launch MISSION-001 --workspace ~/custom/path`,
+	Args: cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		// Check agent identity - only ORC can launch missions
+		identity, err := agent.GetCurrentAgentID()
+		if err == nil && identity.Type == agent.AgentTypeIMP {
+			return fmt.Errorf("IMPs cannot launch missions - only ORC can launch missions")
+		}
+
+		missionID := args[0]
+		workspacePath, _ := cmd.Flags().GetString("workspace")
+
+		// Default workspace path
+		if workspacePath == "" {
+			homeDir, err := os.UserHomeDir()
+			if err != nil {
+				return fmt.Errorf("failed to get home directory: %w", err)
+			}
+			workspacePath = filepath.Join(homeDir, "src", "missions", missionID)
+		}
+
+		// Phase 1: Load desired state from database
+		fmt.Printf("🔍 Analyzing mission: %s\n\n", missionID)
+
+		mission, err := models.GetMission(missionID)
+		if err != nil {
+			return fmt.Errorf("mission not found in database: %w\nCreate it first: orc mission create", err)
+		}
+
+		groves, err := models.GetGrovesByMission(missionID)
+		if err != nil {
+			return fmt.Errorf("failed to load groves: %w", err)
+		}
+
+		fmt.Printf("Mission: %s - %s\n", mission.ID, mission.Title)
+		fmt.Printf("Groves in DB: %d\n\n", len(groves))
+
+		// Phase 2: Analyze current state and generate plan
+		var plan []string
+
+		// Check mission workspace
+		if _, err := os.Stat(workspacePath); os.IsNotExist(err) {
+			plan = append(plan, fmt.Sprintf("CREATE mission workspace: %s", workspacePath))
+		} else {
+			plan = append(plan, fmt.Sprintf("EXISTS mission workspace: %s", workspacePath))
+		}
+
+		// Check mission config
+		missionConfigPath := filepath.Join(workspacePath, ".orc", "config.json")
+		if _, err := os.Stat(missionConfigPath); os.IsNotExist(err) {
+			plan = append(plan, fmt.Sprintf("CREATE mission config: %s", missionConfigPath))
+		} else {
+			plan = append(plan, fmt.Sprintf("EXISTS mission config: %s", missionConfigPath))
+		}
+
+		// Check groves directory
+		grovesDir := filepath.Join(workspacePath, "groves")
+		if _, err := os.Stat(grovesDir); os.IsNotExist(err) {
+			plan = append(plan, fmt.Sprintf("CREATE groves directory: %s", grovesDir))
+		} else {
+			plan = append(plan, fmt.Sprintf("EXISTS groves directory: %s", grovesDir))
+		}
+
+		// Plan for each grove
+		for _, grove := range groves {
+			desiredPath := filepath.Join(grovesDir, grove.Name)
+			currentPath := grove.Path
+
+			// Check if grove exists at current path
+			currentExists := false
+			if _, err := os.Stat(currentPath); err == nil {
+				currentExists = true
+			}
+
+			// Check if grove exists at desired path
+			desiredExists := false
+			if _, err := os.Stat(desiredPath); err == nil {
+				desiredExists = true
+			}
+
+			if currentPath != desiredPath {
+				if currentExists && !desiredExists {
+					plan = append(plan, fmt.Sprintf("MOVE grove %s: %s → %s", grove.ID, currentPath, desiredPath))
+				} else if !currentExists && !desiredExists {
+					plan = append(plan, fmt.Sprintf("MISSING grove %s: %s (needs materialization)", grove.ID, desiredPath))
+				} else if desiredExists {
+					plan = append(plan, fmt.Sprintf("EXISTS grove %s: %s", grove.ID, desiredPath))
+					plan = append(plan, fmt.Sprintf("UPDATE DB path for %s: %s → %s", grove.ID, currentPath, desiredPath))
+				}
+			} else {
+				if currentExists {
+					plan = append(plan, fmt.Sprintf("EXISTS grove %s: %s", grove.ID, desiredPath))
+				} else {
+					plan = append(plan, fmt.Sprintf("MISSING grove %s: %s (needs materialization)", grove.ID, desiredPath))
+				}
+			}
+
+			// Check grove config
+			groveConfigPath := filepath.Join(desiredPath, ".orc", "config.json")
+			if _, err := os.Stat(groveConfigPath); os.IsNotExist(err) {
+				plan = append(plan, fmt.Sprintf("CREATE grove config: %s", groveConfigPath))
+			} else {
+				plan = append(plan, fmt.Sprintf("EXISTS grove config: %s", groveConfigPath))
+			}
+		}
+
+		// Check for old .orc-mission files to clean up
+		oldMissionFile := filepath.Join(workspacePath, ".orc-mission")
+		if _, err := os.Stat(oldMissionFile); err == nil {
+			plan = append(plan, fmt.Sprintf("DELETE old .orc-mission: %s", oldMissionFile))
+		}
+
+		// Phase 3: Show plan
+		fmt.Println("📋 Plan:\n")
+		for _, step := range plan {
+			fmt.Printf("  %s\n", step)
+		}
+		fmt.Println()
+
+		// Phase 4: Ask for confirmation
+		fmt.Print("Apply changes? [y/N]: ")
+		var response string
+		fmt.Scanln(&response)
+		if response != "y" && response != "Y" {
+			fmt.Println("Aborted")
+			return nil
+		}
+
+		// Phase 5: Apply changes
+		fmt.Println("\n🚀 Applying changes...\n")
+
+		// Create mission workspace
+		if err := os.MkdirAll(workspacePath, 0755); err != nil {
+			return fmt.Errorf("failed to create mission workspace: %w", err)
+		}
+		fmt.Printf("✓ Mission workspace ready\n")
+
+		// Create .orc directory
+		orcDir := filepath.Join(workspacePath, ".orc")
+		if err := os.MkdirAll(orcDir, 0755); err != nil {
+			return fmt.Errorf("failed to create .orc directory: %w", err)
+		}
+
+		// Write mission config
+		if err := context.WriteMissionContext(workspacePath, missionID); err != nil {
+			return fmt.Errorf("failed to write mission config: %w", err)
+		}
+		fmt.Printf("✓ Mission config written\n")
+
+		// Create groves directory
+		if err := os.MkdirAll(grovesDir, 0755); err != nil {
+			return fmt.Errorf("failed to create groves directory: %w", err)
+		}
+		fmt.Printf("✓ Groves directory ready\n")
+
+		// Process each grove
+		for _, grove := range groves {
+			desiredPath := filepath.Join(grovesDir, grove.Name)
+			currentPath := grove.Path
+
+			// Move grove if it exists elsewhere
+			if currentPath != desiredPath {
+				if _, err := os.Stat(currentPath); err == nil {
+					// Grove exists at old location - move it
+					if err := os.Rename(currentPath, desiredPath); err != nil {
+						fmt.Printf("  ⚠️  Could not move grove %s: %v\n", grove.ID, err)
+						fmt.Printf("      Manual move required: %s → %s\n", currentPath, desiredPath)
+					} else {
+						fmt.Printf("✓ Moved grove %s\n", grove.ID)
+					}
+				}
+			}
+
+			// Create grove directory if it doesn't exist
+			if _, err := os.Stat(desiredPath); os.IsNotExist(err) {
+				fmt.Printf("  ℹ️  Grove %s worktree missing: %s\n", grove.ID, desiredPath)
+				fmt.Printf("      Materialize with: orc grove create %s --repos <repo> --mission %s\n", grove.Name, missionID)
+			}
+
+			// Create .orc directory in grove
+			groveOrcDir := filepath.Join(desiredPath, ".orc")
+			os.MkdirAll(groveOrcDir, 0755)
+
+			// Write grove config if grove directory exists
+			if _, err := os.Stat(desiredPath); err == nil {
+				if err := writeGroveConfig(desiredPath, grove); err != nil {
+					fmt.Printf("  ⚠️  Could not write config for grove %s: %v\n", grove.ID, err)
+				} else {
+					fmt.Printf("✓ Grove %s config written\n", grove.ID)
+				}
+			}
+
+			// Update DB path if changed
+			if currentPath != desiredPath {
+				if err := models.UpdateGrovePath(grove.ID, desiredPath); err != nil {
+					return fmt.Errorf("failed to update grove path in DB: %w", err)
+				}
+				fmt.Printf("✓ Updated DB path for grove %s\n", grove.ID)
+			}
+		}
+
+		// Clean up old .orc-mission file
+		oldMissionFile = filepath.Join(workspacePath, ".orc-mission")
+		if _, err := os.Stat(oldMissionFile); err == nil {
+			if err := os.Remove(oldMissionFile); err != nil {
+				fmt.Printf("  ⚠️  Could not remove old .orc-mission: %v\n", err)
+			} else {
+				fmt.Printf("✓ Removed old .orc-mission file\n")
+			}
+		}
+
+		fmt.Println()
+		fmt.Printf("✅ Mission infrastructure ready at: %s\n", workspacePath)
+		fmt.Println()
+		fmt.Println("Next steps:")
+		fmt.Printf("  cd %s\n", workspacePath)
+		fmt.Printf("  orc summary --mission %s\n", missionID)
+
+		return nil
+	},
+}
+
+// writeGroveConfig writes .orc/config.json for a grove
+func writeGroveConfig(grovePath string, grove *models.Grove) error {
+	cfg := &config.Config{
+		Version: "1.0",
+		Type:    config.TypeGrove,
+		Grove: &config.GroveConfig{
+			GroveID:   grove.ID,
+			MissionID: grove.MissionID,
+			Name:      grove.Name,
+			Repos:     []string{}, // TODO: parse from grove.Repos field
+			CreatedAt: grove.CreatedAt.Format("2006-01-02T15:04:05Z"),
+		},
+	}
+
+	return config.SaveConfig(grovePath, cfg)
+}
+
 var missionPinCmd = &cobra.Command{
 	Use:   "pin [mission-id]",
 	Short: "Pin mission to keep it visible",
@@ -399,6 +655,7 @@ func MissionCmd() *cobra.Command {
 	missionCreateCmd.Flags().StringP("description", "d", "", "Mission description")
 	missionListCmd.Flags().StringP("status", "s", "", "Filter by status (active, paused, complete, archived)")
 	missionStartCmd.Flags().StringP("workspace", "w", "", "Custom workspace path (default: ~/missions/MISSION-ID)")
+	missionLaunchCmd.Flags().StringP("workspace", "w", "", "Custom workspace path (default: ~/src/missions/MISSION-ID)")
 	missionUpdateCmd.Flags().StringP("title", "t", "", "New mission title")
 	missionUpdateCmd.Flags().StringP("description", "d", "", "New mission description")
 	missionDeleteCmd.Flags().BoolP("force", "f", false, "Force delete even with associated data")
@@ -408,6 +665,7 @@ func MissionCmd() *cobra.Command {
 	missionCmd.AddCommand(missionListCmd)
 	missionCmd.AddCommand(missionShowCmd)
 	missionCmd.AddCommand(missionStartCmd)
+	missionCmd.AddCommand(missionLaunchCmd)
 	missionCmd.AddCommand(missionCompleteCmd)
 	missionCmd.AddCommand(missionArchiveCmd)
 	missionCmd.AddCommand(missionUpdateCmd)
