@@ -45,7 +45,7 @@ test_create_mission() {
     log_info "Created mission: $TEST_MISSION_ID"
     TEST_MISSION_DIR="$HOME/src/missions/$TEST_MISSION_ID"
 
-    assert_command_succeeds "orc mission list | grep -q '$TEST_MISSION_ID'" \
+    assert_command_succeeds "orc mission list | grep -q \"$TEST_MISSION_ID\"" \
         "Mission appears in mission list"
 
     return $?
@@ -101,11 +101,11 @@ test_mission_context_detection() {
 
     cd "$TEST_MISSION_DIR"
 
-    # Run orc status and check output
+    # Run orc status and check output (looks for "Mission:" header)
     local status_output=$(orc status 2>&1)
 
     assert_contains "$status_output" "$TEST_MISSION_ID" "orc status shows test mission"
-    assert_contains "$status_output" "Mission Context" "orc status detects mission context"
+    assert_contains "$status_output" "Mission:" "orc status displays mission header"
 
     return $?
 }
@@ -117,7 +117,7 @@ test_create_work_order() {
     cd "$TEST_MISSION_DIR"
 
     # Create work order (should auto-scope to this mission)
-    orc work-order create "Test work order for integration testing"
+    orc task create "Test work order for integration testing"
 
     # Verify it appears in summary
     local summary_output=$(orc summary 2>&1)
@@ -134,7 +134,7 @@ test_command_autoscoping() {
     cd "$TEST_MISSION_DIR"
 
     # Get work order list - should only show this mission's orders
-    local wo_list=$(orc work-order list 2>&1)
+    local wo_list=$(orc task list 2>&1)
 
     # Should contain our test mission
     assert_contains "$wo_list" "$TEST_MISSION_ID" "Work order list scoped to test mission"

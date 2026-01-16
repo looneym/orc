@@ -9,18 +9,17 @@ import (
 )
 
 type Handoff struct {
-	ID                  string
-	CreatedAt           time.Time
-	HandoffNote         string
-	ActiveMissionID     sql.NullString
-	ActiveWorkOrders    sql.NullString // JSON array of work order IDs
-	ActiveGroveID       sql.NullString
-	TodosSnapshot       sql.NullString
-	GraphitiEpisodeUUID sql.NullString
+	ID               string
+	CreatedAt        time.Time
+	HandoffNote      string
+	ActiveMissionID  sql.NullString
+	ActiveWorkOrders sql.NullString // JSON array of work order IDs
+	ActiveGroveID    sql.NullString
+	TodosSnapshot    sql.NullString
 }
 
 // CreateHandoff creates a new handoff with a narrative note
-func CreateHandoff(note string, activeMissionID string, activeWorkOrders []string, todosJSON, graphitiUUID, activeGroveID string) (*Handoff, error) {
+func CreateHandoff(note string, activeMissionID string, activeWorkOrders []string, todosJSON, activeGroveID string) (*Handoff, error) {
 	database, err := db.GetDB()
 	if err != nil {
 		return nil, err
@@ -36,7 +35,7 @@ func CreateHandoff(note string, activeMissionID string, activeWorkOrders []strin
 	id := fmt.Sprintf("HO-%03d", maxID+1)
 
 	// Handle nullable strings
-	var missionID, workOrders, todos, graphiti, groveID sql.NullString
+	var missionID, workOrders, todos, groveID sql.NullString
 
 	if activeMissionID != "" {
 		missionID = sql.NullString{String: activeMissionID, Valid: true}
@@ -58,17 +57,14 @@ func CreateHandoff(note string, activeMissionID string, activeWorkOrders []strin
 	if todosJSON != "" {
 		todos = sql.NullString{String: todosJSON, Valid: true}
 	}
-	if graphitiUUID != "" {
-		graphiti = sql.NullString{String: graphitiUUID, Valid: true}
-	}
 	if activeGroveID != "" {
 		groveID = sql.NullString{String: activeGroveID, Valid: true}
 	}
 
 	_, err = database.Exec(
-		`INSERT INTO handoffs (id, handoff_note, active_mission_id, active_work_orders, active_grove_id, todos_snapshot, graphiti_episode_uuid)
-		 VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		id, note, missionID, workOrders, groveID, todos, graphiti,
+		`INSERT INTO handoffs (id, handoff_note, active_mission_id, active_work_orders, active_grove_id, todos_snapshot)
+		 VALUES (?, ?, ?, ?, ?, ?)`,
+		id, note, missionID, workOrders, groveID, todos,
 	)
 	if err != nil {
 		return nil, err
@@ -86,10 +82,10 @@ func GetHandoff(id string) (*Handoff, error) {
 
 	h := &Handoff{}
 	err = database.QueryRow(
-		`SELECT id, created_at, handoff_note, active_mission_id, active_work_orders, active_grove_id, todos_snapshot, graphiti_episode_uuid
+		`SELECT id, created_at, handoff_note, active_mission_id, active_work_orders, active_grove_id, todos_snapshot
 		 FROM handoffs WHERE id = ?`,
 		id,
-	).Scan(&h.ID, &h.CreatedAt, &h.HandoffNote, &h.ActiveMissionID, &h.ActiveWorkOrders, &h.ActiveGroveID, &h.TodosSnapshot, &h.GraphitiEpisodeUUID)
+	).Scan(&h.ID, &h.CreatedAt, &h.HandoffNote, &h.ActiveMissionID, &h.ActiveWorkOrders, &h.ActiveGroveID, &h.TodosSnapshot)
 
 	if err != nil {
 		return nil, err
@@ -107,9 +103,9 @@ func GetLatestHandoff() (*Handoff, error) {
 
 	h := &Handoff{}
 	err = database.QueryRow(
-		`SELECT id, created_at, handoff_note, active_mission_id, active_work_orders, active_grove_id, todos_snapshot, graphiti_episode_uuid
+		`SELECT id, created_at, handoff_note, active_mission_id, active_work_orders, active_grove_id, todos_snapshot
 		 FROM handoffs ORDER BY created_at DESC LIMIT 1`,
-	).Scan(&h.ID, &h.CreatedAt, &h.HandoffNote, &h.ActiveMissionID, &h.ActiveWorkOrders, &h.ActiveGroveID, &h.TodosSnapshot, &h.GraphitiEpisodeUUID)
+	).Scan(&h.ID, &h.CreatedAt, &h.HandoffNote, &h.ActiveMissionID, &h.ActiveWorkOrders, &h.ActiveGroveID, &h.TodosSnapshot)
 
 	if err != nil {
 		return nil, err
@@ -127,10 +123,10 @@ func GetLatestHandoffForGrove(groveID string) (*Handoff, error) {
 
 	h := &Handoff{}
 	err = database.QueryRow(
-		`SELECT id, created_at, handoff_note, active_mission_id, active_work_orders, active_grove_id, todos_snapshot, graphiti_episode_uuid
+		`SELECT id, created_at, handoff_note, active_mission_id, active_work_orders, active_grove_id, todos_snapshot
 		 FROM handoffs WHERE active_grove_id = ? ORDER BY created_at DESC LIMIT 1`,
 		groveID,
-	).Scan(&h.ID, &h.CreatedAt, &h.HandoffNote, &h.ActiveMissionID, &h.ActiveWorkOrders, &h.ActiveGroveID, &h.TodosSnapshot, &h.GraphitiEpisodeUUID)
+	).Scan(&h.ID, &h.CreatedAt, &h.HandoffNote, &h.ActiveMissionID, &h.ActiveWorkOrders, &h.ActiveGroveID, &h.TodosSnapshot)
 
 	if err != nil {
 		return nil, err
@@ -146,7 +142,7 @@ func ListHandoffs(limit int) ([]*Handoff, error) {
 		return nil, err
 	}
 
-	query := `SELECT id, created_at, handoff_note, active_mission_id, active_work_orders, active_grove_id, todos_snapshot, graphiti_episode_uuid
+	query := `SELECT id, created_at, handoff_note, active_mission_id, active_work_orders, active_grove_id, todos_snapshot
 	          FROM handoffs ORDER BY created_at DESC`
 
 	if limit > 0 {
@@ -162,7 +158,7 @@ func ListHandoffs(limit int) ([]*Handoff, error) {
 	var handoffs []*Handoff
 	for rows.Next() {
 		h := &Handoff{}
-		err := rows.Scan(&h.ID, &h.CreatedAt, &h.HandoffNote, &h.ActiveMissionID, &h.ActiveWorkOrders, &h.ActiveGroveID, &h.TodosSnapshot, &h.GraphitiEpisodeUUID)
+		err := rows.Scan(&h.ID, &h.CreatedAt, &h.HandoffNote, &h.ActiveMissionID, &h.ActiveWorkOrders, &h.ActiveGroveID, &h.TodosSnapshot)
 		if err != nil {
 			return nil, err
 		}

@@ -6,26 +6,29 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/test-helpers.sh"
 
-# Test identifiers (mission ID will be set dynamically)
-TEST_MISSION_ID=""
-TEST_MISSION_DIR=""
+# Test identifiers
+# MISSION-420 is the dedicated test mission - use it if it exists
+TEST_MISSION_ID="MISSION-420"
+TEST_MISSION_DIR="$HOME/src/missions/MISSION-420"
 TEST_GROVE_NAME="test-canary-$(date +%s)"
-TEST_GROVE_PATH="$HOME/src/worktrees/$TEST_GROVE_NAME"
+# NOTE: Grove path includes mission ID prefix (e.g., MISSION-XXX-grove-name)
+TEST_GROVE_PATH=""  # Will be set after mission is known
 CANARY_REPO="$HOME/src/orc-canary"
+CREATED_MISSION=false
 
 # Cleanup function
 cleanup() {
     log_section "Cleanup"
 
     # Remove worktree if it exists
-    if [[ -d "$TEST_GROVE_PATH" ]]; then
+    if [[ -n "$TEST_GROVE_PATH" ]] && [[ -d "$TEST_GROVE_PATH" ]]; then
         cd "$CANARY_REPO"
         git worktree remove "$TEST_GROVE_PATH" --force 2>/dev/null || true
         log_success "Removed worktree"
     fi
 
-    # Remove mission directory
-    if [[ -d "$TEST_MISSION_DIR" ]]; then
+    # Only remove mission directory if we created it (not MISSION-420)
+    if [[ "$CREATED_MISSION" == "true" ]] && [[ -d "$TEST_MISSION_DIR" ]]; then
         rm -rf "$TEST_MISSION_DIR"
         log_success "Removed test mission directory"
     fi
@@ -39,23 +42,33 @@ cleanup() {
 
 trap cleanup EXIT
 
-# Setup: Create mission
+# Setup: Use MISSION-420 (dedicated test mission) or create one
 setup_mission() {
     log_info "Setting up test mission"
 
-    local output=$(orc mission create "Grove Test Mission" \
-        --description "Testing grove and TMux integration" 2>&1)
+    # Check if MISSION-420 exists
+    if orc mission list 2>&1 | grep -q "MISSION-420"; then
+        log_info "Using dedicated test mission: MISSION-420"
+        TEST_MISSION_ID="MISSION-420"
+        TEST_MISSION_DIR="$HOME/src/missions/MISSION-420"
+    else
+        log_warn "MISSION-420 not found, creating temporary mission"
 
-    # Extract mission ID from output
-    TEST_MISSION_ID=$(echo "$output" | grep -oE 'MISSION-[0-9]+' | head -1)
+        local output=$(orc mission create "Grove Test Mission" \
+            --description "Testing grove and TMux integration" 2>&1)
 
-    if [[ -z "$TEST_MISSION_ID" ]]; then
-        log_error "Failed to extract mission ID from output"
-        return 1
+        # Extract mission ID from output
+        TEST_MISSION_ID=$(echo "$output" | grep -oE 'MISSION-[0-9]+' | head -1)
+
+        if [[ -z "$TEST_MISSION_ID" ]]; then
+            log_error "Failed to extract mission ID from output"
+            return 1
+        fi
+
+        log_info "Created temporary mission: $TEST_MISSION_ID"
+        TEST_MISSION_DIR="$HOME/src/missions/$TEST_MISSION_ID"
+        CREATED_MISSION=true
     fi
-
-    log_info "Created mission: $TEST_MISSION_ID"
-    TEST_MISSION_DIR="$HOME/src/missions/$TEST_MISSION_ID"
 
     mkdir -p "$TEST_MISSION_DIR/.orc"
 
@@ -74,7 +87,10 @@ EOF
 }
 EOF
 
-    log_success "Test mission created"
+    # Set grove path now that we know the mission ID
+    TEST_GROVE_PATH="$HOME/src/worktrees/$TEST_MISSION_ID-$TEST_GROVE_NAME"
+
+    log_success "Test mission ready: $TEST_MISSION_ID"
 }
 
 # Test 1: Create grove with worktree
@@ -89,7 +105,7 @@ test_create_grove() {
         --mission "$TEST_MISSION_ID"
 
     # Verify grove in database
-    assert_command_succeeds "orc grove list | grep -q '$TEST_GROVE_NAME'" \
+    assert_command_succeeds "orc grove list | grep -q \"$TEST_GROVE_NAME\"" \
         "Grove appears in grove list"
 
     # Verify worktree exists
@@ -107,22 +123,25 @@ test_grove_metadata() {
     log_info "Verifying grove metadata"
 
     assert_directory_exists "$TEST_GROVE_PATH/.orc" "Grove .orc directory"
-    assert_file_exists "$TEST_GROVE_PATH/.orc/metadata.json" "Grove metadata.json"
+    # Grove now uses config.json instead of metadata.json
+    assert_file_exists "$TEST_GROVE_PATH/.orc/config.json" "Grove config.json"
 
-    local metadata=$(cat "$TEST_GROVE_PATH/.orc/metadata.json")
-    assert_contains "$metadata" "$TEST_MISSION_ID" "metadata.json contains mission ID"
+    local config=$(cat "$TEST_GROVE_PATH/.orc/config.json")
+    assert_contains "$config" "$TEST_MISSION_ID" "config.json contains mission ID"
 
     return $?
 }
 
-# Test 3: Verify mission marker propagation
-test_mission_marker() {
-    log_info "Verifying .orc-mission marker in grove"
+# Test 3: Verify mission context propagation via config.json
+test_mission_context_in_grove() {
+    log_info "Verifying mission context in grove config.json"
 
-    assert_file_exists "$TEST_GROVE_PATH/.orc-mission" ".orc-mission marker in grove"
+    # Grove stores mission context in .orc/config.json (not separate .orc-mission file)
+    assert_file_exists "$TEST_GROVE_PATH/.orc/config.json" "Grove config.json exists"
 
-    local marker=$(cat "$TEST_GROVE_PATH/.orc-mission")
-    assert_contains "$marker" "$TEST_MISSION_ID" ".orc-mission contains correct mission ID"
+    local config=$(cat "$TEST_GROVE_PATH/.orc/config.json")
+    assert_contains "$config" "$TEST_MISSION_ID" "config.json contains mission ID"
+    assert_contains "$config" "mission_id" "config.json has mission_id field"
 
     return $?
 }
@@ -197,7 +216,7 @@ main() {
     # Run tests
     run_test "Create grove with worktree" test_create_grove
     run_test "Verify grove metadata" test_grove_metadata
-    run_test "Verify mission marker propagation" test_mission_marker
+    run_test "Verify mission context in grove" test_mission_context_in_grove
     run_test "Test commands from grove directory" test_commands_from_grove
     run_test "TMux session basics" test_tmux_session_basics
     run_test "Grove show command" test_grove_show

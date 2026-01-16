@@ -72,7 +72,6 @@ Examples:
 		groveID, _ := cmd.Flags().GetString("grove")
 		taskIDs, _ := cmd.Flags().GetStringSlice("tasks")
 		todosFile, _ := cmd.Flags().GetString("todos")
-		graphitiUUID, _ := cmd.Flags().GetString("graphiti-uuid")
 
 		// Read todos JSON if provided
 		var todosJSON string
@@ -90,7 +89,7 @@ Examples:
 			}
 		}
 
-		handoff, err := models.CreateHandoff(note, missionID, taskIDs, todosJSON, graphitiUUID, groveID)
+		handoff, err := models.CreateHandoff(note, missionID, taskIDs, todosJSON, groveID)
 		if err != nil {
 			return fmt.Errorf("failed to create handoff: %w", err)
 		}
@@ -140,9 +139,6 @@ var handoffShowCmd = &cobra.Command{
 		}
 		if handoff.ActiveWorkOrders.Valid {
 			fmt.Printf("Tasks: %s\n", handoff.ActiveWorkOrders.String)
-		}
-		if handoff.GraphitiEpisodeUUID.Valid {
-			fmt.Printf("Graphiti: %s\n", handoff.GraphitiEpisodeUUID.String)
 		}
 
 		fmt.Printf("\n--- HANDOFF NOTE ---\n\n%s\n\n", handoff.HandoffNote)
@@ -246,7 +242,6 @@ func HandoffCmd() *cobra.Command {
 	handoffCreateCmd.Flags().String("grove", "", "Active grove ID (for IMP handoffs)")
 	handoffCreateCmd.Flags().StringSliceP("tasks", "w", nil, "Comma-separated list of active task IDs")
 	handoffCreateCmd.Flags().StringP("todos", "t", "", "Path to todos JSON file")
-	handoffCreateCmd.Flags().StringP("graphiti-uuid", "g", "", "Graphiti episode UUID")
 
 	handoffListCmd.Flags().IntP("limit", "l", 10, "Maximum number of handoffs to show")
 

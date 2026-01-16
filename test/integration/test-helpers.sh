@@ -43,7 +43,8 @@ assert_command_succeeds() {
     local cmd="$1"
     local description="${2:-command}"
 
-    if eval "$cmd" &>/dev/null; then
+    # Use subshell without pipefail to avoid SIGPIPE issues with grep -q
+    if ( set +o pipefail; eval "$cmd" &>/dev/null ); then
         log_success "$description succeeded"
         return 0
     else
@@ -56,7 +57,8 @@ assert_command_fails() {
     local cmd="$1"
     local description="${2:-command}"
 
-    if eval "$cmd" &>/dev/null; then
+    # Use subshell without pipefail to avoid SIGPIPE issues with grep -q
+    if ( set +o pipefail; eval "$cmd" &>/dev/null ); then
         log_error "$description succeeded but should have failed"
         return 1
     else

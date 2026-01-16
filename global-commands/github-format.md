@@ -329,7 +329,7 @@ main() {
 # Execute with error handling
 if [[ $# -ne 1 ]]; then
     echo "Usage: $0 <markdown-file>"
-    echo "Example: $0 tech-plan.md"
+    echo "Example: $0 notes.md"
     exit 1
 fi
 
@@ -338,8 +338,8 @@ main "$1"
 
 ### Usage Examples
 ```bash
-# Format a tech plan for GitHub issue
-./github-format.sh tech-plans/dlq-investigation.md
+# Format notes for GitHub issue
+./github-format.sh docs/investigation-notes.md
 
 # Format investigation summary for PR comment
 ./github-format.sh investigation-summary.md

@@ -108,15 +108,13 @@ Mission: "Auth Refactor"
 - `active_work_orders` (TEXT) - JSON array of in-progress WO IDs
 - `active_grove_id` (TEXT) - Foreign key to groves (optional)
 - `todos_snapshot` (TEXT) - JSON snapshot of todo list
-- `graphiti_episode_uuid` (TEXT) - Link to Graphiti episode
 
-**Purpose**: Enables /g-handoff → /g-bootstrap workflow
+**Purpose**: Enables orc handoff → orc prime workflow
 
 **Relationships**:
 - References current Mission
 - References active Work Orders (multiple possible)
 - Optionally references active Grove
-- Links to Graphiti episode
 
 ---
 

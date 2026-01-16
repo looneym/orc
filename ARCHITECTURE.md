@@ -1,7 +1,7 @@
 # ORC 2.0 - System Overview
 
 **Generated:** 2026-01-14
-**Source:** Oracle synthesis from knowledge graph (Graphiti)
+**Updated:** 2026-01-16
 
 ---
 
@@ -9,7 +9,7 @@
 
 ORC (Orchestrator) is a mission coordination system for managing complex, multi-repository software development work. It combines traditional task management with AI-powered context preservation, enabling seamless handoffs between human operators and Claude AI agents across multiple workspaces.
 
-**Key Innovation:** ORC maintains two complementary knowledge systems - SQLite for structured operational data and Graphiti for semantic memory and design decisions - allowing both deterministic queries and intelligent pattern synthesis.
+**Key Innovation:** ORC uses SQLite as the single source of truth for all operational data, combined with handoff narratives that preserve context across sessions. This enables seamless handoffs between human operators and Claude AI agents.
 
 ---
 
@@ -99,18 +99,18 @@ orc grove open GROVE-XXX      # Opens in new TMux window with IMP layout
 - Work orders/tasks used for coordination
 
 ### 5. Context Preservation & Handoffs
-**g-bootstrap & g-handoff Integration:**
+**orc prime & handoff Integration:**
 
 Session boundaries are preserved through:
-- **Handoffs**: Narrative summaries stored in SQLite + Graphiti
-- **g-bootstrap**: Restores full context at session start (git state, Graphiti memories, ledger)
-- **g-handoff**: Captures session work, decisions, discoveries at session end
+- **Handoffs**: Narrative summaries stored in SQLite database
+- **orc prime**: Injects context at session start (mission, epic, tasks, recent handoff)
+- **orc handoff create**: Captures session work, decisions, discoveries at session end
 
 **Key Features:**
-- Cross-session memory preservation
+- Cross-session memory preservation via handoff narratives
 - New Claude sessions start with full historical context
 - Zero "cold start" problem
-- Episodes stored in Graphiti with semantic searchability
+- Handoffs searchable via CLI (`orc handoff list`, `orc handoff show`)
 
 ### 6. TMux Integration
 **One TMux session per mission:**
@@ -153,8 +153,7 @@ This pattern replaces SessionStart hooks (which are broken in Claude Code v2.1.7
 
 ### Primary Technologies
 - **Language**: Go (CLI binary)
-- **Primary Database**: SQLite (structured operational data)
-- **Semantic Memory**: Graphiti (knowledge graph, design decisions, patterns)
+- **Database**: SQLite (single source of truth for all operational data)
 - **Version Control**: Git (with worktree integration)
 - **Session Management**: TMux
 - **AI Integration**: Claude API (via Claude Code CLI)
@@ -165,7 +164,7 @@ This pattern replaces SessionStart hooks (which are broken in Claude Code v2.1.7
 - `missions` - Top-level coordination scopes
 - `work_orders` - Tasks with status, type, parent_id, assigned_grove_id, pinned flag
 - `groves` - Git worktrees registered to missions
-- `handoffs` - Session handoff narratives with Graphiti episode UUIDs
+- `handoffs` - Session handoff narratives for context preservation
 
 **Removed Tables (simplified in 2.0):**
 - ~~`operations`~~ - Removed (too rigid, use work_order.type instead)
@@ -181,39 +180,25 @@ This pattern replaces SessionStart hooks (which are broken in Claude Code v2.1.7
 
 ---
 
-## Dual Database System: SQLite + Graphiti
+## Database System: SQLite
 
-### SQLite (Operational Database)
-**Purpose:** Single source of truth for structured operational data
+### SQLite (Single Source of Truth)
+**Purpose:** Authoritative source for all structured operational data
 
 **Stores:**
-- Missions, work orders, groves, handoffs
+- Missions, epics, rabbit holes, tasks
+- Groves (git worktrees)
+- Handoffs (session narratives)
+- Tags and task-tag associations
 - Current state (status, assignments, timestamps)
-- Deterministic queries (e.g., "show all ready work orders")
 
 **Characteristics:**
 - Fast, local, transactional
 - Schema-enforced data integrity
-- Authoritative for current state
+- Deterministic queries (e.g., "show all ready tasks")
 - Files like metadata.json are DERIVED from this, never read for decisions
 
-### Graphiti (Semantic Memory / Knowledge Graph)
-**Purpose:** AI-accessible semantic memory and pattern synthesis
-
-**Stores:**
-- Design decisions with rationale and alternatives considered
-- Session handoffs (narrative summaries)
-- Technical patterns and preferences
-- Entity relationships (WHO decided WHAT, WHY)
-- Discovery insights and open questions
-
-**Characteristics:**
-- Graph-based (nodes + facts + episodes)
-- Semantic search capabilities
-- Cross-session context preservation
-- Enables Oracle pattern queries
-
-### How They Interact
+### Handoff System
 
 **Data Flow:**
 ```
@@ -221,24 +206,18 @@ Session Work → SQLite (operational state)
             ↓
          Handoff (at session end)
             ↓
-    Graphiti Episode (narrative + decisions)
+    Narrative stored in SQLite
             ↓
-    Knowledge Graph (nodes, facts, relationships)
-            ↓
-    Oracle Queries (pattern synthesis)
+    Next session reads via orc prime
 ```
-
-**Complementary Roles:**
-- **SQLite answers**: "What work orders are ready?" (deterministic)
-- **Graphiti answers**: "What design patterns does El Presidente prefer?" (synthesized)
 
 **Bootstrap Process:**
 ```
 New Session starts
     ↓
-g-bootstrap queries:
-    - SQLite: Current missions, work orders, groves
-    - Graphiti: Recent handoffs, design decisions, open questions
+orc prime queries:
+    - SQLite: Current mission, epic, tasks
+    - SQLite: Recent handoff narrative
     - Git: Current branch, uncommitted changes
     ↓
 Full context restored → Work begins
@@ -248,15 +227,14 @@ Full context restored → Work begins
 ```
 Session ending
     ↓
-g-handoff creates:
-    - Handoff record in SQLite (work_order_ids, timestamp)
-    - Episode in Graphiti (narrative, decisions, discoveries)
-    - Knowledge graph updates (nodes, facts)
+orc handoff create:
+    - Handoff record in SQLite (narrative, task_ids, timestamp)
+    - Config updated with current handoff ID
     ↓
 Next session can bootstrap from this
 ```
 
-**Key Insight:** SQLite tells you WHERE YOU ARE, Graphiti tells you HOW YOU GOT HERE and WHY.
+**Key Insight:** SQLite tells you WHERE YOU ARE. Handoff narratives tell you HOW YOU GOT HERE.
 
 ---
 
@@ -264,13 +242,11 @@ Next session can bootstrap from this
 
 ### Active Development (In Progress)
 
-**WO-030: Oracle Integration** ⚡ PRIORITY
-- Design pattern lookup interface
-- Query Graphiti for "what would El Presidente want?"
-- Return decisions with rationale + references
-- Approval workflow for new patterns
-- **Status**: Early experimentation showing promising results
-- **Recent Success**: Pattern synthesis working ("dynamite" - El Presidente)
+**Semantic Epic System** ⚡ PRIORITY
+- 9-epic type system with type-specific rules
+- Tag-based task auto-routing
+- Working modes for different contexts
+- **Status**: Active development (EPIC-178)
 
 **WO-021: Core Architecture Design**
 - Cross-grove coordination mechanisms (WO-016)
@@ -323,11 +299,11 @@ Next session can bootstrap from this
 
 ### Near-Term Roadmap
 
-**Phase 1: Oracle Productionization**
-- Build full Oracle query interface
-- Seed Graphiti with existing patterns
-- Integrate with CLI commands
-- Add approval workflow
+**Phase 1: Semantic Epic System**
+- Formalize 9-epic type system
+- Tag-based task organization
+- Working modes for different contexts
+- Epic focus and context injection
 
 **Phase 2: Cross-Mission Coordination**
 - Refine mail system
@@ -335,14 +311,14 @@ Next session can bootstrap from this
 - ORC → IMP directive system
 - Async communication patterns
 
-**Phase 3: Discovery Sharing**
-- Cross-grove discovery propagation
-- Mission-scoped knowledge sharing
-- Graphiti group_id segregation
-- Context inheritance patterns
+**Phase 3: Tooling & Integration**
+- vim-orc plugin (fugitive-style)
+- El Presidente's desk (document staging)
+- ORC Claude skills plugin
+- Room concept for contextual spaces
 
 **Phase 4: Workflow Automation**
-- Work order state transitions (auto/manual rules)
+- Task state transitions (auto/manual rules)
 - Grove lifecycle automation
 - TMux session management
 - Handoff automation improvements
@@ -354,11 +330,11 @@ Next session can bootstrap from this
 - Restore forest/factory metaphor consistently
 - Personality + functionality
 
-**Advanced Oracle**
-- Proactive pattern suggestions
-- Sentiment tracking (capture "cool", "dynamite" reactions)
-- Pattern evolution over time
-- Contradiction detection
+**Advanced Context Management**
+- Proactive context suggestions
+- Cross-session pattern detection
+- Handoff quality scoring
+- Context inheritance patterns
 
 **Multi-Agent Orchestration**
 - ORC coordinates multiple IMPs across groves
@@ -376,10 +352,10 @@ Next session can bootstrap from this
 - TMux automation: ✅ Clean integration
 - Proto-mail system: ✅ Bidirectional communication working
 
-**Oracle Validation:**
-- Pattern synthesis: ✅ "Dynamite" results from 15+ facts
-- Cross-session queries: ✅ Knowledge spanning multiple days
-- Design preference extraction: ✅ Accurate patterns identified
+**Handoff System:**
+- Context preservation: ✅ Zero cold-start issues
+- Cross-session continuity: ✅ Narratives span multiple days
+- Handoff CLI: ✅ create, list, show commands working
 
 **Operational Metrics:**
 - Sessions with zero cold-start issues: 100%
@@ -469,10 +445,10 @@ orc work-order complete WO-001
 ### Session Boundaries
 ```bash
 # At session start
-/g-bootstrap                  # Restores full context
+orc prime                     # Restores full context
 
 # At session end
-/g-handoff                    # Captures session to Graphiti
+orc handoff create --note "Session summary..."
 ```
 
 ---
@@ -481,11 +457,11 @@ orc work-order complete WO-001
 
 **What Makes ORC Unique:**
 
-1. **Dual Knowledge Systems** - Deterministic (SQLite) + Semantic (Graphiti)
-2. **Zero Cold-Start** - Full context preservation across sessions
+1. **SQLite Source of Truth** - Single authoritative database for all state
+2. **Zero Cold-Start** - Full context preservation via handoff narratives
 3. **Multi-Agent Coordination** - ORC/IMP architecture with mail system
 4. **Git Worktree Native** - First-class support for isolated workspaces
-5. **Oracle Pattern System** - AI queries historical design preferences
+5. **Semantic Epic System** - 9-epic types with working modes
 6. **TMux Integration** - One session per mission, programmatic layout
 7. **Flat But Structured** - Simple hierarchy with optional grouping
 8. **Validation-Driven** - Proven by first-try production deployment
@@ -508,8 +484,7 @@ orc work-order complete WO-001
 - `internal/models/workorder.go` - Work order model and queries
 
 **External Dependencies:**
-- Graphiti (MCP server for semantic memory)
-- Claude Code CLI (g-bootstrap, g-handoff commands)
+- Claude Code CLI (for AI integration)
 - Git (worktree support)
 - TMux (session management)
 
@@ -522,11 +497,10 @@ orc work-order complete WO-001
 **Grove**: Git worktree registered to a mission, physical workspace
 **IMP**: Implementation (conceptual layer over grove, not separate entity)
 **ORC**: Main orchestrator that coordinates IMPs across missions
-**Proto-Mail**: Work-order-based bidirectional messaging (WO-061 ↔ WO-065)
-**Oracle**: Design pattern lookup interface querying Graphiti
+**Proto-Mail**: Work-order-based bidirectional messaging
 **Handoff**: Session boundary artifact (narrative + work state)
-**g-bootstrap**: Context restoration at session start
-**g-handoff**: Context capture at session end
+**orc prime**: Context injection at session start
+**orc handoff**: Context capture at session end
 **Epic**: Work order with children (parent in hierarchy)
 
 ---
@@ -535,9 +509,4 @@ orc work-order complete WO-001
 
 **Repository**: ~/src/orc
 **Documentation**: CLAUDE.md (project context), glossary/ (definitions)
-**Knowledge Base**: Graphiti (group_id: "orc")
 **Status**: Active development, production-validated (MISSION-002)
-
----
-
-*This document was synthesized from 50+ knowledge graph facts, 20+ design episodes, and operational data from ORC's dual database system. Generated using Oracle pattern synthesis capabilities.*

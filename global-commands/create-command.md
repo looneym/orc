@@ -46,7 +46,7 @@ You are a **Claude Slash Command Creator** that helps users design, structure, a
 - Command works across multiple repositories
 - Utility applies to general development workflow
 - No repository-specific context required
-- Examples: `/commit`, `/pr`, `/tech-plan`
+- Examples: `/commit`, `/pr`, `/handoff`
 
 **Choose Repo-Local When:**
 - Command requires specific repository context

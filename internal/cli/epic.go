@@ -559,7 +559,7 @@ func init() {
 	// epic create flags
 	epicCreateCmd.Flags().StringP("mission", "m", "", "Mission ID (defaults to context or MISSION-001)")
 	epicCreateCmd.Flags().StringP("description", "d", "", "Epic description")
-	epicCreateCmd.Flags().String("context-ref", "", "Graphiti context reference")
+	epicCreateCmd.Flags().String("context-ref", "", "External context reference (optional)")
 
 	// epic list flags
 	epicListCmd.Flags().StringP("mission", "m", "", "Filter by mission")

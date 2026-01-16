@@ -10,15 +10,9 @@ This directory contains the canonical definitions for ORC terminology. When ther
 
 ### [ledger-entities.md](./ledger-entities.md)
 **System**: SQLite database (~/.orc/orc.db)
-**Contains**: Mission, Operation, Work Order, Expedition, Grove, Plan, Handoff, Dependency
+**Contains**: Mission, Work Order, Grove, Handoff
 **Purpose**: Database schema definitions and entity relationships
-**Status**: ⚠️ Has many contentious questions about relationships
-
-### [graphiti-episode-types.md](./graphiti-episode-types.md)
-**System**: Graphiti + Neo4j semantic memory
-**Contains**: Design Decision, Learning Artifact, Investigation Report, Session Summary, etc.
-**Purpose**: Standardized episode naming conventions for knowledge capture
-**Status**: ✅ Stable, migrated from original GLOSSARY.md
+**Status**: ✅ Stable - simplified ORC 2.0 schema
 
 ### [forest-factory-roles.md](./forest-factory-roles.md)
 **System**: Conceptual model from NORTH_STAR.md
@@ -46,11 +40,10 @@ This directory contains the canonical definitions for ORC terminology. When ther
 - **Question**: When are groves created? Can they exist without expeditions?
 - **Impact**: Affects worktree creation workflow
 
-### 4. **Plan vs Tech Plan**
-- **Ledger**: `plans` table links to expeditions
-- **Filesystem**: `tech-plans/` directory with markdown files
-- **Question**: What's the relationship? Should table be renamed?
-- **Impact**: How we integrate tech planning with ledger
+### 4. **Plan Storage**
+- **Resolved**: ORC 2.0 uses SQLite database only for all structured data
+- Plans stored as work order notes or in handoff narratives
+- No separate filesystem-based tech plan system
 
 ### 5. **Work Order State Management**
 - **NORTH_STAR**: Directory-based (work-orders/01-backlog/, etc.)
@@ -63,7 +56,7 @@ This directory contains the canonical definitions for ORC terminology. When ther
 ## How to Use This Glossary
 
 **When adding new concepts**:
-1. Determine which system it belongs to (Ledger, Graphiti, or Conceptual)
+1. Determine which system it belongs to (Ledger or Conceptual)
 2. Add definition to appropriate file
 3. Note any relationships or tensions with existing concepts
 4. Flag contentious questions for discussion
@@ -72,7 +65,7 @@ This directory contains the canonical definitions for ORC terminology. When ther
 1. Discussion with El Presidente
 2. Document decision in appropriate file
 3. Update database schema if needed
-4. Capture rationale in Graphiti as "Design Decision" episode
+4. Capture rationale in handoff or documentation
 
 **When something is unclear**:
 1. Check this glossary first

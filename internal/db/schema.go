@@ -93,7 +93,6 @@ CREATE TABLE IF NOT EXISTS handoffs (
 	active_work_orders TEXT,
 	active_grove_id TEXT,
 	todos_snapshot TEXT,
-	graphiti_episode_uuid TEXT,
 	FOREIGN KEY (active_mission_id) REFERENCES missions(id),
 	FOREIGN KEY (active_grove_id) REFERENCES groves(id)
 );

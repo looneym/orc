@@ -6,7 +6,7 @@ import (
 )
 
 // schemaVersion tracks the current schema version
-const currentSchemaVersion = 11
+const currentSchemaVersion = 12
 
 // Migration represents a database migration
 type Migration struct {
@@ -71,6 +71,11 @@ var migrations = []Migration{
 		Version: 11,
 		Name:    "remove_implement_status",
 		Up:      migrationV11,
+	},
+	{
+		Version: 12,
+		Name:    "drop_graphiti_episode_uuid_column",
+		Up:      migrationV12,
 	},
 }
 
@@ -950,6 +955,66 @@ func migrationV11(db *sql.DB) error {
 	`)
 	if err != nil {
 		return fmt.Errorf("failed to recreate task indexes: %w", err)
+	}
+
+	return nil
+}
+
+// migrationV12 drops the graphiti_episode_uuid column from handoffs table
+// Graphiti integration is being removed to simplify the system
+func migrationV12(db *sql.DB) error {
+	// SQLite doesn't support DROP COLUMN in older versions
+	// Must recreate table without the column
+
+	// Step 1: Create new handoffs table without graphiti_episode_uuid
+	_, err := db.Exec(`
+		CREATE TABLE handoffs_new (
+			id TEXT PRIMARY KEY,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			handoff_note TEXT NOT NULL,
+			active_mission_id TEXT,
+			active_work_orders TEXT,
+			active_grove_id TEXT,
+			todos_snapshot TEXT,
+			FOREIGN KEY (active_mission_id) REFERENCES missions(id),
+			FOREIGN KEY (active_grove_id) REFERENCES groves(id)
+		)
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to create handoffs_new table: %w", err)
+	}
+
+	// Step 2: Copy data (excluding graphiti_episode_uuid)
+	_, err = db.Exec(`
+		INSERT INTO handoffs_new (
+			id, created_at, handoff_note, active_mission_id,
+			active_work_orders, active_grove_id, todos_snapshot
+		)
+		SELECT
+			id, created_at, handoff_note, active_mission_id,
+			active_work_orders, active_grove_id, todos_snapshot
+		FROM handoffs
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to copy handoffs data: %w", err)
+	}
+
+	// Step 3: Drop old handoffs table
+	_, err = db.Exec(`DROP TABLE handoffs`)
+	if err != nil {
+		return fmt.Errorf("failed to drop old handoffs table: %w", err)
+	}
+
+	// Step 4: Rename new table to handoffs
+	_, err = db.Exec(`ALTER TABLE handoffs_new RENAME TO handoffs`)
+	if err != nil {
+		return fmt.Errorf("failed to rename handoffs_new to handoffs: %w", err)
+	}
+
+	// Step 5: Recreate index
+	_, err = db.Exec(`CREATE INDEX IF NOT EXISTS idx_handoffs_created ON handoffs(created_at DESC)`)
+	if err != nil {
+		return fmt.Errorf("failed to recreate handoffs index: %w", err)
 	}
 
 	return nil

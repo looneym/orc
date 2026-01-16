@@ -76,9 +76,10 @@ Provides reusable test utilities:
 ### Test Isolation
 
 Each test:
-- Creates unique missions/groves (using timestamps)
+- Uses MISSION-420 as the dedicated test mission (avoids DB pollution)
+- Creates unique groves (using timestamps)
 - Registers cleanup functions
-- Cleans up on exit (success or failure)
+- Cleans up groves/worktrees on exit (success or failure)
 - Does not interfere with other tests
 
 ## Prerequisites
@@ -88,6 +89,7 @@ Each test:
 - TMux installed
 - orc-canary repository at ~/src/orc-canary
 - Git configured
+- MISSION-420 exists as the dedicated test mission (`orc mission create "Integration Test Mission" --id MISSION-420`)
 
 ## Running Tests
 
@@ -232,6 +234,13 @@ orc init
 ```bash
 cd ~/src
 git clone git@github.com:example/orc-canary.git
+```
+
+### "MISSION-420 not found"
+```bash
+# Create dedicated test mission
+orc mission create "Integration Test Mission" --description "Dedicated mission for integration tests"
+# Note: Mission ID will be auto-generated; rename to MISSION-420 or update tests
 ```
 
 ### "TMux session already exists"
