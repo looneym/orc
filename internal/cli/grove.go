@@ -64,13 +64,11 @@ Examples:
 
 			name := args[0]
 
-			// Smart default: use mission context if available, otherwise MISSION-001
+			// Get mission from context or require explicit flag
 			if missionID == "" {
-				if ctxMissionID := context.GetContextMissionID(); ctxMissionID != "" {
-					missionID = ctxMissionID
-					fmt.Printf("ℹ️  Using mission from context: %s\n", missionID)
-				} else {
-					missionID = "MISSION-001"
+				missionID = context.GetContextMissionID()
+				if missionID == "" {
+					return fmt.Errorf("no mission context detected\nHint: Use --mission flag or run from a grove/mission directory")
 				}
 			}
 
@@ -135,7 +133,7 @@ Examples:
 		},
 	}
 
-	cmd.Flags().StringVarP(&missionID, "mission", "m", "", "Mission ID (defaults to MISSION-001)")
+	cmd.Flags().StringVarP(&missionID, "mission", "m", "", "Mission ID (defaults to context)")
 	cmd.Flags().StringSliceVarP(&repos, "repos", "r", nil, "Comma-separated list of repo names")
 	cmd.Flags().StringVarP(&basePath, "path", "p", "", "Base path for worktrees (default: ~/src/worktrees)")
 

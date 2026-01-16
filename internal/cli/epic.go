@@ -26,13 +26,11 @@ var epicCreateCmd = &cobra.Command{
 		description, _ := cmd.Flags().GetString("description")
 		contextRef, _ := cmd.Flags().GetString("context-ref")
 
-		// Smart default: use mission context if available
+		// Get mission from context or require explicit flag
 		if missionID == "" {
-			if ctxMissionID := context.GetContextMissionID(); ctxMissionID != "" {
-				missionID = ctxMissionID
-				fmt.Printf("ℹ️  Using mission from context: %s\n", missionID)
-			} else {
-				missionID = "MISSION-001"
+			missionID = context.GetContextMissionID()
+			if missionID == "" {
+				return fmt.Errorf("no mission context detected\nHint: Use --mission flag or run from a grove/mission directory")
 			}
 		}
 
@@ -615,7 +613,7 @@ func getCurrentEpic() string {
 
 func init() {
 	// epic create flags
-	epicCreateCmd.Flags().StringP("mission", "m", "", "Mission ID (defaults to context or MISSION-001)")
+	epicCreateCmd.Flags().StringP("mission", "m", "", "Mission ID (defaults to context)")
 	epicCreateCmd.Flags().StringP("description", "d", "", "Epic description")
 	epicCreateCmd.Flags().String("context-ref", "", "External context reference (optional)")
 

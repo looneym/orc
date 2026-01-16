@@ -1,6 +1,7 @@
 package context
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"time"
@@ -117,13 +118,34 @@ func WriteMissionConfig(workspacePath, missionID string, isMaster bool) error {
 	return config.SaveConfig(workspacePath, cfg)
 }
 
-// GetContextMissionID returns the mission ID from context, or empty string if not in mission context
+// GetContextMissionID returns the mission ID from context, checking grove first, then mission, then global
+// Returns empty string if no context found - caller should handle this as an error
 func GetContextMissionID() string {
-	ctx, err := DetectMissionContext()
-	if err != nil || ctx == nil {
-		return ""
+	// Check grove context first (most specific - IMP territory)
+	groveCtx, err := DetectGroveContext()
+	if err == nil && groveCtx != nil && groveCtx.MissionID != "" {
+		fmt.Fprintf(os.Stderr, "(using grove context: %s)\n", groveCtx.MissionID)
+		return groveCtx.MissionID
 	}
-	return ctx.MissionID
+
+	// Check mission context (ORC territory)
+	missionCtx, err := DetectMissionContext()
+	if err == nil && missionCtx != nil && missionCtx.MissionID != "" {
+		fmt.Fprintf(os.Stderr, "(using mission context: %s)\n", missionCtx.MissionID)
+		return missionCtx.MissionID
+	}
+
+	// Check global state (~/.orc/config.json)
+	homeDir, err := os.UserHomeDir()
+	if err == nil {
+		cfg, err := config.LoadConfig(homeDir)
+		if err == nil && cfg.Type == config.TypeGlobal && cfg.State != nil && cfg.State.ActiveMissionID != "" {
+			fmt.Fprintf(os.Stderr, "(using global context: %s)\n", cfg.State.ActiveMissionID)
+			return cfg.State.ActiveMissionID
+		}
+	}
+
+	return "" // No context found - caller must handle
 }
 
 // IsMissionContext returns true if we're running in a mission context

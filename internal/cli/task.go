@@ -32,17 +32,16 @@ var taskCreateCmd = &cobra.Command{
 			return fmt.Errorf("cannot specify both --epic and --rabbit-hole")
 		}
 
-		// Smart default: if neither specified, use Unsorted epic
+		// Require explicit epic or rabbit-hole
 		if epicID == "" && rabbitHoleID == "" {
-			epicID = "EPIC-165"
+			return fmt.Errorf("no epic specified\nHint: Use --epic or --rabbit-hole flag")
 		}
 
-		// Smart default for mission
+		// Get mission from context or require explicit flag
 		if missionID == "" {
-			if ctxMissionID := context.GetContextMissionID(); ctxMissionID != "" {
-				missionID = ctxMissionID
-			} else {
-				missionID = "MISSION-001"
+			missionID = context.GetContextMissionID()
+			if missionID == "" {
+				return fmt.Errorf("no mission context detected\nHint: Use --mission flag or run from a grove/mission directory")
 			}
 		}
 
@@ -408,7 +407,7 @@ func init() {
 	// task create flags
 	taskCreateCmd.Flags().String("epic", "", "Epic ID (required if no rabbit-hole)")
 	taskCreateCmd.Flags().String("rabbit-hole", "", "Rabbit hole ID (required if no epic)")
-	taskCreateCmd.Flags().StringP("mission", "m", "", "Mission ID (defaults to context or MISSION-001)")
+	taskCreateCmd.Flags().StringP("mission", "m", "", "Mission ID (defaults to context)")
 	taskCreateCmd.Flags().StringP("description", "d", "", "Task description")
 	taskCreateCmd.Flags().String("type", "", "Task type (research, implementation, fix, documentation, maintenance)")
 
