@@ -403,13 +403,13 @@ func AddTagToTask(taskID, tagName string) error {
 		return fmt.Errorf("task %s already has tag '%s' (one tag per task limit)\nRemove existing tag first with: orc task untag %s", taskID, existingTag.Name, taskID)
 	}
 
-	// Generate task_tag ID
-	var count int
-	err = database.QueryRow("SELECT COUNT(*) FROM task_tags").Scan(&count)
+	// Generate task_tag ID by finding max existing ID
+	var maxID int
+	err = database.QueryRow("SELECT COALESCE(MAX(CAST(SUBSTR(id, 4) AS INTEGER)), 0) FROM task_tags").Scan(&maxID)
 	if err != nil {
 		return err
 	}
-	id := fmt.Sprintf("TT-%03d", count+1)
+	id := fmt.Sprintf("TT-%03d", maxID+1)
 
 	// Create task-tag association
 	_, err = database.Exec(

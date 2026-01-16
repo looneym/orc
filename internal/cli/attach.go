@@ -91,7 +91,23 @@ Examples:
 		fmt.Println("  - Top right:  Vim (code editing)")
 		fmt.Println("  - Bot right:  Shell (commands)")
 		fmt.Println()
-		fmt.Println(tmux.AttachInstructions(sessionName))
+		fmt.Println("Attaching to session...")
+
+		// Find tmux binary
+		tmuxPath, err := exec.LookPath("tmux")
+		if err != nil {
+			// Fallback to instructions if tmux not found
+			fmt.Println(tmux.AttachInstructions(sessionName))
+			return nil
+		}
+
+		// Replace current process with tmux attach
+		attachArgs := []string{"tmux", "attach", "-t", sessionName}
+		env := os.Environ()
+
+		if err := syscall.Exec(tmuxPath, attachArgs, env); err != nil {
+			return fmt.Errorf("failed to exec tmux attach: %w", err)
+		}
 
 		return nil
 	},

@@ -25,14 +25,14 @@ func CreateExpedition(name string) (*Expedition, error) {
 		return nil, err
 	}
 
-	// Generate expedition ID (simple sequential for now)
-	var count int
-	err = database.QueryRow("SELECT COUNT(*) FROM expeditions").Scan(&count)
+	// Generate expedition ID by finding max existing ID
+	var maxID int
+	err = database.QueryRow("SELECT COALESCE(MAX(CAST(SUBSTR(id, 5) AS INTEGER)), 0) FROM expeditions").Scan(&maxID)
 	if err != nil {
 		return nil, err
 	}
 
-	id := fmt.Sprintf("EXP-%03d", count+1)
+	id := fmt.Sprintf("EXP-%03d", maxID+1)
 
 	_, err = database.Exec(
 		"INSERT INTO expeditions (id, name, status) VALUES (?, ?, ?)",

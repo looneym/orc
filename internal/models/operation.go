@@ -36,14 +36,14 @@ func CreateOperation(missionID, title, description string) (*Operation, error) {
 		return nil, fmt.Errorf("mission %s not found", missionID)
 	}
 
-	// Generate operation ID
-	var count int
-	err = database.QueryRow("SELECT COUNT(*) FROM operations").Scan(&count)
+	// Generate operation ID by finding max existing ID
+	var maxID int
+	err = database.QueryRow("SELECT COALESCE(MAX(CAST(SUBSTR(id, 4) AS INTEGER)), 0) FROM operations").Scan(&maxID)
 	if err != nil {
 		return nil, err
 	}
 
-	id := fmt.Sprintf("OP-%03d", count+1)
+	id := fmt.Sprintf("OP-%03d", maxID+1)
 
 	var desc sql.NullString
 	if description != "" {

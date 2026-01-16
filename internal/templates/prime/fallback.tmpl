@@ -1,0 +1,37 @@
+# ORC Context - Role Not Configured
+
+**Location**: `{{.Location}}`
+
+## Configuration Required
+
+No role is configured for this context. The `role` field must be set in `.orc/config.json`.
+
+{{if .Grove}}
+**Detected grove**: {{.Grove.Name}} ({{.Grove.ID}})
+**Suggested role**: `IMP` (Implementation Agent)
+
+To configure, edit `.orc/config.json` and add:
+```json
+"role": "IMP"
+```
+
+{{else if .Mission}}
+**Detected mission**: {{.Mission.ID}}
+**Suggested role**: `ORC` (Orchestrator)
+
+To configure, edit `.orc/config.json` and add:
+```json
+"role": "ORC"
+```
+
+{{else}}
+No mission or grove context detected.
+You may be in the wrong directory.
+
+**To connect to ORC**: Run `orc attach` to attach to the orchestrator session.
+
+{{end}}
+{{template "git-discovery.tmpl"}}
+{{template "core-rules.tmpl"}}
+---
+**Action Required**: Ask the user to configure the role or direct you to the correct context.

@@ -26,14 +26,14 @@ func CreateMission(title, description string) (*Mission, error) {
 		return nil, err
 	}
 
-	// Generate mission ID
-	var count int
-	err = database.QueryRow("SELECT COUNT(*) FROM missions").Scan(&count)
+	// Generate mission ID by finding max existing ID
+	var maxID int
+	err = database.QueryRow("SELECT COALESCE(MAX(CAST(SUBSTR(id, 9) AS INTEGER)), 0) FROM missions").Scan(&maxID)
 	if err != nil {
 		return nil, err
 	}
 
-	id := fmt.Sprintf("MISSION-%03d", count+1)
+	id := fmt.Sprintf("MISSION-%03d", maxID+1)
 
 	var desc sql.NullString
 	if description != "" {

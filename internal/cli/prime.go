@@ -3,11 +3,12 @@ package cli
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"strings"
 
+	"github.com/example/orc/internal/config"
 	"github.com/example/orc/internal/context"
 	"github.com/example/orc/internal/models"
+	"github.com/example/orc/internal/templates"
 	"github.com/spf13/cobra"
 )
 
@@ -29,7 +30,7 @@ Output includes:
 - Current location (cwd)
 - Mission context (if any)
 - Active work order (if any)
-- Latest handoff note (brief)
+- Core rules for ORC usage
 
 Still useful for:
 - Manual context refresh during long sessions
@@ -59,31 +60,97 @@ func runPrime(cmd *cobra.Command, args []string) error {
 		cwd = "(unknown)"
 	}
 
-	// Detect grove context first (IMP mode)
+	// Detect contexts
 	groveCtx, _ := context.DetectGroveContext()
-	if groveCtx != nil {
-		output := buildIMPPrimeOutput(groveCtx, cwd)
-		fmt.Println(output)
+	missionCtx, _ := context.DetectMissionContext()
+
+	// Load config to check role
+	cfg, _ := config.LoadConfig(cwd)
+
+	// Determine role from config
+	var role string
+	if cfg != nil {
+		switch cfg.Type {
+		case config.TypeGrove:
+			if cfg.Grove != nil {
+				role = cfg.Grove.Role
+			}
+		case config.TypeMission:
+			if cfg.Mission != nil {
+				role = cfg.Mission.Role
+			}
+		case config.TypeGlobal:
+			if cfg.State != nil {
+				role = cfg.State.Role
+			}
+		}
+	}
+
+	// If no role configured, show fallback guidance
+	if role == "" {
+		output := buildFallbackOutput(cwd, groveCtx, missionCtx)
+		fmt.Println(truncateOutput(output, format, maxLines))
 		return nil
 	}
 
-	// Fallback to old mission/orchestrator context
-	missionCtx, _ := context.DetectMissionContext()
+	// Route based on role
+	var fullOutput string
+	switch role {
+	case config.RoleIMP:
+		if groveCtx != nil {
+			fullOutput = buildIMPPrimeOutput(groveCtx, cwd)
+		} else {
+			fullOutput = buildFallbackOutput(cwd, groveCtx, missionCtx)
+		}
+	case config.RoleORC:
+		fullOutput = buildORCPrimeOutput(missionCtx, cwd, cfg)
+	default:
+		fullOutput = buildFallbackOutput(cwd, groveCtx, missionCtx)
+	}
 
-	// Build prime output
+	fmt.Println(truncateOutput(fullOutput, format, maxLines))
+	return nil
+}
+
+// truncateOutput truncates output to max lines if needed
+func truncateOutput(output, format string, maxLines int) string {
+	if format == "text" {
+		lines := strings.Split(output, "\n")
+		if len(lines) > maxLines {
+			lines = lines[:maxLines]
+			lines = append(lines, "...", "", "*(Output truncated to max lines)*")
+		}
+		return strings.Join(lines, "\n")
+	}
+	return output
+}
+
+// buildORCPrimeOutput creates ORC orchestrator context output
+func buildORCPrimeOutput(missionCtx *context.MissionContext, cwd string, cfg *config.Config) string {
 	var output strings.Builder
 
 	output.WriteString("# ORC Context (Session Prime)\n\n")
 
-	// Current location
+	// Identity
+	output.WriteString("## Identity\n\n")
+	output.WriteString("**Role**: Orchestrator (ORC)\n")
 	output.WriteString(fmt.Sprintf("**Location**: `%s`\n\n", cwd))
 
-	// Git context (if in git repo)
-	output.WriteString(getGitContext())
+	// Git context
+	output.WriteString(getGitInstructions())
+
+	// Current epic focus (if set)
+	if cfg != nil && cfg.Mission != nil && cfg.Mission.CurrentEpic != "" {
+		epic, err := models.GetEpic(cfg.Mission.CurrentEpic)
+		if err == nil {
+			output.WriteString("## Current Focus\n\n")
+			output.WriteString(fmt.Sprintf("**Epic**: %s - %s [%s]\n\n", epic.ID, epic.Title, epic.Status))
+		}
+	}
 
 	// Mission context
 	if missionCtx != nil {
-		output.WriteString(fmt.Sprintf("**Mission**: %s (Deputy context)\n", missionCtx.MissionID))
+		output.WriteString(fmt.Sprintf("**Mission**: %s\n", missionCtx.MissionID))
 		output.WriteString(fmt.Sprintf("**Workspace**: %s\n\n", missionCtx.WorkspacePath))
 
 		// Get mission details
@@ -100,59 +167,24 @@ func runPrime(cmd *cobra.Command, args []string) error {
 					output.WriteString("\n\n")
 				}
 			}
-
-			// Get active tasks
-			tasks, err := models.ListTasks("", "", "implement")
-			if err == nil && len(tasks) > 0 {
-				// Filter to current mission
-				for _, task := range tasks {
-					if task.MissionID == missionCtx.MissionID {
-						output.WriteString(fmt.Sprintf("### Active Work: %s\n\n", task.ID))
-						output.WriteString(fmt.Sprintf("**%s** [%s]\n\n", task.Title, task.Status))
-						break
-					}
-				}
-			}
-
-			// Get latest handoff
-			ho, err := models.GetLatestHandoff()
-			if err == nil && ho != nil {
-				output.WriteString(fmt.Sprintf("### Latest Handoff: %s\n\n", ho.ID))
-				output.WriteString(fmt.Sprintf("*Created: %s*\n\n", ho.CreatedAt.Format("Jan 2, 15:04")))
-
-				// Include brief note excerpt
-				noteLines := strings.Split(ho.HandoffNote, "\n")
-				if len(noteLines) > 5 {
-					output.WriteString(strings.Join(noteLines[:5], "\n"))
-					output.WriteString("\n\n*(Showing first 5 lines)*\n\n")
-				} else {
-					output.WriteString(ho.HandoffNote)
-					output.WriteString("\n\n")
-				}
-			}
 		}
 	} else {
 		output.WriteString("**Context**: Master orchestrator (global)\n\n")
 		output.WriteString("Run `orc mission list` to see available missions.\n\n")
 	}
 
-	// Footer note
-	output.WriteString("\n---\n")
-	output.WriteString("💡 **Note**: This is lightweight orientation context.\n")
+	// Core rules (shared)
+	output.WriteString(getCoreRules())
 
-	// Truncate to max lines if needed
-	fullOutput := output.String()
-	if format == "text" {
-		lines := strings.Split(fullOutput, "\n")
-		if len(lines) > maxLines {
-			lines = lines[:maxLines]
-			lines = append(lines, "...", "", "*(Output truncated to max lines)*")
-		}
-		fullOutput = strings.Join(lines, "\n")
+	// Footer (loaded from template)
+	welcome, err := templates.GetWelcomeORC()
+	if err == nil {
+		output.WriteString(welcome)
+	} else {
+		output.WriteString("---\nYou are the ORC - Orchestrator coordinating missions and IMPs.\n")
 	}
 
-	fmt.Println(fullOutput)
-	return nil
+	return output.String()
 }
 
 // buildIMPPrimeOutput creates IMP-focused context prompt when in grove territory
@@ -169,7 +201,7 @@ func buildIMPPrimeOutput(groveCtx *context.GroveContext, cwd string) string {
 	output.WriteString(fmt.Sprintf("**Location**: `%s`\n\n", cwd))
 
 	// Git context
-	output.WriteString(getGitContext())
+	output.WriteString(getGitInstructions())
 
 	// Section 2: Assignment - Epics assigned to this grove
 	output.WriteString("## Assignment\n\n")
@@ -205,95 +237,87 @@ func buildIMPPrimeOutput(groveCtx *context.GroveContext, cwd string) string {
 		output.WriteString("Run `orc summary` to see the full mission tree.\n\n")
 	}
 
-	// Section 3: Handoff Context
-	ho, err := models.GetLatestHandoffForGrove(groveCtx.GroveID)
-	if err == nil && ho != nil {
-		output.WriteString("## Handoff Context\n\n")
-		output.WriteString(fmt.Sprintf("**From**: Previous session (%s)\n", ho.CreatedAt.Format("Jan 2, 15:04")))
-		output.WriteString(fmt.Sprintf("**ID**: %s\n\n", ho.ID))
-
-		noteLines := strings.Split(ho.HandoffNote, "\n")
-		if len(noteLines) > 8 {
-			output.WriteString(strings.Join(noteLines[:8], "\n"))
-			output.WriteString("\n\n*(Showing first 8 lines)*\n\n")
-		} else {
-			output.WriteString(ho.HandoffNote)
-			output.WriteString("\n\n")
-		}
-	}
-
-	// Section 4: ORC CLI Primer
+	// Section 3: ORC CLI Primer
 	output.WriteString("## ORC CLI Primer\n\n")
 	output.WriteString("**Core Commands**:\n")
 	output.WriteString("- `orc summary` - View mission tree and current assignments\n")
 	output.WriteString("- `orc task list --epic EPIC-ID` - List tasks for your epic\n")
 	output.WriteString("- `orc task show TASK-ID` - View task details\n")
 	output.WriteString("- `orc task complete TASK-ID` - Mark task as completed\n")
-	output.WriteString("- `orc epic check-assignment` - Verify your epic assignment\n")
-	output.WriteString("- `/handoff` - Create session handoff note (via Claude Code skill)\n\n")
+	output.WriteString("- `orc epic check-assignment` - Verify your epic assignment\n\n")
 
-	// Section 5: Core Rules
-	output.WriteString("## Core Rules\n\n")
-	output.WriteString("- **Track all work in ORC ledger** - Use `orc task` commands to manage progress\n")
-	output.WriteString("- **TodoWrite tool is NOT ALLOWED** - This tool is banned; use ORC ledger instead\n")
-	output.WriteString("- **TODO markdown files are NOT ALLOWED** - No TODO.md or similar files\n")
-	output.WriteString("- **Stay in grove territory** - Work within assigned epics only\n")
-	output.WriteString("- **Handoff between sessions** - Use `/handoff` skill before ending work\n\n")
+	// Section 4: Core Rules (shared across all session types)
+	output.WriteString(getCoreRules())
+	output.WriteString("- **Stay in grove territory** - Work within assigned epics only\n\n")
 
-	// Footer
-	output.WriteString("---\n")
-	output.WriteString("💡 **You are an IMP** - Implementation agent working within a grove on assigned epics.\n")
-	output.WriteString("🎯 **Focus**: Complete ready tasks, update ledger, maintain context through handoffs.\n")
+	// Footer (loaded from template)
+	welcome, err := templates.GetWelcomeIMP()
+	if err == nil {
+		output.WriteString(welcome)
+	} else {
+		output.WriteString("---\nYou are an IMP - Implementation agent working within a grove on assigned epics.\n")
+	}
 
 	return output.String()
 }
 
-// getGitContext returns git context if in a git repository
-func getGitContext() string {
+// getGitInstructions returns instructions for Claude to discover git context
+// Content loaded from templates/prime/git-discovery.tmpl
+func getGitInstructions() string {
+	content, err := templates.GetGitDiscovery()
+	if err != nil {
+		// Fallback to inline if template fails
+		return "## Git Context Discovery\n\nRun `git status` to see repository state.\n\n"
+	}
+	return content
+}
+
+// getCoreRules returns the core rules that apply to ALL Claude sessions
+// Content loaded from templates/prime/core-rules.tmpl
+func getCoreRules() string {
+	content, err := templates.GetCoreRules()
+	if err != nil {
+		// Fallback to inline if template fails
+		return "## Core Rules\n\n- Track all work in ORC ledger\n- TodoWrite tool is NOT ALLOWED\n\n"
+	}
+	return content
+}
+
+// buildFallbackOutput creates output when no role is configured
+func buildFallbackOutput(cwd string, groveCtx *context.GroveContext, missionCtx *context.MissionContext) string {
 	var output strings.Builder
 
-	// Check if in git repo
-	cmd := exec.Command("git", "rev-parse", "--git-dir")
-	if err := cmd.Run(); err != nil {
-		return "" // Not in git repo
+	output.WriteString("# ORC Context - Role Not Configured\n\n")
+	output.WriteString(fmt.Sprintf("**Location**: `%s`\n\n", cwd))
+
+	output.WriteString("## Configuration Required\n\n")
+	output.WriteString("No role is configured for this context. The `role` field must be set in `.orc/config.json`.\n\n")
+
+	if groveCtx != nil {
+		output.WriteString(fmt.Sprintf("**Detected grove**: %s (%s)\n", groveCtx.Name, groveCtx.GroveID))
+		output.WriteString("**Suggested role**: `IMP` (Implementation Agent)\n\n")
+		output.WriteString("To configure, edit `.orc/config.json` and add:\n")
+		output.WriteString("```json\n")
+		output.WriteString("\"role\": \"IMP\"\n")
+		output.WriteString("```\n\n")
+	} else if missionCtx != nil {
+		output.WriteString(fmt.Sprintf("**Detected mission**: %s\n", missionCtx.MissionID))
+		output.WriteString("**Suggested role**: `ORC` (Orchestrator)\n\n")
+		output.WriteString("To configure, edit `.orc/config.json` and add:\n")
+		output.WriteString("```json\n")
+		output.WriteString("\"role\": \"ORC\"\n")
+		output.WriteString("```\n\n")
+	} else {
+		output.WriteString("No mission or grove context detected.\n")
+		output.WriteString("You may be in the wrong directory.\n\n")
+		output.WriteString("**To connect to ORC**: Run `orc attach` to attach to the orchestrator session.\n\n")
 	}
 
-	output.WriteString("**Git Context**:\n")
+	output.WriteString(getGitInstructions())
+	output.WriteString(getCoreRules())
 
-	// Get current branch
-	cmd = exec.Command("git", "branch", "--show-current")
-	if branchBytes, err := cmd.Output(); err == nil {
-		branch := strings.TrimSpace(string(branchBytes))
-		if branch != "" {
-			output.WriteString(fmt.Sprintf("- Branch: `%s`\n", branch))
-		}
-	}
+	output.WriteString("---\n")
+	output.WriteString("⚠️ **Action Required**: Ask the user to configure the role or direct you to the correct context.\n")
 
-	// Get recent commits (last 3)
-	cmd = exec.Command("git", "log", "--oneline", "-3")
-	if commitBytes, err := cmd.Output(); err == nil {
-		commits := strings.TrimSpace(string(commitBytes))
-		if commits != "" {
-			lines := strings.Split(commits, "\n")
-			output.WriteString("- Recent commits:\n")
-			for _, line := range lines {
-				if line != "" {
-					output.WriteString(fmt.Sprintf("  - %s\n", line))
-				}
-			}
-		}
-	}
-
-	// Check for uncommitted changes
-	cmd = exec.Command("git", "status", "--short")
-	if statusBytes, err := cmd.Output(); err == nil {
-		status := strings.TrimSpace(string(statusBytes))
-		if status != "" {
-			lines := strings.Split(status, "\n")
-			output.WriteString(fmt.Sprintf("- Uncommitted changes: %d files\n", len(lines)))
-		}
-	}
-
-	output.WriteString("\n")
 	return output.String()
 }

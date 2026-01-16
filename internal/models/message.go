@@ -36,14 +36,19 @@ func CreateMessage(sender, recipient, subject, body, missionID string) (*Message
 		return nil, fmt.Errorf("mission %s not found", missionID)
 	}
 
-	// Generate message ID scoped to mission
-	var count int
-	err = database.QueryRow("SELECT COUNT(*) FROM messages WHERE mission_id = ?", missionID).Scan(&count)
+	// Generate message ID scoped to mission by finding max existing ID
+	// Message IDs are formatted as MSG-{missionID}-NNN, extract NNN for max calculation
+	prefix := fmt.Sprintf("MSG-%s-", missionID)
+	var maxID int
+	err = database.QueryRow(
+		"SELECT COALESCE(MAX(CAST(REPLACE(id, ?, '') AS INTEGER)), 0) FROM messages WHERE mission_id = ?",
+		prefix, missionID,
+	).Scan(&maxID)
 	if err != nil {
 		return nil, err
 	}
 
-	id := fmt.Sprintf("MSG-%s-%03d", missionID, count+1)
+	id := fmt.Sprintf("MSG-%s-%03d", missionID, maxID+1)
 
 	// Insert message
 	_, err = database.Exec(

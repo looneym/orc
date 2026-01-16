@@ -36,14 +36,14 @@ func CreateGrove(missionID, name, path string, repos []string) (*Grove, error) {
 		return nil, fmt.Errorf("mission %s not found", missionID)
 	}
 
-	// Generate grove ID
-	var count int
-	err = database.QueryRow("SELECT COUNT(*) FROM groves").Scan(&count)
+	// Generate grove ID by finding max existing ID
+	var maxID int
+	err = database.QueryRow("SELECT COALESCE(MAX(CAST(SUBSTR(id, 7) AS INTEGER)), 0) FROM groves").Scan(&maxID)
 	if err != nil {
 		return nil, err
 	}
 
-	id := fmt.Sprintf("GROVE-%03d", count+1)
+	id := fmt.Sprintf("GROVE-%03d", maxID+1)
 
 	// Convert repos array to JSON
 	var reposJSON sql.NullString

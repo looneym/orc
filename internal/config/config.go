@@ -15,6 +15,12 @@ const (
 	TypeGlobal  ConfigType = "global"
 )
 
+// Role constants
+const (
+	RoleORC = "ORC" // Orchestrator agent
+	RoleIMP = "IMP" // Implementation agent
+)
+
 type Config struct {
 	Version string      `json:"version"`
 	Type    ConfigType  `json:"type"`
@@ -28,20 +34,26 @@ type MissionConfig struct {
 	MissionID     string `json:"mission_id"`
 	WorkspacePath string `json:"workspace_path"`
 	IsMaster      bool   `json:"is_master,omitempty"`
+	Role          string `json:"role,omitempty"`         // "ORC", "IMP", or empty
+	CurrentEpic   string `json:"current_epic,omitempty"` // Currently focused epic ID
 	CreatedAt     string `json:"created_at"`
 }
 
 type GroveConfig struct {
-	GroveID   string   `json:"grove_id"`
-	MissionID string   `json:"mission_id"`
-	Name      string   `json:"name"`
-	Repos     []string `json:"repos"`
-	CreatedAt string   `json:"created_at"`
+	GroveID     string   `json:"grove_id"`
+	MissionID   string   `json:"mission_id"`
+	Name        string   `json:"name"`
+	Repos       []string `json:"repos"`
+	Role        string   `json:"role,omitempty"`         // "IMP" typically, or empty
+	CurrentEpic string   `json:"current_epic,omitempty"` // Currently focused epic ID
+	CreatedAt   string   `json:"created_at"`
 }
 
 type StateConfig struct {
 	ActiveMissionID  string   `json:"active_mission_id"`
 	CurrentHandoffID string   `json:"current_handoff_id"`
+	Role             string   `json:"role,omitempty"`         // "ORC" for global orchestrator
+	CurrentEpic      string   `json:"current_epic,omitempty"` // Currently focused epic ID
 	LastUpdated      string   `json:"last_updated"`
 	ActiveWorkOrders []string `json:"active_work_orders"`
 }

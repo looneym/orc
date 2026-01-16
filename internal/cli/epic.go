@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/example/orc/internal/config"
 	"github.com/example/orc/internal/context"
 	"github.com/example/orc/internal/models"
 	"github.com/spf13/cobra"
@@ -470,6 +471,72 @@ func writeEpicAssignment(groveDir string, epic *models.Epic) error {
 	}
 }
 
+var epicFocusCmd = &cobra.Command{
+	Use:   "focus [epic-id]",
+	Short: "Set the current epic focus in config",
+	Long: `Set the currently focused epic in the .orc/config.json file.
+
+This tells orc prime which epic you're working on, so Claude knows the context.
+If no epic is specified, clears the current focus.
+
+Examples:
+  orc epic focus EPIC-123    # Set focus to EPIC-123
+  orc epic focus             # Clear current focus`,
+	Args: cobra.MaximumNArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		// Get current directory
+		cwd, err := os.Getwd()
+		if err != nil {
+			return fmt.Errorf("failed to get current directory: %w", err)
+		}
+
+		// Load existing config
+		cfg, err := config.LoadConfig(cwd)
+		if err != nil {
+			return fmt.Errorf("no .orc/config.json found in %s: %w", cwd, err)
+		}
+
+		var epicID string
+		if len(args) > 0 {
+			epicID = args[0]
+
+			// Validate epic exists
+			epic, err := models.GetEpic(epicID)
+			if err != nil {
+				return fmt.Errorf("epic %s not found: %w", epicID, err)
+			}
+
+			fmt.Printf("✓ Setting focus to: %s - %s\n", epic.ID, epic.Title)
+		} else {
+			fmt.Println("✓ Clearing epic focus")
+		}
+
+		// Update config based on type
+		switch cfg.Type {
+		case config.TypeGrove:
+			cfg.Grove.CurrentEpic = epicID
+		case config.TypeMission:
+			cfg.Mission.CurrentEpic = epicID
+		case config.TypeGlobal:
+			cfg.State.CurrentEpic = epicID
+		default:
+			return fmt.Errorf("unknown config type: %s", cfg.Type)
+		}
+
+		// Save config
+		if err := config.SaveConfig(cwd, cfg); err != nil {
+			return fmt.Errorf("failed to save config: %w", err)
+		}
+
+		if epicID != "" {
+			fmt.Println()
+			fmt.Println("💡 Run 'orc prime' to see updated context")
+		}
+
+		return nil
+	},
+}
+
 // Helper function for status icons
 func getStatusIcon(status string) string {
 	switch status {
@@ -521,6 +588,7 @@ func init() {
 	epicCmd.AddCommand(epicAssignCmd)
 	epicCmd.AddCommand(epicCheckAssignmentCmd)
 	epicCmd.AddCommand(epicUpdateAssignmentCmd)
+	epicCmd.AddCommand(epicFocusCmd)
 }
 
 // EpicCmd returns the epic command

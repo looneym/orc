@@ -26,14 +26,14 @@ func CreateHandoff(note string, activeMissionID string, activeWorkOrders []strin
 		return nil, err
 	}
 
-	// Generate handoff ID
-	var count int
-	err = database.QueryRow("SELECT COUNT(*) FROM handoffs").Scan(&count)
+	// Generate handoff ID by finding max existing ID
+	var maxID int
+	err = database.QueryRow("SELECT COALESCE(MAX(CAST(SUBSTR(id, 4) AS INTEGER)), 0) FROM handoffs").Scan(&maxID)
 	if err != nil {
 		return nil, err
 	}
 
-	id := fmt.Sprintf("HO-%03d", count+1)
+	id := fmt.Sprintf("HO-%03d", maxID+1)
 
 	// Handle nullable strings
 	var missionID, workOrders, todos, graphiti, groveID sql.NullString
