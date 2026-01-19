@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -10,10 +11,12 @@ import (
 
 	"github.com/example/orc/internal/agent"
 	"github.com/example/orc/internal/config"
-	"github.com/example/orc/internal/context"
+	orccontext "github.com/example/orc/internal/context"
 	coremission "github.com/example/orc/internal/core/mission"
 	"github.com/example/orc/internal/models"
+	"github.com/example/orc/internal/ports/primary"
 	"github.com/example/orc/internal/tmux"
+	"github.com/example/orc/internal/wire"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 )
@@ -68,26 +71,19 @@ var missionCreateCmd = &cobra.Command{
 	Short: "Create a new mission",
 	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// Check agent identity - only ORC can create missions
-		identity, _ := agent.GetCurrentAgentID()
-		guardCtx := coremission.GuardContext{
-			AgentType: coremission.AgentType(identity.Type),
-			AgentID:   identity.FullID,
-			MissionID: identity.MissionID,
-		}
-		if result := coremission.CanCreateMission(guardCtx); !result.Allowed {
-			return result.Error()
-		}
-
+		ctx := context.Background()
 		title := args[0]
 		description, _ := cmd.Flags().GetString("description")
 
-		mission, err := models.CreateMission(title, description)
+		resp, err := wire.MissionService().CreateMission(ctx, primary.CreateMissionRequest{
+			Title:       title,
+			Description: description,
+		})
 		if err != nil {
-			return fmt.Errorf("failed to create mission: %w", err)
+			return err // Guard failures returned as errors from service
 		}
 
-		fmt.Printf("✓ Created mission %s: %s\n", mission.ID, mission.Title)
+		fmt.Printf("✓ Created mission %s: %s\n", resp.MissionID, resp.Mission.Title)
 		return nil
 	},
 }
@@ -96,9 +92,12 @@ var missionListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List missions",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		ctx := context.Background()
 		status, _ := cmd.Flags().GetString("status")
 
-		missions, err := models.ListMissions(status)
+		missions, err := wire.MissionService().ListMissions(ctx, primary.MissionFilters{
+			Status: status,
+		})
 		if err != nil {
 			return fmt.Errorf("failed to list missions: %w", err)
 		}
@@ -124,9 +123,10 @@ var missionShowCmd = &cobra.Command{
 	Short: "Show mission details",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		ctx := context.Background()
 		id := args[0]
 
-		mission, err := models.GetMission(id)
+		mission, err := wire.MissionService().GetMission(ctx, id)
 		if err != nil {
 			return fmt.Errorf("failed to get mission: %w", err)
 		}
@@ -134,16 +134,16 @@ var missionShowCmd = &cobra.Command{
 		fmt.Printf("\nMission: %s\n", mission.ID)
 		fmt.Printf("Title:   %s\n", mission.Title)
 		fmt.Printf("Status:  %s\n", mission.Status)
-		if mission.Description.Valid {
-			fmt.Printf("Description: %s\n", mission.Description.String)
+		if mission.Description != "" {
+			fmt.Printf("Description: %s\n", mission.Description)
 		}
-		fmt.Printf("Created: %s\n", mission.CreatedAt.Format("2006-01-02 15:04"))
-		if mission.CompletedAt.Valid {
-			fmt.Printf("Completed: %s\n", mission.CompletedAt.Time.Format("2006-01-02 15:04"))
+		fmt.Printf("Created: %s\n", mission.CreatedAt)
+		if mission.CompletedAt != "" {
+			fmt.Printf("Completed: %s\n", mission.CompletedAt)
 		}
 		fmt.Println()
 
-		// List shipments under this mission
+		// List shipments under this mission (still using models - no service method yet)
 		shipments, err := models.ListShipments(id, "")
 		if err == nil && len(shipments) > 0 {
 			fmt.Println("Shipments:")
@@ -153,7 +153,7 @@ var missionShowCmd = &cobra.Command{
 			fmt.Println()
 		}
 
-		// List groves for this mission
+		// List groves for this mission (still using models - no service method yet)
 		groves, err := models.GetGrovesByMission(id)
 		if err == nil && len(groves) > 0 {
 			fmt.Println("Groves:")
@@ -199,7 +199,7 @@ Examples:
 		workspacePath, _ := cmd.Flags().GetString("workspace")
 
 		// Check if we're in ORC source directory
-		if context.IsOrcSourceDirectory() {
+		if orccontext.IsOrcSourceDirectory() {
 			return fmt.Errorf("cannot start mission in ORC source directory - please run from another location")
 		}
 
@@ -229,7 +229,7 @@ Examples:
 		}
 
 		// Write .orc/config.json for mission context
-		if err := context.WriteMissionContext(workspacePath, missionID); err != nil {
+		if err := orccontext.WriteMissionContext(workspacePath, missionID); err != nil {
 			return fmt.Errorf("failed to write mission config: %w", err)
 		}
 
@@ -312,26 +312,12 @@ var missionCompleteCmd = &cobra.Command{
 	Short: "Mark a mission as complete",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		ctx := context.Background()
 		id := args[0]
 
-		// Fetch mission to check pinned state
-		mission, err := models.GetMission(id)
+		err := wire.MissionService().CompleteMission(ctx, id)
 		if err != nil {
-			return fmt.Errorf("failed to get mission: %w", err)
-		}
-
-		// Guard check
-		stateCtx := coremission.MissionStateContext{
-			MissionID: id,
-			IsPinned:  mission.Pinned,
-		}
-		if result := coremission.CanCompleteMission(stateCtx); !result.Allowed {
-			return result.Error()
-		}
-
-		err = models.UpdateMissionStatus(id, "complete")
-		if err != nil {
-			return fmt.Errorf("failed to complete mission: %w", err)
+			return err // Guard failures returned as errors from service
 		}
 
 		fmt.Printf("✓ Mission %s marked as complete\n", id)
@@ -344,26 +330,12 @@ var missionArchiveCmd = &cobra.Command{
 	Short: "Archive a completed mission",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		ctx := context.Background()
 		id := args[0]
 
-		// Fetch mission to check pinned state
-		mission, err := models.GetMission(id)
+		err := wire.MissionService().ArchiveMission(ctx, id)
 		if err != nil {
-			return fmt.Errorf("failed to get mission: %w", err)
-		}
-
-		// Guard check
-		stateCtx := coremission.MissionStateContext{
-			MissionID: id,
-			IsPinned:  mission.Pinned,
-		}
-		if result := coremission.CanArchiveMission(stateCtx); !result.Allowed {
-			return result.Error()
-		}
-
-		err = models.UpdateMissionStatus(id, "archived")
-		if err != nil {
-			return fmt.Errorf("failed to archive mission: %w", err)
+			return err // Guard failures returned as errors from service
 		}
 
 		fmt.Printf("✓ Mission %s archived\n", id)
@@ -376,6 +348,7 @@ var missionUpdateCmd = &cobra.Command{
 	Short: "Update mission title and/or description",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		ctx := context.Background()
 		id := args[0]
 		title, _ := cmd.Flags().GetString("title")
 		description, _ := cmd.Flags().GetString("description")
@@ -384,7 +357,11 @@ var missionUpdateCmd = &cobra.Command{
 			return fmt.Errorf("must specify at least --title or --description")
 		}
 
-		err := models.UpdateMission(id, title, description)
+		err := wire.MissionService().UpdateMission(ctx, primary.UpdateMissionRequest{
+			MissionID:   id,
+			Title:       title,
+			Description: description,
+		})
 		if err != nil {
 			return fmt.Errorf("failed to update mission: %w", err)
 		}
@@ -407,34 +384,23 @@ Examples:
   orc mission delete MISSION-001 --force`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		ctx := context.Background()
 		id := args[0]
 		force, _ := cmd.Flags().GetBool("force")
 
-		// Get mission details before deleting
-		mission, err := models.GetMission(id)
+		// Get mission details before deleting (for output)
+		mission, err := wire.MissionService().GetMission(ctx, id)
 		if err != nil {
 			return fmt.Errorf("failed to get mission: %w", err)
 		}
 
-		// Fetch dependency counts
-		shipments, _ := models.ListShipments(id, "")
-		groves, _ := models.GetGrovesByMission(id)
-
-		// Guard check
-		deleteCtx := coremission.DeleteContext{
-			MissionID:     id,
-			ShipmentCount: len(shipments),
-			GroveCount:    len(groves),
-			ForceDelete:   force,
-		}
-		if result := coremission.CanDeleteMission(deleteCtx); !result.Allowed {
-			return result.Error()
-		}
-
-		// Delete the mission
-		err = models.DeleteMission(id)
+		// Delete the mission (guards handled in service)
+		err = wire.MissionService().DeleteMission(ctx, primary.DeleteMissionRequest{
+			MissionID: id,
+			Force:     force,
+		})
 		if err != nil {
-			return fmt.Errorf("failed to delete mission: %w", err)
+			return err // Guard failures returned as errors from service
 		}
 
 		fmt.Printf("✓ Deleted mission %s: %s\n", mission.ID, mission.Title)
@@ -957,9 +923,10 @@ var missionPinCmd = &cobra.Command{
 	Short: "Pin mission to keep it visible",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		ctx := context.Background()
 		id := args[0]
 
-		err := models.PinMission(id)
+		err := wire.MissionService().PinMission(ctx, id)
 		if err != nil {
 			return fmt.Errorf("failed to pin mission: %w", err)
 		}
@@ -974,9 +941,10 @@ var missionUnpinCmd = &cobra.Command{
 	Short: "Unpin mission",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		ctx := context.Background()
 		id := args[0]
 
-		err := models.UnpinMission(id)
+		err := wire.MissionService().UnpinMission(ctx, id)
 		if err != nil {
 			return fmt.Errorf("failed to unpin mission: %w", err)
 		}

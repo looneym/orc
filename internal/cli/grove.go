@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -12,9 +13,11 @@ import (
 	"time"
 
 	"github.com/example/orc/internal/config"
-	"github.com/example/orc/internal/context"
+	orccontext "github.com/example/orc/internal/context"
 	"github.com/example/orc/internal/models"
+	"github.com/example/orc/internal/ports/primary"
 	"github.com/example/orc/internal/tmux"
+	"github.com/example/orc/internal/wire"
 	"github.com/spf13/cobra"
 )
 
@@ -66,7 +69,7 @@ Examples:
 
 			// Get mission from context or require explicit flag
 			if missionID == "" {
-				missionID = context.GetContextMissionID()
+				missionID = orccontext.GetContextMissionID()
 				if missionID == "" {
 					return fmt.Errorf("no mission context detected\nHint: Use --mission flag or run from a grove/mission directory")
 				}
@@ -148,9 +151,36 @@ func groveListCmd() *cobra.Command {
 		Short: "List all groves",
 		Long:  `List all groves with their current status.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			groves, err := models.ListGroves(missionID)
-			if err != nil {
-				return fmt.Errorf("failed to list groves: %w", err)
+			ctx := context.Background()
+
+			// Use service if mission filter provided, otherwise use models for "list all"
+			// (service's ListGroves requires missionID, models.ListGroves handles empty)
+			var groves []*primary.Grove
+			if missionID != "" {
+				var err error
+				groves, err = wire.GroveService().ListGroves(ctx, primary.GroveFilters{
+					MissionID: missionID,
+				})
+				if err != nil {
+					return fmt.Errorf("failed to list groves: %w", err)
+				}
+			} else {
+				// List all groves via models (service doesn't support empty missionID)
+				modelGroves, err := models.ListGroves("")
+				if err != nil {
+					return fmt.Errorf("failed to list groves: %w", err)
+				}
+				groves = make([]*primary.Grove, len(modelGroves))
+				for i, g := range modelGroves {
+					groves[i] = &primary.Grove{
+						ID:        g.ID,
+						Name:      g.Name,
+						MissionID: g.MissionID,
+						Path:      g.Path,
+						Status:    g.Status,
+						CreatedAt: g.CreatedAt.Format("2006-01-02T15:04:05Z"),
+					}
+				}
 			}
 
 			if len(groves) == 0 {
@@ -191,9 +221,10 @@ func groveShowCmd() *cobra.Command {
 		Short: "Show grove details",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			ctx := context.Background()
 			id := args[0]
 
-			grove, err := models.GetGrove(id)
+			grove, err := wire.GroveService().GetGrove(ctx, id)
 			if err != nil {
 				return fmt.Errorf("failed to get grove: %w", err)
 			}
@@ -203,10 +234,7 @@ func groveShowCmd() *cobra.Command {
 			fmt.Printf("Mission: %s\n", grove.MissionID)
 			fmt.Printf("Path:    %s\n", grove.Path)
 			fmt.Printf("Status:  %s\n", grove.Status)
-			if grove.Repos.Valid {
-				fmt.Printf("Repos:   %s\n", grove.Repos.String)
-			}
-			fmt.Printf("Created: %s\n", grove.CreatedAt.Format("2006-01-02 15:04"))
+			fmt.Printf("Created: %s\n", grove.CreatedAt)
 			fmt.Println()
 
 			return nil
@@ -227,36 +255,40 @@ Examples:
   orc grove rename GROVE-001 backend-refactor --update-config`,
 		Args: cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			ctx := context.Background()
 			id := args[0]
 			newName := args[1]
 
-			// Get grove before rename
-			grove, err := models.GetGrove(id)
+			// Get grove before rename (for old name display)
+			grove, err := wire.GroveService().GetGrove(ctx, id)
 			if err != nil {
 				return fmt.Errorf("failed to get grove: %w", err)
 			}
 
 			oldName := grove.Name
 
-			// Rename in database
-			err = models.RenameGrove(id, newName)
+			// Rename in database via service
+			err = wire.GroveService().RenameGrove(ctx, primary.RenameGroveRequest{
+				GroveID: id,
+				NewName: newName,
+			})
 			if err != nil {
-				return fmt.Errorf("failed to rename grove: %w", err)
+				return err // Guard failures returned as errors from service
 			}
 
 			fmt.Printf("✓ Grove %s renamed\n", id)
 			fmt.Printf("  %s → %s\n", oldName, newName)
 
-			// Update .orc/config.json if requested
+			// Update .orc/config.json if requested (CLI-specific logic)
 			if updateMetadata {
-				// Reload grove with new name
-				grove, err = models.GetGrove(id)
+				// Reload grove with new name (using models for filesystem write)
+				groveModel, err := models.GetGrove(id)
 				if err != nil {
 					fmt.Printf("  ⚠️  Warning: Could not reload grove for config update: %v\n", err)
 					return nil
 				}
 
-				if err := writeGroveMetadata(grove); err != nil {
+				if err := writeGroveMetadata(groveModel); err != nil {
 					fmt.Printf("  ⚠️  Warning: Could not update .orc/config.json: %v\n", err)
 				} else {
 					fmt.Printf("  ✓ Updated .orc/config.json\n")
@@ -290,15 +322,16 @@ Examples:
   orc grove delete GROVE-TEST-001 --force --remove-worktree`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			ctx := context.Background()
 			groveID := args[0]
 
-			// Get grove details before deleting
-			grove, err := models.GetGrove(groveID)
+			// Get grove details before deleting (for output and worktree path)
+			grove, err := wire.GroveService().GetGrove(ctx, groveID)
 			if err != nil {
 				return fmt.Errorf("failed to get grove: %w", err)
 			}
 
-			// Remove worktree if requested
+			// Remove worktree if requested (CLI-specific filesystem operation)
 			if removeWorktree {
 				if _, err := os.Stat(grove.Path); err == nil {
 					fmt.Printf("Removing worktree at: %s\n", grove.Path)
@@ -319,9 +352,13 @@ Examples:
 				}
 			}
 
-			// Delete from database
-			if err := models.DeleteGrove(groveID); err != nil {
-				return fmt.Errorf("failed to delete grove from database: %w", err)
+			// Delete from database via service
+			err = wire.GroveService().DeleteGrove(ctx, primary.DeleteGroveRequest{
+				GroveID: groveID,
+				Force:   force,
+			})
+			if err != nil {
+				return err // Guard failures returned as errors from service
 			}
 
 			fmt.Printf("✓ Deleted grove %s: %s\n", grove.ID, grove.Name)
