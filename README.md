@@ -1,65 +1,39 @@
-# 🏭 ORC 2.0 - Forest Factory Orchestration System
-
-**Forest Factory Command Center for El Presidente's Development Ecosystem**
+# ORC - The Forest Factory
 
 ![Forest Factory](assets/orc.png)
 
-## 🎯 What It Does
+Deep in the forest stands a factory. The ORC oversees operations from the command center while IMPs work in scattered groves, hammering out code. Shipments move through the system - bundles of tasks ready for delivery. Tomes accumulate knowledge. Handoffs pass the torch between shifts.
 
-ORC 2.0 coordinates multiple Claude agents working across repositories simultaneously. 
+ORC is a CLI for structured AI-assisted development. It tracks missions, organizes work into containers, preserves context across sessions, and provisions isolated workspaces. The forest runs on SQLite and git worktrees.
 
-## 🗂️ Memory Architecture
+Today, ORC orchestrates a single agent working thoughtfully through well-planned tasks. Tomorrow, a Shipment will spawn a swarm of IMPs working in parallel. But swarms need solid foundations - planning, context preservation, merge strategies, quality controls. The factory is being built to scale.
 
-- **SQLite Ledger** - Single source of truth for all operational data: missions, epics, tasks, groves, and handoffs
-- **Handoff System** - Narrative-based context transfer between sessions for seamless continuity
+## The Cast
 
-## 🌲 Key Concepts
+**The ORC** is your Orchestrator - the agent who oversees the forest, coordinates missions, and maintains the big picture. The ORC doesn't write code directly; it manages the work, tracks progress, and ensures context flows between sessions.
 
-- **🎭 ORCs (Orchestrators)** - Coordinate missions, manage work orders, and facilitate cross-grove communication
-- **⚒️ IMPs (Implementers)** - Work in groves on actual code, completing work orders and reporting discoveries back
-- **🌳 Groves** - Git worktrees where IMPs do their work; one mission can have multiple groves from different repositories
-- **📋 Handoffs** - Context preservation across sessions via narrative summaries
+**IMPs** are Implementation agents. These mischievous workers inhabit groves and do the actual coding. Each IMP works in isolation, focused on its assigned tasks, reporting discoveries back to the Orchestrator.
 
-## 🤖 Systematic + Intelligent
+**Groves** are where the work happens. Technically they're git worktrees - isolated copies of repositories where an IMP can make changes without affecting the main codebase. One mission might have several groves, each focused on different aspects of the work.
 
-Claude agents work autonomously on separate cross-repo tasks while sharing context through the handoff system. The system combines systematic execution (structured work tracking, TMux coordination) with context preservation (handoff narratives). Currently powering all development work with full context preservation across sessions.
+**Missions** are the grand undertakings. Every piece of work belongs to a mission, giving it context and purpose.
 
----
+### Containers
 
-## Quick Start
+Work in ORC is organized into containers that hold related items:
 
-```bash
-# Initialize ORC context
-orc prime
+**Shipments** (SHIP-*) are bundles of tasks ready for delivery - the primary unit of work that moves through the system. **Conclaves** (CON-*) are gatherings where discussions happen and decisions are made. **Investigations** (INV-*) are mysteries to solve - research and exploration that informs future work. **Tomes** (TOME-*) are books of accumulated knowledge - documentation that persists and grows.
 
-# View current mission status
-orc status
+### Leaves
 
-# List work orders
-orc work-order list
+Inside containers live individual items: **Tasks** are deeds to be done. **Questions** are riddles awaiting answers. **Plans** are maps of intent. **Notes** are scattered thoughts worth preserving.
 
-# Create a new mission
-orc mission create "Mission Title" -d "Description"
+### Rituals
 
-# Create work orders
-orc work-order create "Task title" --mission MISSION-001
+**Handoffs** pass the torch between sessions. When one Claude session ends and another begins, the handoff narrative carries context forward - what was accomplished, what remains, what pitfalls to avoid.
 
-# View mission summary
-orc summary
-```
-
-## Command System Architecture
-
-**Central Management + Global Access**
-- Commands stored in `global-commands/` (universal) and `.claude/commands/` (ORC-specific)
-- Symlinked to `~/.claude/commands/` for global availability
-- Single source of truth - update once, available everywhere
-
-**Key Commands**
-- `/handoff` - Create handoff for session continuity
-- `orc prime` - Lightweight context injection (agents auto-run this on startup via direct prompt)
-- `orc status --handoff` - View latest handoff
+**Priming** awakens context at session start. Run `orc prime` and the current mission, focus, and recent history flow into the conversation.
 
 ---
 
-**Orchestrator Claude Coordinates. Investigation Claude Implements. El Presidente Commands.**
+*The forest hums with industry. Shipments move through groves. IMPs hammer at their tasks. And the ORC watches over all.*
