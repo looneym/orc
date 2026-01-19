@@ -141,10 +141,10 @@ func shouldShowLeaf(entityID string, filters *filterConfig) (bool, string) {
 		return true, "" // Unknown type, show it
 	}
 
-	// Check leaf type filter
+	// Check leaf type filter (hide specified types)
 	if len(filters.leafTypes) > 0 {
 		// Support both singular (task) and plural (tasks) forms
-		if !filters.leafTypes[entityType] && !filters.leafTypes[entityType+"s"] {
+		if filters.leafTypes[entityType] || filters.leafTypes[entityType+"s"] {
 			return false, ""
 		}
 	}
@@ -795,7 +795,7 @@ Examples:
 	cmd.Flags().Bool("all", false, "Show all containers (default: only show focused container if set)")
 	cmd.Flags().StringSlice("filter-statuses", []string{}, "Hide items with these statuses (comma-separated: paused,blocked)")
 	cmd.Flags().StringSlice("filter-containers", []string{}, "Show only these container types (comma-separated: SHIP,CON,INV,TOME)")
-	cmd.Flags().StringSlice("filter-leaves", []string{}, "Show only these leaf types (comma-separated: tasks,notes,questions,plans)")
+	cmd.Flags().StringSlice("filter-leaves", []string{}, "Hide these leaf types (comma-separated: tasks,notes,questions,plans)")
 	cmd.Flags().StringSlice("tags", []string{}, "Show only leaves with these tags")
 	cmd.Flags().StringSlice("not-tags", []string{}, "Hide leaves with these tags")
 
