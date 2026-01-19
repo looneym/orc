@@ -15,7 +15,6 @@ import (
 	"github.com/example/orc/internal/config"
 	orccontext "github.com/example/orc/internal/context"
 	"github.com/example/orc/internal/models"
-	"github.com/example/orc/internal/ports/primary"
 	"github.com/example/orc/internal/tmux"
 	"github.com/example/orc/internal/wire"
 	"github.com/spf13/cobra"
@@ -153,37 +152,20 @@ func groveListCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := context.Background()
 
-			// Use service if mission filter provided, otherwise use models for "list all"
+			// Use adapter if mission filter provided, otherwise use models for "list all"
 			// (service's ListGroves requires missionID, models.ListGroves handles empty)
-			var groves []*primary.Grove
 			if missionID != "" {
-				var err error
-				groves, err = wire.GroveService().ListGroves(ctx, primary.GroveFilters{
-					MissionID: missionID,
-				})
-				if err != nil {
-					return fmt.Errorf("failed to list groves: %w", err)
-				}
-			} else {
-				// List all groves via models (service doesn't support empty missionID)
-				modelGroves, err := models.ListGroves("")
-				if err != nil {
-					return fmt.Errorf("failed to list groves: %w", err)
-				}
-				groves = make([]*primary.Grove, len(modelGroves))
-				for i, g := range modelGroves {
-					groves[i] = &primary.Grove{
-						ID:        g.ID,
-						Name:      g.Name,
-						MissionID: g.MissionID,
-						Path:      g.Path,
-						Status:    g.Status,
-						CreatedAt: g.CreatedAt.Format("2006-01-02T15:04:05Z"),
-					}
-				}
+				_, err := wire.GroveAdapter().List(ctx, missionID)
+				return err
 			}
 
-			if len(groves) == 0 {
+			// List all groves via models (service doesn't support empty missionID)
+			modelGroves, err := models.ListGroves("")
+			if err != nil {
+				return fmt.Errorf("failed to list groves: %w", err)
+			}
+
+			if len(modelGroves) == 0 {
 				fmt.Println("No groves found.")
 				fmt.Println()
 				fmt.Println("Create your first grove:")
@@ -195,13 +177,13 @@ func groveListCmd() *cobra.Command {
 			fmt.Fprintln(w, "ID\tNAME\tMISSION\tSTATUS\tPATH")
 			fmt.Fprintln(w, "--\t----\t-------\t------\t----")
 
-			for _, grove := range groves {
+			for _, g := range modelGroves {
 				fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n",
-					grove.ID,
-					grove.Name,
-					grove.MissionID,
-					grove.Status,
-					grove.Path,
+					g.ID,
+					g.Name,
+					g.MissionID,
+					g.Status,
+					g.Path,
 				)
 			}
 
@@ -222,22 +204,8 @@ func groveShowCmd() *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := context.Background()
-			id := args[0]
-
-			grove, err := wire.GroveService().GetGrove(ctx, id)
-			if err != nil {
-				return fmt.Errorf("failed to get grove: %w", err)
-			}
-
-			fmt.Printf("\nGrove: %s\n", grove.ID)
-			fmt.Printf("Name:    %s\n", grove.Name)
-			fmt.Printf("Mission: %s\n", grove.MissionID)
-			fmt.Printf("Path:    %s\n", grove.Path)
-			fmt.Printf("Status:  %s\n", grove.Status)
-			fmt.Printf("Created: %s\n", grove.CreatedAt)
-			fmt.Println()
-
-			return nil
+			_, err := wire.GroveAdapter().Show(ctx, args[0])
+			return err
 		},
 	}
 }
@@ -259,27 +227,13 @@ Examples:
 			id := args[0]
 			newName := args[1]
 
-			// Get grove before rename (for old name display)
-			grove, err := wire.GroveService().GetGrove(ctx, id)
+			// Rename via adapter (handles get + rename + output)
+			_, err := wire.GroveAdapter().Rename(ctx, id, newName)
 			if err != nil {
-				return fmt.Errorf("failed to get grove: %w", err)
+				return err
 			}
 
-			oldName := grove.Name
-
-			// Rename in database via service
-			err = wire.GroveService().RenameGrove(ctx, primary.RenameGroveRequest{
-				GroveID: id,
-				NewName: newName,
-			})
-			if err != nil {
-				return err // Guard failures returned as errors from service
-			}
-
-			fmt.Printf("✓ Grove %s renamed\n", id)
-			fmt.Printf("  %s → %s\n", oldName, newName)
-
-			// Update .orc/config.json if requested (CLI-specific logic)
+			// Update .orc/config.json if requested (CLI-specific filesystem logic)
 			if updateMetadata {
 				// Reload grove with new name (using models for filesystem write)
 				groveModel, err := models.GetGrove(id)
@@ -325,45 +279,42 @@ Examples:
 			ctx := context.Background()
 			groveID := args[0]
 
-			// Get grove details before deleting (for output and worktree path)
-			grove, err := wire.GroveService().GetGrove(ctx, groveID)
+			// Get grove path before deleting (for worktree removal)
+			grove, err := wire.GroveAdapter().GetGrove(ctx, groveID)
 			if err != nil {
-				return fmt.Errorf("failed to get grove: %w", err)
+				return err
 			}
+			grovePath := grove.Path
 
 			// Remove worktree if requested (CLI-specific filesystem operation)
 			if removeWorktree {
-				if _, err := os.Stat(grove.Path); err == nil {
-					fmt.Printf("Removing worktree at: %s\n", grove.Path)
+				if _, err := os.Stat(grovePath); err == nil {
+					fmt.Printf("Removing worktree at: %s\n", grovePath)
 
 					// Try to remove git worktree first
-					if err := exec.Command("git", "worktree", "remove", grove.Path, "--force").Run(); err != nil {
+					if err := exec.Command("git", "worktree", "remove", grovePath, "--force").Run(); err != nil {
 						fmt.Printf("  ⚠️  Warning: git worktree remove failed: %v\n", err)
 						fmt.Printf("  Attempting direct directory removal...\n")
 
 						// Fall back to direct directory removal
-						if err := os.RemoveAll(grove.Path); err != nil {
+						if err := os.RemoveAll(grovePath); err != nil {
 							return fmt.Errorf("failed to remove worktree directory: %w", err)
 						}
 					}
 					fmt.Printf("  ✓ Worktree removed\n")
 				} else {
-					fmt.Printf("  ℹ️  Worktree not found at %s (already removed)\n", grove.Path)
+					fmt.Printf("  ℹ️  Worktree not found at %s (already removed)\n", grovePath)
 				}
 			}
 
-			// Delete from database via service
-			err = wire.GroveService().DeleteGrove(ctx, primary.DeleteGroveRequest{
-				GroveID: groveID,
-				Force:   force,
-			})
+			// Delete from database via adapter
+			_, err = wire.GroveAdapter().Delete(ctx, groveID, force)
 			if err != nil {
-				return err // Guard failures returned as errors from service
+				return err
 			}
 
-			fmt.Printf("✓ Deleted grove %s: %s\n", grove.ID, grove.Name)
 			if !removeWorktree {
-				fmt.Printf("  ℹ️  Worktree still exists at: %s\n", grove.Path)
+				fmt.Printf("  ℹ️  Worktree still exists at: %s\n", grovePath)
 				fmt.Printf("     Use --remove-worktree to delete it\n")
 			}
 

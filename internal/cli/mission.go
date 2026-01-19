@@ -14,7 +14,6 @@ import (
 	orccontext "github.com/example/orc/internal/context"
 	coremission "github.com/example/orc/internal/core/mission"
 	"github.com/example/orc/internal/models"
-	"github.com/example/orc/internal/ports/primary"
 	"github.com/example/orc/internal/tmux"
 	"github.com/example/orc/internal/wire"
 	"github.com/fatih/color"
@@ -75,16 +74,7 @@ var missionCreateCmd = &cobra.Command{
 		title := args[0]
 		description, _ := cmd.Flags().GetString("description")
 
-		resp, err := wire.MissionService().CreateMission(ctx, primary.CreateMissionRequest{
-			Title:       title,
-			Description: description,
-		})
-		if err != nil {
-			return err // Guard failures returned as errors from service
-		}
-
-		fmt.Printf("✓ Created mission %s: %s\n", resp.MissionID, resp.Mission.Title)
-		return nil
+		return wire.MissionAdapter().Create(ctx, title, description)
 	},
 }
 
@@ -95,26 +85,7 @@ var missionListCmd = &cobra.Command{
 		ctx := context.Background()
 		status, _ := cmd.Flags().GetString("status")
 
-		missions, err := wire.MissionService().ListMissions(ctx, primary.MissionFilters{
-			Status: status,
-		})
-		if err != nil {
-			return fmt.Errorf("failed to list missions: %w", err)
-		}
-
-		if len(missions) == 0 {
-			fmt.Println("No missions found")
-			return nil
-		}
-
-		fmt.Printf("\n%-15s %-10s %s\n", "ID", "STATUS", "TITLE")
-		fmt.Println("────────────────────────────────────────────────────────────────")
-		for _, m := range missions {
-			fmt.Printf("%-15s %-10s %s\n", m.ID, m.Status, m.Title)
-		}
-		fmt.Println()
-
-		return nil
+		return wire.MissionAdapter().List(ctx, status)
 	},
 }
 
@@ -126,22 +97,11 @@ var missionShowCmd = &cobra.Command{
 		ctx := context.Background()
 		id := args[0]
 
-		mission, err := wire.MissionService().GetMission(ctx, id)
+		// Show mission details via adapter
+		_, err := wire.MissionAdapter().Show(ctx, id)
 		if err != nil {
-			return fmt.Errorf("failed to get mission: %w", err)
+			return err
 		}
-
-		fmt.Printf("\nMission: %s\n", mission.ID)
-		fmt.Printf("Title:   %s\n", mission.Title)
-		fmt.Printf("Status:  %s\n", mission.Status)
-		if mission.Description != "" {
-			fmt.Printf("Description: %s\n", mission.Description)
-		}
-		fmt.Printf("Created: %s\n", mission.CreatedAt)
-		if mission.CompletedAt != "" {
-			fmt.Printf("Completed: %s\n", mission.CompletedAt)
-		}
-		fmt.Println()
 
 		// List shipments under this mission (still using models - no service method yet)
 		shipments, err := models.ListShipments(id, "")
@@ -313,15 +273,7 @@ var missionCompleteCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
-		id := args[0]
-
-		err := wire.MissionService().CompleteMission(ctx, id)
-		if err != nil {
-			return err // Guard failures returned as errors from service
-		}
-
-		fmt.Printf("✓ Mission %s marked as complete\n", id)
-		return nil
+		return wire.MissionAdapter().Complete(ctx, args[0])
 	},
 }
 
@@ -331,15 +283,7 @@ var missionArchiveCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
-		id := args[0]
-
-		err := wire.MissionService().ArchiveMission(ctx, id)
-		if err != nil {
-			return err // Guard failures returned as errors from service
-		}
-
-		fmt.Printf("✓ Mission %s archived\n", id)
-		return nil
+		return wire.MissionAdapter().Archive(ctx, args[0])
 	},
 }
 
@@ -353,21 +297,7 @@ var missionUpdateCmd = &cobra.Command{
 		title, _ := cmd.Flags().GetString("title")
 		description, _ := cmd.Flags().GetString("description")
 
-		if title == "" && description == "" {
-			return fmt.Errorf("must specify at least --title or --description")
-		}
-
-		err := wire.MissionService().UpdateMission(ctx, primary.UpdateMissionRequest{
-			MissionID:   id,
-			Title:       title,
-			Description: description,
-		})
-		if err != nil {
-			return fmt.Errorf("failed to update mission: %w", err)
-		}
-
-		fmt.Printf("✓ Mission %s updated\n", id)
-		return nil
+		return wire.MissionAdapter().Update(ctx, id, title, description)
 	},
 }
 
@@ -388,23 +318,7 @@ Examples:
 		id := args[0]
 		force, _ := cmd.Flags().GetBool("force")
 
-		// Get mission details before deleting (for output)
-		mission, err := wire.MissionService().GetMission(ctx, id)
-		if err != nil {
-			return fmt.Errorf("failed to get mission: %w", err)
-		}
-
-		// Delete the mission (guards handled in service)
-		err = wire.MissionService().DeleteMission(ctx, primary.DeleteMissionRequest{
-			MissionID: id,
-			Force:     force,
-		})
-		if err != nil {
-			return err // Guard failures returned as errors from service
-		}
-
-		fmt.Printf("✓ Deleted mission %s: %s\n", mission.ID, mission.Title)
-		return nil
+		return wire.MissionAdapter().Delete(ctx, id, force)
 	},
 }
 
@@ -924,15 +838,7 @@ var missionPinCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
-		id := args[0]
-
-		err := wire.MissionService().PinMission(ctx, id)
-		if err != nil {
-			return fmt.Errorf("failed to pin mission: %w", err)
-		}
-
-		fmt.Printf("✓ Mission %s pinned 📌\n", id)
-		return nil
+		return wire.MissionAdapter().Pin(ctx, args[0])
 	},
 }
 
@@ -942,15 +848,7 @@ var missionUnpinCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
-		id := args[0]
-
-		err := wire.MissionService().UnpinMission(ctx, id)
-		if err != nil {
-			return fmt.Errorf("failed to unpin mission: %w", err)
-		}
-
-		fmt.Printf("✓ Mission %s unpinned\n", id)
-		return nil
+		return wire.MissionAdapter().Unpin(ctx, args[0])
 	},
 }
 
