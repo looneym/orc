@@ -29,3 +29,6 @@ coverage.txt
 
 # Go workspace file
 go.work
+
+# Local ORC config
+.orc/

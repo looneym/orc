@@ -148,6 +148,54 @@ func CompleteShipment(id string) error {
 	return err
 }
 
+// PauseShipment marks a shipment as paused
+func PauseShipment(id string) error {
+	shipment, err := GetShipment(id)
+	if err != nil {
+		return err
+	}
+
+	if shipment.Status != "active" {
+		return fmt.Errorf("can only pause active shipments (current status: %s)", shipment.Status)
+	}
+
+	database, err := db.GetDB()
+	if err != nil {
+		return err
+	}
+
+	_, err = database.Exec(
+		"UPDATE shipments SET status = 'paused', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+		id,
+	)
+
+	return err
+}
+
+// ResumeShipment marks a paused shipment as active
+func ResumeShipment(id string) error {
+	shipment, err := GetShipment(id)
+	if err != nil {
+		return err
+	}
+
+	if shipment.Status != "paused" {
+		return fmt.Errorf("can only resume paused shipments (current status: %s)", shipment.Status)
+	}
+
+	database, err := db.GetDB()
+	if err != nil {
+		return err
+	}
+
+	_, err = database.Exec(
+		"UPDATE shipments SET status = 'active', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+		id,
+	)
+
+	return err
+}
+
 // UpdateShipment updates the title and/or description of a shipment
 func UpdateShipment(id, title, description string) error {
 	database, err := db.GetDB()

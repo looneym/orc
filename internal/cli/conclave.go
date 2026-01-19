@@ -188,6 +188,40 @@ var conclaveCompleteCmd = &cobra.Command{
 	},
 }
 
+var conclavePauseCmd = &cobra.Command{
+	Use:   "pause [conclave-id]",
+	Short: "Pause an active conclave",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		conclaveID := args[0]
+
+		err := models.PauseConclave(conclaveID)
+		if err != nil {
+			return fmt.Errorf("failed to pause conclave: %w", err)
+		}
+
+		fmt.Printf("✓ Conclave %s paused\n", conclaveID)
+		return nil
+	},
+}
+
+var conclaveResumeCmd = &cobra.Command{
+	Use:   "resume [conclave-id]",
+	Short: "Resume a paused conclave",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		conclaveID := args[0]
+
+		err := models.ResumeConclave(conclaveID)
+		if err != nil {
+			return fmt.Errorf("failed to resume conclave: %w", err)
+		}
+
+		fmt.Printf("✓ Conclave %s resumed\n", conclaveID)
+		return nil
+	},
+}
+
 var conclaveUpdateCmd = &cobra.Command{
 	Use:   "update [conclave-id]",
 	Short: "Update conclave title and/or description",
@@ -280,6 +314,8 @@ func init() {
 	conclaveCmd.AddCommand(conclaveListCmd)
 	conclaveCmd.AddCommand(conclaveShowCmd)
 	conclaveCmd.AddCommand(conclaveCompleteCmd)
+	conclaveCmd.AddCommand(conclavePauseCmd)
+	conclaveCmd.AddCommand(conclaveResumeCmd)
 	conclaveCmd.AddCommand(conclaveUpdateCmd)
 	conclaveCmd.AddCommand(conclavePinCmd)
 	conclaveCmd.AddCommand(conclaveUnpinCmd)

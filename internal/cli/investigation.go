@@ -158,6 +158,40 @@ var investigationCompleteCmd = &cobra.Command{
 	},
 }
 
+var investigationPauseCmd = &cobra.Command{
+	Use:   "pause [investigation-id]",
+	Short: "Pause an active investigation",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		investigationID := args[0]
+
+		err := models.PauseInvestigation(investigationID)
+		if err != nil {
+			return fmt.Errorf("failed to pause investigation: %w", err)
+		}
+
+		fmt.Printf("✓ Investigation %s paused\n", investigationID)
+		return nil
+	},
+}
+
+var investigationResumeCmd = &cobra.Command{
+	Use:   "resume [investigation-id]",
+	Short: "Resume a paused investigation",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		investigationID := args[0]
+
+		err := models.ResumeInvestigation(investigationID)
+		if err != nil {
+			return fmt.Errorf("failed to resume investigation: %w", err)
+		}
+
+		fmt.Printf("✓ Investigation %s resumed\n", investigationID)
+		return nil
+	},
+}
+
 var investigationUpdateCmd = &cobra.Command{
 	Use:   "update [investigation-id]",
 	Short: "Update investigation title and/or description",
@@ -268,6 +302,8 @@ func init() {
 	investigationCmd.AddCommand(investigationListCmd)
 	investigationCmd.AddCommand(investigationShowCmd)
 	investigationCmd.AddCommand(investigationCompleteCmd)
+	investigationCmd.AddCommand(investigationPauseCmd)
+	investigationCmd.AddCommand(investigationResumeCmd)
 	investigationCmd.AddCommand(investigationUpdateCmd)
 	investigationCmd.AddCommand(investigationPinCmd)
 	investigationCmd.AddCommand(investigationUnpinCmd)

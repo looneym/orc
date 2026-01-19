@@ -152,7 +152,7 @@ func ListTasks(shipmentID, status string) ([]*Task, error) {
 	return tasks, nil
 }
 
-// ClaimTask claims a task (marks as "implement")
+// ClaimTask claims a task (marks as "in_progress")
 func ClaimTask(id, groveID string) error {
 	database, err := db.GetDB()
 	if err != nil {
@@ -165,7 +165,7 @@ func ClaimTask(id, groveID string) error {
 	}
 
 	_, err = database.Exec(
-		"UPDATE tasks SET status = 'implement', assigned_grove_id = ?, claimed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+		"UPDATE tasks SET status = 'in_progress', assigned_grove_id = ?, claimed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
 		groveIDNullable, id,
 	)
 
@@ -192,6 +192,54 @@ func CompleteTask(id string) error {
 
 	_, err = database.Exec(
 		"UPDATE tasks SET status = 'complete', completed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+		id,
+	)
+
+	return err
+}
+
+// PauseTask marks a task as paused
+func PauseTask(id string) error {
+	task, err := GetTask(id)
+	if err != nil {
+		return err
+	}
+
+	if task.Status != "in_progress" {
+		return fmt.Errorf("can only pause in_progress tasks (current status: %s)", task.Status)
+	}
+
+	database, err := db.GetDB()
+	if err != nil {
+		return err
+	}
+
+	_, err = database.Exec(
+		"UPDATE tasks SET status = 'paused', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+		id,
+	)
+
+	return err
+}
+
+// ResumeTask marks a paused task as in_progress
+func ResumeTask(id string) error {
+	task, err := GetTask(id)
+	if err != nil {
+		return err
+	}
+
+	if task.Status != "paused" {
+		return fmt.Errorf("can only resume paused tasks (current status: %s)", task.Status)
+	}
+
+	database, err := db.GetDB()
+	if err != nil {
+		return err
+	}
+
+	_, err = database.Exec(
+		"UPDATE tasks SET status = 'in_progress', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
 		id,
 	)
 

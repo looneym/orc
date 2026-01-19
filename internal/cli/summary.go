@@ -161,39 +161,46 @@ func shouldShowLeaf(entityID string, filters *filterConfig) (bool, string) {
 	return true, tagName
 }
 
-// displayShipmentChildren shows tasks under a shipment with tag filtering
+// displayShipmentChildren shows tasks and notes under a shipment with tag filtering
 // Returns count of visible items
 func displayShipmentChildren(shipmentID, prefix string, filters *filterConfig) int {
-	tasks, err := models.GetShipmentTasks(shipmentID)
-	if err != nil {
-		return 0
-	}
+	tasks, _ := models.GetShipmentTasks(shipmentID)
+	notes, _ := models.GetNotesByContainer("shipment", shipmentID)
 
-	// Collect visible and hidden items
-	type taskDisplay struct {
-		task    *models.Task
+	// Collect all children with tag filtering
+	type childItem struct {
+		id      string
+		title   string
+		status  string
+		pinned  bool
 		tagName string
 	}
-	var visible []taskDisplay
+	var visible []childItem
 	hiddenCount := 0
 
 	for _, t := range tasks {
 		if t.Status == "complete" || filters.statusMap[t.Status] {
 			continue
 		}
-
 		show, tagName := shouldShowLeaf(t.ID, filters)
 		if show {
-			visible = append(visible, taskDisplay{t, tagName})
+			visible = append(visible, childItem{t.ID, t.Title, t.Status, t.Pinned, tagName})
+		} else {
+			hiddenCount++
+		}
+	}
+	for _, n := range notes {
+		show, tagName := shouldShowLeaf(n.ID, filters)
+		if show {
+			visible = append(visible, childItem{n.ID, n.Title, "", n.Pinned, tagName})
 		} else {
 			hiddenCount++
 		}
 	}
 
-	// Display visible items
-	for k, item := range visible {
+	for k, child := range visible {
 		pinnedEmoji := ""
-		if item.task.Pinned {
+		if child.pinned {
 			pinnedEmoji = "📌 "
 		}
 		isLast := k == len(visible)-1 && hiddenCount == 0
@@ -202,14 +209,14 @@ func displayShipmentChildren(shipmentID, prefix string, filters *filterConfig) i
 			childPrefix = prefix + "└── "
 		}
 		tagInfo := ""
-		if item.tagName != "" {
-			tagInfo = " " + colorizeTag(item.tagName)
+		if child.tagName != "" {
+			tagInfo = " " + colorizeTag(child.tagName)
 		}
-		statusInfo := colorizeStatus(item.task.Status)
+		statusInfo := colorizeStatus(child.status)
 		if statusInfo != "" {
-			fmt.Printf("%s%s%s - %s - %s%s\n", childPrefix, pinnedEmoji, colorizeID(item.task.ID), statusInfo, item.task.Title, tagInfo)
+			fmt.Printf("%s%s%s - %s - %s%s\n", childPrefix, pinnedEmoji, colorizeID(child.id), statusInfo, child.title, tagInfo)
 		} else {
-			fmt.Printf("%s%s%s - %s%s\n", childPrefix, pinnedEmoji, colorizeID(item.task.ID), item.task.Title, tagInfo)
+			fmt.Printf("%s%s%s - %s%s\n", childPrefix, pinnedEmoji, colorizeID(child.id), child.title, tagInfo)
 		}
 	}
 
@@ -221,7 +228,7 @@ func displayShipmentChildren(shipmentID, prefix string, filters *filterConfig) i
 	return len(visible)
 }
 
-// displayConclaveChildren shows tasks/questions/plans under a conclave with tag filtering
+// displayConclaveChildren shows tasks/questions/plans/notes under a conclave with tag filtering
 // Returns count of visible items
 func displayConclaveChildren(conclaveID, prefix string, filters *filterConfig) int {
 	// Get tasks
@@ -230,6 +237,8 @@ func displayConclaveChildren(conclaveID, prefix string, filters *filterConfig) i
 	questions, _ := models.GetConclaveQuestions(conclaveID)
 	// Get plans
 	plans, _ := models.GetConclavePlans(conclaveID)
+	// Get notes
+	notes, _ := models.GetNotesByContainer("conclave", conclaveID)
 
 	// Collect all children with tag filtering
 	type childItem struct {
@@ -275,6 +284,14 @@ func displayConclaveChildren(conclaveID, prefix string, filters *filterConfig) i
 			hiddenCount++
 		}
 	}
+	for _, n := range notes {
+		show, tagName := shouldShowLeaf(n.ID, filters)
+		if show {
+			visible = append(visible, childItem{n.ID, n.Title, "", n.Pinned, tagName})
+		} else {
+			hiddenCount++
+		}
+	}
 
 	for k, child := range visible {
 		pinnedEmoji := ""
@@ -306,19 +323,21 @@ func displayConclaveChildren(conclaveID, prefix string, filters *filterConfig) i
 	return len(visible)
 }
 
-// displayInvestigationChildren shows questions under an investigation with tag filtering
+// displayInvestigationChildren shows questions and notes under an investigation with tag filtering
 // Returns count of visible items
 func displayInvestigationChildren(investigationID, prefix string, filters *filterConfig) int {
-	questions, err := models.GetInvestigationQuestions(investigationID)
-	if err != nil {
-		return 0
-	}
+	questions, _ := models.GetInvestigationQuestions(investigationID)
+	notes, _ := models.GetNotesByContainer("investigation", investigationID)
 
-	type questionDisplay struct {
-		question *models.Question
-		tagName  string
+	// Collect all children with tag filtering
+	type childItem struct {
+		id      string
+		title   string
+		status  string
+		pinned  bool
+		tagName string
 	}
-	var visible []questionDisplay
+	var visible []childItem
 	hiddenCount := 0
 
 	for _, q := range questions {
@@ -327,15 +346,23 @@ func displayInvestigationChildren(investigationID, prefix string, filters *filte
 		}
 		show, tagName := shouldShowLeaf(q.ID, filters)
 		if show {
-			visible = append(visible, questionDisplay{q, tagName})
+			visible = append(visible, childItem{q.ID, q.Title, q.Status, q.Pinned, tagName})
+		} else {
+			hiddenCount++
+		}
+	}
+	for _, n := range notes {
+		show, tagName := shouldShowLeaf(n.ID, filters)
+		if show {
+			visible = append(visible, childItem{n.ID, n.Title, "", n.Pinned, tagName})
 		} else {
 			hiddenCount++
 		}
 	}
 
-	for k, item := range visible {
+	for k, child := range visible {
 		pinnedEmoji := ""
-		if item.question.Pinned {
+		if child.pinned {
 			pinnedEmoji = "📌 "
 		}
 		isLast := k == len(visible)-1 && hiddenCount == 0
@@ -344,14 +371,14 @@ func displayInvestigationChildren(investigationID, prefix string, filters *filte
 			childPrefix = prefix + "└── "
 		}
 		tagInfo := ""
-		if item.tagName != "" {
-			tagInfo = " " + colorizeTag(item.tagName)
+		if child.tagName != "" {
+			tagInfo = " " + colorizeTag(child.tagName)
 		}
-		statusInfo := colorizeStatus(item.question.Status)
+		statusInfo := colorizeStatus(child.status)
 		if statusInfo != "" {
-			fmt.Printf("%s%s%s - %s - %s%s\n", childPrefix, pinnedEmoji, colorizeID(item.question.ID), statusInfo, item.question.Title, tagInfo)
+			fmt.Printf("%s%s%s - %s - %s%s\n", childPrefix, pinnedEmoji, colorizeID(child.id), statusInfo, child.title, tagInfo)
 		} else {
-			fmt.Printf("%s%s%s - %s%s\n", childPrefix, pinnedEmoji, colorizeID(item.question.ID), item.question.Title, tagInfo)
+			fmt.Printf("%s%s%s - %s%s\n", childPrefix, pinnedEmoji, colorizeID(child.id), child.title, tagInfo)
 		}
 	}
 
@@ -363,40 +390,56 @@ func displayInvestigationChildren(investigationID, prefix string, filters *filte
 	return len(visible)
 }
 
-// displayTomeChildren shows notes count under a tome
-// Returns count of notes
+// displayTomeChildren shows notes under a tome with tag filtering
+// Returns count of visible notes
 func displayTomeChildren(tomeID, prefix string, filters *filterConfig) int {
 	notes, err := models.GetTomeNotes(tomeID)
 	if err != nil || len(notes) == 0 {
 		return 0
 	}
 
-	// For tomes with tag filtering, count matching notes
-	visibleCount := 0
+	// Collect all children with tag filtering
+	type childItem struct {
+		id      string
+		title   string
+		pinned  bool
+		tagName string
+	}
+	var visible []childItem
 	hiddenCount := 0
 
-	if len(filters.includeTags) > 0 || len(filters.excludeTags) > 0 {
-		for _, n := range notes {
-			show, _ := shouldShowLeaf(n.ID, filters)
-			if show {
-				visibleCount++
-			} else {
-				hiddenCount++
-			}
+	for _, n := range notes {
+		show, tagName := shouldShowLeaf(n.ID, filters)
+		if show {
+			visible = append(visible, childItem{n.ID, n.Title, n.Pinned, tagName})
+		} else {
+			hiddenCount++
 		}
-		if visibleCount > 0 || hiddenCount > 0 {
-			if hiddenCount > 0 {
-				fmt.Printf("%s└── (%d notes, %d filtered)\n", prefix, visibleCount, hiddenCount)
-			} else {
-				fmt.Printf("%s└── (%d notes)\n", prefix, visibleCount)
-			}
-		}
-		return visibleCount
 	}
 
-	// No tag filtering - just show count
-	fmt.Printf("%s└── (%d notes)\n", prefix, len(notes))
-	return len(notes)
+	for k, child := range visible {
+		pinnedEmoji := ""
+		if child.pinned {
+			pinnedEmoji = "📌 "
+		}
+		isLast := k == len(visible)-1 && hiddenCount == 0
+		childPrefix := prefix + "├── "
+		if isLast {
+			childPrefix = prefix + "└── "
+		}
+		tagInfo := ""
+		if child.tagName != "" {
+			tagInfo = " " + colorizeTag(child.tagName)
+		}
+		fmt.Printf("%s%s%s - %s%s\n", childPrefix, pinnedEmoji, colorizeID(child.id), child.title, tagInfo)
+	}
+
+	// Show hidden count if any
+	if hiddenCount > 0 {
+		fmt.Printf("%s└── (%d other items)\n", prefix, hiddenCount)
+	}
+
+	return len(visible)
 }
 
 // containerInfo holds container display information
@@ -418,7 +461,7 @@ func SummaryCmd() *cobra.Command {
 
 Display modes:
   Default: Show only focused container (if focus is set)
-  --expand: Show all containers
+  --all: Show all containers
 
 Containers shown:
   - Shipments (SHIP-*) with Tasks
@@ -435,9 +478,9 @@ Filtering:
 
 Examples:
   orc summary                          # focused container only (if set)
-  orc summary --expand                 # all containers
-  orc summary --filter-containers SHIP,CON --expand
-  orc summary --tags research --expand
+  orc summary --all                    # all containers
+  orc summary --filter-containers SHIP,CON --all
+  orc summary --tags research --all
   orc summary --filter-statuses paused,blocked`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Get current working directory for config
@@ -448,7 +491,7 @@ Examples:
 
 			// Get flags
 			missionFilter, _ := cmd.Flags().GetString("mission")
-			expandAll, _ := cmd.Flags().GetBool("expand")
+			expandAll, _ := cmd.Flags().GetBool("all")
 			filterStatuses, _ := cmd.Flags().GetStringSlice("filter-statuses")
 			filterContainers, _ := cmd.Flags().GetStringSlice("filter-containers")
 			includeTags, _ := cmd.Flags().GetStringSlice("tags")
@@ -717,7 +760,7 @@ Examples:
 				if otherContainerCount > 0 {
 					msg := fmt.Sprintf("(%d other containers", otherContainerCount)
 					if focusedContainer != nil && !expandAll {
-						msg += " - use --expand to show all"
+						msg += " - use --all to show"
 					}
 					msg += ")"
 					fmt.Printf("└── %s\n", msg)
@@ -735,7 +778,7 @@ Examples:
 	}
 
 	cmd.Flags().StringP("mission", "m", "", "Mission filter: mission ID or 'current' for context mission")
-	cmd.Flags().Bool("expand", false, "Show all containers (default: only show focused container if set)")
+	cmd.Flags().Bool("all", false, "Show all containers (default: only show focused container if set)")
 	cmd.Flags().StringSlice("filter-statuses", []string{}, "Hide items with these statuses (comma-separated: paused,blocked)")
 	cmd.Flags().StringSlice("filter-containers", []string{}, "Show only these container types (comma-separated: SHIP,CON,INV,TOME)")
 	cmd.Flags().StringSlice("tags", []string{}, "Show only leaves with these tags")
@@ -749,6 +792,7 @@ func containerHasMatchingLeaves(c containerInfo, filters *filterConfig) bool {
 	switch c.containerType {
 	case "shipment":
 		tasks, _ := models.GetShipmentTasks(c.id)
+		notes, _ := models.GetNotesByContainer("shipment", c.id)
 		for _, t := range tasks {
 			if t.Status == "complete" || filters.statusMap[t.Status] {
 				continue
@@ -758,10 +802,17 @@ func containerHasMatchingLeaves(c containerInfo, filters *filterConfig) bool {
 				return true
 			}
 		}
+		for _, n := range notes {
+			show, _ := shouldShowLeaf(n.ID, filters)
+			if show {
+				return true
+			}
+		}
 	case "conclave":
 		tasks, _ := models.GetConclaveTasks(c.id)
 		questions, _ := models.GetConclaveQuestions(c.id)
 		plans, _ := models.GetConclavePlans(c.id)
+		notes, _ := models.GetNotesByContainer("conclave", c.id)
 		for _, t := range tasks {
 			if t.Status == "complete" || filters.statusMap[t.Status] {
 				continue
@@ -789,13 +840,26 @@ func containerHasMatchingLeaves(c containerInfo, filters *filterConfig) bool {
 				return true
 			}
 		}
+		for _, n := range notes {
+			show, _ := shouldShowLeaf(n.ID, filters)
+			if show {
+				return true
+			}
+		}
 	case "investigation":
 		questions, _ := models.GetInvestigationQuestions(c.id)
+		notes, _ := models.GetNotesByContainer("investigation", c.id)
 		for _, q := range questions {
 			if q.Status == "answered" || filters.statusMap[q.Status] {
 				continue
 			}
 			show, _ := shouldShowLeaf(q.ID, filters)
+			if show {
+				return true
+			}
+		}
+		for _, n := range notes {
+			show, _ := shouldShowLeaf(n.ID, filters)
 			if show {
 				return true
 			}

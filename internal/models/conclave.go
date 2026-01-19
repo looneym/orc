@@ -148,6 +148,54 @@ func CompleteConclave(id string) error {
 	return err
 }
 
+// PauseConclave marks a conclave as paused
+func PauseConclave(id string) error {
+	c, err := GetConclave(id)
+	if err != nil {
+		return err
+	}
+
+	if c.Status != "active" {
+		return fmt.Errorf("can only pause active conclaves (current status: %s)", c.Status)
+	}
+
+	database, err := db.GetDB()
+	if err != nil {
+		return err
+	}
+
+	_, err = database.Exec(
+		"UPDATE conclaves SET status = 'paused', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+		id,
+	)
+
+	return err
+}
+
+// ResumeConclave marks a paused conclave as active
+func ResumeConclave(id string) error {
+	c, err := GetConclave(id)
+	if err != nil {
+		return err
+	}
+
+	if c.Status != "paused" {
+		return fmt.Errorf("can only resume paused conclaves (current status: %s)", c.Status)
+	}
+
+	database, err := db.GetDB()
+	if err != nil {
+		return err
+	}
+
+	_, err = database.Exec(
+		"UPDATE conclaves SET status = 'active', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+		id,
+	)
+
+	return err
+}
+
 // UpdateConclave updates the title and/or description of a conclave
 func UpdateConclave(id, title, description string) error {
 	database, err := db.GetDB()

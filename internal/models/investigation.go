@@ -148,6 +148,54 @@ func CompleteInvestigation(id string) error {
 	return err
 }
 
+// PauseInvestigation marks an investigation as paused
+func PauseInvestigation(id string) error {
+	inv, err := GetInvestigation(id)
+	if err != nil {
+		return err
+	}
+
+	if inv.Status != "active" {
+		return fmt.Errorf("can only pause active investigations (current status: %s)", inv.Status)
+	}
+
+	database, err := db.GetDB()
+	if err != nil {
+		return err
+	}
+
+	_, err = database.Exec(
+		"UPDATE investigations SET status = 'paused', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+		id,
+	)
+
+	return err
+}
+
+// ResumeInvestigation marks a paused investigation as active
+func ResumeInvestigation(id string) error {
+	inv, err := GetInvestigation(id)
+	if err != nil {
+		return err
+	}
+
+	if inv.Status != "paused" {
+		return fmt.Errorf("can only resume paused investigations (current status: %s)", inv.Status)
+	}
+
+	database, err := db.GetDB()
+	if err != nil {
+		return err
+	}
+
+	_, err = database.Exec(
+		"UPDATE investigations SET status = 'active', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+		id,
+	)
+
+	return err
+}
+
 // UpdateInvestigation updates the title and/or description of an investigation
 func UpdateInvestigation(id, title, description string) error {
 	database, err := db.GetDB()

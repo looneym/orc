@@ -224,6 +224,40 @@ var taskCompleteCmd = &cobra.Command{
 	},
 }
 
+var taskPauseCmd = &cobra.Command{
+	Use:   "pause [task-id]",
+	Short: "Pause an in-progress task",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		taskID := args[0]
+
+		err := models.PauseTask(taskID)
+		if err != nil {
+			return fmt.Errorf("failed to pause task: %w", err)
+		}
+
+		fmt.Printf("✓ Task %s paused\n", taskID)
+		return nil
+	},
+}
+
+var taskResumeCmd = &cobra.Command{
+	Use:   "resume [task-id]",
+	Short: "Resume a paused task",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		taskID := args[0]
+
+		err := models.ResumeTask(taskID)
+		if err != nil {
+			return fmt.Errorf("failed to resume task: %w", err)
+		}
+
+		fmt.Printf("✓ Task %s resumed\n", taskID)
+		return nil
+	},
+}
+
 var taskUpdateCmd = &cobra.Command{
 	Use:   "update [task-id]",
 	Short: "Update task title and/or description",
@@ -410,6 +444,8 @@ func init() {
 	taskCmd.AddCommand(taskShowCmd)
 	taskCmd.AddCommand(taskClaimCmd)
 	taskCmd.AddCommand(taskCompleteCmd)
+	taskCmd.AddCommand(taskPauseCmd)
+	taskCmd.AddCommand(taskResumeCmd)
 	taskCmd.AddCommand(taskUpdateCmd)
 	taskCmd.AddCommand(taskPinCmd)
 	taskCmd.AddCommand(taskUnpinCmd)

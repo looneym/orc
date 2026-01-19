@@ -149,6 +149,9 @@ func showCurrentFocus(cfg *config.Config) error {
 
 // getCurrentFocus gets the current focus from config based on config type
 func getCurrentFocus(cfg *config.Config) string {
+	if cfg == nil {
+		return ""
+	}
 	switch cfg.Type {
 	case config.TypeMission:
 		if cfg.Mission != nil {

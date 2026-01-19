@@ -149,6 +149,40 @@ var shipmentCompleteCmd = &cobra.Command{
 	},
 }
 
+var shipmentPauseCmd = &cobra.Command{
+	Use:   "pause [shipment-id]",
+	Short: "Pause an active shipment",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		shipmentID := args[0]
+
+		err := models.PauseShipment(shipmentID)
+		if err != nil {
+			return fmt.Errorf("failed to pause shipment: %w", err)
+		}
+
+		fmt.Printf("Shipment %s paused\n", shipmentID)
+		return nil
+	},
+}
+
+var shipmentResumeCmd = &cobra.Command{
+	Use:   "resume [shipment-id]",
+	Short: "Resume a paused shipment",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		shipmentID := args[0]
+
+		err := models.ResumeShipment(shipmentID)
+		if err != nil {
+			return fmt.Errorf("failed to resume shipment: %w", err)
+		}
+
+		fmt.Printf("Shipment %s resumed\n", shipmentID)
+		return nil
+	},
+}
+
 var shipmentUpdateCmd = &cobra.Command{
 	Use:   "update [shipment-id]",
 	Short: "Update shipment title and/or description",
@@ -242,6 +276,8 @@ func init() {
 	shipmentCmd.AddCommand(shipmentListCmd)
 	shipmentCmd.AddCommand(shipmentShowCmd)
 	shipmentCmd.AddCommand(shipmentCompleteCmd)
+	shipmentCmd.AddCommand(shipmentPauseCmd)
+	shipmentCmd.AddCommand(shipmentResumeCmd)
 	shipmentCmd.AddCommand(shipmentUpdateCmd)
 	shipmentCmd.AddCommand(shipmentPinCmd)
 	shipmentCmd.AddCommand(shipmentUnpinCmd)

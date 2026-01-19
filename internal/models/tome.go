@@ -148,6 +148,54 @@ func CompleteTome(id string) error {
 	return err
 }
 
+// PauseTome marks a tome as paused
+func PauseTome(id string) error {
+	t, err := GetTome(id)
+	if err != nil {
+		return err
+	}
+
+	if t.Status != "active" {
+		return fmt.Errorf("can only pause active tomes (current status: %s)", t.Status)
+	}
+
+	database, err := db.GetDB()
+	if err != nil {
+		return err
+	}
+
+	_, err = database.Exec(
+		"UPDATE tomes SET status = 'paused', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+		id,
+	)
+
+	return err
+}
+
+// ResumeTome marks a paused tome as active
+func ResumeTome(id string) error {
+	t, err := GetTome(id)
+	if err != nil {
+		return err
+	}
+
+	if t.Status != "paused" {
+		return fmt.Errorf("can only resume paused tomes (current status: %s)", t.Status)
+	}
+
+	database, err := db.GetDB()
+	if err != nil {
+		return err
+	}
+
+	_, err = database.Exec(
+		"UPDATE tomes SET status = 'active', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+		id,
+	)
+
+	return err
+}
+
 // UpdateTome updates the title and/or description of a tome
 func UpdateTome(id, title, description string) error {
 	database, err := db.GetDB()
