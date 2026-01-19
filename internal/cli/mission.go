@@ -314,7 +314,22 @@ var missionCompleteCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		id := args[0]
 
-		err := models.UpdateMissionStatus(id, "complete")
+		// Fetch mission to check pinned state
+		mission, err := models.GetMission(id)
+		if err != nil {
+			return fmt.Errorf("failed to get mission: %w", err)
+		}
+
+		// Guard check
+		stateCtx := coremission.MissionStateContext{
+			MissionID: id,
+			IsPinned:  mission.Pinned,
+		}
+		if result := coremission.CanCompleteMission(stateCtx); !result.Allowed {
+			return result.Error()
+		}
+
+		err = models.UpdateMissionStatus(id, "complete")
 		if err != nil {
 			return fmt.Errorf("failed to complete mission: %w", err)
 		}
@@ -331,7 +346,22 @@ var missionArchiveCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		id := args[0]
 
-		err := models.UpdateMissionStatus(id, "archived")
+		// Fetch mission to check pinned state
+		mission, err := models.GetMission(id)
+		if err != nil {
+			return fmt.Errorf("failed to get mission: %w", err)
+		}
+
+		// Guard check
+		stateCtx := coremission.MissionStateContext{
+			MissionID: id,
+			IsPinned:  mission.Pinned,
+		}
+		if result := coremission.CanArchiveMission(stateCtx); !result.Allowed {
+			return result.Error()
+		}
+
+		err = models.UpdateMissionStatus(id, "archived")
 		if err != nil {
 			return fmt.Errorf("failed to archive mission: %w", err)
 		}
@@ -386,21 +416,19 @@ Examples:
 			return fmt.Errorf("failed to get mission: %w", err)
 		}
 
-		// Check for associated shipments and groves
+		// Fetch dependency counts
 		shipments, _ := models.ListShipments(id, "")
 		groves, _ := models.GetGrovesByMission(id)
 
-		if !force && (len(shipments) > 0 || len(groves) > 0) {
-			fmt.Printf("Mission %s has associated data:\n", id)
-			if len(shipments) > 0 {
-				fmt.Printf("  - %d shipments\n", len(shipments))
-			}
-			if len(groves) > 0 {
-				fmt.Printf("  - %d groves\n", len(groves))
-			}
-			fmt.Println()
-			fmt.Println("Use --force to delete anyway")
-			return fmt.Errorf("mission has associated data")
+		// Guard check
+		deleteCtx := coremission.DeleteContext{
+			MissionID:     id,
+			ShipmentCount: len(shipments),
+			GroveCount:    len(groves),
+			ForceDelete:   force,
+		}
+		if result := coremission.CanDeleteMission(deleteCtx); !result.Allowed {
+			return result.Error()
 		}
 
 		// Delete the mission
