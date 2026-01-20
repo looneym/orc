@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/example/orc/internal/config"
-	"github.com/example/orc/internal/models"
 	"github.com/example/orc/internal/wire"
 	"github.com/spf13/cobra"
 )
@@ -110,7 +109,7 @@ func validateAndGetInfo(id string) (containerType string, title string, err erro
 		return "Conclave", con.Title, nil
 
 	case strings.HasPrefix(id, "INV-"):
-		inv, err := models.GetInvestigation(id)
+		inv, err := wire.InvestigationService().GetInvestigation(ctx, id)
 		if err != nil {
 			return "", "", fmt.Errorf("investigation %s not found", id)
 		}
@@ -246,7 +245,7 @@ func GetFocusInfo(focusID string) (containerType, title, status string) {
 			return "Conclave", con.Title, con.Status
 		}
 	case strings.HasPrefix(focusID, "INV-"):
-		if inv, err := models.GetInvestigation(focusID); err == nil {
+		if inv, err := wire.InvestigationService().GetInvestigation(ctx, focusID); err == nil {
 			return "Investigation", inv.Title, inv.Status
 		}
 	case strings.HasPrefix(focusID, "TOME-"):

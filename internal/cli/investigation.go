@@ -1,12 +1,14 @@
 package cli
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"text/tabwriter"
 
-	"github.com/example/orc/internal/context"
-	"github.com/example/orc/internal/models"
+	orcctx "github.com/example/orc/internal/context"
+	"github.com/example/orc/internal/ports/primary"
+	"github.com/example/orc/internal/wire"
 	"github.com/spf13/cobra"
 )
 
@@ -28,17 +30,23 @@ var investigationCreateCmd = &cobra.Command{
 
 		// Get mission from context or require explicit flag
 		if missionID == "" {
-			missionID = context.GetContextMissionID()
+			missionID = orcctx.GetContextMissionID()
 			if missionID == "" {
 				return fmt.Errorf("no mission context detected\nHint: Use --mission flag or run from a grove/mission directory")
 			}
 		}
 
-		investigation, err := models.CreateInvestigation(missionID, title, description)
+		ctx := context.Background()
+		resp, err := wire.InvestigationService().CreateInvestigation(ctx, primary.CreateInvestigationRequest{
+			MissionID:   missionID,
+			Title:       title,
+			Description: description,
+		})
 		if err != nil {
 			return fmt.Errorf("failed to create investigation: %w", err)
 		}
 
+		investigation := resp.Investigation
 		fmt.Printf("✓ Created investigation %s: %s\n", investigation.ID, investigation.Title)
 		fmt.Printf("  Mission: %s\n", investigation.MissionID)
 		fmt.Printf("  Status: %s\n", investigation.Status)
@@ -58,10 +66,14 @@ var investigationListCmd = &cobra.Command{
 
 		// Get mission from context if not specified
 		if missionID == "" {
-			missionID = context.GetContextMissionID()
+			missionID = orcctx.GetContextMissionID()
 		}
 
-		investigations, err := models.ListInvestigations(missionID, status)
+		ctx := context.Background()
+		investigations, err := wire.InvestigationService().ListInvestigations(ctx, primary.InvestigationFilters{
+			MissionID: missionID,
+			Status:    status,
+		})
 		if err != nil {
 			return fmt.Errorf("failed to list investigations: %w", err)
 		}
@@ -97,31 +109,32 @@ var investigationShowCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		investigationID := args[0]
 
-		investigation, err := models.GetInvestigation(investigationID)
+		ctx := context.Background()
+		investigation, err := wire.InvestigationService().GetInvestigation(ctx, investigationID)
 		if err != nil {
 			return fmt.Errorf("investigation not found: %w", err)
 		}
 
 		fmt.Printf("Investigation: %s\n", investigation.ID)
 		fmt.Printf("Title: %s\n", investigation.Title)
-		if investigation.Description.Valid {
-			fmt.Printf("Description: %s\n", investigation.Description.String)
+		if investigation.Description != "" {
+			fmt.Printf("Description: %s\n", investigation.Description)
 		}
 		fmt.Printf("Status: %s\n", investigation.Status)
 		fmt.Printf("Mission: %s\n", investigation.MissionID)
-		if investigation.AssignedGroveID.Valid {
-			fmt.Printf("Assigned Grove: %s\n", investigation.AssignedGroveID.String)
+		if investigation.AssignedGroveID != "" {
+			fmt.Printf("Assigned Grove: %s\n", investigation.AssignedGroveID)
 		}
 		if investigation.Pinned {
 			fmt.Printf("Pinned: yes\n")
 		}
-		fmt.Printf("Created: %s\n", investigation.CreatedAt.Format("2006-01-02 15:04"))
-		if investigation.CompletedAt.Valid {
-			fmt.Printf("Completed: %s\n", investigation.CompletedAt.Time.Format("2006-01-02 15:04"))
+		fmt.Printf("Created: %s\n", investigation.CreatedAt)
+		if investigation.CompletedAt != "" {
+			fmt.Printf("Completed: %s\n", investigation.CompletedAt)
 		}
 
 		// Show questions in this investigation
-		questions, err := models.GetInvestigationQuestions(investigationID)
+		questions, err := wire.InvestigationService().GetInvestigationQuestions(ctx, investigationID)
 		if err != nil {
 			return fmt.Errorf("failed to get questions: %w", err)
 		}
@@ -148,7 +161,8 @@ var investigationCompleteCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		investigationID := args[0]
 
-		err := models.CompleteInvestigation(investigationID)
+		ctx := context.Background()
+		err := wire.InvestigationService().CompleteInvestigation(ctx, investigationID)
 		if err != nil {
 			return fmt.Errorf("failed to complete investigation: %w", err)
 		}
@@ -165,7 +179,8 @@ var investigationPauseCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		investigationID := args[0]
 
-		err := models.PauseInvestigation(investigationID)
+		ctx := context.Background()
+		err := wire.InvestigationService().PauseInvestigation(ctx, investigationID)
 		if err != nil {
 			return fmt.Errorf("failed to pause investigation: %w", err)
 		}
@@ -182,7 +197,8 @@ var investigationResumeCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		investigationID := args[0]
 
-		err := models.ResumeInvestigation(investigationID)
+		ctx := context.Background()
+		err := wire.InvestigationService().ResumeInvestigation(ctx, investigationID)
 		if err != nil {
 			return fmt.Errorf("failed to resume investigation: %w", err)
 		}
@@ -205,7 +221,12 @@ var investigationUpdateCmd = &cobra.Command{
 			return fmt.Errorf("must specify --title and/or --description")
 		}
 
-		err := models.UpdateInvestigation(investigationID, title, description)
+		ctx := context.Background()
+		err := wire.InvestigationService().UpdateInvestigation(ctx, primary.UpdateInvestigationRequest{
+			InvestigationID: investigationID,
+			Title:           title,
+			Description:     description,
+		})
 		if err != nil {
 			return fmt.Errorf("failed to update investigation: %w", err)
 		}
@@ -222,7 +243,8 @@ var investigationPinCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		investigationID := args[0]
 
-		err := models.PinInvestigation(investigationID)
+		ctx := context.Background()
+		err := wire.InvestigationService().PinInvestigation(ctx, investigationID)
 		if err != nil {
 			return fmt.Errorf("failed to pin investigation: %w", err)
 		}
@@ -239,7 +261,8 @@ var investigationUnpinCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		investigationID := args[0]
 
-		err := models.UnpinInvestigation(investigationID)
+		ctx := context.Background()
+		err := wire.InvestigationService().UnpinInvestigation(ctx, investigationID)
 		if err != nil {
 			return fmt.Errorf("failed to unpin investigation: %w", err)
 		}
@@ -256,7 +279,8 @@ var investigationDeleteCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		investigationID := args[0]
 
-		err := models.DeleteInvestigation(investigationID)
+		ctx := context.Background()
+		err := wire.InvestigationService().DeleteInvestigation(ctx, investigationID)
 		if err != nil {
 			return fmt.Errorf("failed to delete investigation: %w", err)
 		}
@@ -274,7 +298,8 @@ var investigationAssignCmd = &cobra.Command{
 		investigationID := args[0]
 		groveID := args[1]
 
-		err := models.AssignInvestigationToGrove(investigationID, groveID)
+		ctx := context.Background()
+		err := wire.InvestigationService().AssignInvestigationToGrove(ctx, investigationID, groveID)
 		if err != nil {
 			return fmt.Errorf("failed to assign investigation: %w", err)
 		}

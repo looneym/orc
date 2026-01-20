@@ -17,16 +17,19 @@ import (
 )
 
 var (
-	missionService   primary.MissionService
-	groveService     primary.GroveService
-	shipmentService  primary.ShipmentService
-	taskService      primary.TaskService
-	noteService      primary.NoteService
-	handoffService   primary.HandoffService
-	tomeService      primary.TomeService
-	conclaveService  primary.ConclaveService
-	operationService primary.OperationService
-	once             sync.Once
+	missionService       primary.MissionService
+	groveService         primary.GroveService
+	shipmentService      primary.ShipmentService
+	taskService          primary.TaskService
+	noteService          primary.NoteService
+	handoffService       primary.HandoffService
+	tomeService          primary.TomeService
+	conclaveService      primary.ConclaveService
+	operationService     primary.OperationService
+	investigationService primary.InvestigationService
+	questionService      primary.QuestionService
+	planService          primary.PlanService
+	once                 sync.Once
 )
 
 // MissionService returns the singleton MissionService instance.
@@ -83,6 +86,24 @@ func OperationService() primary.OperationService {
 	return operationService
 }
 
+// InvestigationService returns the singleton InvestigationService instance.
+func InvestigationService() primary.InvestigationService {
+	once.Do(initServices)
+	return investigationService
+}
+
+// QuestionService returns the singleton QuestionService instance.
+func QuestionService() primary.QuestionService {
+	once.Do(initServices)
+	return questionService
+}
+
+// PlanService returns the singleton PlanService instance.
+func PlanService() primary.PlanService {
+	once.Do(initServices)
+	return planService
+}
+
 // initServices initializes all services and their dependencies.
 // This is called once via sync.Once.
 func initServices() {
@@ -124,6 +145,14 @@ func initServices() {
 	operationRepo := sqlite.NewOperationRepository(database)
 	conclaveService = app.NewConclaveService(conclaveRepo)
 	operationService = app.NewOperationService(operationRepo)
+
+	// Create investigation, question, and plan services
+	investigationRepo := sqlite.NewInvestigationRepository(database)
+	questionRepo := sqlite.NewQuestionRepository(database)
+	planRepo := sqlite.NewPlanRepository(database)
+	investigationService = app.NewInvestigationService(investigationRepo)
+	questionService = app.NewQuestionService(questionRepo)
+	planService = app.NewPlanService(planRepo)
 }
 
 // MissionAdapter returns a new MissionAdapter writing to stdout.

@@ -8,7 +8,6 @@ import (
 
 	"github.com/example/orc/internal/config"
 	ctx "github.com/example/orc/internal/context"
-	"github.com/example/orc/internal/models"
 	"github.com/example/orc/internal/ports/primary"
 	"github.com/example/orc/internal/templates"
 	"github.com/example/orc/internal/wire"
@@ -265,21 +264,21 @@ func buildIMPPrimeOutput(groveCtx *ctx.GroveContext, cwd string) string {
 	}
 
 	// Investigations
-	investigations, _ := models.GetInvestigationsByGrove(groveCtx.GroveID)
+	investigations, _ := wire.InvestigationService().GetInvestigationsByGrove(context.Background(), groveCtx.GroveID)
 	for i, inv := range investigations {
 		hasAssignments = true
 		output.WriteString(fmt.Sprintf("### Investigation %d: %s\n\n", i+1, inv.ID))
 		output.WriteString(fmt.Sprintf("**%s** [%s] (Research)\n\n", inv.Title, inv.Status))
 
-		if inv.Description.Valid && inv.Description.String != "" {
-			output.WriteString(inv.Description.String)
+		if inv.Description != "" {
+			output.WriteString(inv.Description)
 			output.WriteString("\n\n")
 		}
 
 		// Show open questions
-		questions, err := models.GetInvestigationQuestions(inv.ID)
+		questions, err := wire.InvestigationService().GetInvestigationQuestions(context.Background(), inv.ID)
 		if err == nil {
-			var openQuestions []*models.Question
+			var openQuestions []*primary.InvestigationQuestion
 			for _, q := range questions {
 				if q.Status == "open" {
 					openQuestions = append(openQuestions, q)

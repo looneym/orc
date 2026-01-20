@@ -588,3 +588,211 @@ type OperationFilters struct {
 	MissionID string
 	Status    string
 }
+
+// InvestigationRepository defines the secondary port for investigation persistence.
+type InvestigationRepository interface {
+	// Create persists a new investigation.
+	Create(ctx context.Context, investigation *InvestigationRecord) error
+
+	// GetByID retrieves an investigation by its ID.
+	GetByID(ctx context.Context, id string) (*InvestigationRecord, error)
+
+	// List retrieves investigations matching the given filters.
+	List(ctx context.Context, filters InvestigationFilters) ([]*InvestigationRecord, error)
+
+	// Update updates an existing investigation.
+	Update(ctx context.Context, investigation *InvestigationRecord) error
+
+	// Delete removes an investigation from persistence.
+	Delete(ctx context.Context, id string) error
+
+	// Pin pins an investigation.
+	Pin(ctx context.Context, id string) error
+
+	// Unpin unpins an investigation.
+	Unpin(ctx context.Context, id string) error
+
+	// GetNextID returns the next available investigation ID.
+	GetNextID(ctx context.Context) (string, error)
+
+	// UpdateStatus updates the status and optionally completed_at timestamp.
+	UpdateStatus(ctx context.Context, id, status string, setCompleted bool) error
+
+	// GetByGrove retrieves investigations assigned to a grove.
+	GetByGrove(ctx context.Context, groveID string) ([]*InvestigationRecord, error)
+
+	// AssignGrove assigns an investigation to a grove.
+	AssignGrove(ctx context.Context, investigationID, groveID string) error
+
+	// MissionExists checks if a mission exists (for validation).
+	MissionExists(ctx context.Context, missionID string) (bool, error)
+
+	// GetQuestionsByInvestigation retrieves questions for an investigation.
+	GetQuestionsByInvestigation(ctx context.Context, investigationID string) ([]*InvestigationQuestionRecord, error)
+}
+
+// InvestigationRecord represents an investigation as stored in persistence.
+type InvestigationRecord struct {
+	ID              string
+	MissionID       string
+	Title           string
+	Description     string // Empty string means null
+	Status          string
+	AssignedGroveID string // Empty string means null
+	Pinned          bool
+	CreatedAt       string
+	UpdatedAt       string
+	CompletedAt     string // Empty string means null
+}
+
+// InvestigationFilters contains filter options for querying investigations.
+type InvestigationFilters struct {
+	MissionID string
+	Status    string
+}
+
+// InvestigationQuestionRecord represents a question as returned from investigation cross-entity query.
+type InvestigationQuestionRecord struct {
+	ID               string
+	InvestigationID  string
+	MissionID        string
+	Title            string
+	Description      string
+	Status           string
+	Answer           string
+	Pinned           bool
+	CreatedAt        string
+	UpdatedAt        string
+	AnsweredAt       string
+	ConclaveID       string
+	PromotedFromID   string
+	PromotedFromType string
+}
+
+// QuestionRepository defines the secondary port for question persistence.
+type QuestionRepository interface {
+	// Create persists a new question.
+	Create(ctx context.Context, question *QuestionRecord) error
+
+	// GetByID retrieves a question by its ID.
+	GetByID(ctx context.Context, id string) (*QuestionRecord, error)
+
+	// List retrieves questions matching the given filters.
+	List(ctx context.Context, filters QuestionFilters) ([]*QuestionRecord, error)
+
+	// Update updates an existing question.
+	Update(ctx context.Context, question *QuestionRecord) error
+
+	// Delete removes a question from persistence.
+	Delete(ctx context.Context, id string) error
+
+	// Pin pins a question.
+	Pin(ctx context.Context, id string) error
+
+	// Unpin unpins a question.
+	Unpin(ctx context.Context, id string) error
+
+	// GetNextID returns the next available question ID.
+	GetNextID(ctx context.Context) (string, error)
+
+	// Answer sets the answer for a question and marks it as answered.
+	Answer(ctx context.Context, id, answer string) error
+
+	// MissionExists checks if a mission exists (for validation).
+	MissionExists(ctx context.Context, missionID string) (bool, error)
+
+	// InvestigationExists checks if an investigation exists (for validation).
+	InvestigationExists(ctx context.Context, investigationID string) (bool, error)
+}
+
+// QuestionRecord represents a question as stored in persistence.
+type QuestionRecord struct {
+	ID               string
+	InvestigationID  string // Empty string means null
+	MissionID        string
+	Title            string
+	Description      string // Empty string means null
+	Status           string
+	Answer           string // Empty string means null
+	Pinned           bool
+	CreatedAt        string
+	UpdatedAt        string
+	AnsweredAt       string // Empty string means null
+	ConclaveID       string // Empty string means null
+	PromotedFromID   string // Empty string means null
+	PromotedFromType string // Empty string means null
+}
+
+// QuestionFilters contains filter options for querying questions.
+type QuestionFilters struct {
+	InvestigationID string
+	MissionID       string
+	Status          string
+}
+
+// PlanRepository defines the secondary port for plan persistence.
+type PlanRepository interface {
+	// Create persists a new plan.
+	Create(ctx context.Context, plan *PlanRecord) error
+
+	// GetByID retrieves a plan by its ID.
+	GetByID(ctx context.Context, id string) (*PlanRecord, error)
+
+	// List retrieves plans matching the given filters.
+	List(ctx context.Context, filters PlanFilters) ([]*PlanRecord, error)
+
+	// Update updates an existing plan.
+	Update(ctx context.Context, plan *PlanRecord) error
+
+	// Delete removes a plan from persistence.
+	Delete(ctx context.Context, id string) error
+
+	// Pin pins a plan.
+	Pin(ctx context.Context, id string) error
+
+	// Unpin unpins a plan.
+	Unpin(ctx context.Context, id string) error
+
+	// GetNextID returns the next available plan ID.
+	GetNextID(ctx context.Context) (string, error)
+
+	// Approve approves a plan and sets the approved_at timestamp.
+	Approve(ctx context.Context, id string) error
+
+	// GetActivePlanForShipment retrieves the active (draft) plan for a shipment.
+	GetActivePlanForShipment(ctx context.Context, shipmentID string) (*PlanRecord, error)
+
+	// HasActivePlanForShipment checks if a shipment has an active (draft) plan.
+	HasActivePlanForShipment(ctx context.Context, shipmentID string) (bool, error)
+
+	// MissionExists checks if a mission exists (for validation).
+	MissionExists(ctx context.Context, missionID string) (bool, error)
+
+	// ShipmentExists checks if a shipment exists (for validation).
+	ShipmentExists(ctx context.Context, shipmentID string) (bool, error)
+}
+
+// PlanRecord represents a plan as stored in persistence.
+type PlanRecord struct {
+	ID               string
+	ShipmentID       string // Empty string means null
+	MissionID        string
+	Title            string
+	Description      string // Empty string means null
+	Status           string
+	Content          string // Empty string means null
+	Pinned           bool
+	CreatedAt        string
+	UpdatedAt        string
+	ApprovedAt       string // Empty string means null
+	ConclaveID       string // Empty string means null
+	PromotedFromID   string // Empty string means null
+	PromotedFromType string // Empty string means null
+}
+
+// PlanFilters contains filter options for querying plans.
+type PlanFilters struct {
+	ShipmentID string
+	MissionID  string
+	Status     string
+}

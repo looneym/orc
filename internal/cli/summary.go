@@ -394,7 +394,17 @@ func displayConclaveChildren(conclaveID, prefix string, filters *filterConfig) i
 // displayInvestigationChildren shows questions and notes under an investigation with tag filtering
 // Returns count of visible items
 func displayInvestigationChildren(investigationID, prefix string, filters *filterConfig) int {
-	questions, _ := models.GetInvestigationQuestions(investigationID)
+	invQuestions, _ := wire.InvestigationService().GetInvestigationQuestions(context.Background(), investigationID)
+	// Convert to models.Question for the rest of the function
+	var questions []*models.Question
+	for _, q := range invQuestions {
+		questions = append(questions, &models.Question{
+			ID:     q.ID,
+			Title:  q.Title,
+			Status: q.Status,
+			Pinned: q.Pinned,
+		})
+	}
 	serviceNotes, _ := wire.NoteService().GetNotesByContainer(context.Background(), "investigation", investigationID)
 	// Convert to models.Note for the rest of the function
 	var notes []*models.Note
@@ -710,18 +720,14 @@ Examples:
 
 				// Collect investigations
 				if len(filters.containerTypes) == 0 || filters.containerTypes["INV"] {
-					investigations, _ := models.ListInvestigations(mission.ID, "")
+					investigations, _ := wire.InvestigationService().ListInvestigations(context.Background(), primary.InvestigationFilters{MissionID: mission.ID})
 					for _, inv := range investigations {
 						if inv.Status == "complete" || filters.statusMap[inv.Status] {
 							continue
 						}
-						groveID := ""
-						if inv.AssignedGroveID.Valid {
-							groveID = inv.AssignedGroveID.String
-						}
 						c := containerInfo{
 							id: inv.ID, title: inv.Title, status: inv.Status,
-							pinned: inv.Pinned, groveID: groveID, containerType: "investigation",
+							pinned: inv.Pinned, groveID: inv.AssignedGroveID, containerType: "investigation",
 						}
 						if inv.ID == focusID {
 							focusedContainer = &c
@@ -949,7 +955,11 @@ func containerHasMatchingLeaves(c containerInfo, filters *filterConfig) bool {
 			}
 		}
 	case "investigation":
-		questions, _ := models.GetInvestigationQuestions(c.id)
+		invQuestions, _ := wire.InvestigationService().GetInvestigationQuestions(context.Background(), c.id)
+		var questions []*models.Question
+		for _, q := range invQuestions {
+			questions = append(questions, &models.Question{ID: q.ID, Title: q.Title, Status: q.Status, Pinned: q.Pinned})
+		}
 		serviceNotes, _ := wire.NoteService().GetNotesByContainer(context.Background(), "investigation", c.id)
 		var notes []*models.Note
 		for _, n := range serviceNotes {
