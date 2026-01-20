@@ -1,12 +1,14 @@
 package cli
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strings"
 
 	"github.com/example/orc/internal/config"
 	"github.com/example/orc/internal/models"
+	"github.com/example/orc/internal/wire"
 	"github.com/spf13/cobra"
 )
 
@@ -91,9 +93,10 @@ func loadConfigWithDir(dir string) (*config.Config, string, error) {
 
 // validateAndGetInfo validates the container ID exists and returns its type and title
 func validateAndGetInfo(id string) (containerType string, title string, err error) {
+	ctx := context.Background()
 	switch {
 	case strings.HasPrefix(id, "SHIP-"):
-		ship, err := models.GetShipment(id)
+		ship, err := wire.ShipmentService().GetShipment(ctx, id)
 		if err != nil {
 			return "", "", fmt.Errorf("shipment %s not found", id)
 		}
@@ -232,9 +235,10 @@ func GetFocusInfo(focusID string) (containerType, title, status string) {
 		return "", "", ""
 	}
 
+	ctx := context.Background()
 	switch {
 	case strings.HasPrefix(focusID, "SHIP-"):
-		if ship, err := models.GetShipment(focusID); err == nil {
+		if ship, err := wire.ShipmentService().GetShipment(ctx, focusID); err == nil {
 			return "Shipment", ship.Title, ship.Status
 		}
 	case strings.HasPrefix(focusID, "CON-"):

@@ -13,7 +13,6 @@ import (
 	"github.com/example/orc/internal/config"
 	orccontext "github.com/example/orc/internal/context"
 	coremission "github.com/example/orc/internal/core/mission"
-	"github.com/example/orc/internal/models"
 	"github.com/example/orc/internal/ports/primary"
 	"github.com/example/orc/internal/tmux"
 	"github.com/example/orc/internal/wire"
@@ -104,8 +103,8 @@ var missionShowCmd = &cobra.Command{
 			return err
 		}
 
-		// List shipments under this mission (still using models - no service method yet)
-		shipments, err := models.ListShipments(id, "")
+		// List shipments under this mission via service
+		shipments, err := wire.ShipmentService().ListShipments(ctx, primary.ShipmentFilters{MissionID: id})
 		if err == nil && len(shipments) > 0 {
 			fmt.Println("Shipments:")
 			for _, shipment := range shipments {

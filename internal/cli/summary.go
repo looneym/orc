@@ -176,7 +176,17 @@ func shouldShowLeaf(entityID string, filters *filterConfig) (bool, string) {
 // displayShipmentChildren shows tasks and notes under a shipment with tag filtering
 // Returns count of visible items
 func displayShipmentChildren(shipmentID, prefix string, filters *filterConfig) int {
-	tasks, _ := models.GetShipmentTasks(shipmentID)
+	shipmentTasks, _ := wire.ShipmentService().GetShipmentTasks(context.Background(), shipmentID)
+	// Convert to models.Task for the rest of the function
+	var tasks []*models.Task
+	for _, t := range shipmentTasks {
+		tasks = append(tasks, &models.Task{
+			ID:     t.ID,
+			Title:  t.Title,
+			Status: t.Status,
+			Pinned: t.Pinned,
+		})
+	}
 	notes, _ := models.GetNotesByContainer("shipment", shipmentID)
 
 	// Collect all children with tag filtering
@@ -600,18 +610,14 @@ Examples:
 
 				// Collect shipments
 				if len(filters.containerTypes) == 0 || filters.containerTypes["SHIP"] {
-					shipments, _ := models.ListShipments(mission.ID, "")
+					shipments, _ := wire.ShipmentService().ListShipments(context.Background(), primary.ShipmentFilters{MissionID: mission.ID})
 					for _, s := range shipments {
 						if s.Status == "complete" || filters.statusMap[s.Status] {
 							continue
 						}
-						groveID := ""
-						if s.AssignedGroveID.Valid {
-							groveID = s.AssignedGroveID.String
-						}
 						c := containerInfo{
 							id: s.ID, title: s.Title, status: s.Status,
-							pinned: s.Pinned, groveID: groveID, containerType: "shipment",
+							pinned: s.Pinned, groveID: s.AssignedGroveID, containerType: "shipment",
 						}
 						if s.ID == focusID {
 							focusedContainer = &c
@@ -809,7 +815,17 @@ Examples:
 func containerHasMatchingLeaves(c containerInfo, filters *filterConfig) bool {
 	switch c.containerType {
 	case "shipment":
-		tasks, _ := models.GetShipmentTasks(c.id)
+		shipmentTasks, _ := wire.ShipmentService().GetShipmentTasks(context.Background(), c.id)
+		// Convert to models.Task for tag checking
+		var tasks []*models.Task
+		for _, t := range shipmentTasks {
+			tasks = append(tasks, &models.Task{
+				ID:     t.ID,
+				Title:  t.Title,
+				Status: t.Status,
+				Pinned: t.Pinned,
+			})
+		}
 		notes, _ := models.GetNotesByContainer("shipment", c.id)
 		for _, t := range tasks {
 			if t.Status == "complete" || filters.statusMap[t.Status] {

@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"os"
 
-	ctx "github.com/example/orc/internal/context"
-	"github.com/example/orc/internal/models"
+	orccontext "github.com/example/orc/internal/context"
+	"github.com/example/orc/internal/ports/primary"
 	"github.com/example/orc/internal/wire"
 	"github.com/spf13/cobra"
 )
@@ -22,6 +22,7 @@ var taskCreateCmd = &cobra.Command{
 	Short: "Create a new task",
 	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		ctx := context.Background()
 		title := args[0]
 		shipmentID, _ := cmd.Flags().GetString("shipment")
 		missionID, _ := cmd.Flags().GetString("mission")
@@ -30,20 +31,27 @@ var taskCreateCmd = &cobra.Command{
 
 		// Get mission from context or require explicit flag
 		if missionID == "" {
-			missionID = ctx.GetContextMissionID()
+			missionID = orccontext.GetContextMissionID()
 			if missionID == "" {
 				return fmt.Errorf("no mission context detected\nHint: Use --mission flag or run from a grove/mission directory")
 			}
 		}
 
-		task, err := models.CreateTask(shipmentID, missionID, title, description, taskType)
+		resp, err := wire.TaskService().CreateTask(ctx, primary.CreateTaskRequest{
+			ShipmentID:  shipmentID,
+			MissionID:   missionID,
+			Title:       title,
+			Description: description,
+			Type:        taskType,
+		})
 		if err != nil {
 			return fmt.Errorf("failed to create task: %w", err)
 		}
 
+		task := resp.Task
 		fmt.Printf("✓ Created task %s: %s\n", task.ID, task.Title)
-		if task.ShipmentID.Valid {
-			fmt.Printf("  Under shipment: %s\n", task.ShipmentID.String)
+		if task.ShipmentID != "" {
+			fmt.Printf("  Under shipment: %s\n", task.ShipmentID)
 		}
 		fmt.Printf("  Mission: %s\n", task.MissionID)
 		return nil
@@ -54,24 +62,25 @@ var taskListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List tasks",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		ctx := context.Background()
 		shipmentID, _ := cmd.Flags().GetString("shipment")
 		status, _ := cmd.Flags().GetString("status")
 		tag, _ := cmd.Flags().GetString("tag")
 
-		var tasks []*models.Task
+		var tasks []*primary.Task
 		var err error
 
 		if tag != "" {
 			// Filter by tag
-			tasks, err = models.ListTasksByTag(tag)
+			tasks, err = wire.TaskService().ListTasksByTag(ctx, tag)
 			if err != nil {
 				return fmt.Errorf("failed to list tasks: %w", err)
 			}
 
 			// Apply additional filters if specified
-			var filteredTasks []*models.Task
+			var filteredTasks []*primary.Task
 			for _, task := range tasks {
-				if shipmentID != "" && (!task.ShipmentID.Valid || task.ShipmentID.String != shipmentID) {
+				if shipmentID != "" && task.ShipmentID != shipmentID {
 					continue
 				}
 				if status != "" && task.Status != status {
@@ -82,7 +91,10 @@ var taskListCmd = &cobra.Command{
 			tasks = filteredTasks
 		} else {
 			// Use normal list
-			tasks, err = models.ListTasks(shipmentID, status)
+			tasks, err = wire.TaskService().ListTasks(ctx, primary.TaskFilters{
+				ShipmentID: shipmentID,
+				Status:     status,
+			})
 			if err != nil {
 				return fmt.Errorf("failed to list tasks: %w", err)
 			}
@@ -102,16 +114,16 @@ var taskListCmd = &cobra.Command{
 			}
 
 			typeStr := ""
-			if task.Type.Valid {
-				typeStr = fmt.Sprintf(" [%s]", task.Type.String)
+			if task.Type != "" {
+				typeStr = fmt.Sprintf(" [%s]", task.Type)
 			}
 
 			fmt.Printf("%s %s: %s%s [%s]%s\n", statusIcon, task.ID, task.Title, typeStr, task.Status, pinnedIcon)
-			if task.ShipmentID.Valid {
-				fmt.Printf("   Shipment: %s\n", task.ShipmentID.String)
+			if task.ShipmentID != "" {
+				fmt.Printf("   Shipment: %s\n", task.ShipmentID)
 			}
-			if task.AssignedGroveID.Valid {
-				fmt.Printf("   Grove: %s\n", task.AssignedGroveID.String)
+			if task.AssignedGroveID != "" {
+				fmt.Printf("   Grove: %s\n", task.AssignedGroveID)
 			}
 			fmt.Println()
 		}
@@ -124,9 +136,10 @@ var taskShowCmd = &cobra.Command{
 	Short: "Show task details",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		ctx := context.Background()
 		taskID := args[0]
 
-		task, err := models.GetTask(taskID)
+		task, err := wire.TaskService().GetTask(ctx, taskID)
 		if err != nil {
 			return fmt.Errorf("task not found: %w", err)
 		}
@@ -134,38 +147,41 @@ var taskShowCmd = &cobra.Command{
 		// Display task details
 		fmt.Printf("Task: %s\n", task.ID)
 		fmt.Printf("Title: %s\n", task.Title)
-		if task.Description.Valid {
-			fmt.Printf("Description: %s\n", task.Description.String)
+		if task.Description != "" {
+			fmt.Printf("Description: %s\n", task.Description)
 		}
 		fmt.Printf("Status: %s\n", task.Status)
-		if task.Type.Valid {
-			fmt.Printf("Type: %s\n", task.Type.String)
+		if task.Type != "" {
+			fmt.Printf("Type: %s\n", task.Type)
 		}
 		fmt.Printf("Mission: %s\n", task.MissionID)
-		if task.ShipmentID.Valid {
-			fmt.Printf("Shipment: %s\n", task.ShipmentID.String)
+		if task.ShipmentID != "" {
+			fmt.Printf("Shipment: %s\n", task.ShipmentID)
 		}
-		if task.AssignedGroveID.Valid {
-			fmt.Printf("Assigned Grove: %s\n", task.AssignedGroveID.String)
+		if task.AssignedGroveID != "" {
+			fmt.Printf("Assigned Grove: %s\n", task.AssignedGroveID)
 		}
-		if task.Priority.Valid {
-			fmt.Printf("Priority: %s\n", task.Priority.String)
+		if task.Priority != "" {
+			fmt.Printf("Priority: %s\n", task.Priority)
 		}
 		if task.Pinned {
 			fmt.Printf("Pinned: yes\n")
 		}
-		if task.ConclaveID.Valid {
-			fmt.Printf("Conclave: %s\n", task.ConclaveID.String)
+		if task.ConclaveID != "" {
+			fmt.Printf("Conclave: %s\n", task.ConclaveID)
 		}
-		if task.PromotedFromID.Valid {
-			fmt.Printf("Promoted from: %s (%s)\n", task.PromotedFromID.String, task.PromotedFromType.String)
+		if task.PromotedFromID != "" {
+			fmt.Printf("Promoted from: %s (%s)\n", task.PromotedFromID, task.PromotedFromType)
 		}
-		fmt.Printf("Created: %s\n", task.CreatedAt.Format("2006-01-02 15:04"))
-		if task.ClaimedAt.Valid {
-			fmt.Printf("Claimed: %s\n", task.ClaimedAt.Time.Format("2006-01-02 15:04"))
+		fmt.Printf("Created: %s\n", task.CreatedAt)
+		if task.ClaimedAt != "" {
+			fmt.Printf("Claimed: %s\n", task.ClaimedAt)
 		}
-		if task.CompletedAt.Valid {
-			fmt.Printf("Completed: %s\n", task.CompletedAt.Time.Format("2006-01-02 15:04"))
+		if task.CompletedAt != "" {
+			fmt.Printf("Completed: %s\n", task.CompletedAt)
+		}
+		if task.Tag != nil {
+			fmt.Printf("Tag: %s\n", task.Tag.Name)
 		}
 
 		return nil
@@ -177,18 +193,22 @@ var taskClaimCmd = &cobra.Command{
 	Short: "Claim a task (mark as implement)",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		ctx := context.Background()
 		taskID := args[0]
 
 		// Try to get grove from current directory
 		cwd, _ := os.Getwd()
-		grove, _ := wire.GroveService().GetGroveByPath(context.Background(), cwd)
+		grove, _ := wire.GroveService().GetGroveByPath(ctx, cwd)
 
 		groveID := ""
 		if grove != nil {
 			groveID = grove.ID
 		}
 
-		err := models.ClaimTask(taskID, groveID)
+		err := wire.TaskService().ClaimTask(ctx, primary.ClaimTaskRequest{
+			TaskID:  taskID,
+			GroveID: groveID,
+		})
 		if err != nil {
 			return fmt.Errorf("failed to claim task: %w", err)
 		}
@@ -210,9 +230,10 @@ var taskCompleteCmd = &cobra.Command{
 	Short: "Mark task as complete",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		ctx := context.Background()
 		taskID := args[0]
 
-		err := models.CompleteTask(taskID)
+		err := wire.TaskService().CompleteTask(ctx, taskID)
 		if err != nil {
 			return fmt.Errorf("failed to complete task: %w", err)
 		}
@@ -231,9 +252,10 @@ var taskPauseCmd = &cobra.Command{
 	Short: "Pause an in-progress task",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		ctx := context.Background()
 		taskID := args[0]
 
-		err := models.PauseTask(taskID)
+		err := wire.TaskService().PauseTask(ctx, taskID)
 		if err != nil {
 			return fmt.Errorf("failed to pause task: %w", err)
 		}
@@ -248,9 +270,10 @@ var taskResumeCmd = &cobra.Command{
 	Short: "Resume a paused task",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		ctx := context.Background()
 		taskID := args[0]
 
-		err := models.ResumeTask(taskID)
+		err := wire.TaskService().ResumeTask(ctx, taskID)
 		if err != nil {
 			return fmt.Errorf("failed to resume task: %w", err)
 		}
@@ -265,6 +288,7 @@ var taskUpdateCmd = &cobra.Command{
 	Short: "Update task title and/or description",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		ctx := context.Background()
 		taskID := args[0]
 		title, _ := cmd.Flags().GetString("title")
 		description, _ := cmd.Flags().GetString("description")
@@ -273,7 +297,11 @@ var taskUpdateCmd = &cobra.Command{
 			return fmt.Errorf("must specify --title and/or --description")
 		}
 
-		err := models.UpdateTask(taskID, title, description)
+		err := wire.TaskService().UpdateTask(ctx, primary.UpdateTaskRequest{
+			TaskID:      taskID,
+			Title:       title,
+			Description: description,
+		})
 		if err != nil {
 			return fmt.Errorf("failed to update task: %w", err)
 		}
@@ -288,9 +316,10 @@ var taskPinCmd = &cobra.Command{
 	Short: "Pin task to keep it visible",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		ctx := context.Background()
 		taskID := args[0]
 
-		err := models.PinTask(taskID)
+		err := wire.TaskService().PinTask(ctx, taskID)
 		if err != nil {
 			return fmt.Errorf("failed to pin task: %w", err)
 		}
@@ -305,9 +334,10 @@ var taskUnpinCmd = &cobra.Command{
 	Short: "Unpin task",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		ctx := context.Background()
 		taskID := args[0]
 
-		err := models.UnpinTask(taskID)
+		err := wire.TaskService().UnpinTask(ctx, taskID)
 		if err != nil {
 			return fmt.Errorf("failed to unpin task: %w", err)
 		}
@@ -322,27 +352,20 @@ var taskDiscoverCmd = &cobra.Command{
 	Short: "Find and optionally claim ready tasks",
 	Long:  "Discover ready tasks assigned to the current grove",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		ctx := context.Background()
 		autoClaim, _ := cmd.Flags().GetBool("auto-claim")
 
 		// Get current grove
 		cwd, _ := os.Getwd()
-		grove, err := wire.GroveService().GetGroveByPath(context.Background(), cwd)
+		grove, err := wire.GroveService().GetGroveByPath(ctx, cwd)
 		if err != nil {
 			return fmt.Errorf("not in a grove directory: %w", err)
 		}
 
 		// Get tasks assigned to this grove with ready status
-		tasks, err := models.GetTasksByGrove(grove.ID)
+		readyTasks, err := wire.TaskService().DiscoverTasks(ctx, grove.ID)
 		if err != nil {
 			return fmt.Errorf("failed to get tasks: %w", err)
-		}
-
-		// Filter to ready tasks
-		var readyTasks []*models.Task
-		for _, task := range tasks {
-			if task.Status == "ready" {
-				readyTasks = append(readyTasks, task)
-			}
 		}
 
 		if len(readyTasks) == 0 {
@@ -356,15 +379,18 @@ var taskDiscoverCmd = &cobra.Command{
 		fmt.Printf("Found %d ready task(s):\n\n", len(readyTasks))
 		for _, task := range readyTasks {
 			fmt.Printf("📦 %s: %s\n", task.ID, task.Title)
-			if task.Description.Valid {
-				fmt.Printf("   %s\n", task.Description.String)
+			if task.Description != "" {
+				fmt.Printf("   %s\n", task.Description)
 			}
 		}
 
 		if autoClaim && len(readyTasks) > 0 {
 			// Claim first ready task
 			task := readyTasks[0]
-			err := models.ClaimTask(task.ID, grove.ID)
+			err := wire.TaskService().ClaimTask(ctx, primary.ClaimTaskRequest{
+				TaskID:  task.ID,
+				GroveID: grove.ID,
+			})
 			if err != nil {
 				return fmt.Errorf("failed to claim task: %w", err)
 			}
@@ -391,10 +417,11 @@ var taskTagCmd = &cobra.Command{
 	Short: "Add a tag to a task",
 	Args:  cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		ctx := context.Background()
 		taskID := args[0]
 		tagName := args[1]
 
-		err := models.AddTagToTask(taskID, tagName)
+		err := wire.TaskService().TagTask(ctx, taskID, tagName)
 		if err != nil {
 			return fmt.Errorf("failed to tag task: %w", err)
 		}
@@ -409,9 +436,10 @@ var taskUntagCmd = &cobra.Command{
 	Short: "Remove tag from a task",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		ctx := context.Background()
 		taskID := args[0]
 
-		err := models.RemoveTagFromTask(taskID)
+		err := wire.TaskService().UntagTask(ctx, taskID)
 		if err != nil {
 			return fmt.Errorf("failed to untag task: %w", err)
 		}

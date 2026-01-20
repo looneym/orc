@@ -119,3 +119,162 @@ const (
 	// AgentTypeIMP represents an implementation agent in a grove.
 	AgentTypeIMP AgentType = "IMP"
 )
+
+// ShipmentRepository defines the secondary port for shipment persistence.
+type ShipmentRepository interface {
+	// Create persists a new shipment.
+	Create(ctx context.Context, shipment *ShipmentRecord) error
+
+	// GetByID retrieves a shipment by its ID.
+	GetByID(ctx context.Context, id string) (*ShipmentRecord, error)
+
+	// List retrieves shipments matching the given filters.
+	List(ctx context.Context, filters ShipmentFilters) ([]*ShipmentRecord, error)
+
+	// Update updates an existing shipment.
+	Update(ctx context.Context, shipment *ShipmentRecord) error
+
+	// Delete removes a shipment from persistence.
+	Delete(ctx context.Context, id string) error
+
+	// Pin pins a shipment.
+	Pin(ctx context.Context, id string) error
+
+	// Unpin unpins a shipment.
+	Unpin(ctx context.Context, id string) error
+
+	// GetNextID returns the next available shipment ID.
+	GetNextID(ctx context.Context) (string, error)
+
+	// GetByGrove retrieves shipments assigned to a grove.
+	GetByGrove(ctx context.Context, groveID string) ([]*ShipmentRecord, error)
+
+	// AssignGrove assigns a shipment to a grove.
+	AssignGrove(ctx context.Context, shipmentID, groveID string) error
+
+	// UpdateStatus updates the status and optionally completed_at timestamp.
+	UpdateStatus(ctx context.Context, id, status string, setCompleted bool) error
+
+	// MissionExists checks if a mission exists (for validation).
+	MissionExists(ctx context.Context, missionID string) (bool, error)
+
+	// GroveAssignedToOther checks if grove is assigned to another shipment.
+	GroveAssignedToOther(ctx context.Context, groveID, excludeShipmentID string) (string, error)
+}
+
+// ShipmentRecord represents a shipment as stored in persistence.
+type ShipmentRecord struct {
+	ID              string
+	MissionID       string
+	Title           string
+	Description     string // Empty string means null
+	Status          string
+	AssignedGroveID string // Empty string means null
+	Pinned          bool
+	CreatedAt       string
+	UpdatedAt       string
+	CompletedAt     string // Empty string means null
+}
+
+// ShipmentFilters contains filter options for querying shipments.
+type ShipmentFilters struct {
+	MissionID string
+	Status    string
+}
+
+// TaskRepository defines the secondary port for task persistence.
+type TaskRepository interface {
+	// Create persists a new task.
+	Create(ctx context.Context, task *TaskRecord) error
+
+	// GetByID retrieves a task by its ID.
+	GetByID(ctx context.Context, id string) (*TaskRecord, error)
+
+	// List retrieves tasks matching the given filters.
+	List(ctx context.Context, filters TaskFilters) ([]*TaskRecord, error)
+
+	// Update updates an existing task.
+	Update(ctx context.Context, task *TaskRecord) error
+
+	// Delete removes a task from persistence.
+	Delete(ctx context.Context, id string) error
+
+	// Pin pins a task.
+	Pin(ctx context.Context, id string) error
+
+	// Unpin unpins a task.
+	Unpin(ctx context.Context, id string) error
+
+	// GetNextID returns the next available task ID.
+	GetNextID(ctx context.Context) (string, error)
+
+	// GetByGrove retrieves tasks assigned to a grove.
+	GetByGrove(ctx context.Context, groveID string) ([]*TaskRecord, error)
+
+	// GetByShipment retrieves tasks for a shipment.
+	GetByShipment(ctx context.Context, shipmentID string) ([]*TaskRecord, error)
+
+	// UpdateStatus updates the status with optional timestamps.
+	UpdateStatus(ctx context.Context, id, status string, setClaimed, setCompleted bool) error
+
+	// Claim claims a task for a grove.
+	Claim(ctx context.Context, id, groveID string) error
+
+	// AssignGroveByShipment assigns all tasks of a shipment to a grove.
+	AssignGroveByShipment(ctx context.Context, shipmentID, groveID string) error
+
+	// MissionExists checks if a mission exists (for validation).
+	MissionExists(ctx context.Context, missionID string) (bool, error)
+
+	// ShipmentExists checks if a shipment exists (for validation).
+	ShipmentExists(ctx context.Context, shipmentID string) (bool, error)
+
+	// GetTag retrieves the tag for a task (nil if none).
+	GetTag(ctx context.Context, taskID string) (*TagRecord, error)
+
+	// AddTag adds a tag to a task.
+	AddTag(ctx context.Context, taskID, tagID string) error
+
+	// RemoveTag removes the tag from a task.
+	RemoveTag(ctx context.Context, taskID string) error
+
+	// ListByTag retrieves tasks with a specific tag.
+	ListByTag(ctx context.Context, tagID string) ([]*TaskRecord, error)
+
+	// GetNextEntityTagID returns the next available entity tag ID.
+	GetNextEntityTagID(ctx context.Context) (string, error)
+}
+
+// TaskRecord represents a task as stored in persistence.
+type TaskRecord struct {
+	ID               string
+	ShipmentID       string // Empty string means null
+	MissionID        string
+	Title            string
+	Description      string // Empty string means null
+	Type             string // Empty string means null
+	Status           string
+	Priority         string // Empty string means null
+	AssignedGroveID  string // Empty string means null
+	Pinned           bool
+	CreatedAt        string
+	UpdatedAt        string
+	ClaimedAt        string // Empty string means null
+	CompletedAt      string // Empty string means null
+	ConclaveID       string // Empty string means null
+	PromotedFromID   string // Empty string means null
+	PromotedFromType string // Empty string means null
+}
+
+// TaskFilters contains filter options for querying tasks.
+type TaskFilters struct {
+	ShipmentID string
+	Status     string
+	MissionID  string
+}
+
+// TagRecord represents a tag reference for task tagging.
+type TagRecord struct {
+	ID   string
+	Name string
+}

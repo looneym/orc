@@ -1,9 +1,11 @@
 package cli
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/example/orc/internal/models"
+	"github.com/example/orc/internal/wire"
 	"github.com/spf13/cobra"
 )
 
@@ -81,7 +83,8 @@ var tagShowCmd = &cobra.Command{
 		fmt.Println()
 
 		// Display tasks with this tag
-		tasks, err := models.ListTasksByTag(name)
+		ctx := context.Background()
+		tasks, err := wire.TaskService().ListTasksByTag(ctx, name)
 		if err != nil {
 			return fmt.Errorf("failed to get tasks: %w", err)
 		}

@@ -9,6 +9,7 @@ import (
 	"github.com/example/orc/internal/config"
 	ctx "github.com/example/orc/internal/context"
 	"github.com/example/orc/internal/models"
+	"github.com/example/orc/internal/ports/primary"
 	"github.com/example/orc/internal/templates"
 	"github.com/example/orc/internal/wire"
 	"github.com/spf13/cobra"
@@ -214,27 +215,27 @@ func buildIMPPrimeOutput(groveCtx *ctx.GroveContext, cwd string) string {
 	hasAssignments := false
 
 	// Shipments
-	shipments, _ := models.GetShipmentsByGrove(groveCtx.GroveID)
+	shipments, _ := wire.ShipmentService().GetShipmentsByGrove(context.Background(), groveCtx.GroveID)
 	for i, shipment := range shipments {
 		hasAssignments = true
 		output.WriteString(fmt.Sprintf("### Shipment %d: %s\n\n", i+1, shipment.ID))
 		output.WriteString(fmt.Sprintf("**%s** [%s]\n\n", shipment.Title, shipment.Status))
 
-		if shipment.Description.Valid && shipment.Description.String != "" {
-			descLines := strings.Split(shipment.Description.String, "\n")
+		if shipment.Description != "" {
+			descLines := strings.Split(shipment.Description, "\n")
 			if len(descLines) > 5 {
 				output.WriteString(strings.Join(descLines[:5], "\n"))
 				output.WriteString("\n\n*(Description truncated)*\n\n")
 			} else {
-				output.WriteString(shipment.Description.String)
+				output.WriteString(shipment.Description)
 				output.WriteString("\n\n")
 			}
 		}
 
 		// Show ready tasks for this shipment
-		tasks, err := models.GetShipmentTasks(shipment.ID)
+		tasks, err := wire.ShipmentService().GetShipmentTasks(context.Background(), shipment.ID)
 		if err == nil {
-			var readyTasks []*models.Task
+			var readyTasks []*primary.Task
 			for _, t := range tasks {
 				if t.Status == "ready" {
 					readyTasks = append(readyTasks, t)

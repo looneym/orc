@@ -17,9 +17,11 @@ import (
 )
 
 var (
-	missionService primary.MissionService
-	groveService   primary.GroveService
-	once           sync.Once
+	missionService  primary.MissionService
+	groveService    primary.GroveService
+	shipmentService primary.ShipmentService
+	taskService     primary.TaskService
+	once            sync.Once
 )
 
 // MissionService returns the singleton MissionService instance.
@@ -32,6 +34,18 @@ func MissionService() primary.MissionService {
 func GroveService() primary.GroveService {
 	once.Do(initServices)
 	return groveService
+}
+
+// ShipmentService returns the singleton ShipmentService instance.
+func ShipmentService() primary.ShipmentService {
+	once.Do(initServices)
+	return shipmentService
+}
+
+// TaskService returns the singleton TaskService instance.
+func TaskService() primary.TaskService {
+	once.Do(initServices)
+	return taskService
 }
 
 // initServices initializes all services and their dependencies.
@@ -54,6 +68,13 @@ func initServices() {
 	// Create services (primary ports implementation)
 	missionService = app.NewMissionService(missionRepo, groveRepo, agentProvider, executor)
 	groveService = app.NewGroveService(groveRepo, missionRepo, agentProvider, executor)
+
+	// Create shipment and task services
+	shipmentRepo := sqlite.NewShipmentRepository(database)
+	taskRepo := sqlite.NewTaskRepository(database)
+	tagRepo := sqlite.NewTagRepository(database)
+	shipmentService = app.NewShipmentService(shipmentRepo, taskRepo)
+	taskService = app.NewTaskService(taskRepo, tagRepo)
 }
 
 // MissionAdapter returns a new MissionAdapter writing to stdout.
