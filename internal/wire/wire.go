@@ -21,6 +21,9 @@ var (
 	groveService    primary.GroveService
 	shipmentService primary.ShipmentService
 	taskService     primary.TaskService
+	noteService     primary.NoteService
+	handoffService  primary.HandoffService
+	tomeService     primary.TomeService
 	once            sync.Once
 )
 
@@ -46,6 +49,24 @@ func ShipmentService() primary.ShipmentService {
 func TaskService() primary.TaskService {
 	once.Do(initServices)
 	return taskService
+}
+
+// NoteService returns the singleton NoteService instance.
+func NoteService() primary.NoteService {
+	once.Do(initServices)
+	return noteService
+}
+
+// HandoffService returns the singleton HandoffService instance.
+func HandoffService() primary.HandoffService {
+	once.Do(initServices)
+	return handoffService
+}
+
+// TomeService returns the singleton TomeService instance.
+func TomeService() primary.TomeService {
+	once.Do(initServices)
+	return tomeService
 }
 
 // initServices initializes all services and their dependencies.
@@ -75,6 +96,14 @@ func initServices() {
 	tagRepo := sqlite.NewTagRepository(database)
 	shipmentService = app.NewShipmentService(shipmentRepo, taskRepo)
 	taskService = app.NewTaskService(taskRepo, tagRepo)
+
+	// Create note, handoff, and tome services
+	noteRepo := sqlite.NewNoteRepository(database)
+	handoffRepo := sqlite.NewHandoffRepository(database)
+	tomeRepo := sqlite.NewTomeRepository(database)
+	noteService = app.NewNoteService(noteRepo)
+	handoffService = app.NewHandoffService(handoffRepo)
+	tomeService = app.NewTomeService(tomeRepo, noteService) // Tome needs NoteService for GetTomeNotes
 }
 
 // MissionAdapter returns a new MissionAdapter writing to stdout.

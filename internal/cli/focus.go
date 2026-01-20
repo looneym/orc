@@ -117,7 +117,7 @@ func validateAndGetInfo(id string) (containerType string, title string, err erro
 		return "Investigation", inv.Title, nil
 
 	case strings.HasPrefix(id, "TOME-"):
-		tome, err := models.GetTome(id)
+		tome, err := wire.TomeService().GetTome(ctx, id)
 		if err != nil {
 			return "", "", fmt.Errorf("tome %s not found", id)
 		}
@@ -250,7 +250,7 @@ func GetFocusInfo(focusID string) (containerType, title, status string) {
 			return "Investigation", inv.Title, inv.Status
 		}
 	case strings.HasPrefix(focusID, "TOME-"):
-		if tome, err := models.GetTome(focusID); err == nil {
+		if tome, err := wire.TomeService().GetTome(ctx, focusID); err == nil {
 			return "Tome", tome.Title, tome.Status
 		}
 	}

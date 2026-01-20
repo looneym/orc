@@ -7,7 +7,6 @@ import (
 
 	"github.com/example/orc/internal/config"
 	ctx "github.com/example/orc/internal/context"
-	"github.com/example/orc/internal/models"
 	"github.com/example/orc/internal/wire"
 	"github.com/spf13/cobra"
 )
@@ -116,12 +115,12 @@ This provides a focused view of "where am I right now?"`,
 
 			// Display latest handoff
 			if currentHandoffID != "" {
-				handoff, err := models.GetHandoff(currentHandoffID)
+				handoff, err := wire.HandoffService().GetHandoff(context.Background(), currentHandoffID)
 				if err != nil {
 					fmt.Printf("❌ Latest Handoff: %s (error loading: %v)\n", currentHandoffID, err)
 				} else {
 					fmt.Printf("📝 Latest Handoff: %s\n", handoff.ID)
-					fmt.Printf("   Created: %s\n", handoff.CreatedAt.Format("2006-01-02 15:04:05"))
+					fmt.Printf("   Created: %s\n", handoff.CreatedAt)
 
 					// Show full note if --handoff flag is set
 					if showHandoff {

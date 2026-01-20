@@ -278,3 +278,151 @@ type TagRecord struct {
 	ID   string
 	Name string
 }
+
+// NoteRepository defines the secondary port for note persistence.
+type NoteRepository interface {
+	// Create persists a new note.
+	Create(ctx context.Context, note *NoteRecord) error
+
+	// GetByID retrieves a note by its ID.
+	GetByID(ctx context.Context, id string) (*NoteRecord, error)
+
+	// List retrieves notes matching the given filters.
+	List(ctx context.Context, filters NoteFilters) ([]*NoteRecord, error)
+
+	// Update updates an existing note.
+	Update(ctx context.Context, note *NoteRecord) error
+
+	// Delete removes a note from persistence.
+	Delete(ctx context.Context, id string) error
+
+	// Pin pins a note.
+	Pin(ctx context.Context, id string) error
+
+	// Unpin unpins a note.
+	Unpin(ctx context.Context, id string) error
+
+	// GetNextID returns the next available note ID.
+	GetNextID(ctx context.Context) (string, error)
+
+	// GetByContainer retrieves notes for a specific container.
+	GetByContainer(ctx context.Context, containerType, containerID string) ([]*NoteRecord, error)
+
+	// MissionExists checks if a mission exists (for validation).
+	MissionExists(ctx context.Context, missionID string) (bool, error)
+}
+
+// NoteRecord represents a note as stored in persistence.
+type NoteRecord struct {
+	ID               string
+	MissionID        string
+	Title            string
+	Content          string // Empty string means null
+	Type             string // Empty string means null
+	ShipmentID       string // Empty string means null
+	InvestigationID  string // Empty string means null
+	ConclaveID       string // Empty string means null
+	TomeID           string // Empty string means null
+	Pinned           bool
+	CreatedAt        string
+	UpdatedAt        string
+	PromotedFromID   string // Empty string means null
+	PromotedFromType string // Empty string means null
+}
+
+// NoteFilters contains filter options for querying notes.
+type NoteFilters struct {
+	Type      string
+	MissionID string
+}
+
+// HandoffRepository defines the secondary port for handoff persistence.
+// Handoffs are immutable - no Update or Delete operations.
+type HandoffRepository interface {
+	// Create persists a new handoff.
+	Create(ctx context.Context, handoff *HandoffRecord) error
+
+	// GetByID retrieves a handoff by its ID.
+	GetByID(ctx context.Context, id string) (*HandoffRecord, error)
+
+	// GetLatest retrieves the most recent handoff.
+	GetLatest(ctx context.Context) (*HandoffRecord, error)
+
+	// GetLatestForGrove retrieves the most recent handoff for a grove.
+	GetLatestForGrove(ctx context.Context, groveID string) (*HandoffRecord, error)
+
+	// List retrieves handoffs with optional limit.
+	List(ctx context.Context, limit int) ([]*HandoffRecord, error)
+
+	// GetNextID returns the next available handoff ID.
+	GetNextID(ctx context.Context) (string, error)
+}
+
+// HandoffRecord represents a handoff as stored in persistence.
+type HandoffRecord struct {
+	ID              string
+	CreatedAt       string
+	HandoffNote     string
+	ActiveMissionID string // Empty string means null
+	ActiveGroveID   string // Empty string means null
+	TodosSnapshot   string // Empty string means null
+}
+
+// TomeRepository defines the secondary port for tome persistence.
+type TomeRepository interface {
+	// Create persists a new tome.
+	Create(ctx context.Context, tome *TomeRecord) error
+
+	// GetByID retrieves a tome by its ID.
+	GetByID(ctx context.Context, id string) (*TomeRecord, error)
+
+	// List retrieves tomes matching the given filters.
+	List(ctx context.Context, filters TomeFilters) ([]*TomeRecord, error)
+
+	// Update updates an existing tome.
+	Update(ctx context.Context, tome *TomeRecord) error
+
+	// Delete removes a tome from persistence.
+	Delete(ctx context.Context, id string) error
+
+	// Pin pins a tome.
+	Pin(ctx context.Context, id string) error
+
+	// Unpin unpins a tome.
+	Unpin(ctx context.Context, id string) error
+
+	// GetNextID returns the next available tome ID.
+	GetNextID(ctx context.Context) (string, error)
+
+	// UpdateStatus updates the status and optionally completed_at timestamp.
+	UpdateStatus(ctx context.Context, id, status string, setCompleted bool) error
+
+	// GetByGrove retrieves tomes assigned to a grove.
+	GetByGrove(ctx context.Context, groveID string) ([]*TomeRecord, error)
+
+	// AssignGrove assigns a tome to a grove.
+	AssignGrove(ctx context.Context, tomeID, groveID string) error
+
+	// MissionExists checks if a mission exists (for validation).
+	MissionExists(ctx context.Context, missionID string) (bool, error)
+}
+
+// TomeRecord represents a tome as stored in persistence.
+type TomeRecord struct {
+	ID              string
+	MissionID       string
+	Title           string
+	Description     string // Empty string means null
+	Status          string
+	AssignedGroveID string // Empty string means null
+	Pinned          bool
+	CreatedAt       string
+	UpdatedAt       string
+	CompletedAt     string // Empty string means null
+}
+
+// TomeFilters contains filter options for querying tomes.
+type TomeFilters struct {
+	MissionID string
+	Status    string
+}

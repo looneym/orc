@@ -1,12 +1,14 @@
 package cli
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"text/tabwriter"
 
-	"github.com/example/orc/internal/context"
-	"github.com/example/orc/internal/models"
+	orccontext "github.com/example/orc/internal/context"
+	"github.com/example/orc/internal/ports/primary"
+	"github.com/example/orc/internal/wire"
 	"github.com/spf13/cobra"
 )
 
@@ -21,23 +23,29 @@ var tomeCreateCmd = &cobra.Command{
 	Short: "Create a new tome",
 	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		ctx := context.Background()
 		title := args[0]
 		missionID, _ := cmd.Flags().GetString("mission")
 		description, _ := cmd.Flags().GetString("description")
 
 		// Get mission from context or require explicit flag
 		if missionID == "" {
-			missionID = context.GetContextMissionID()
+			missionID = orccontext.GetContextMissionID()
 			if missionID == "" {
 				return fmt.Errorf("no mission context detected\nHint: Use --mission flag or run from a grove/mission directory")
 			}
 		}
 
-		tome, err := models.CreateTome(missionID, title, description)
+		resp, err := wire.TomeService().CreateTome(ctx, primary.CreateTomeRequest{
+			MissionID:   missionID,
+			Title:       title,
+			Description: description,
+		})
 		if err != nil {
 			return fmt.Errorf("failed to create tome: %w", err)
 		}
 
+		tome := resp.Tome
 		fmt.Printf("✓ Created tome %s: %s\n", tome.ID, tome.Title)
 		fmt.Printf("  Mission: %s\n", tome.MissionID)
 		fmt.Printf("  Status: %s\n", tome.Status)
@@ -52,15 +60,19 @@ var tomeListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List tomes",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		ctx := context.Background()
 		missionID, _ := cmd.Flags().GetString("mission")
 		status, _ := cmd.Flags().GetString("status")
 
 		// Get mission from context if not specified
 		if missionID == "" {
-			missionID = context.GetContextMissionID()
+			missionID = orccontext.GetContextMissionID()
 		}
 
-		tomes, err := models.ListTomes(missionID, status)
+		tomes, err := wire.TomeService().ListTomes(ctx, primary.TomeFilters{
+			MissionID: missionID,
+			Status:    status,
+		})
 		if err != nil {
 			return fmt.Errorf("failed to list tomes: %w", err)
 		}
@@ -94,30 +106,31 @@ var tomeShowCmd = &cobra.Command{
 	Short: "Show tome details",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		ctx := context.Background()
 		tomeID := args[0]
 
-		tome, err := models.GetTome(tomeID)
+		tome, err := wire.TomeService().GetTome(ctx, tomeID)
 		if err != nil {
 			return fmt.Errorf("tome not found: %w", err)
 		}
 
 		fmt.Printf("Tome: %s\n", tome.ID)
 		fmt.Printf("Title: %s\n", tome.Title)
-		if tome.Description.Valid {
-			fmt.Printf("Description: %s\n", tome.Description.String)
+		if tome.Description != "" {
+			fmt.Printf("Description: %s\n", tome.Description)
 		}
 		fmt.Printf("Status: %s\n", tome.Status)
 		fmt.Printf("Mission: %s\n", tome.MissionID)
 		if tome.Pinned {
 			fmt.Printf("Pinned: yes\n")
 		}
-		fmt.Printf("Created: %s\n", tome.CreatedAt.Format("2006-01-02 15:04"))
-		if tome.CompletedAt.Valid {
-			fmt.Printf("Completed: %s\n", tome.CompletedAt.Time.Format("2006-01-02 15:04"))
+		fmt.Printf("Created: %s\n", tome.CreatedAt)
+		if tome.CompletedAt != "" {
+			fmt.Printf("Completed: %s\n", tome.CompletedAt)
 		}
 
 		// Show notes in this tome
-		notes, err := models.GetTomeNotes(tomeID)
+		notes, err := wire.TomeService().GetTomeNotes(ctx, tomeID)
 		if err != nil {
 			return fmt.Errorf("failed to get notes: %w", err)
 		}
@@ -126,8 +139,8 @@ var tomeShowCmd = &cobra.Command{
 			fmt.Printf("\nNotes (%d):\n", len(notes))
 			for _, note := range notes {
 				typeStr := ""
-				if note.Type.Valid {
-					typeStr = fmt.Sprintf(" [%s]", note.Type.String)
+				if note.Type != "" {
+					typeStr = fmt.Sprintf(" [%s]", note.Type)
 				}
 				fmt.Printf("  📝 %s: %s%s\n", note.ID, note.Title, typeStr)
 			}
@@ -142,9 +155,10 @@ var tomeCompleteCmd = &cobra.Command{
 	Short: "Mark tome as complete",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		ctx := context.Background()
 		tomeID := args[0]
 
-		err := models.CompleteTome(tomeID)
+		err := wire.TomeService().CompleteTome(ctx, tomeID)
 		if err != nil {
 			return fmt.Errorf("failed to complete tome: %w", err)
 		}
@@ -159,9 +173,10 @@ var tomePauseCmd = &cobra.Command{
 	Short: "Pause an active tome",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		ctx := context.Background()
 		tomeID := args[0]
 
-		err := models.PauseTome(tomeID)
+		err := wire.TomeService().PauseTome(ctx, tomeID)
 		if err != nil {
 			return fmt.Errorf("failed to pause tome: %w", err)
 		}
@@ -176,9 +191,10 @@ var tomeResumeCmd = &cobra.Command{
 	Short: "Resume a paused tome",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		ctx := context.Background()
 		tomeID := args[0]
 
-		err := models.ResumeTome(tomeID)
+		err := wire.TomeService().ResumeTome(ctx, tomeID)
 		if err != nil {
 			return fmt.Errorf("failed to resume tome: %w", err)
 		}
@@ -193,6 +209,7 @@ var tomeUpdateCmd = &cobra.Command{
 	Short: "Update tome title and/or description",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		ctx := context.Background()
 		tomeID := args[0]
 		title, _ := cmd.Flags().GetString("title")
 		description, _ := cmd.Flags().GetString("description")
@@ -201,7 +218,11 @@ var tomeUpdateCmd = &cobra.Command{
 			return fmt.Errorf("must specify --title and/or --description")
 		}
 
-		err := models.UpdateTome(tomeID, title, description)
+		err := wire.TomeService().UpdateTome(ctx, primary.UpdateTomeRequest{
+			TomeID:      tomeID,
+			Title:       title,
+			Description: description,
+		})
 		if err != nil {
 			return fmt.Errorf("failed to update tome: %w", err)
 		}
@@ -216,9 +237,10 @@ var tomePinCmd = &cobra.Command{
 	Short: "Pin tome to keep it visible",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		ctx := context.Background()
 		tomeID := args[0]
 
-		err := models.PinTome(tomeID)
+		err := wire.TomeService().PinTome(ctx, tomeID)
 		if err != nil {
 			return fmt.Errorf("failed to pin tome: %w", err)
 		}
@@ -233,9 +255,10 @@ var tomeUnpinCmd = &cobra.Command{
 	Short: "Unpin tome",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		ctx := context.Background()
 		tomeID := args[0]
 
-		err := models.UnpinTome(tomeID)
+		err := wire.TomeService().UnpinTome(ctx, tomeID)
 		if err != nil {
 			return fmt.Errorf("failed to unpin tome: %w", err)
 		}
@@ -250,9 +273,10 @@ var tomeDeleteCmd = &cobra.Command{
 	Short: "Delete a tome",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		ctx := context.Background()
 		tomeID := args[0]
 
-		err := models.DeleteTome(tomeID)
+		err := wire.TomeService().DeleteTome(ctx, tomeID)
 		if err != nil {
 			return fmt.Errorf("failed to delete tome: %w", err)
 		}
