@@ -156,7 +156,7 @@ CREATE TABLE IF NOT EXISTS conclaves (
 	shipment_id TEXT,
 	title TEXT NOT NULL,
 	description TEXT,
-	status TEXT NOT NULL CHECK(status IN ('open', 'in_progress', 'decided', 'closed')) DEFAULT 'open',
+	status TEXT NOT NULL CHECK(status IN ('open', 'paused', 'closed')) DEFAULT 'open',
 	decision TEXT,
 	pinned INTEGER DEFAULT 0,
 	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -357,7 +357,7 @@ func InitSchema() error {
 				return err
 			}
 			// Insert all migration versions as applied
-			for i := 1; i <= 32; i++ {
+			for i := 1; i <= 33; i++ {
 				_, err = db.Exec("INSERT INTO schema_version (version) VALUES (?)", i)
 				if err != nil {
 					return err

@@ -88,10 +88,10 @@ func TestCanPauseConclave(t *testing.T) {
 		wantReason  string
 	}{
 		{
-			name: "can pause active conclave",
+			name: "can pause open conclave",
 			ctx: StatusTransitionContext{
 				ConclaveID: "CON-001",
-				Status:     "active",
+				Status:     "open",
 			},
 			wantAllowed: true,
 		},
@@ -102,16 +102,16 @@ func TestCanPauseConclave(t *testing.T) {
 				Status:     "paused",
 			},
 			wantAllowed: false,
-			wantReason:  "can only pause active conclaves (current status: paused)",
+			wantReason:  "can only pause open conclaves (current status: paused)",
 		},
 		{
-			name: "cannot pause complete conclave",
+			name: "cannot pause closed conclave",
 			ctx: StatusTransitionContext{
 				ConclaveID: "CON-001",
-				Status:     "complete",
+				Status:     "closed",
 			},
 			wantAllowed: false,
-			wantReason:  "can only pause active conclaves (current status: complete)",
+			wantReason:  "can only pause open conclaves (current status: closed)",
 		},
 	}
 
@@ -144,22 +144,22 @@ func TestCanResumeConclave(t *testing.T) {
 			wantAllowed: true,
 		},
 		{
-			name: "cannot resume active conclave",
+			name: "cannot resume open conclave",
 			ctx: StatusTransitionContext{
 				ConclaveID: "CON-001",
-				Status:     "active",
+				Status:     "open",
 			},
 			wantAllowed: false,
-			wantReason:  "can only resume paused conclaves (current status: active)",
+			wantReason:  "can only resume paused conclaves (current status: open)",
 		},
 		{
-			name: "cannot resume complete conclave",
+			name: "cannot resume closed conclave",
 			ctx: StatusTransitionContext{
 				ConclaveID: "CON-001",
-				Status:     "complete",
+				Status:     "closed",
 			},
 			wantAllowed: false,
-			wantReason:  "can only resume paused conclaves (current status: complete)",
+			wantReason:  "can only resume paused conclaves (current status: closed)",
 		},
 	}
 

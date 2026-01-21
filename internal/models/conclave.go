@@ -22,7 +22,7 @@ type Conclave struct {
 
 // Conclave status constants
 const (
-	ConclaveStatusActive   = "active"
-	ConclaveStatusPaused   = "paused"
-	ConclaveStatusComplete = "complete"
+	ConclaveStatusOpen   = "open"
+	ConclaveStatusPaused = "paused"
+	ConclaveStatusClosed = "closed"
 )

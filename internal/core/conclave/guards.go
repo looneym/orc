@@ -33,7 +33,7 @@ type CompleteConclaveContext struct {
 // StatusTransitionContext provides context for pause/resume guards.
 type StatusTransitionContext struct {
 	ConclaveID string
-	Status     string // "active", "paused", "complete"
+	Status     string // "open", "paused", "closed"
 }
 
 // CanCreateConclave evaluates whether a conclave can be created.
@@ -66,12 +66,12 @@ func CanCompleteConclave(ctx CompleteConclaveContext) GuardResult {
 
 // CanPauseConclave evaluates whether a conclave can be paused.
 // Rules:
-// - Status must be "active"
+// - Status must be "open"
 func CanPauseConclave(ctx StatusTransitionContext) GuardResult {
-	if ctx.Status != "active" {
+	if ctx.Status != "open" {
 		return GuardResult{
 			Allowed: false,
-			Reason:  fmt.Sprintf("can only pause active conclaves (current status: %s)", ctx.Status),
+			Reason:  fmt.Sprintf("can only pause open conclaves (current status: %s)", ctx.Status),
 		}
 	}
 

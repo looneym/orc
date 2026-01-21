@@ -174,8 +174,8 @@ func TestCreateConclave_Success(t *testing.T) {
 	if resp.Conclave.Title != "Test Conclave" {
 		t.Errorf("expected title 'Test Conclave', got '%s'", resp.Conclave.Title)
 	}
-	if resp.Conclave.Status != "active" {
-		t.Errorf("expected status 'active', got '%s'", resp.Conclave.Status)
+	if resp.Conclave.Status != "open" {
+		t.Errorf("expected status 'open', got '%s'", resp.Conclave.Status)
 	}
 }
 
@@ -208,7 +208,7 @@ func TestGetConclave_Found(t *testing.T) {
 		ID:           "CON-001",
 		CommissionID: "MISSION-001",
 		Title:        "Test Conclave",
-		Status:       "active",
+		Status:       "open",
 	}
 
 	conclave, err := service.GetConclave(ctx, "CON-001")
@@ -244,13 +244,13 @@ func TestListConclaves_FilterByMission(t *testing.T) {
 		ID:           "CON-001",
 		CommissionID: "MISSION-001",
 		Title:        "Conclave 1",
-		Status:       "active",
+		Status:       "open",
 	}
 	conclaveRepo.conclaves["CON-002"] = &secondary.ConclaveRecord{
 		ID:           "CON-002",
 		CommissionID: "MISSION-002",
 		Title:        "Conclave 2",
-		Status:       "active",
+		Status:       "open",
 	}
 
 	conclaves, err := service.ListConclaves(ctx, primary.ConclaveFilters{CommissionID: "MISSION-001"})
@@ -271,7 +271,7 @@ func TestListConclaves_FilterByStatus(t *testing.T) {
 		ID:           "CON-001",
 		CommissionID: "MISSION-001",
 		Title:        "Active Conclave",
-		Status:       "active",
+		Status:       "open",
 	}
 	conclaveRepo.conclaves["CON-002"] = &secondary.ConclaveRecord{
 		ID:           "CON-002",
@@ -280,13 +280,13 @@ func TestListConclaves_FilterByStatus(t *testing.T) {
 		Status:       "paused",
 	}
 
-	conclaves, err := service.ListConclaves(ctx, primary.ConclaveFilters{Status: "active"})
+	conclaves, err := service.ListConclaves(ctx, primary.ConclaveFilters{Status: "open"})
 
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 	if len(conclaves) != 1 {
-		t.Errorf("expected 1 active conclave, got %d", len(conclaves))
+		t.Errorf("expected 1 open conclave, got %d", len(conclaves))
 	}
 }
 
@@ -302,7 +302,7 @@ func TestCompleteConclave_UnpinnedAllowed(t *testing.T) {
 		ID:           "CON-001",
 		CommissionID: "MISSION-001",
 		Title:        "Test Conclave",
-		Status:       "active",
+		Status:       "open",
 		Pinned:       false,
 	}
 
@@ -311,8 +311,8 @@ func TestCompleteConclave_UnpinnedAllowed(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-	if conclaveRepo.conclaves["CON-001"].Status != "complete" {
-		t.Errorf("expected status 'complete', got '%s'", conclaveRepo.conclaves["CON-001"].Status)
+	if conclaveRepo.conclaves["CON-001"].Status != "closed" {
+		t.Errorf("expected status 'closed', got '%s'", conclaveRepo.conclaves["CON-001"].Status)
 	}
 }
 
@@ -324,7 +324,7 @@ func TestCompleteConclave_PinnedBlocked(t *testing.T) {
 		ID:           "CON-001",
 		CommissionID: "MISSION-001",
 		Title:        "Pinned Conclave",
-		Status:       "active",
+		Status:       "open",
 		Pinned:       true,
 	}
 
@@ -358,7 +358,7 @@ func TestPauseConclave_ActiveAllowed(t *testing.T) {
 		ID:           "CON-001",
 		CommissionID: "MISSION-001",
 		Title:        "Active Conclave",
-		Status:       "active",
+		Status:       "open",
 	}
 
 	err := service.PauseConclave(ctx, "CON-001")
@@ -385,7 +385,7 @@ func TestPauseConclave_NotActiveBlocked(t *testing.T) {
 	err := service.PauseConclave(ctx, "CON-001")
 
 	if err == nil {
-		t.Fatal("expected error for pausing non-active conclave, got nil")
+		t.Fatal("expected error for pausing non-open conclave, got nil")
 	}
 }
 
@@ -397,13 +397,13 @@ func TestPauseConclave_CompleteBlocked(t *testing.T) {
 		ID:           "CON-001",
 		CommissionID: "MISSION-001",
 		Title:        "Complete Conclave",
-		Status:       "complete",
+		Status:       "closed",
 	}
 
 	err := service.PauseConclave(ctx, "CON-001")
 
 	if err == nil {
-		t.Fatal("expected error for pausing complete conclave, got nil")
+		t.Fatal("expected error for pausing closed conclave, got nil")
 	}
 }
 
@@ -427,8 +427,8 @@ func TestResumeConclave_PausedAllowed(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-	if conclaveRepo.conclaves["CON-001"].Status != "active" {
-		t.Errorf("expected status 'active', got '%s'", conclaveRepo.conclaves["CON-001"].Status)
+	if conclaveRepo.conclaves["CON-001"].Status != "open" {
+		t.Errorf("expected status 'open', got '%s'", conclaveRepo.conclaves["CON-001"].Status)
 	}
 }
 
@@ -440,7 +440,7 @@ func TestResumeConclave_NotPausedBlocked(t *testing.T) {
 		ID:           "CON-001",
 		CommissionID: "MISSION-001",
 		Title:        "Active Conclave",
-		Status:       "active",
+		Status:       "open",
 	}
 
 	err := service.ResumeConclave(ctx, "CON-001")
@@ -462,7 +462,7 @@ func TestPinConclave(t *testing.T) {
 		ID:           "CON-001",
 		CommissionID: "MISSION-001",
 		Title:        "Test Conclave",
-		Status:       "active",
+		Status:       "open",
 		Pinned:       false,
 	}
 
@@ -484,7 +484,7 @@ func TestUnpinConclave(t *testing.T) {
 		ID:           "CON-001",
 		CommissionID: "MISSION-001",
 		Title:        "Pinned Conclave",
-		Status:       "active",
+		Status:       "open",
 		Pinned:       true,
 	}
 
@@ -511,7 +511,7 @@ func TestUpdateConclave_Title(t *testing.T) {
 		CommissionID: "MISSION-001",
 		Title:        "Old Title",
 		Description:  "Original description",
-		Status:       "active",
+		Status:       "open",
 	}
 
 	err := service.UpdateConclave(ctx, primary.UpdateConclaveRequest{
@@ -539,7 +539,7 @@ func TestDeleteConclave_Success(t *testing.T) {
 		ID:           "CON-001",
 		CommissionID: "MISSION-001",
 		Title:        "Test Conclave",
-		Status:       "active",
+		Status:       "open",
 	}
 
 	err := service.DeleteConclave(ctx, "CON-001")
@@ -565,13 +565,13 @@ func TestGetConclavesByShipment_Success(t *testing.T) {
 		CommissionID: "MISSION-001",
 		ShipmentID:   "SHIP-001",
 		Title:        "Assigned Conclave",
-		Status:       "active",
+		Status:       "open",
 	}
 	conclaveRepo.conclaves["CON-002"] = &secondary.ConclaveRecord{
 		ID:           "CON-002",
 		CommissionID: "MISSION-001",
 		Title:        "Unassigned Conclave",
-		Status:       "active",
+		Status:       "open",
 	}
 
 	conclaves, err := service.GetConclavesByShipment(ctx, "SHIP-001")

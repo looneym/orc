@@ -89,7 +89,7 @@ var conclaveListCmd = &cobra.Command{
 				pinnedMark = " [pinned]"
 			}
 			statusIcon := "🧠"
-			if c.Status == "complete" {
+			if c.Status == "closed" {
 				statusIcon = "✅"
 			}
 			fmt.Fprintf(w, "%s\t%s%s\t%s %s\t%s\n", c.ID, c.Title, pinnedMark, statusIcon, c.Status, c.CommissionID)
@@ -321,7 +321,7 @@ func init() {
 
 	// conclave list flags
 	conclaveListCmd.Flags().StringP("commission", "c", "", "Filter by mission")
-	conclaveListCmd.Flags().StringP("status", "s", "", "Filter by status (active, complete)")
+	conclaveListCmd.Flags().StringP("status", "s", "", "Filter by status (open, paused, closed)")
 
 	// conclave update flags
 	conclaveUpdateCmd.Flags().String("title", "", "New title")

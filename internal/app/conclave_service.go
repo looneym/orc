@@ -45,7 +45,7 @@ func (s *ConclaveServiceImpl) CreateConclave(ctx context.Context, req primary.Cr
 		CommissionID: req.CommissionID,
 		Title:        req.Title,
 		Description:  req.Description,
-		Status:       "active",
+		Status:       "open",
 	}
 
 	if err := s.conclaveRepo.Create(ctx, record); err != nil {
@@ -102,7 +102,7 @@ func (s *ConclaveServiceImpl) CompleteConclave(ctx context.Context, conclaveID s
 		return fmt.Errorf("cannot complete pinned conclave %s. Unpin first with: orc conclave unpin %s", conclaveID, conclaveID)
 	}
 
-	return s.conclaveRepo.UpdateStatus(ctx, conclaveID, "complete", true)
+	return s.conclaveRepo.UpdateStatus(ctx, conclaveID, "closed", true)
 }
 
 // PauseConclave pauses an active conclave.
@@ -112,9 +112,9 @@ func (s *ConclaveServiceImpl) PauseConclave(ctx context.Context, conclaveID stri
 		return err
 	}
 
-	// Guard: can only pause active conclaves
-	if record.Status != "active" {
-		return fmt.Errorf("can only pause active conclaves (current status: %s)", record.Status)
+	// Guard: can only pause open conclaves
+	if record.Status != "open" {
+		return fmt.Errorf("can only pause open conclaves (current status: %s)", record.Status)
 	}
 
 	return s.conclaveRepo.UpdateStatus(ctx, conclaveID, "paused", false)
@@ -132,7 +132,7 @@ func (s *ConclaveServiceImpl) ResumeConclave(ctx context.Context, conclaveID str
 		return fmt.Errorf("can only resume paused conclaves (current status: %s)", record.Status)
 	}
 
-	return s.conclaveRepo.UpdateStatus(ctx, conclaveID, "active", false)
+	return s.conclaveRepo.UpdateStatus(ctx, conclaveID, "open", false)
 }
 
 // UpdateConclave updates a conclave's title and/or description.

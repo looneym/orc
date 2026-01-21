@@ -174,6 +174,11 @@ var migrations = []Migration{
 		Name:    "fix_dangling_fk_references",
 		Up:      migrationV32,
 	},
+	{
+		Version: 33,
+		Name:    "simplify_conclave_statuses",
+		Up:      migrationV33,
+	},
 }
 
 // RunMigrations executes all pending migrations
@@ -3612,6 +3617,62 @@ func migrationV32(db *sql.DB) error {
 	`)
 	if err != nil {
 		return fmt.Errorf("failed to fix plans table: %w", err)
+	}
+
+	return nil
+}
+
+// migrationV33 simplifies conclave statuses to: open, paused, closed
+// Data migration: open->open, in_progress->paused, decided->closed, closed->closed
+func migrationV33(db *sql.DB) error {
+	// Disable FK constraints during migration
+	_, err := db.Exec(`PRAGMA foreign_keys = OFF`)
+	if err != nil {
+		return fmt.Errorf("failed to disable foreign keys: %w", err)
+	}
+	defer db.Exec(`PRAGMA foreign_keys = ON`)
+
+	// Step 1: Update existing status values
+	// in_progress -> paused
+	_, err = db.Exec(`UPDATE conclaves SET status = 'paused' WHERE status = 'in_progress'`)
+	if err != nil {
+		return fmt.Errorf("failed to migrate in_progress to paused: %w", err)
+	}
+
+	// decided -> closed
+	_, err = db.Exec(`UPDATE conclaves SET status = 'closed' WHERE status = 'decided'`)
+	if err != nil {
+		return fmt.Errorf("failed to migrate decided to closed: %w", err)
+	}
+
+	// Step 2: Recreate table with new CHECK constraint
+	_, err = db.Exec(`
+		ALTER TABLE conclaves RENAME TO conclaves_old;
+
+		CREATE TABLE conclaves (
+			id TEXT PRIMARY KEY,
+			commission_id TEXT NOT NULL,
+			shipment_id TEXT,
+			title TEXT NOT NULL,
+			description TEXT,
+			status TEXT NOT NULL CHECK(status IN ('open', 'paused', 'closed')) DEFAULT 'open',
+			decision TEXT,
+			pinned INTEGER DEFAULT 0,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			decided_at DATETIME,
+			FOREIGN KEY (commission_id) REFERENCES commissions(id),
+			FOREIGN KEY (shipment_id) REFERENCES shipments(id)
+		);
+
+		INSERT INTO conclaves SELECT * FROM conclaves_old;
+		DROP TABLE conclaves_old;
+
+		CREATE INDEX idx_conclaves_commission ON conclaves(commission_id);
+		CREATE INDEX idx_conclaves_status ON conclaves(status);
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to recreate conclaves table: %w", err)
 	}
 
 	return nil

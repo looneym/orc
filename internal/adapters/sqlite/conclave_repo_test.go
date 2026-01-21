@@ -448,28 +448,28 @@ func TestConclaveRepository_UpdateStatus(t *testing.T) {
 	conclave := createTestConclave(t, repo, ctx, "MISSION-001", "Status Test", "")
 
 	// Update status without completed timestamp
-	err := repo.UpdateStatus(ctx, conclave.ID, "in_progress", false)
+	err := repo.UpdateStatus(ctx, conclave.ID, "paused", false)
 	if err != nil {
 		t.Fatalf("UpdateStatus failed: %v", err)
 	}
 
 	retrieved, _ := repo.GetByID(ctx, conclave.ID)
-	if retrieved.Status != "in_progress" {
-		t.Errorf("expected status 'in_progress', got '%s'", retrieved.Status)
+	if retrieved.Status != "paused" {
+		t.Errorf("expected status 'paused', got '%s'", retrieved.Status)
 	}
 	if retrieved.DecidedAt != "" {
 		t.Error("expected DecidedAt to be empty")
 	}
 
-	// Update to complete (with decided timestamp)
-	err = repo.UpdateStatus(ctx, conclave.ID, "complete", true)
+	// Update to closed (with decided timestamp)
+	err = repo.UpdateStatus(ctx, conclave.ID, "closed", true)
 	if err != nil {
 		t.Fatalf("UpdateStatus failed: %v", err)
 	}
 
 	retrieved, _ = repo.GetByID(ctx, conclave.ID)
-	if retrieved.Status != "complete" {
-		t.Errorf("expected status 'complete', got '%s'", retrieved.Status)
+	if retrieved.Status != "closed" {
+		t.Errorf("expected status 'closed', got '%s'", retrieved.Status)
 	}
 	if retrieved.DecidedAt == "" {
 		t.Error("expected DecidedAt to be set")
