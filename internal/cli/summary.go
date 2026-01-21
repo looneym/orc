@@ -188,9 +188,12 @@ func displayShipmentChildren(shipmentID, prefix string, filters *filterConfig) i
 		})
 	}
 	serviceNotes, _ := wire.NoteService().GetNotesByContainer(context.Background(), "shipment", shipmentID)
-	// Convert to models.Note for the rest of the function
+	// Convert to models.Note for the rest of the function (filter out closed notes)
 	var notes []*models.Note
 	for _, n := range serviceNotes {
+		if n.Status == "closed" {
+			continue
+		}
 		notes = append(notes, &models.Note{
 			ID:     n.ID,
 			Title:  n.Title,
@@ -296,11 +299,14 @@ func displayConclaveChildren(conclaveID, prefix string, filters *filterConfig) i
 			Pinned: p.Pinned,
 		})
 	}
-	// Get notes
+	// Get notes (filter out closed notes)
 	serviceNotes, _ := wire.NoteService().GetNotesByContainer(ctx, "conclave", conclaveID)
 	// Convert to models.Note for the rest of the function
 	var notes []*models.Note
 	for _, n := range serviceNotes {
+		if n.Status == "closed" {
+			continue
+		}
 		notes = append(notes, &models.Note{
 			ID:     n.ID,
 			Title:  n.Title,
@@ -406,9 +412,12 @@ func displayInvestigationChildren(investigationID, prefix string, filters *filte
 		})
 	}
 	serviceNotes, _ := wire.NoteService().GetNotesByContainer(context.Background(), "investigation", investigationID)
-	// Convert to models.Note for the rest of the function
+	// Convert to models.Note for the rest of the function (filter out closed notes)
 	var notes []*models.Note
 	for _, n := range serviceNotes {
+		if n.Status == "closed" {
+			continue
+		}
 		notes = append(notes, &models.Note{
 			ID:     n.ID,
 			Title:  n.Title,
@@ -484,9 +493,12 @@ func displayTomeChildren(tomeID, prefix string, filters *filterConfig) int {
 	if err != nil || len(serviceNotes) == 0 {
 		return 0
 	}
-	// Convert to models.Note for the rest of the function
+	// Convert to models.Note for the rest of the function (filter out closed notes)
 	var notes []*models.Note
 	for _, n := range serviceNotes {
+		if n.Status == "closed" {
+			continue
+		}
 		notes = append(notes, &models.Note{
 			ID:     n.ID,
 			Title:  n.Title,
@@ -895,6 +907,9 @@ func containerHasMatchingLeaves(c containerInfo, filters *filterConfig) bool {
 		serviceNotes, _ := wire.NoteService().GetNotesByContainer(context.Background(), "shipment", c.id)
 		var notes []*models.Note
 		for _, n := range serviceNotes {
+			if n.Status == "closed" {
+				continue
+			}
 			notes = append(notes, &models.Note{ID: n.ID, Title: n.Title, Pinned: n.Pinned})
 		}
 		for _, t := range tasks {
@@ -919,6 +934,9 @@ func containerHasMatchingLeaves(c containerInfo, filters *filterConfig) bool {
 		serviceNotes, _ := wire.NoteService().GetNotesByContainer(context.Background(), "conclave", c.id)
 		var notes []*models.Note
 		for _, n := range serviceNotes {
+			if n.Status == "closed" {
+				continue
+			}
 			notes = append(notes, &models.Note{ID: n.ID, Title: n.Title, Pinned: n.Pinned})
 		}
 		for _, t := range tasks {
@@ -963,6 +981,9 @@ func containerHasMatchingLeaves(c containerInfo, filters *filterConfig) bool {
 		serviceNotes, _ := wire.NoteService().GetNotesByContainer(context.Background(), "investigation", c.id)
 		var notes []*models.Note
 		for _, n := range serviceNotes {
+			if n.Status == "closed" {
+				continue
+			}
 			notes = append(notes, &models.Note{ID: n.ID, Title: n.Title, Pinned: n.Pinned})
 		}
 		for _, q := range questions {
@@ -983,6 +1004,9 @@ func containerHasMatchingLeaves(c containerInfo, filters *filterConfig) bool {
 	case "tome":
 		serviceNotes, _ := wire.TomeService().GetTomeNotes(context.Background(), c.id)
 		for _, n := range serviceNotes {
+			if n.Status == "closed" {
+				continue
+			}
 			show, _ := shouldShowLeaf(n.ID, filters)
 			if show {
 				return true
