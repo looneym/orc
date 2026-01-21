@@ -2077,6 +2077,7 @@ func migrationV22(db *sql.DB) error {
 	}
 
 	// Step 2: Copy data from missions with ID transformation
+	// Note: missions table doesn't have started_at column, so we use NULL
 	_, err = db.Exec(`
 		INSERT INTO commissions (id, title, description, status, pinned, created_at, started_at, completed_at)
 		SELECT
@@ -2086,7 +2087,7 @@ func migrationV22(db *sql.DB) error {
 			status,
 			pinned,
 			created_at,
-			started_at,
+			NULL,
 			completed_at
 		FROM missions
 	`)

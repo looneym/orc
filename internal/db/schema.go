@@ -1,61 +1,45 @@
 package db
 
+// schemaSQL is the complete modern schema for fresh ORC installs.
+// This schema reflects the current state after all migrations.
 const schemaSQL = `
--- Commissions (Strategic work streams)
-CREATE TABLE IF NOT EXISTS missions (
+-- Commissions (Strategic work streams) - renamed from missions
+CREATE TABLE IF NOT EXISTS commissions (
 	id TEXT PRIMARY KEY,
 	title TEXT NOT NULL,
 	description TEXT,
-	status TEXT NOT NULL CHECK(status IN ('active', 'paused', 'complete', 'archived')) DEFAULT 'active',
+	status TEXT NOT NULL CHECK(status IN ('initial', 'active', 'paused', 'complete', 'archived', 'deleted')) DEFAULT 'initial',
 	pinned INTEGER DEFAULT 0,
 	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-	updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+	started_at DATETIME,
 	completed_at DATETIME
 );
 
--- Epics (Top-level work containers)
-CREATE TABLE IF NOT EXISTS epics (
+-- Shipments (Work containers) - renamed from epics
+CREATE TABLE IF NOT EXISTS shipments (
 	id TEXT PRIMARY KEY,
-	mission_id TEXT NOT NULL,
+	commission_id TEXT NOT NULL,
 	title TEXT NOT NULL,
 	description TEXT,
-	status TEXT NOT NULL CHECK(status IN ('ready', 'design', 'implement', 'deploy', 'blocked', 'paused', 'complete')) DEFAULT 'ready',
-	priority TEXT CHECK(priority IN ('low', 'medium', 'high')),
+	status TEXT NOT NULL CHECK(status IN ('active', 'paused', 'complete')) DEFAULT 'active',
 	assigned_grove_id TEXT,
-	context_ref TEXT,
 	pinned INTEGER DEFAULT 0,
 	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 	updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 	completed_at DATETIME,
-	FOREIGN KEY (mission_id) REFERENCES missions(id),
+	FOREIGN KEY (commission_id) REFERENCES commissions(id),
 	FOREIGN KEY (assigned_grove_id) REFERENCES groves(id)
-);
-
--- Rabbit Holes (Optional grouping layer within epics)
-CREATE TABLE IF NOT EXISTS rabbit_holes (
-	id TEXT PRIMARY KEY,
-	epic_id TEXT NOT NULL,
-	title TEXT NOT NULL,
-	description TEXT,
-	status TEXT NOT NULL CHECK(status IN ('ready', 'design', 'implement', 'deploy', 'blocked', 'paused', 'complete')) DEFAULT 'ready',
-	priority TEXT CHECK(priority IN ('low', 'medium', 'high')),
-	pinned INTEGER DEFAULT 0,
-	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-	updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-	completed_at DATETIME,
-	FOREIGN KEY (epic_id) REFERENCES epics(id) ON DELETE CASCADE
 );
 
 -- Tasks (Atomic units of work)
 CREATE TABLE IF NOT EXISTS tasks (
 	id TEXT PRIMARY KEY,
-	epic_id TEXT,
-	rabbit_hole_id TEXT,
-	mission_id TEXT NOT NULL,
+	shipment_id TEXT,
+	commission_id TEXT NOT NULL,
 	title TEXT NOT NULL,
 	description TEXT,
 	type TEXT CHECK(type IN ('research', 'implementation', 'fix', 'documentation', 'maintenance')),
-	status TEXT NOT NULL CHECK(status IN ('ready', 'design', 'implement', 'deploy', 'blocked', 'paused', 'complete')) DEFAULT 'ready',
+	status TEXT NOT NULL CHECK(status IN ('ready', 'in_progress', 'blocked', 'paused', 'complete')) DEFAULT 'ready',
 	priority TEXT CHECK(priority IN ('low', 'medium', 'high')),
 	assigned_grove_id TEXT,
 	context_ref TEXT,
@@ -64,24 +48,22 @@ CREATE TABLE IF NOT EXISTS tasks (
 	updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 	claimed_at DATETIME,
 	completed_at DATETIME,
-	FOREIGN KEY (epic_id) REFERENCES epics(id) ON DELETE CASCADE,
-	FOREIGN KEY (rabbit_hole_id) REFERENCES rabbit_holes(id) ON DELETE CASCADE,
-	FOREIGN KEY (mission_id) REFERENCES missions(id),
-	FOREIGN KEY (assigned_grove_id) REFERENCES groves(id),
-	CHECK ((epic_id IS NOT NULL AND rabbit_hole_id IS NULL) OR (epic_id IS NULL AND rabbit_hole_id IS NOT NULL))
+	FOREIGN KEY (shipment_id) REFERENCES shipments(id) ON DELETE CASCADE,
+	FOREIGN KEY (commission_id) REFERENCES commissions(id),
+	FOREIGN KEY (assigned_grove_id) REFERENCES groves(id)
 );
 
 -- Groves (Physical workspaces) - Commission-level worktrees
 CREATE TABLE IF NOT EXISTS groves (
 	id TEXT PRIMARY KEY,
-	mission_id TEXT NOT NULL,
+	commission_id TEXT NOT NULL,
 	name TEXT NOT NULL,
 	path TEXT NOT NULL UNIQUE,
 	repos TEXT,
 	status TEXT NOT NULL CHECK(status IN ('active', 'archived')) DEFAULT 'active',
 	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 	updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-	FOREIGN KEY (mission_id) REFERENCES missions(id)
+	FOREIGN KEY (commission_id) REFERENCES commissions(id)
 );
 
 -- Handoffs (Claude-to-Claude context transfer)
@@ -89,11 +71,11 @@ CREATE TABLE IF NOT EXISTS handoffs (
 	id TEXT PRIMARY KEY,
 	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 	handoff_note TEXT NOT NULL,
-	active_mission_id TEXT,
+	active_commission_id TEXT,
 	active_work_orders TEXT,
 	active_grove_id TEXT,
 	todos_snapshot TEXT,
-	FOREIGN KEY (active_mission_id) REFERENCES missions(id),
+	FOREIGN KEY (active_commission_id) REFERENCES commissions(id),
 	FOREIGN KEY (active_grove_id) REFERENCES groves(id)
 );
 
@@ -106,28 +88,200 @@ CREATE TABLE IF NOT EXISTS messages (
 	body TEXT NOT NULL,
 	timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
 	read INTEGER DEFAULT 0,
-	mission_id TEXT NOT NULL,
-	FOREIGN KEY (mission_id) REFERENCES missions(id)
+	commission_id TEXT NOT NULL,
+	FOREIGN KEY (commission_id) REFERENCES commissions(id)
+);
+
+-- Entity tags (generic tagging system)
+CREATE TABLE IF NOT EXISTS tags (
+	id TEXT PRIMARY KEY,
+	name TEXT NOT NULL UNIQUE,
+	color TEXT,
+	created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS entity_tags (
+	tag_id TEXT NOT NULL,
+	entity_type TEXT NOT NULL,
+	entity_id TEXT NOT NULL,
+	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+	PRIMARY KEY (tag_id, entity_type, entity_id),
+	FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE
+);
+
+-- Investigations (Research containers)
+CREATE TABLE IF NOT EXISTS investigations (
+	id TEXT PRIMARY KEY,
+	commission_id TEXT NOT NULL,
+	shipment_id TEXT,
+	title TEXT NOT NULL,
+	description TEXT,
+	status TEXT NOT NULL CHECK(status IN ('open', 'in_progress', 'resolved', 'closed')) DEFAULT 'open',
+	pinned INTEGER DEFAULT 0,
+	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+	updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+	resolved_at DATETIME,
+	FOREIGN KEY (commission_id) REFERENCES commissions(id),
+	FOREIGN KEY (shipment_id) REFERENCES shipments(id)
+);
+
+-- Conclaves (Decision containers)
+CREATE TABLE IF NOT EXISTS conclaves (
+	id TEXT PRIMARY KEY,
+	commission_id TEXT NOT NULL,
+	shipment_id TEXT,
+	title TEXT NOT NULL,
+	description TEXT,
+	status TEXT NOT NULL CHECK(status IN ('open', 'in_progress', 'decided', 'closed')) DEFAULT 'open',
+	decision TEXT,
+	pinned INTEGER DEFAULT 0,
+	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+	updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+	decided_at DATETIME,
+	FOREIGN KEY (commission_id) REFERENCES commissions(id),
+	FOREIGN KEY (shipment_id) REFERENCES shipments(id)
+);
+
+-- Tomes (Knowledge containers)
+CREATE TABLE IF NOT EXISTS tomes (
+	id TEXT PRIMARY KEY,
+	commission_id TEXT NOT NULL,
+	title TEXT NOT NULL,
+	description TEXT,
+	content TEXT,
+	status TEXT NOT NULL CHECK(status IN ('draft', 'published', 'archived')) DEFAULT 'draft',
+	pinned INTEGER DEFAULT 0,
+	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+	updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+	FOREIGN KEY (commission_id) REFERENCES commissions(id)
+);
+
+-- Notes (Observations and learnings)
+CREATE TABLE IF NOT EXISTS notes (
+	id TEXT PRIMARY KEY,
+	commission_id TEXT NOT NULL,
+	shipment_id TEXT,
+	investigation_id TEXT,
+	conclave_id TEXT,
+	tome_id TEXT,
+	title TEXT NOT NULL,
+	content TEXT,
+	type TEXT CHECK(type IN ('learning', 'concern', 'finding', 'frq', 'bug', 'investigation_report')),
+	status TEXT NOT NULL CHECK(status IN ('open', 'resolved', 'closed')) DEFAULT 'open',
+	pinned INTEGER DEFAULT 0,
+	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+	updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+	FOREIGN KEY (commission_id) REFERENCES commissions(id),
+	FOREIGN KEY (shipment_id) REFERENCES shipments(id),
+	FOREIGN KEY (investigation_id) REFERENCES investigations(id),
+	FOREIGN KEY (conclave_id) REFERENCES conclaves(id),
+	FOREIGN KEY (tome_id) REFERENCES tomes(id)
+);
+
+-- Questions (Open questions)
+CREATE TABLE IF NOT EXISTS questions (
+	id TEXT PRIMARY KEY,
+	commission_id TEXT NOT NULL,
+	shipment_id TEXT,
+	investigation_id TEXT,
+	conclave_id TEXT,
+	title TEXT NOT NULL,
+	content TEXT,
+	answer TEXT,
+	status TEXT NOT NULL CHECK(status IN ('open', 'answered', 'closed')) DEFAULT 'open',
+	pinned INTEGER DEFAULT 0,
+	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+	updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+	answered_at DATETIME,
+	FOREIGN KEY (commission_id) REFERENCES commissions(id),
+	FOREIGN KEY (shipment_id) REFERENCES shipments(id),
+	FOREIGN KEY (investigation_id) REFERENCES investigations(id),
+	FOREIGN KEY (conclave_id) REFERENCES conclaves(id)
+);
+
+-- Plans (Implementation plans)
+CREATE TABLE IF NOT EXISTS plans (
+	id TEXT PRIMARY KEY,
+	commission_id TEXT NOT NULL,
+	shipment_id TEXT,
+	title TEXT NOT NULL,
+	description TEXT,
+	content TEXT,
+	status TEXT NOT NULL CHECK(status IN ('draft', 'approved', 'superseded')) DEFAULT 'draft',
+	pinned INTEGER DEFAULT 0,
+	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+	updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+	approved_at DATETIME,
+	FOREIGN KEY (commission_id) REFERENCES commissions(id),
+	FOREIGN KEY (shipment_id) REFERENCES shipments(id)
+);
+
+-- Repos (Repository configurations)
+CREATE TABLE IF NOT EXISTS repos (
+	id TEXT PRIMARY KEY,
+	name TEXT NOT NULL UNIQUE,
+	url TEXT,
+	local_path TEXT,
+	default_branch TEXT DEFAULT 'main',
+	status TEXT NOT NULL CHECK(status IN ('active', 'archived')) DEFAULT 'active',
+	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+	updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- PRs (Pull requests)
+CREATE TABLE IF NOT EXISTS prs (
+	id TEXT PRIMARY KEY,
+	shipment_id TEXT NOT NULL UNIQUE,
+	repo_id TEXT NOT NULL,
+	commission_id TEXT NOT NULL,
+	number INTEGER,
+	title TEXT NOT NULL,
+	description TEXT,
+	branch TEXT NOT NULL,
+	target_branch TEXT,
+	url TEXT,
+	status TEXT NOT NULL CHECK(status IN ('draft', 'open', 'approved', 'merged', 'closed')) DEFAULT 'open',
+	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+	updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+	merged_at DATETIME,
+	closed_at DATETIME,
+	FOREIGN KEY (shipment_id) REFERENCES shipments(id) ON DELETE CASCADE,
+	FOREIGN KEY (repo_id) REFERENCES repos(id),
+	FOREIGN KEY (commission_id) REFERENCES commissions(id)
 );
 
 -- Create indexes for common queries
-CREATE INDEX IF NOT EXISTS idx_missions_status ON missions(status);
-CREATE INDEX IF NOT EXISTS idx_epics_mission ON epics(mission_id);
-CREATE INDEX IF NOT EXISTS idx_epics_status ON epics(status);
-CREATE INDEX IF NOT EXISTS idx_epics_grove ON epics(assigned_grove_id);
-CREATE INDEX IF NOT EXISTS idx_rabbit_holes_epic ON rabbit_holes(epic_id);
-CREATE INDEX IF NOT EXISTS idx_rabbit_holes_status ON rabbit_holes(status);
-CREATE INDEX IF NOT EXISTS idx_tasks_epic ON tasks(epic_id);
-CREATE INDEX IF NOT EXISTS idx_tasks_rabbit_hole ON tasks(rabbit_hole_id);
-CREATE INDEX IF NOT EXISTS idx_tasks_mission ON tasks(mission_id);
+CREATE INDEX IF NOT EXISTS idx_commissions_status ON commissions(status);
+CREATE INDEX IF NOT EXISTS idx_shipments_commission ON shipments(commission_id);
+CREATE INDEX IF NOT EXISTS idx_shipments_status ON shipments(status);
+CREATE INDEX IF NOT EXISTS idx_shipments_grove ON shipments(assigned_grove_id);
+CREATE INDEX IF NOT EXISTS idx_tasks_shipment ON tasks(shipment_id);
+CREATE INDEX IF NOT EXISTS idx_tasks_commission ON tasks(commission_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
 CREATE INDEX IF NOT EXISTS idx_tasks_grove ON tasks(assigned_grove_id);
-CREATE INDEX IF NOT EXISTS idx_groves_mission ON groves(mission_id);
+CREATE INDEX IF NOT EXISTS idx_groves_commission ON groves(commission_id);
 CREATE INDEX IF NOT EXISTS idx_groves_status ON groves(status);
 CREATE INDEX IF NOT EXISTS idx_handoffs_created ON handoffs(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_messages_recipient ON messages(recipient, read);
-CREATE INDEX IF NOT EXISTS idx_messages_mission ON messages(mission_id);
+CREATE INDEX IF NOT EXISTS idx_messages_commission ON messages(commission_id);
 CREATE INDEX IF NOT EXISTS idx_messages_timestamp ON messages(timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_investigations_commission ON investigations(commission_id);
+CREATE INDEX IF NOT EXISTS idx_investigations_status ON investigations(status);
+CREATE INDEX IF NOT EXISTS idx_conclaves_commission ON conclaves(commission_id);
+CREATE INDEX IF NOT EXISTS idx_conclaves_status ON conclaves(status);
+CREATE INDEX IF NOT EXISTS idx_tomes_commission ON tomes(commission_id);
+CREATE INDEX IF NOT EXISTS idx_notes_commission ON notes(commission_id);
+CREATE INDEX IF NOT EXISTS idx_notes_shipment ON notes(shipment_id);
+CREATE INDEX IF NOT EXISTS idx_questions_commission ON questions(commission_id);
+CREATE INDEX IF NOT EXISTS idx_questions_status ON questions(status);
+CREATE INDEX IF NOT EXISTS idx_plans_commission ON plans(commission_id);
+CREATE INDEX IF NOT EXISTS idx_plans_status ON plans(status);
+CREATE INDEX IF NOT EXISTS idx_repos_name ON repos(name);
+CREATE INDEX IF NOT EXISTS idx_repos_status ON repos(status);
+CREATE INDEX IF NOT EXISTS idx_prs_shipment ON prs(shipment_id);
+CREATE INDEX IF NOT EXISTS idx_prs_repo ON prs(repo_id);
+CREATE INDEX IF NOT EXISTS idx_prs_commission ON prs(commission_id);
+CREATE INDEX IF NOT EXISTS idx_prs_status ON prs(status);
 `
 
 // InitSchema creates the database schema
@@ -145,20 +299,41 @@ func InitSchema() error {
 	}
 
 	if tableCount == 0 {
-		// Fresh install - check if we have old schema tables
+		// Fresh install - check if we have old schema tables (migrations needed)
 		var oldTableCount int
-		err = db.QueryRow("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name IN ('operations', 'expeditions')").Scan(&oldTableCount)
+		err = db.QueryRow("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name IN ('operations', 'expeditions', 'missions')").Scan(&oldTableCount)
 		if err != nil {
 			return err
 		}
 
 		if oldTableCount > 0 {
-			// Old schema exists - run migrations
+			// Old schema exists - run migrations to upgrade
 			return RunMigrations()
 		} else {
-			// Completely fresh install - create new schema directly
+			// Completely fresh install - create modern schema directly
+			// Also create schema_version at max version to prevent migrations from running
 			_, err = db.Exec(schemaSQL)
-			return err
+			if err != nil {
+				return err
+			}
+			// Mark all migrations as applied for fresh installs
+			_, err = db.Exec(`
+				CREATE TABLE IF NOT EXISTS schema_version (
+					version INTEGER PRIMARY KEY,
+					applied_at DATETIME DEFAULT CURRENT_TIMESTAMP
+				)
+			`)
+			if err != nil {
+				return err
+			}
+			// Insert all migration versions as applied
+			for i := 1; i <= 24; i++ {
+				_, err = db.Exec("INSERT INTO schema_version (version) VALUES (?)", i)
+				if err != nil {
+					return err
+				}
+			}
+			return nil
 		}
 	}
 
