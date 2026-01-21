@@ -68,6 +68,10 @@ components:
   templates:
     in: internal/templates/**
 
+  # Scaffold code generation
+  scaffold:
+    in: internal/scaffold/**
+
   tmux:
     in: internal/tmux/**
 
@@ -143,6 +147,11 @@ deps:
   templates:
     anyProjectDeps: false
     anyVendorDeps: true
+
+  # Scaffold depends only on templates
+  scaffold:
+    mayDependOn:
+      - templates
 
   tmux:
     anyProjectDeps: true

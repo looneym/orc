@@ -46,6 +46,9 @@ It coordinates IMPs (Implementation Agents) working in isolated groves (worktree
 	rootCmd.AddCommand(cli.InvestigationCmd())
 	rootCmd.AddCommand(cli.ConclaveCmd())
 
+	// Developer tools
+	rootCmd.AddCommand(cli.ScaffoldCmd())
+
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
