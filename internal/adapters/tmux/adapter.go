@@ -88,5 +88,33 @@ func (a *Adapter) AttachInstructions(sessionName string) string {
 	return tmuxpkg.AttachInstructions(sessionName)
 }
 
+// SplitVertical splits a pane vertically.
+func (a *Adapter) SplitVertical(ctx context.Context, target, workingDir string) error {
+	session := &tmuxpkg.Session{Name: ""}
+	return session.SplitVertical(target, workingDir)
+}
+
+// SplitHorizontal splits a pane horizontally.
+func (a *Adapter) SplitHorizontal(ctx context.Context, target, workingDir string) error {
+	session := &tmuxpkg.Session{Name: ""}
+	return session.SplitHorizontal(target, workingDir)
+}
+
+// SelectWindow selects a window by index.
+func (a *Adapter) SelectWindow(ctx context.Context, sessionName string, index int) error {
+	session := &tmuxpkg.Session{Name: sessionName}
+	return session.SelectWindow(index)
+}
+
+// RenameWindow renames a window.
+func (a *Adapter) RenameWindow(ctx context.Context, target, newName string) error {
+	return tmuxpkg.RenameWindow(target, newName)
+}
+
+// RespawnPane respawns a pane with optional command.
+func (a *Adapter) RespawnPane(ctx context.Context, target string, command ...string) error {
+	return tmuxpkg.RespawnPane(target, command...)
+}
+
 // Ensure Adapter implements the interface
 var _ secondary.TMuxAdapter = (*Adapter)(nil)

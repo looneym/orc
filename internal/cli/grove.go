@@ -16,7 +16,6 @@ import (
 	"github.com/example/orc/internal/config"
 	orccontext "github.com/example/orc/internal/context"
 	"github.com/example/orc/internal/ports/primary"
-	"github.com/example/orc/internal/tmux"
 	"github.com/example/orc/internal/wire"
 )
 
@@ -355,9 +354,6 @@ Examples:
 			}
 			sessionName := strings.TrimSpace(string(sessionNameBytes))
 
-			// Create session object
-			session := &tmux.Session{Name: sessionName}
-
 			// Get next window index by listing current windows
 			windowsOutput, err := exec.Command("tmux", "list-windows", "-t", sessionName, "-F", "#{window_index}").Output()
 			if err != nil {
@@ -374,8 +370,10 @@ Examples:
 			}
 			nextIndex := maxIndex + 1
 
-			// Create grove window with IMP layout
-			_, err = session.CreateGroveWindow(nextIndex, grove.Name, grove.Path)
+			// Create grove window with IMP layout via adapter
+			ctx := context.Background()
+			tmuxAdapter := wire.TMuxAdapter()
+			err = tmuxAdapter.CreateGroveWindow(ctx, sessionName, nextIndex, grove.Name, grove.Path)
 			if err != nil {
 				return fmt.Errorf("failed to create grove window: %w", err)
 			}

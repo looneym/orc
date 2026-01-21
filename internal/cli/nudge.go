@@ -7,7 +7,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/example/orc/internal/agent"
-	"github.com/example/orc/internal/tmux"
 	"github.com/example/orc/internal/wire"
 )
 
@@ -61,13 +60,15 @@ Examples:
 			}
 
 			// Check if session exists
+			ctx := context.Background()
+			tmuxAdapter := wire.TMuxAdapter()
 			sessionName := fmt.Sprintf("orc-%s", identity.MissionID)
-			if !tmux.SessionExists(sessionName) {
+			if !tmuxAdapter.SessionExists(ctx, sessionName) {
 				return fmt.Errorf("tmux session %s not running - agent may not be active", sessionName)
 			}
 
 			// Send nudge
-			if err := tmux.NudgeSession(target, message); err != nil {
+			if err := tmuxAdapter.NudgeSession(ctx, target, message); err != nil {
 				return fmt.Errorf("failed to send nudge: %w", err)
 			}
 

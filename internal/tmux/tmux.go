@@ -255,6 +255,20 @@ func (s *Session) SelectWindow(windowIndex int) error {
 	return cmd.Run()
 }
 
+// RenameWindow renames a window
+func RenameWindow(target, newName string) error {
+	cmd := exec.Command("tmux", "rename-window", "-t", target, newName)
+	return cmd.Run()
+}
+
+// RespawnPane respawns a pane with optional command
+func RespawnPane(target string, command ...string) error {
+	args := []string{"respawn-pane", "-t", target, "-k"}
+	args = append(args, command...)
+	cmd := exec.Command("tmux", args...)
+	return cmd.Run()
+}
+
 // GetSessionInfo returns formatted information about the session
 func GetSessionInfo(name string) (string, error) {
 	cmd := exec.Command("tmux", "list-windows", "-t", name)

@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 
 	"github.com/fatih/color"
@@ -15,7 +14,7 @@ import (
 	orccontext "github.com/example/orc/internal/context"
 	coremission "github.com/example/orc/internal/core/mission"
 	"github.com/example/orc/internal/ports/primary"
-	"github.com/example/orc/internal/tmux"
+	"github.com/example/orc/internal/ports/secondary"
 	"github.com/example/orc/internal/wire"
 )
 
@@ -113,6 +112,8 @@ Examples:
   orc mission start MISSION-001 --workspace ~/work/mission-001`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		ctx := context.Background()
+
 		// Check agent identity - only ORC can start missions
 		identity, _ := agent.GetCurrentAgentID()
 		guardCtx := coremission.GuardContext{
@@ -174,22 +175,22 @@ Examples:
 
 		// Create TMux session
 		sessionName := fmt.Sprintf("orc-%s", missionID)
+		tmuxAdapter := wire.TMuxAdapter()
 
 		// Check if session already exists
-		if tmux.SessionExists(sessionName) {
+		if tmuxAdapter.SessionExists(ctx, sessionName) {
 			return fmt.Errorf("TMux session '%s' already exists. Attach with: tmux attach -t %s", sessionName, sessionName)
 		}
 
 		fmt.Printf("Creating TMux session: %s\n", sessionName)
 
 		// Create session with base numbering from 1
-		session, err := tmux.NewSession(sessionName, workspacePath)
-		if err != nil {
+		if err := tmuxAdapter.CreateSession(ctx, sessionName, workspacePath); err != nil {
 			return fmt.Errorf("failed to create TMux session: %w", err)
 		}
 
 		// Create ORC window (window 1) with claude
-		if err := session.CreateOrcWindow(workspacePath); err != nil {
+		if err := tmuxAdapter.CreateOrcWindow(ctx, sessionName, workspacePath); err != nil {
 			return fmt.Errorf("failed to create ORC window: %w", err)
 		}
 		fmt.Printf("  ✓ Window 1: orc (claude | vim | shell)\n")
@@ -211,7 +212,7 @@ Examples:
 			}
 
 			// Create grove window with vim, claude IMP, and shell
-			if _, err := session.CreateGroveWindow(windowIndex, grove.Name, grove.Path); err != nil {
+			if err := tmuxAdapter.CreateGroveWindow(ctx, sessionName, windowIndex, grove.Name, grove.Path); err != nil {
 				fmt.Printf("  ⚠️  Warning: Could not create window for grove %s: %v\n", grove.ID, err)
 				continue
 			}
@@ -225,12 +226,12 @@ Examples:
 		}
 
 		// Select the ORC window (window 1) as default
-		session.SelectWindow(1)
+		tmuxAdapter.SelectWindow(ctx, sessionName, 1)
 
 		fmt.Println()
 		fmt.Printf("Mission workspace ready!\n")
 		fmt.Println()
-		fmt.Println(tmux.AttachInstructions(sessionName))
+		fmt.Println(tmuxAdapter.AttachInstructions(sessionName))
 
 		return nil
 	},
@@ -354,7 +355,8 @@ Examples:
 
 		if createTmux {
 			sessionName := fmt.Sprintf("orc-%s", missionID)
-			tmuxPlan := orchSvc.PlanTmuxSession(state, workspacePath, sessionName, tmux.SessionExists(sessionName), &tmuxChecker{})
+			tmuxAdapter := wire.TMuxAdapter()
+			tmuxPlan := orchSvc.PlanTmuxSession(state, workspacePath, sessionName, tmuxAdapter.SessionExists(ctx, sessionName), &tmuxChecker{adapter: tmuxAdapter})
 			displayTmuxPlan(tmuxPlan)
 		}
 
@@ -383,7 +385,8 @@ Examples:
 		fmt.Println()
 		fmt.Println("Next steps:")
 		fmt.Printf("  cd %s\n", workspacePath)
-		if createTmux && !tmux.SessionExists(fmt.Sprintf("orc-%s", missionID)) {
+		tmuxAdapterForCheck := wire.TMuxAdapter()
+		if createTmux && !tmuxAdapterForCheck.SessionExists(ctx, fmt.Sprintf("orc-%s", missionID)) {
 			fmt.Printf("  tmux attach -t orc-%s\n", missionID)
 		}
 		fmt.Printf("  orc summary --mission %s\n", missionID)
@@ -392,19 +395,21 @@ Examples:
 	},
 }
 
-// tmuxChecker implements app.TmuxWindowChecker for the tmux package
-type tmuxChecker struct{}
+// tmuxChecker implements app.TmuxWindowChecker using the TMuxAdapter
+type tmuxChecker struct {
+	adapter secondary.TMuxAdapter
+}
 
 func (t *tmuxChecker) WindowExists(session, window string) bool {
-	return tmux.WindowExists(session, window)
+	return t.adapter.WindowExists(context.Background(), session, window)
 }
 
 func (t *tmuxChecker) GetPaneCount(session, window string) int {
-	return tmux.GetPaneCount(session, window)
+	return t.adapter.GetPaneCount(context.Background(), session, window)
 }
 
 func (t *tmuxChecker) GetPaneCommand(session, window string, pane int) string {
-	return tmux.GetPaneCommand(session, window, pane)
+	return t.adapter.GetPaneCommand(context.Background(), session, window, pane)
 }
 
 // displayMissionState shows the database state section of the plan
@@ -532,10 +537,13 @@ func displayInfrastructureResult(result *app.InfrastructureApplyResult, missionI
 
 // applyTmuxSession creates or updates the TMux session for a mission
 func applyTmuxSession(sessionName string, groves []*primary.Grove, grovesDir, workspacePath string) {
+	ctx := context.Background()
+	tmuxAdapter := wire.TMuxAdapter()
+
 	fmt.Println()
 	fmt.Println("🖥️  Creating TMux session...")
 
-	if tmux.SessionExists(sessionName) {
+	if tmuxAdapter.SessionExists(ctx, sessionName) {
 		fmt.Printf("  ℹ️  Session %s already exists - checking windows\n", sessionName)
 
 		for i, grove := range groves {
@@ -543,16 +551,15 @@ func applyTmuxSession(sessionName string, groves []*primary.Grove, grovesDir, wo
 			grovePath := filepath.Join(grovesDir, grove.Name)
 
 			if _, err := os.Stat(grovePath); err == nil {
-				if tmux.WindowExists(sessionName, grove.Name) {
-					paneCount := tmux.GetPaneCount(sessionName, grove.Name)
-					pane2Cmd := tmux.GetPaneCommand(sessionName, grove.Name, 2)
+				if tmuxAdapter.WindowExists(ctx, sessionName, grove.Name) {
+					paneCount := tmuxAdapter.GetPaneCount(ctx, sessionName, grove.Name)
+					pane2Cmd := tmuxAdapter.GetPaneCommand(ctx, sessionName, grove.Name, 2)
 
 					if paneCount == 3 && pane2Cmd == "orc" {
 						fmt.Printf("  ✓ Window %d (%s): IMP already running [%s]\n", windowIndex, grove.Name, grove.ID)
 					} else if paneCount == 3 {
 						target := fmt.Sprintf("%s:%s.2", sessionName, grove.Name)
-						connectCmd := exec.Command("tmux", "respawn-pane", "-t", target, "-k", "orc", "connect")
-						if err := connectCmd.Run(); err != nil {
+						if err := tmuxAdapter.RespawnPane(ctx, target, "orc", "connect"); err != nil {
 							fmt.Printf("  ⚠️  Could not respawn pane in window %s: %v\n", grove.Name, err)
 						} else {
 							fmt.Printf("  ✓ Window %d (%s): IMP rebooted [%s]\n", windowIndex, grove.Name, grove.ID)
@@ -578,8 +585,7 @@ func applyTmuxSession(sessionName string, groves []*primary.Grove, grovesDir, wo
 			}
 		}
 
-		session, err := tmux.NewSession(sessionName, startDir)
-		if err != nil {
+		if err := tmuxAdapter.CreateSession(ctx, sessionName, startDir); err != nil {
 			fmt.Printf("  ⚠️  Failed to create TMux session: %v\n", err)
 			return
 		}
@@ -591,16 +597,16 @@ func applyTmuxSession(sessionName string, groves []*primary.Grove, grovesDir, wo
 			if _, err := os.Stat(grovePath); err == nil {
 				if i == 0 {
 					target := fmt.Sprintf("%s:1", sessionName)
-					exec.Command("tmux", "rename-window", "-t", target, grove.Name).Run()
+					tmuxAdapter.RenameWindow(ctx, target, grove.Name)
 					target = fmt.Sprintf("%s:%s", sessionName, grove.Name)
-					session.SplitVertical(target, grovePath)
+					tmuxAdapter.SplitVertical(ctx, target, grovePath)
 					rightPane := fmt.Sprintf("%s.2", target)
-					session.SplitHorizontal(rightPane, grovePath)
+					tmuxAdapter.SplitHorizontal(ctx, rightPane, grovePath)
 					topRightPane := fmt.Sprintf("%s.2", target)
-					exec.Command("tmux", "respawn-pane", "-t", topRightPane, "-k", "orc", "connect").Run()
+					tmuxAdapter.RespawnPane(ctx, topRightPane, "orc", "connect")
 					fmt.Printf("✓ Window %d: %s (IMP auto-booting) [%s]\n", windowIndex, grove.Name, grove.ID)
 				} else {
-					if _, err := session.CreateGroveWindowShell(windowIndex, grove.Name, grovePath); err != nil {
+					if err := tmuxAdapter.CreateGroveWindowShell(ctx, sessionName, windowIndex, grove.Name, grovePath); err != nil {
 						fmt.Printf("  ⚠️  Could not create window for grove %s: %v\n", grove.ID, err)
 						continue
 					}
@@ -612,7 +618,7 @@ func applyTmuxSession(sessionName string, groves []*primary.Grove, grovesDir, wo
 		}
 
 		if len(groves) > 0 {
-			session.SelectWindow(1)
+			tmuxAdapter.SelectWindow(ctx, sessionName, 1)
 		}
 
 		fmt.Println()

@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -9,7 +10,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/example/orc/internal/tmux"
+	"github.com/example/orc/internal/wire"
 )
 
 var attachCmd = &cobra.Command{
@@ -33,7 +34,9 @@ If the session already exists, provides attach instructions.
 Examples:
   orc attach`,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		ctx := context.Background()
 		sessionName := "orc-master"
+		tmuxAdapter := wire.TMuxAdapter()
 
 		// Get ORC source directory path
 		home, err := os.UserHomeDir()
@@ -43,7 +46,7 @@ Examples:
 		orcPath := filepath.Join(home, "src", "orc")
 
 		// Check if session already exists
-		if tmux.SessionExists(sessionName) {
+		if tmuxAdapter.SessionExists(ctx, sessionName) {
 			fmt.Printf("✓ Attaching to existing session: %s\n", sessionName)
 
 			// Find tmux binary
@@ -75,13 +78,12 @@ Examples:
 		fmt.Println()
 
 		// Create session with base numbering from 1
-		session, err := tmux.NewSession(sessionName, orcPath)
-		if err != nil {
+		if err := tmuxAdapter.CreateSession(ctx, sessionName, orcPath); err != nil {
 			return fmt.Errorf("failed to create TMux session: %w", err)
 		}
 
 		// Create ORC orchestrator window with sophisticated layout
-		if err := session.CreateOrcWindow(orcPath); err != nil {
+		if err := tmuxAdapter.CreateOrcWindow(ctx, sessionName, orcPath); err != nil {
 			return fmt.Errorf("failed to create ORC window: %w", err)
 		}
 
@@ -98,7 +100,7 @@ Examples:
 		tmuxPath, err := exec.LookPath("tmux")
 		if err != nil {
 			// Fallback to instructions if tmux not found
-			fmt.Println(tmux.AttachInstructions(sessionName))
+			fmt.Println(tmuxAdapter.AttachInstructions(sessionName))
 			return nil
 		}
 

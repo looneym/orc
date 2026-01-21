@@ -21,10 +21,17 @@ type TMuxAdapter interface {
 	SendKeys(ctx context.Context, target, keys string) error
 	GetPaneCount(ctx context.Context, sessionName, windowName string) int
 	GetPaneCommand(ctx context.Context, sessionName, windowName string, paneNum int) string
+	SplitVertical(ctx context.Context, target, workingDir string) error
+	SplitHorizontal(ctx context.Context, target, workingDir string) error
 
 	// Communication
 	NudgeSession(ctx context.Context, target, message string) error
 
 	// Information
 	AttachInstructions(sessionName string) string
+
+	// Window navigation
+	SelectWindow(ctx context.Context, sessionName string, index int) error
+	RenameWindow(ctx context.Context, target, newName string) error
+	RespawnPane(ctx context.Context, target string, command ...string) error
 }

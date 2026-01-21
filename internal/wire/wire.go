@@ -11,9 +11,11 @@ import (
 	cliadapter "github.com/example/orc/internal/adapters/cli"
 	"github.com/example/orc/internal/adapters/persistence"
 	"github.com/example/orc/internal/adapters/sqlite"
+	tmuxadapter "github.com/example/orc/internal/adapters/tmux"
 	"github.com/example/orc/internal/app"
 	"github.com/example/orc/internal/db"
 	"github.com/example/orc/internal/ports/primary"
+	"github.com/example/orc/internal/ports/secondary"
 )
 
 var (
@@ -32,6 +34,7 @@ var (
 	tagService                  primary.TagService
 	messageService              primary.MessageService
 	missionOrchestrationService *app.MissionOrchestrationService
+	tmuxService                 secondary.TMuxAdapter
 	once                        sync.Once
 )
 
@@ -125,6 +128,12 @@ func MissionOrchestrationService() *app.MissionOrchestrationService {
 	return missionOrchestrationService
 }
 
+// TMuxAdapter returns the singleton TMuxAdapter instance.
+func TMuxAdapter() secondary.TMuxAdapter {
+	once.Do(initServices)
+	return tmuxService
+}
+
 // initServices initializes all services and their dependencies.
 // This is called once via sync.Once.
 func initServices() {
@@ -138,9 +147,11 @@ func initServices() {
 	missionRepo := sqlite.NewMissionRepository(database)
 	groveRepo := sqlite.NewGroveRepository(database)
 	agentProvider := persistence.NewAgentIdentityProvider()
+	tmuxAdapter := tmuxadapter.NewAdapter()
+	tmuxService = tmuxAdapter // Store for getter
 
-	// Create effect executor with injected repositories
-	executor := app.NewEffectExecutor(groveRepo, missionRepo)
+	// Create effect executor with injected repositories and adapters
+	executor := app.NewEffectExecutor(groveRepo, missionRepo, tmuxAdapter)
 
 	// Create services (primary ports implementation)
 	missionService = app.NewMissionService(missionRepo, groveRepo, agentProvider, executor)

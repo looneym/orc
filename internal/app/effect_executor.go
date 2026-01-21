@@ -8,7 +8,6 @@ import (
 
 	"github.com/example/orc/internal/core/effects"
 	"github.com/example/orc/internal/ports/secondary"
-	"github.com/example/orc/internal/tmux"
 )
 
 // EffectExecutor interprets and executes effects.
@@ -21,13 +20,15 @@ type EffectExecutor interface {
 type DefaultEffectExecutor struct {
 	groveRepo   secondary.GroveRepository
 	missionRepo secondary.MissionRepository
+	tmuxAdapter secondary.TMuxAdapter
 }
 
-// NewEffectExecutor creates a new DefaultEffectExecutor with injected repositories.
-func NewEffectExecutor(groveRepo secondary.GroveRepository, missionRepo secondary.MissionRepository) *DefaultEffectExecutor {
+// NewEffectExecutor creates a new DefaultEffectExecutor with injected dependencies.
+func NewEffectExecutor(groveRepo secondary.GroveRepository, missionRepo secondary.MissionRepository, tmuxAdapter secondary.TMuxAdapter) *DefaultEffectExecutor {
 	return &DefaultEffectExecutor{
 		groveRepo:   groveRepo,
 		missionRepo: missionRepo,
+		tmuxAdapter: tmuxAdapter,
 	}
 }
 
@@ -128,8 +129,7 @@ func (e *DefaultEffectExecutor) executeTMux(ctx context.Context, eff effects.TMu
 		if workingDir == "" {
 			workingDir = "."
 		}
-		_, err := tmux.NewSession(eff.SessionName, workingDir)
-		return err
+		return e.tmuxAdapter.CreateSession(ctx, eff.SessionName, workingDir)
 	case "new_window":
 		// TMux window creation requires an existing session
 		// This is handled through the session object in the current tmux package
