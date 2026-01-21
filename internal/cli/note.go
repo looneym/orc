@@ -6,10 +6,11 @@ import (
 	"os"
 	"text/tabwriter"
 
+	"github.com/spf13/cobra"
+
 	orccontext "github.com/example/orc/internal/context"
 	"github.com/example/orc/internal/ports/primary"
 	"github.com/example/orc/internal/wire"
-	"github.com/spf13/cobra"
 )
 
 var noteCmd = &cobra.Command{

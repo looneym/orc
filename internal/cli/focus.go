@@ -6,9 +6,10 @@ import (
 	"os"
 	"strings"
 
+	"github.com/spf13/cobra"
+
 	"github.com/example/orc/internal/config"
 	"github.com/example/orc/internal/wire"
-	"github.com/spf13/cobra"
 )
 
 // FocusCmd returns the focus command
@@ -139,9 +140,9 @@ func showCurrentFocus(cfg *config.Config) error {
 
 	containerType, title, err := validateAndGetInfo(focusID)
 	if err != nil {
-		// Focus is set but container no longer exists
+		// Focus is set but container no longer exists - graceful degradation, not an error
 		fmt.Printf("Focus: %s (container not found - may have been deleted)\n", focusID)
-		return nil
+		return nil //nolint:nilerr // intentional: show info even if container deleted
 	}
 
 	fmt.Printf("Focus: %s\n", focusID)

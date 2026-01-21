@@ -7,13 +7,14 @@ import (
 	"os"
 	"strings"
 
+	"github.com/fatih/color"
+	"github.com/spf13/cobra"
+
 	"github.com/example/orc/internal/config"
 	ctx "github.com/example/orc/internal/context"
 	"github.com/example/orc/internal/models"
 	"github.com/example/orc/internal/ports/primary"
 	"github.com/example/orc/internal/wire"
-	"github.com/fatih/color"
-	"github.com/spf13/cobra"
 )
 
 // filterConfig holds all filtering settings for the summary display

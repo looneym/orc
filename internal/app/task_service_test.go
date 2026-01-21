@@ -15,26 +15,26 @@ import (
 
 // mockTaskRepository implements secondary.TaskRepository for testing.
 type mockTaskRepository struct {
-	tasks               map[string]*secondary.TaskRecord
-	tags                map[string]*secondary.TagRecord // taskID -> tag
-	createErr           error
-	getErr              error
-	updateErr           error
-	deleteErr           error
-	listErr             error
-	updateStatusErr     error
-	claimErr            error
-	missionExistsResult bool
-	missionExistsErr    error
+	tasks                map[string]*secondary.TaskRecord
+	tags                 map[string]*secondary.TagRecord // taskID -> tag
+	createErr            error
+	getErr               error
+	updateErr            error
+	deleteErr            error
+	listErr              error
+	updateStatusErr      error
+	claimErr             error
+	missionExistsResult  bool
+	missionExistsErr     error
 	shipmentExistsResult bool
-	shipmentExistsErr   error
+	shipmentExistsErr    error
 }
 
 func newMockTaskRepository() *mockTaskRepository {
 	return &mockTaskRepository{
-		tasks:               make(map[string]*secondary.TaskRecord),
-		tags:                make(map[string]*secondary.TagRecord),
-		missionExistsResult: true,
+		tasks:                make(map[string]*secondary.TaskRecord),
+		tags:                 make(map[string]*secondary.TagRecord),
+		missionExistsResult:  true,
 		shipmentExistsResult: true,
 	}
 }

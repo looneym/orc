@@ -38,6 +38,7 @@ linters-settings:
     enable-all: true
     disable:
       - fieldalignment  # Too noisy for development
+      - shadow          # Common Go pattern of reusing err
 
   goimports:
     local-prefixes: github.com/example/orc

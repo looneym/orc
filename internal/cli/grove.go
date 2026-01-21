@@ -11,12 +11,13 @@ import (
 	"text/tabwriter"
 	"time"
 
+	"github.com/spf13/cobra"
+
 	"github.com/example/orc/internal/config"
 	orccontext "github.com/example/orc/internal/context"
 	"github.com/example/orc/internal/ports/primary"
 	"github.com/example/orc/internal/tmux"
 	"github.com/example/orc/internal/wire"
-	"github.com/spf13/cobra"
 )
 
 // GroveCmd returns the grove command

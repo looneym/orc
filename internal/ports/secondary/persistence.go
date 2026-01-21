@@ -87,12 +87,12 @@ type GroveRepository interface {
 
 // GroveRecord represents a grove as stored in persistence.
 type GroveRecord struct {
-	ID          string
-	Name        string
-	MissionID   string
+	ID           string
+	Name         string
+	MissionID    string
 	WorktreePath string
-	Status      string
-	CreatedAt   string
+	Status       string
+	CreatedAt    string
 }
 
 // AgentIdentityProvider defines the secondary port for agent identity resolution.
@@ -105,9 +105,9 @@ type AgentIdentityProvider interface {
 // AgentIdentity represents an agent's identity as provided by the secondary port.
 type AgentIdentity struct {
 	Type      AgentType
-	ID        string   // "ORC" for orchestrator, Grove ID for IMP
-	FullID    string   // Complete ID like "ORC" or "IMP-GROVE-001"
-	MissionID string   // Mission ID (empty for ORC outside mission)
+	ID        string // "ORC" for orchestrator, Grove ID for IMP
+	FullID    string // Complete ID like "ORC" or "IMP-GROVE-001"
+	MissionID string // Mission ID (empty for ORC outside mission)
 }
 
 // AgentType represents the type of agent.

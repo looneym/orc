@@ -4,10 +4,11 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/spf13/cobra"
+
 	"github.com/example/orc/internal/agent"
 	"github.com/example/orc/internal/tmux"
 	"github.com/example/orc/internal/wire"
-	"github.com/spf13/cobra"
 )
 
 // NudgeCmd returns the nudge command

@@ -156,10 +156,7 @@ func (s *MissionServiceImpl) LaunchMission(ctx context.Context, req primary.Laun
 	}
 
 	// 2. Create mission first
-	createResp, err := s.CreateMission(ctx, primary.CreateMissionRequest{
-		Title:       req.Title,
-		Description: req.Description,
-	})
+	createResp, err := s.CreateMission(ctx, primary.CreateMissionRequest(req))
 	if err != nil {
 		return nil, err
 	}

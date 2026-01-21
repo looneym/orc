@@ -6,12 +6,13 @@ import (
 	"os"
 	"strings"
 
+	"github.com/spf13/cobra"
+
 	"github.com/example/orc/internal/config"
 	ctx "github.com/example/orc/internal/context"
 	"github.com/example/orc/internal/ports/primary"
 	"github.com/example/orc/internal/templates"
 	"github.com/example/orc/internal/wire"
-	"github.com/spf13/cobra"
 )
 
 // PrimeCmd returns the prime command
@@ -200,7 +201,7 @@ func buildIMPPrimeOutput(groveCtx *ctx.GroveContext, cwd string) string {
 
 	// Section 1: IMP Identity
 	output.WriteString("## Identity\n\n")
-	output.WriteString(fmt.Sprintf("**Role**: Implementation Agent (IMP)\n"))
+	output.WriteString("**Role**: Implementation Agent (IMP)\n")
 	output.WriteString(fmt.Sprintf("**Grove**: %s (`%s`)\n", groveCtx.Name, groveCtx.GroveID))
 	output.WriteString(fmt.Sprintf("**Mission**: `%s`\n", groveCtx.MissionID))
 	output.WriteString(fmt.Sprintf("**Location**: `%s`\n\n", cwd))

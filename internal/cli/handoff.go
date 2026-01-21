@@ -9,10 +9,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/spf13/cobra"
+
 	"github.com/example/orc/internal/config"
 	"github.com/example/orc/internal/ports/primary"
 	"github.com/example/orc/internal/wire"
-	"github.com/spf13/cobra"
 )
 
 var handoffCmd = &cobra.Command{

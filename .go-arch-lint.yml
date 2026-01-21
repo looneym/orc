@@ -71,6 +71,10 @@ components:
   tmux:
     in: internal/tmux/**
 
+  # Version info (build-time injected)
+  version:
+    in: internal/version/**
+
 deps:
   # Core can depend on itself (effects, shared types)
   core:
@@ -142,3 +146,8 @@ deps:
 
   tmux:
     anyProjectDeps: true
+
+  # Version - no internal deps (just stdlib)
+  version:
+    anyProjectDeps: false
+    anyVendorDeps: true

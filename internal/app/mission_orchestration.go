@@ -388,10 +388,10 @@ func (s *MissionOrchestrationService) writeClaudeSettings(path string) error {
 
 // TmuxSessionPlan describes the TMux session to create or update.
 type TmuxSessionPlan struct {
-	SessionName  string
-	WorkingDir   string
+	SessionName   string
+	WorkingDir    string
 	SessionExists bool
-	WindowPlans  []WindowPlan
+	WindowPlans   []WindowPlan
 }
 
 // WindowPlan describes a TMux window to create or update.

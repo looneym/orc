@@ -15,20 +15,20 @@ import (
 
 // mockPlanRepository implements secondary.PlanRepository for testing.
 type mockPlanRepository struct {
-	plans                      map[string]*secondary.PlanRecord
-	activePlanForShipment      map[string]string // shipmentID -> planID
-	createErr                  error
-	getErr                     error
-	updateErr                  error
-	deleteErr                  error
-	listErr                    error
-	approveErr                 error
-	missionExistsResult        bool
-	missionExistsErr           error
-	shipmentExistsResult       bool
-	shipmentExistsErr          error
-	hasActivePlanResult        bool
-	hasActivePlanErr           error
+	plans                 map[string]*secondary.PlanRecord
+	activePlanForShipment map[string]string // shipmentID -> planID
+	createErr             error
+	getErr                error
+	updateErr             error
+	deleteErr             error
+	listErr               error
+	approveErr            error
+	missionExistsResult   bool
+	missionExistsErr      error
+	shipmentExistsResult  bool
+	shipmentExistsErr     error
+	hasActivePlanResult   bool
+	hasActivePlanErr      error
 }
 
 func newMockPlanRepository() *mockPlanRepository {

@@ -7,6 +7,9 @@ import (
 	"os/exec"
 	"path/filepath"
 
+	"github.com/fatih/color"
+	"github.com/spf13/cobra"
+
 	"github.com/example/orc/internal/agent"
 	"github.com/example/orc/internal/app"
 	orccontext "github.com/example/orc/internal/context"
@@ -14,8 +17,6 @@ import (
 	"github.com/example/orc/internal/ports/primary"
 	"github.com/example/orc/internal/tmux"
 	"github.com/example/orc/internal/wire"
-	"github.com/fatih/color"
-	"github.com/spf13/cobra"
 )
 
 // Color helpers for plan output

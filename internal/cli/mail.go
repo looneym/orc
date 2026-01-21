@@ -5,10 +5,11 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/spf13/cobra"
+
 	"github.com/example/orc/internal/agent"
 	"github.com/example/orc/internal/ports/primary"
 	"github.com/example/orc/internal/wire"
-	"github.com/spf13/cobra"
 )
 
 // MailCmd returns the mail command
@@ -268,11 +269,9 @@ Example:
 
 			// Display messages
 			for _, msg := range messages {
-				direction := "→"
+				direction := "←"
 				if msg.Sender == identity.FullID {
 					direction = "→"
-				} else {
-					direction = "←"
 				}
 
 				fmt.Printf("%s [%s] %s\n", direction, msg.Timestamp, msg.Subject)

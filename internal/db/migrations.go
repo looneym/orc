@@ -5,9 +5,6 @@ import (
 	"fmt"
 )
 
-// schemaVersion tracks the current schema version
-const currentSchemaVersion = 21
-
 // Migration represents a database migration
 type Migration struct {
 	Version int

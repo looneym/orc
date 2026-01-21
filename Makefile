@@ -3,6 +3,14 @@
 # Go binary location (handles empty GOBIN)
 GOBIN := $(shell go env GOPATH)/bin
 
+# Version info (injected at build time)
+VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
+COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+BUILD_TIME := $(shell date -u '+%Y-%m-%d %H:%M:%S')
+LDFLAGS := -X 'github.com/example/orc/internal/version.Version=$(VERSION)' \
+           -X 'github.com/example/orc/internal/version.Commit=$(COMMIT)' \
+           -X 'github.com/example/orc/internal/version.BuildTime=$(BUILD_TIME)'
+
 # Default target
 .DEFAULT_GOAL := help
 
@@ -24,7 +32,7 @@ install: install-binary install-shim
 # Install the actual binary as orc-bin
 install-binary:
 	@echo "Building and installing orc-bin..."
-	go build -o $(GOBIN)/orc-bin ./cmd/orc
+	go build -ldflags "$(LDFLAGS)" -o $(GOBIN)/orc-bin ./cmd/orc
 
 # Install the shim script as orc
 install-shim:
@@ -56,7 +64,7 @@ uninstall-shim:
 # Build local binary for development (preferred command)
 dev:
 	@echo "Building local ./orc..."
-	@go build -o orc ./cmd/orc
+	@go build -ldflags "$(LDFLAGS)" -o orc ./cmd/orc
 	@echo "✓ Built ./orc (local development binary)"
 
 # Alias for backwards compatibility

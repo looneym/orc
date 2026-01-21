@@ -8,9 +8,10 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/spf13/cobra"
+
 	"github.com/example/orc/internal/ports/primary"
 	"github.com/example/orc/internal/wire"
-	"github.com/spf13/cobra"
 )
 
 // TestCmd returns the test command

@@ -5,10 +5,11 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/spf13/cobra"
+
 	"github.com/example/orc/internal/config"
 	ctx "github.com/example/orc/internal/context"
 	"github.com/example/orc/internal/wire"
-	"github.com/spf13/cobra"
 )
 
 // StatusCmd returns the status command
