@@ -192,7 +192,7 @@ func initServices() {
 	messageService = app.NewMessageService(messageRepo)
 
 	// Create orchestration services
-	missionOrchestrationService = app.NewMissionOrchestrationService(missionService, groveService)
+	missionOrchestrationService = app.NewMissionOrchestrationService(missionService, groveService, agentProvider)
 }
 
 // MissionAdapter returns a new MissionAdapter writing to stdout.

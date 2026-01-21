@@ -10,24 +10,46 @@ import (
 	"time"
 
 	"github.com/example/orc/internal/config"
+	coremission "github.com/example/orc/internal/core/mission"
 	"github.com/example/orc/internal/ports/primary"
+	"github.com/example/orc/internal/ports/secondary"
 )
 
 // MissionOrchestrationService handles complex mission infrastructure operations.
 // It implements the plan/apply pattern for idempotent infrastructure management.
 type MissionOrchestrationService struct {
-	missionSvc primary.MissionService
-	groveSvc   primary.GroveService
+	missionSvc    primary.MissionService
+	groveSvc      primary.GroveService
+	agentProvider secondary.AgentIdentityProvider
 }
 
 // NewMissionOrchestrationService creates a new orchestration service.
-func NewMissionOrchestrationService(missionSvc primary.MissionService, groveSvc primary.GroveService) *MissionOrchestrationService {
+func NewMissionOrchestrationService(missionSvc primary.MissionService, groveSvc primary.GroveService, agentProvider secondary.AgentIdentityProvider) *MissionOrchestrationService {
 	return &MissionOrchestrationService{
-		missionSvc: missionSvc,
-		groveSvc:   groveSvc,
+		missionSvc:    missionSvc,
+		groveSvc:      groveSvc,
+		agentProvider: agentProvider,
 	}
 }
 
+// CheckLaunchPermission verifies the current agent can launch/start missions.
+// Returns nil if allowed, error with user-friendly message if not.
+func (s *MissionOrchestrationService) CheckLaunchPermission(ctx context.Context) error {
+	identity, err := s.agentProvider.GetCurrentIdentity(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get agent identity: %w", err)
+	}
+
+	guardCtx := coremission.GuardContext{
+		AgentType: coremission.AgentType(identity.Type),
+		AgentID:   identity.FullID,
+		MissionID: identity.MissionID,
+	}
+	if result := coremission.CanLaunchMission(guardCtx); !result.Allowed {
+		return result.Error()
+	}
+	return nil
+}
 
 // LoadMissionState loads the mission and its groves from the database.
 func (s *MissionOrchestrationService) LoadMissionState(ctx context.Context, missionID string) (*primary.MissionState, error) {
@@ -324,7 +346,6 @@ func (s *MissionOrchestrationService) writeClaudeSettings(path string) error {
 	return nil
 }
 
-
 // PlanTmuxSession generates a plan for the TMux session.
 func (s *MissionOrchestrationService) PlanTmuxSession(state *primary.MissionState, workspacePath, sessionName string, sessionExists bool, windowChecker primary.TmuxWindowChecker) *primary.TmuxSessionPlan {
 	plan := &primary.TmuxSessionPlan{
@@ -380,8 +401,6 @@ func (s *MissionOrchestrationService) PlanTmuxSession(state *primary.MissionStat
 
 	return plan
 }
-
-
 
 // FormatTimestamp formats a time for display.
 func FormatTimestamp(t time.Time) string {

@@ -4,9 +4,11 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/example/orc/internal/ports/primary"
+	"github.com/example/orc/internal/ports/secondary"
 )
 
 // MockMissionService for testing
@@ -120,6 +122,7 @@ func TestMissionOrchestrationService_LoadMissionState(t *testing.T) {
 
 	missionSvc := newMockMissionService()
 	groveSvc := newMockGroveService()
+	agentProvider := newMockAgentProvider(secondary.AgentTypeORC)
 
 	missionSvc.missions["MISSION-001"] = &primary.Mission{
 		ID:    "MISSION-001",
@@ -131,7 +134,7 @@ func TestMissionOrchestrationService_LoadMissionState(t *testing.T) {
 		{ID: "GROVE-002", Name: "grove-b", MissionID: "MISSION-001"},
 	}
 
-	svc := NewMissionOrchestrationService(missionSvc, groveSvc)
+	svc := NewMissionOrchestrationService(missionSvc, groveSvc, agentProvider)
 
 	state, err := svc.LoadMissionState(ctx, "MISSION-001")
 	if err != nil {
@@ -152,8 +155,9 @@ func TestMissionOrchestrationService_LoadMissionState_NotFound(t *testing.T) {
 
 	missionSvc := newMockMissionService()
 	groveSvc := newMockGroveService()
+	agentProvider := newMockAgentProvider(secondary.AgentTypeORC)
 
-	svc := NewMissionOrchestrationService(missionSvc, groveSvc)
+	svc := NewMissionOrchestrationService(missionSvc, groveSvc, agentProvider)
 
 	_, err := svc.LoadMissionState(ctx, "MISSION-999")
 	if err == nil {
@@ -164,7 +168,8 @@ func TestMissionOrchestrationService_LoadMissionState_NotFound(t *testing.T) {
 func TestMissionOrchestrationService_AnalyzeInfrastructure(t *testing.T) {
 	missionSvc := newMockMissionService()
 	groveSvc := newMockGroveService()
-	svc := NewMissionOrchestrationService(missionSvc, groveSvc)
+	agentProvider := newMockAgentProvider(secondary.AgentTypeORC)
+	svc := NewMissionOrchestrationService(missionSvc, groveSvc, agentProvider)
 
 	state := &primary.MissionState{
 		Mission: &primary.Mission{ID: "MISSION-001", Title: "Test"},
@@ -201,7 +206,8 @@ func TestMissionOrchestrationService_ApplyInfrastructure(t *testing.T) {
 
 	missionSvc := newMockMissionService()
 	groveSvc := newMockGroveService()
-	svc := NewMissionOrchestrationService(missionSvc, groveSvc)
+	agentProvider := newMockAgentProvider(secondary.AgentTypeORC)
+	svc := NewMissionOrchestrationService(missionSvc, groveSvc, agentProvider)
 
 	// Create a temp directory for testing
 	tempDir, err := os.MkdirTemp("", "orc-test-*")
@@ -250,7 +256,8 @@ func TestMissionOrchestrationService_ApplyInfrastructure(t *testing.T) {
 func TestMissionOrchestrationService_PlanTmuxSession(t *testing.T) {
 	missionSvc := newMockMissionService()
 	groveSvc := newMockGroveService()
-	svc := NewMissionOrchestrationService(missionSvc, groveSvc)
+	agentProvider := newMockAgentProvider(secondary.AgentTypeORC)
+	svc := NewMissionOrchestrationService(missionSvc, groveSvc, agentProvider)
 
 	// Create a temp directory with a grove
 	tempDir, err := os.MkdirTemp("", "orc-test-*")
@@ -288,3 +295,36 @@ func TestMissionOrchestrationService_PlanTmuxSession(t *testing.T) {
 	}
 }
 
+func TestCheckLaunchPermission_ORCAllowed(t *testing.T) {
+	ctx := context.Background()
+
+	missionSvc := newMockMissionService()
+	groveSvc := newMockGroveService()
+	agentProvider := newMockAgentProvider(secondary.AgentTypeORC)
+
+	svc := NewMissionOrchestrationService(missionSvc, groveSvc, agentProvider)
+
+	err := svc.CheckLaunchPermission(ctx)
+	if err != nil {
+		t.Errorf("expected ORC to be allowed, got error: %v", err)
+	}
+}
+
+func TestCheckLaunchPermission_IMPDenied(t *testing.T) {
+	ctx := context.Background()
+
+	missionSvc := newMockMissionService()
+	groveSvc := newMockGroveService()
+	agentProvider := newMockAgentProvider(secondary.AgentTypeIMP)
+
+	svc := NewMissionOrchestrationService(missionSvc, groveSvc, agentProvider)
+
+	err := svc.CheckLaunchPermission(ctx)
+	if err == nil {
+		t.Error("expected IMP to be denied, got nil error")
+	}
+	// Verify error message mentions IMPs
+	if err != nil && !strings.Contains(err.Error(), "IMP") {
+		t.Errorf("expected error to mention IMP, got: %v", err)
+	}
+}

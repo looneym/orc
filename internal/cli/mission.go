@@ -9,10 +9,8 @@ import (
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 
-	"github.com/example/orc/internal/agent"
 	"github.com/example/orc/internal/config"
 	orccontext "github.com/example/orc/internal/context"
-	coremission "github.com/example/orc/internal/core/mission"
 	"github.com/example/orc/internal/ports/primary"
 	"github.com/example/orc/internal/ports/secondary"
 	"github.com/example/orc/internal/wire"
@@ -115,14 +113,8 @@ Examples:
 		ctx := context.Background()
 
 		// Check agent identity - only ORC can start missions
-		identity, _ := agent.GetCurrentAgentID()
-		guardCtx := coremission.GuardContext{
-			AgentType: coremission.AgentType(identity.Type),
-			AgentID:   identity.FullID,
-			MissionID: identity.MissionID,
-		}
-		if result := coremission.CanStartMission(guardCtx); !result.Allowed {
-			return result.Error()
+		if err := wire.MissionOrchestrationService().CheckLaunchPermission(ctx); err != nil {
+			return err
 		}
 
 		missionID := args[0]
@@ -314,14 +306,8 @@ Examples:
 		ctx := context.Background()
 
 		// Check agent identity - only ORC can launch missions
-		identity, _ := agent.GetCurrentAgentID()
-		guardCtx := coremission.GuardContext{
-			AgentType: coremission.AgentType(identity.Type),
-			AgentID:   identity.FullID,
-			MissionID: identity.MissionID,
-		}
-		if result := coremission.CanLaunchMission(guardCtx); !result.Allowed {
-			return result.Error()
+		if err := wire.MissionOrchestrationService().CheckLaunchPermission(ctx); err != nil {
+			return err
 		}
 
 		missionID := args[0]
