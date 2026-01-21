@@ -164,6 +164,16 @@ var migrations = []Migration{
 		Name:    "add_updated_at_to_commissions",
 		Up:      migrationV30,
 	},
+	{
+		Version: 31,
+		Name:    "fix_fk_constraints_to_commissions",
+		Up:      migrationV31,
+	},
+	{
+		Version: 32,
+		Name:    "fix_dangling_fk_references",
+		Up:      migrationV32,
+	},
 }
 
 // RunMigrations executes all pending migrations
@@ -3007,6 +3017,601 @@ func migrationV30(db *sql.DB) error {
 		if err != nil {
 			return fmt.Errorf("failed to update updated_at values: %w", err)
 		}
+	}
+
+	return nil
+}
+
+// migrationV31 fixes FK constraints to point to commissions instead of missions
+// This recreates all tables that had FKs to the old missions table
+func migrationV31(db *sql.DB) error {
+	// Disable FK constraints during migration
+	_, err := db.Exec(`PRAGMA foreign_keys = OFF`)
+	if err != nil {
+		return fmt.Errorf("failed to disable foreign keys: %w", err)
+	}
+
+	// Re-enable at the end
+	defer db.Exec(`PRAGMA foreign_keys = ON`)
+
+	// Fix notes table
+	if err := recreateNotesTable(db); err != nil {
+		return err
+	}
+
+	// Fix messages table
+	if err := recreateMessagesTable(db); err != nil {
+		return err
+	}
+
+	// Fix questions table
+	if err := recreateQuestionsTable(db); err != nil {
+		return err
+	}
+
+	// Fix plans table
+	if err := recreatePlansTable(db); err != nil {
+		return err
+	}
+
+	// Fix shipments table
+	if err := recreateShipmentsTable(db); err != nil {
+		return err
+	}
+
+	// Fix investigations table
+	if err := recreateInvestigationsTable(db); err != nil {
+		return err
+	}
+
+	// Fix conclaves table
+	if err := recreateConclaves(db); err != nil {
+		return err
+	}
+
+	// Fix tomes table
+	if err := recreateTomesTable(db); err != nil {
+		return err
+	}
+
+	// Fix tasks table
+	if err := recreateTasksTable(db); err != nil {
+		return err
+	}
+
+	// Fix handoffs table
+	if err := recreateHandoffsTable(db); err != nil {
+		return err
+	}
+
+	// Fix prs table
+	if err := recreatePRsTable(db); err != nil {
+		return err
+	}
+
+	// Drop the old missions table
+	_, err = db.Exec(`DROP TABLE IF EXISTS missions`)
+	if err != nil {
+		return fmt.Errorf("failed to drop missions table: %w", err)
+	}
+
+	return nil
+}
+
+func recreateNotesTable(db *sql.DB) error {
+	_, err := db.Exec(`
+		ALTER TABLE notes RENAME TO notes_backup;
+
+		CREATE TABLE notes (
+			id TEXT PRIMARY KEY,
+			commission_id TEXT NOT NULL,
+			shipment_id TEXT,
+			investigation_id TEXT,
+			conclave_id TEXT,
+			tome_id TEXT,
+			title TEXT NOT NULL,
+			content TEXT,
+			type TEXT CHECK(type IN ('learning', 'concern', 'finding', 'frq', 'bug', 'investigation_report')),
+			status TEXT NOT NULL CHECK(status IN ('open', 'resolved', 'closed')) DEFAULT 'open',
+			pinned INTEGER DEFAULT 0,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			closed_at DATETIME,
+			promoted_from_id TEXT,
+			promoted_from_type TEXT,
+			FOREIGN KEY (commission_id) REFERENCES commissions(id),
+			FOREIGN KEY (shipment_id) REFERENCES shipments(id) ON DELETE SET NULL,
+			FOREIGN KEY (investigation_id) REFERENCES investigations(id) ON DELETE SET NULL,
+			FOREIGN KEY (conclave_id) REFERENCES conclaves(id) ON DELETE SET NULL,
+			FOREIGN KEY (tome_id) REFERENCES tomes(id) ON DELETE SET NULL
+		);
+
+		INSERT INTO notes (id, commission_id, shipment_id, investigation_id, conclave_id, tome_id, title, content, type, status, pinned, created_at, updated_at, closed_at, promoted_from_id, promoted_from_type)
+		SELECT id, commission_id, shipment_id, investigation_id, conclave_id, tome_id, title, content, type, status, pinned, created_at, updated_at, closed_at, promoted_from_id, promoted_from_type FROM notes_backup;
+		DROP TABLE notes_backup;
+
+		CREATE INDEX idx_notes_commission ON notes(commission_id);
+		CREATE INDEX idx_notes_shipment ON notes(shipment_id);
+		CREATE INDEX idx_notes_type ON notes(type);
+		CREATE INDEX idx_notes_status ON notes(status);
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to recreate notes table: %w", err)
+	}
+	return nil
+}
+
+func recreateMessagesTable(db *sql.DB) error {
+	_, err := db.Exec(`
+		ALTER TABLE messages RENAME TO messages_backup;
+		
+		CREATE TABLE messages (
+			id TEXT PRIMARY KEY,
+			sender TEXT NOT NULL,
+			recipient TEXT NOT NULL,
+			subject TEXT NOT NULL,
+			body TEXT NOT NULL,
+			timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+			read INTEGER DEFAULT 0,
+			commission_id TEXT NOT NULL,
+			FOREIGN KEY (commission_id) REFERENCES commissions(id)
+		);
+		
+		INSERT INTO messages SELECT * FROM messages_backup;
+		DROP TABLE messages_backup;
+		
+		CREATE INDEX idx_messages_recipient ON messages(recipient, read);
+		CREATE INDEX idx_messages_commission ON messages(commission_id);
+		CREATE INDEX idx_messages_timestamp ON messages(timestamp DESC);
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to recreate messages table: %w", err)
+	}
+	return nil
+}
+
+func recreateQuestionsTable(db *sql.DB) error {
+	_, err := db.Exec(`
+		ALTER TABLE questions RENAME TO questions_backup;
+		
+		CREATE TABLE questions (
+			id TEXT PRIMARY KEY,
+			commission_id TEXT NOT NULL,
+			shipment_id TEXT,
+			investigation_id TEXT,
+			conclave_id TEXT,
+			title TEXT NOT NULL,
+			content TEXT,
+			answer TEXT,
+			status TEXT NOT NULL CHECK(status IN ('open', 'answered', 'closed')) DEFAULT 'open',
+			pinned INTEGER DEFAULT 0,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			answered_at DATETIME,
+			promoted_from_id TEXT,
+			promoted_from_type TEXT,
+			FOREIGN KEY (commission_id) REFERENCES commissions(id),
+			FOREIGN KEY (shipment_id) REFERENCES shipments(id) ON DELETE SET NULL,
+			FOREIGN KEY (investigation_id) REFERENCES investigations(id) ON DELETE SET NULL,
+			FOREIGN KEY (conclave_id) REFERENCES conclaves(id) ON DELETE SET NULL
+		);
+		
+		INSERT INTO questions (id, commission_id, investigation_id, conclave_id, title, content, answer, status, pinned, created_at, updated_at, answered_at, promoted_from_id, promoted_from_type)
+		SELECT id, commission_id, investigation_id, conclave_id, title, description, answer, 
+			CASE status WHEN 'answered' THEN 'answered' ELSE status END,
+			pinned, created_at, updated_at, answered_at, promoted_from_id, promoted_from_type 
+		FROM questions_backup;
+		DROP TABLE questions_backup;
+		
+		CREATE INDEX idx_questions_commission ON questions(commission_id);
+		CREATE INDEX idx_questions_status ON questions(status);
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to recreate questions table: %w", err)
+	}
+	return nil
+}
+
+func recreatePlansTable(db *sql.DB) error {
+	_, err := db.Exec(`
+		ALTER TABLE plans RENAME TO plans_backup;
+		
+		CREATE TABLE plans (
+			id TEXT PRIMARY KEY,
+			commission_id TEXT NOT NULL,
+			shipment_id TEXT,
+			title TEXT NOT NULL,
+			description TEXT,
+			content TEXT,
+			status TEXT NOT NULL CHECK(status IN ('draft', 'approved', 'superseded')) DEFAULT 'draft',
+			pinned INTEGER DEFAULT 0,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			approved_at DATETIME,
+			promoted_from_id TEXT,
+			promoted_from_type TEXT,
+			FOREIGN KEY (commission_id) REFERENCES commissions(id),
+			FOREIGN KEY (shipment_id) REFERENCES shipments(id) ON DELETE SET NULL
+		);
+		
+		INSERT INTO plans (id, commission_id, shipment_id, title, description, content, status, pinned, created_at, updated_at, approved_at, promoted_from_id, promoted_from_type)
+		SELECT id, commission_id, shipment_id, title, description, content, 
+			CASE status WHEN 'approved' THEN 'approved' WHEN 'draft' THEN 'draft' ELSE 'draft' END,
+			pinned, created_at, updated_at, approved_at, promoted_from_id, promoted_from_type 
+		FROM plans_backup;
+		DROP TABLE plans_backup;
+		
+		CREATE INDEX idx_plans_commission ON plans(commission_id);
+		CREATE INDEX idx_plans_status ON plans(status);
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to recreate plans table: %w", err)
+	}
+	return nil
+}
+
+func recreateShipmentsTable(db *sql.DB) error {
+	_, err := db.Exec(`
+		ALTER TABLE shipments RENAME TO shipments_backup;
+		
+		CREATE TABLE shipments (
+			id TEXT PRIMARY KEY,
+			commission_id TEXT NOT NULL,
+			title TEXT NOT NULL,
+			description TEXT,
+			status TEXT NOT NULL CHECK(status IN ('active', 'paused', 'complete')) DEFAULT 'active',
+			assigned_workbench_id TEXT,
+			pinned INTEGER DEFAULT 0,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			completed_at DATETIME,
+			FOREIGN KEY (commission_id) REFERENCES commissions(id),
+			FOREIGN KEY (assigned_workbench_id) REFERENCES workbenches(id)
+		);
+		
+		INSERT INTO shipments (id, commission_id, title, description, status, pinned, created_at, updated_at, completed_at)
+		SELECT id, commission_id, title, description, status, pinned, created_at, updated_at, completed_at 
+		FROM shipments_backup;
+		DROP TABLE shipments_backup;
+		
+		CREATE INDEX idx_shipments_commission ON shipments(commission_id);
+		CREATE INDEX idx_shipments_status ON shipments(status);
+		CREATE INDEX idx_shipments_workbench ON shipments(assigned_workbench_id);
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to recreate shipments table: %w", err)
+	}
+	return nil
+}
+
+func recreateInvestigationsTable(db *sql.DB) error {
+	_, err := db.Exec(`
+		ALTER TABLE investigations RENAME TO investigations_backup;
+		
+		CREATE TABLE investigations (
+			id TEXT PRIMARY KEY,
+			commission_id TEXT NOT NULL,
+			shipment_id TEXT,
+			title TEXT NOT NULL,
+			description TEXT,
+			status TEXT NOT NULL CHECK(status IN ('open', 'in_progress', 'resolved', 'closed')) DEFAULT 'open',
+			pinned INTEGER DEFAULT 0,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			resolved_at DATETIME,
+			FOREIGN KEY (commission_id) REFERENCES commissions(id),
+			FOREIGN KEY (shipment_id) REFERENCES shipments(id)
+		);
+		
+		INSERT INTO investigations (id, commission_id, title, description, status, pinned, created_at, updated_at, resolved_at)
+		SELECT id, commission_id, title, description, 
+			CASE status WHEN 'complete' THEN 'resolved' WHEN 'active' THEN 'open' WHEN 'paused' THEN 'in_progress' ELSE status END,
+			pinned, created_at, updated_at, completed_at 
+		FROM investigations_backup;
+		DROP TABLE investigations_backup;
+		
+		CREATE INDEX idx_investigations_commission ON investigations(commission_id);
+		CREATE INDEX idx_investigations_status ON investigations(status);
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to recreate investigations table: %w", err)
+	}
+	return nil
+}
+
+func recreateConclaves(db *sql.DB) error {
+	_, err := db.Exec(`
+		ALTER TABLE conclaves RENAME TO conclaves_backup;
+		
+		CREATE TABLE conclaves (
+			id TEXT PRIMARY KEY,
+			commission_id TEXT NOT NULL,
+			shipment_id TEXT,
+			title TEXT NOT NULL,
+			description TEXT,
+			status TEXT NOT NULL CHECK(status IN ('open', 'in_progress', 'decided', 'closed')) DEFAULT 'open',
+			decision TEXT,
+			pinned INTEGER DEFAULT 0,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			decided_at DATETIME,
+			FOREIGN KEY (commission_id) REFERENCES commissions(id),
+			FOREIGN KEY (shipment_id) REFERENCES shipments(id)
+		);
+		
+		INSERT INTO conclaves (id, commission_id, title, description, status, pinned, created_at, updated_at, decided_at)
+		SELECT id, commission_id, title, description, 
+			CASE status WHEN 'complete' THEN 'decided' WHEN 'active' THEN 'open' WHEN 'paused' THEN 'in_progress' ELSE status END,
+			pinned, created_at, updated_at, completed_at 
+		FROM conclaves_backup;
+		DROP TABLE conclaves_backup;
+		
+		CREATE INDEX idx_conclaves_commission ON conclaves(commission_id);
+		CREATE INDEX idx_conclaves_status ON conclaves(status);
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to recreate conclaves table: %w", err)
+	}
+	return nil
+}
+
+func recreateTomesTable(db *sql.DB) error {
+	_, err := db.Exec(`
+		ALTER TABLE tomes RENAME TO tomes_backup;
+		
+		CREATE TABLE tomes (
+			id TEXT PRIMARY KEY,
+			commission_id TEXT NOT NULL,
+			title TEXT NOT NULL,
+			description TEXT,
+			content TEXT,
+			status TEXT NOT NULL CHECK(status IN ('draft', 'published', 'archived')) DEFAULT 'draft',
+			pinned INTEGER DEFAULT 0,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			FOREIGN KEY (commission_id) REFERENCES commissions(id)
+		);
+		
+		INSERT INTO tomes (id, commission_id, title, description, status, pinned, created_at, updated_at)
+		SELECT id, commission_id, title, description, 
+			CASE status WHEN 'complete' THEN 'published' WHEN 'active' THEN 'draft' WHEN 'paused' THEN 'draft' ELSE 'draft' END,
+			pinned, created_at, updated_at 
+		FROM tomes_backup;
+		DROP TABLE tomes_backup;
+		
+		CREATE INDEX idx_tomes_commission ON tomes(commission_id);
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to recreate tomes table: %w", err)
+	}
+	return nil
+}
+
+func recreateTasksTable(db *sql.DB) error {
+	_, err := db.Exec(`
+		ALTER TABLE tasks RENAME TO tasks_backup;
+		
+		CREATE TABLE tasks (
+			id TEXT PRIMARY KEY,
+			shipment_id TEXT,
+			commission_id TEXT NOT NULL,
+			title TEXT NOT NULL,
+			description TEXT,
+			type TEXT CHECK(type IN ('research', 'implementation', 'fix', 'documentation', 'maintenance')),
+			status TEXT NOT NULL CHECK(status IN ('ready', 'in_progress', 'blocked', 'paused', 'complete')) DEFAULT 'ready',
+			priority TEXT CHECK(priority IN ('low', 'medium', 'high')),
+			assigned_workbench_id TEXT,
+			context_ref TEXT,
+			pinned INTEGER DEFAULT 0,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			claimed_at DATETIME,
+			completed_at DATETIME,
+			FOREIGN KEY (shipment_id) REFERENCES shipments(id) ON DELETE CASCADE,
+			FOREIGN KEY (commission_id) REFERENCES commissions(id),
+			FOREIGN KEY (assigned_workbench_id) REFERENCES workbenches(id)
+		);
+		
+		INSERT INTO tasks (id, shipment_id, commission_id, title, description, type, status, priority, pinned, created_at, updated_at, claimed_at, completed_at)
+		SELECT id, shipment_id, commission_id, title, description, type, status, priority, pinned, created_at, updated_at, claimed_at, completed_at 
+		FROM tasks_backup;
+		DROP TABLE tasks_backup;
+		
+		CREATE INDEX idx_tasks_shipment ON tasks(shipment_id);
+		CREATE INDEX idx_tasks_commission ON tasks(commission_id);
+		CREATE INDEX idx_tasks_status ON tasks(status);
+		CREATE INDEX idx_tasks_workbench ON tasks(assigned_workbench_id);
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to recreate tasks table: %w", err)
+	}
+	return nil
+}
+
+func recreateHandoffsTable(db *sql.DB) error {
+	_, err := db.Exec(`
+		ALTER TABLE handoffs RENAME TO handoffs_backup;
+		
+		CREATE TABLE handoffs (
+			id TEXT PRIMARY KEY,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			handoff_note TEXT NOT NULL,
+			active_commission_id TEXT,
+			active_work_orders TEXT,
+			active_workbench_id TEXT,
+			todos_snapshot TEXT,
+			FOREIGN KEY (active_commission_id) REFERENCES commissions(id),
+			FOREIGN KEY (active_workbench_id) REFERENCES workbenches(id)
+		);
+		
+		INSERT INTO handoffs (id, created_at, handoff_note, active_commission_id, active_work_orders, todos_snapshot)
+		SELECT id, created_at, handoff_note, active_commission_id, active_work_orders, todos_snapshot 
+		FROM handoffs_backup;
+		DROP TABLE handoffs_backup;
+		
+		CREATE INDEX idx_handoffs_created ON handoffs(created_at DESC);
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to recreate handoffs table: %w", err)
+	}
+	return nil
+}
+
+func recreatePRsTable(db *sql.DB) error {
+	_, err := db.Exec(`
+		ALTER TABLE prs RENAME TO prs_backup;
+		
+		CREATE TABLE prs (
+			id TEXT PRIMARY KEY,
+			shipment_id TEXT NOT NULL UNIQUE,
+			repo_id TEXT NOT NULL,
+			commission_id TEXT NOT NULL,
+			number INTEGER,
+			title TEXT NOT NULL,
+			description TEXT,
+			branch TEXT NOT NULL,
+			target_branch TEXT,
+			url TEXT,
+			status TEXT NOT NULL CHECK(status IN ('draft', 'open', 'approved', 'merged', 'closed')) DEFAULT 'open',
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			merged_at DATETIME,
+			closed_at DATETIME,
+			FOREIGN KEY (shipment_id) REFERENCES shipments(id) ON DELETE CASCADE,
+			FOREIGN KEY (repo_id) REFERENCES repos(id),
+			FOREIGN KEY (commission_id) REFERENCES commissions(id)
+		);
+		
+		INSERT INTO prs SELECT * FROM prs_backup;
+		DROP TABLE prs_backup;
+		
+		CREATE INDEX idx_prs_shipment ON prs(shipment_id);
+		CREATE INDEX idx_prs_repo ON prs(repo_id);
+		CREATE INDEX idx_prs_commission ON prs(commission_id);
+		CREATE INDEX idx_prs_status ON prs(status);
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to recreate prs table: %w", err)
+	}
+	return nil
+}
+
+// migrationV32 fixes dangling FK references in notes, questions, plans
+// These tables were recreated before their FK target tables, causing references to backup tables
+func migrationV32(db *sql.DB) error {
+	// Disable FK constraints during migration
+	_, err := db.Exec(`PRAGMA foreign_keys = OFF`)
+	if err != nil {
+		return fmt.Errorf("failed to disable foreign keys: %w", err)
+	}
+	defer db.Exec(`PRAGMA foreign_keys = ON`)
+
+	// Fix notes table - has FKs to shipments_backup, investigations_backup, conclaves_backup, tomes_backup
+	_, err = db.Exec(`
+		ALTER TABLE notes RENAME TO notes_old;
+
+		CREATE TABLE notes (
+			id TEXT PRIMARY KEY,
+			commission_id TEXT NOT NULL,
+			shipment_id TEXT,
+			investigation_id TEXT,
+			conclave_id TEXT,
+			tome_id TEXT,
+			title TEXT NOT NULL,
+			content TEXT,
+			type TEXT CHECK(type IN ('learning', 'concern', 'finding', 'frq', 'bug', 'investigation_report')),
+			status TEXT NOT NULL CHECK(status IN ('open', 'resolved', 'closed')) DEFAULT 'open',
+			pinned INTEGER DEFAULT 0,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			closed_at DATETIME,
+			promoted_from_id TEXT,
+			promoted_from_type TEXT,
+			FOREIGN KEY (commission_id) REFERENCES commissions(id),
+			FOREIGN KEY (shipment_id) REFERENCES shipments(id) ON DELETE SET NULL,
+			FOREIGN KEY (investigation_id) REFERENCES investigations(id) ON DELETE SET NULL,
+			FOREIGN KEY (conclave_id) REFERENCES conclaves(id) ON DELETE SET NULL,
+			FOREIGN KEY (tome_id) REFERENCES tomes(id) ON DELETE SET NULL
+		);
+
+		INSERT INTO notes SELECT * FROM notes_old;
+		DROP TABLE notes_old;
+
+		CREATE INDEX idx_notes_commission ON notes(commission_id);
+		CREATE INDEX idx_notes_shipment ON notes(shipment_id);
+		CREATE INDEX idx_notes_type ON notes(type);
+		CREATE INDEX idx_notes_status ON notes(status);
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to fix notes table: %w", err)
+	}
+
+	// Fix questions table - has FKs to shipments_backup, investigations_backup, conclaves_backup
+	_, err = db.Exec(`
+		ALTER TABLE questions RENAME TO questions_old;
+
+		CREATE TABLE questions (
+			id TEXT PRIMARY KEY,
+			commission_id TEXT NOT NULL,
+			shipment_id TEXT,
+			investigation_id TEXT,
+			conclave_id TEXT,
+			title TEXT NOT NULL,
+			content TEXT,
+			answer TEXT,
+			status TEXT NOT NULL CHECK(status IN ('open', 'answered', 'closed')) DEFAULT 'open',
+			pinned INTEGER DEFAULT 0,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			answered_at DATETIME,
+			promoted_from_id TEXT,
+			promoted_from_type TEXT,
+			FOREIGN KEY (commission_id) REFERENCES commissions(id),
+			FOREIGN KEY (shipment_id) REFERENCES shipments(id) ON DELETE SET NULL,
+			FOREIGN KEY (investigation_id) REFERENCES investigations(id) ON DELETE SET NULL,
+			FOREIGN KEY (conclave_id) REFERENCES conclaves(id) ON DELETE SET NULL
+		);
+
+		INSERT INTO questions SELECT * FROM questions_old;
+		DROP TABLE questions_old;
+
+		CREATE INDEX idx_questions_commission ON questions(commission_id);
+		CREATE INDEX idx_questions_status ON questions(status);
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to fix questions table: %w", err)
+	}
+
+	// Fix plans table - has FK to shipments_backup
+	_, err = db.Exec(`
+		ALTER TABLE plans RENAME TO plans_old;
+
+		CREATE TABLE plans (
+			id TEXT PRIMARY KEY,
+			commission_id TEXT NOT NULL,
+			shipment_id TEXT,
+			title TEXT NOT NULL,
+			description TEXT,
+			content TEXT,
+			status TEXT NOT NULL CHECK(status IN ('draft', 'approved', 'superseded')) DEFAULT 'draft',
+			pinned INTEGER DEFAULT 0,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			approved_at DATETIME,
+			promoted_from_id TEXT,
+			promoted_from_type TEXT,
+			FOREIGN KEY (commission_id) REFERENCES commissions(id),
+			FOREIGN KEY (shipment_id) REFERENCES shipments(id) ON DELETE SET NULL
+		);
+
+		INSERT INTO plans SELECT * FROM plans_old;
+		DROP TABLE plans_old;
+
+		CREATE INDEX idx_plans_commission ON plans(commission_id);
+		CREATE INDEX idx_plans_status ON plans(status);
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to fix plans table: %w", err)
 	}
 
 	return nil

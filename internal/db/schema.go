@@ -357,7 +357,7 @@ func InitSchema() error {
 				return err
 			}
 			// Insert all migration versions as applied
-			for i := 1; i <= 30; i++ {
+			for i := 1; i <= 32; i++ {
 				_, err = db.Exec("INSERT INTO schema_version (version) VALUES (?)", i)
 				if err != nil {
 					return err
