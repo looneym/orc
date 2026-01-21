@@ -486,11 +486,8 @@ type ConclaveRepository interface {
 	// GetNextID returns the next available conclave ID.
 	GetNextID(ctx context.Context) (string, error)
 
-	// UpdateStatus updates the status and optionally completed_at timestamp.
-	UpdateStatus(ctx context.Context, id, status string, setCompleted bool) error
-
-	// GetByWorkbench retrieves conclaves assigned to a workbench.
-	GetByWorkbench(ctx context.Context, workbenchID string) ([]*ConclaveRecord, error)
+	// UpdateStatus updates the status and optionally decided_at timestamp.
+	UpdateStatus(ctx context.Context, id, status string, setDecided bool) error
 
 	// CommissionExists checks if a commission exists (for validation).
 	CommissionExists(ctx context.Context, commissionID string) (bool, error)
@@ -507,16 +504,17 @@ type ConclaveRepository interface {
 
 // ConclaveRecord represents a conclave as stored in persistence.
 type ConclaveRecord struct {
-	ID                  string
-	CommissionID        string
-	Title               string
-	Description         string // Empty string means null
-	Status              string
-	AssignedWorkbenchID string // Empty string means null
-	Pinned              bool
-	CreatedAt           string
-	UpdatedAt           string
-	CompletedAt         string // Empty string means null
+	ID           string
+	CommissionID string
+	ShipmentID   string // Empty string means null
+	Title        string
+	Description  string // Empty string means null
+	Status       string
+	Decision     string // Empty string means null
+	Pinned       bool
+	CreatedAt    string
+	UpdatedAt    string
+	DecidedAt    string // Empty string means null
 }
 
 // ConclaveFilters contains filter options for querying conclaves.
@@ -548,20 +546,19 @@ type ConclaveTaskRecord struct {
 
 // ConclaveQuestionRecord represents a question as returned from conclave cross-entity query.
 type ConclaveQuestionRecord struct {
-	ID               string
-	InvestigationID  string
-	CommissionID     string
-	Title            string
-	Description      string
-	Status           string
-	Answer           string
-	Pinned           bool
-	CreatedAt        string
-	UpdatedAt        string
-	AnsweredAt       string
-	ConclaveID       string
-	PromotedFromID   string
-	PromotedFromType string
+	ID              string
+	CommissionID    string
+	ShipmentID      string
+	InvestigationID string
+	ConclaveID      string
+	Title           string
+	Content         string
+	Answer          string
+	Status          string
+	Pinned          bool
+	CreatedAt       string
+	UpdatedAt       string
+	AnsweredAt      string
 }
 
 // ConclavePlanRecord represents a plan as returned from conclave cross-entity query.

@@ -727,7 +727,7 @@ Examples:
 						}
 						cont := containerInfo{
 							id: c.ID, title: c.Title, status: c.Status,
-							pinned: c.Pinned, workbenchID: c.AssignedWorkbenchID, containerType: "conclave",
+							pinned: c.Pinned, workbenchID: "", containerType: "conclave",
 						}
 						if c.ID == focusID {
 							focusedContainer = &cont
@@ -745,7 +745,7 @@ Examples:
 						}
 						c := containerInfo{
 							id: inv.ID, title: inv.Title, status: inv.Status,
-							pinned: inv.Pinned, workbenchID: inv.AssignedWorkbenchID, containerType: "investigation",
+							pinned: inv.Pinned, workbenchID: "", containerType: "investigation",
 						}
 						if inv.ID == focusID {
 							focusedContainer = &c

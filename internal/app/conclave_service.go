@@ -160,16 +160,19 @@ func (s *ConclaveServiceImpl) DeleteConclave(ctx context.Context, conclaveID str
 	return s.conclaveRepo.Delete(ctx, conclaveID)
 }
 
-// GetConclavesByGrove retrieves conclaves assigned to a grove.
-func (s *ConclaveServiceImpl) GetConclavesByGrove(ctx context.Context, workbenchID string) ([]*primary.Conclave, error) {
-	records, err := s.conclaveRepo.GetByWorkbench(ctx, workbenchID)
+// GetConclavesByShipment retrieves conclaves belonging to a shipment.
+func (s *ConclaveServiceImpl) GetConclavesByShipment(ctx context.Context, shipmentID string) ([]*primary.Conclave, error) {
+	// Get all conclaves and filter by shipment
+	records, err := s.conclaveRepo.List(ctx, secondary.ConclaveFilters{})
 	if err != nil {
 		return nil, err
 	}
 
-	conclaves := make([]*primary.Conclave, len(records))
-	for i, r := range records {
-		conclaves[i] = s.recordToConclave(r)
+	var conclaves []*primary.Conclave
+	for _, r := range records {
+		if r.ShipmentID == shipmentID {
+			conclaves = append(conclaves, s.recordToConclave(r))
+		}
 	}
 	return conclaves, nil
 }
@@ -220,16 +223,17 @@ func (s *ConclaveServiceImpl) GetConclavePlans(ctx context.Context, conclaveID s
 
 func (s *ConclaveServiceImpl) recordToConclave(r *secondary.ConclaveRecord) *primary.Conclave {
 	return &primary.Conclave{
-		ID:                  r.ID,
-		CommissionID:        r.CommissionID,
-		Title:               r.Title,
-		Description:         r.Description,
-		Status:              r.Status,
-		AssignedWorkbenchID: r.AssignedWorkbenchID,
-		Pinned:              r.Pinned,
-		CreatedAt:           r.CreatedAt,
-		UpdatedAt:           r.UpdatedAt,
-		CompletedAt:         r.CompletedAt,
+		ID:           r.ID,
+		CommissionID: r.CommissionID,
+		ShipmentID:   r.ShipmentID,
+		Title:        r.Title,
+		Description:  r.Description,
+		Status:       r.Status,
+		Decision:     r.Decision,
+		Pinned:       r.Pinned,
+		CreatedAt:    r.CreatedAt,
+		UpdatedAt:    r.UpdatedAt,
+		DecidedAt:    r.DecidedAt,
 	}
 }
 
@@ -249,47 +253,40 @@ func (s *ConclaveServiceImpl) taskRecordToConclaveTask(r *secondary.ConclaveTask
 		UpdatedAt:           r.UpdatedAt,
 		ClaimedAt:           r.ClaimedAt,
 		CompletedAt:         r.CompletedAt,
-		ConclaveID:          r.ConclaveID,
-		PromotedFromID:      r.PromotedFromID,
-		PromotedFromType:    r.PromotedFromType,
 	}
 }
 
 func (s *ConclaveServiceImpl) questionRecordToConclaveQuestion(r *secondary.ConclaveQuestionRecord) *primary.ConclaveQuestion {
 	return &primary.ConclaveQuestion{
-		ID:               r.ID,
-		InvestigationID:  r.InvestigationID,
-		CommissionID:     r.CommissionID,
-		Title:            r.Title,
-		Description:      r.Description,
-		Status:           r.Status,
-		Answer:           r.Answer,
-		Pinned:           r.Pinned,
-		CreatedAt:        r.CreatedAt,
-		UpdatedAt:        r.UpdatedAt,
-		AnsweredAt:       r.AnsweredAt,
-		ConclaveID:       r.ConclaveID,
-		PromotedFromID:   r.PromotedFromID,
-		PromotedFromType: r.PromotedFromType,
+		ID:              r.ID,
+		CommissionID:    r.CommissionID,
+		ShipmentID:      r.ShipmentID,
+		InvestigationID: r.InvestigationID,
+		ConclaveID:      r.ConclaveID,
+		Title:           r.Title,
+		Content:         r.Content,
+		Answer:          r.Answer,
+		Status:          r.Status,
+		Pinned:          r.Pinned,
+		CreatedAt:       r.CreatedAt,
+		UpdatedAt:       r.UpdatedAt,
+		AnsweredAt:      r.AnsweredAt,
 	}
 }
 
 func (s *ConclaveServiceImpl) planRecordToConclavePlan(r *secondary.ConclavePlanRecord) *primary.ConclavePlan {
 	return &primary.ConclavePlan{
-		ID:               r.ID,
-		ShipmentID:       r.ShipmentID,
-		CommissionID:     r.CommissionID,
-		Title:            r.Title,
-		Description:      r.Description,
-		Status:           r.Status,
-		Content:          r.Content,
-		Pinned:           r.Pinned,
-		CreatedAt:        r.CreatedAt,
-		UpdatedAt:        r.UpdatedAt,
-		ApprovedAt:       r.ApprovedAt,
-		ConclaveID:       r.ConclaveID,
-		PromotedFromID:   r.PromotedFromID,
-		PromotedFromType: r.PromotedFromType,
+		ID:          r.ID,
+		CommissionID: r.CommissionID,
+		ShipmentID:  r.ShipmentID,
+		Title:       r.Title,
+		Description: r.Description,
+		Content:     r.Content,
+		Status:      r.Status,
+		Pinned:      r.Pinned,
+		CreatedAt:   r.CreatedAt,
+		UpdatedAt:   r.UpdatedAt,
+		ApprovedAt:  r.ApprovedAt,
 	}
 }
 

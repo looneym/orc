@@ -140,19 +140,18 @@ func setupIntegrationDB(t *testing.T) *sql.DB {
 	_, err = db.Exec(`
 		CREATE TABLE questions (
 			id TEXT PRIMARY KEY,
-			investigation_id TEXT,
 			commission_id TEXT NOT NULL,
+			shipment_id TEXT,
+			investigation_id TEXT,
+			conclave_id TEXT,
 			title TEXT NOT NULL,
-			description TEXT,
-			status TEXT NOT NULL DEFAULT 'open',
+			content TEXT,
 			answer TEXT,
+			status TEXT NOT NULL DEFAULT 'open',
 			pinned INTEGER NOT NULL DEFAULT 0,
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-			answered_at DATETIME,
-			conclave_id TEXT,
-			promoted_from_id TEXT,
-			promoted_from_type TEXT
+			answered_at DATETIME
 		)
 	`)
 	if err != nil {
@@ -164,13 +163,15 @@ func setupIntegrationDB(t *testing.T) *sql.DB {
 		CREATE TABLE conclaves (
 			id TEXT PRIMARY KEY,
 			commission_id TEXT NOT NULL,
+			shipment_id TEXT,
 			title TEXT NOT NULL,
 			description TEXT,
-			status TEXT NOT NULL DEFAULT 'active',
+			status TEXT NOT NULL DEFAULT 'open',
+			decision TEXT,
 			pinned INTEGER NOT NULL DEFAULT 0,
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-			completed_at DATETIME
+			decided_at DATETIME
 		)
 	`)
 	if err != nil {

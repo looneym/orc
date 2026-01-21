@@ -53,14 +53,15 @@ func setupConclaveTestDB(t *testing.T) *sql.DB {
 		CREATE TABLE conclaves (
 			id TEXT PRIMARY KEY,
 			commission_id TEXT NOT NULL,
+			shipment_id TEXT,
 			title TEXT NOT NULL,
 			description TEXT,
-			status TEXT NOT NULL DEFAULT 'active',
-			assigned_workbench_id TEXT,
+			status TEXT NOT NULL DEFAULT 'open',
+			decision TEXT,
 			pinned INTEGER NOT NULL DEFAULT 0,
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-			completed_at DATETIME
+			decided_at DATETIME
 		)
 	`)
 	if err != nil {
@@ -97,19 +98,18 @@ func setupConclaveTestDB(t *testing.T) *sql.DB {
 	_, err = db.Exec(`
 		CREATE TABLE questions (
 			id TEXT PRIMARY KEY,
-			investigation_id TEXT,
 			commission_id TEXT NOT NULL,
+			shipment_id TEXT,
+			investigation_id TEXT,
+			conclave_id TEXT,
 			title TEXT NOT NULL,
-			description TEXT,
-			status TEXT NOT NULL DEFAULT 'open',
+			content TEXT,
 			answer TEXT,
+			status TEXT NOT NULL DEFAULT 'open',
 			pinned INTEGER NOT NULL DEFAULT 0,
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-			answered_at DATETIME,
-			conclave_id TEXT,
-			promoted_from_id TEXT,
-			promoted_from_type TEXT
+			answered_at DATETIME
 		)
 	`)
 	if err != nil {
@@ -139,9 +139,24 @@ func setupConclaveTestDB(t *testing.T) *sql.DB {
 		t.Fatalf("failed to create plans table: %v", err)
 	}
 
+	// Create shipments table (for GetTasksByConclave tests - tasks link via shipment)
+	_, err = db.Exec(`
+		CREATE TABLE shipments (
+			id TEXT PRIMARY KEY,
+			commission_id TEXT NOT NULL,
+			title TEXT NOT NULL,
+			status TEXT NOT NULL DEFAULT 'open',
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		)
+	`)
+	if err != nil {
+		t.Fatalf("failed to create shipments table: %v", err)
+	}
+
 	// Insert test data
 	_, _ = db.Exec("INSERT INTO commissions (id, title, status) VALUES ('MISSION-001', 'Test Mission', 'active')")
 	_, _ = db.Exec("INSERT INTO groves (id, commission_id, name, status) VALUES ('GROVE-001', 'MISSION-001', 'test-grove', 'active')")
+	_, _ = db.Exec("INSERT INTO shipments (id, commission_id, title, status) VALUES ('SHIP-001', 'MISSION-001', 'Test Shipment', 'open')")
 
 	t.Cleanup(func() {
 		db.Close()
@@ -199,8 +214,8 @@ func TestConclaveRepository_Create(t *testing.T) {
 	if retrieved.Title != "Test Conclave" {
 		t.Errorf("expected title 'Test Conclave', got '%s'", retrieved.Title)
 	}
-	if retrieved.Status != "active" {
-		t.Errorf("expected status 'active', got '%s'", retrieved.Status)
+	if retrieved.Status != "open" {
+		t.Errorf("expected status 'open', got '%s'", retrieved.Status)
 	}
 }
 
@@ -286,13 +301,13 @@ func TestConclaveRepository_List_FilterByStatus(t *testing.T) {
 	// Complete c1
 	_ = repo.UpdateStatus(ctx, c1.ID, "complete", true)
 
-	conclaves, err := repo.List(ctx, secondary.ConclaveFilters{Status: "active"})
+	conclaves, err := repo.List(ctx, secondary.ConclaveFilters{Status: "open"})
 	if err != nil {
 		t.Fatalf("List failed: %v", err)
 	}
 
 	if len(conclaves) != 1 {
-		t.Errorf("expected 1 active conclave, got %d", len(conclaves))
+		t.Errorf("expected 1 open conclave, got %d", len(conclaves))
 	}
 }
 
@@ -442,11 +457,11 @@ func TestConclaveRepository_UpdateStatus(t *testing.T) {
 	if retrieved.Status != "in_progress" {
 		t.Errorf("expected status 'in_progress', got '%s'", retrieved.Status)
 	}
-	if retrieved.CompletedAt != "" {
-		t.Error("expected CompletedAt to be empty")
+	if retrieved.DecidedAt != "" {
+		t.Error("expected DecidedAt to be empty")
 	}
 
-	// Update to complete
+	// Update to complete (with decided timestamp)
 	err = repo.UpdateStatus(ctx, conclave.ID, "complete", true)
 	if err != nil {
 		t.Fatalf("UpdateStatus failed: %v", err)
@@ -456,8 +471,8 @@ func TestConclaveRepository_UpdateStatus(t *testing.T) {
 	if retrieved.Status != "complete" {
 		t.Errorf("expected status 'complete', got '%s'", retrieved.Status)
 	}
-	if retrieved.CompletedAt == "" {
-		t.Error("expected CompletedAt to be set")
+	if retrieved.DecidedAt == "" {
+		t.Error("expected DecidedAt to be set")
 	}
 }
 
@@ -472,29 +487,7 @@ func TestConclaveRepository_UpdateStatus_NotFound(t *testing.T) {
 	}
 }
 
-func TestConclaveRepository_GetByWorkbench(t *testing.T) {
-	db := setupConclaveTestDB(t)
-	repo := sqlite.NewConclaveRepository(db)
-	ctx := context.Background()
-
-	// Note: Conclaves don't have AssignWorkbench, so we need to insert directly
-	c1 := createTestConclave(t, repo, ctx, "MISSION-001", "Conclave 1", "")
-	c2 := createTestConclave(t, repo, ctx, "MISSION-001", "Conclave 2", "")
-	createTestConclave(t, repo, ctx, "MISSION-001", "Conclave 3 (unassigned)", "")
-
-	// Assign groves directly via SQL
-	_, _ = db.Exec("UPDATE conclaves SET assigned_workbench_id = 'GROVE-001' WHERE id = ?", c1.ID)
-	_, _ = db.Exec("UPDATE conclaves SET assigned_workbench_id = 'GROVE-001' WHERE id = ?", c2.ID)
-
-	conclaves, err := repo.GetByWorkbench(ctx, "GROVE-001")
-	if err != nil {
-		t.Fatalf("GetByWorkbench failed: %v", err)
-	}
-
-	if len(conclaves) != 2 {
-		t.Errorf("expected 2 conclaves for grove, got %d", len(conclaves))
-	}
-}
+// Note: GetByWorkbench was removed - conclaves are now tied to shipments, not workbenches
 
 func TestConclaveRepository_CommissionExists(t *testing.T) {
 	db := setupConclaveTestDB(t)
@@ -527,10 +520,13 @@ func TestConclaveRepository_GetTasksByConclave(t *testing.T) {
 
 	conclave := createTestConclave(t, repo, ctx, "MISSION-001", "Conclave with Tasks", "")
 
-	// Insert tasks for the conclave
-	_, _ = db.Exec(`INSERT INTO tasks (id, commission_id, title, status, conclave_id) VALUES ('TASK-001', 'MISSION-001', 'Task 1', 'ready', ?)`, conclave.ID)
-	_, _ = db.Exec(`INSERT INTO tasks (id, commission_id, title, status, conclave_id) VALUES ('TASK-002', 'MISSION-001', 'Task 2', 'ready', ?)`, conclave.ID)
-	_, _ = db.Exec(`INSERT INTO tasks (id, commission_id, title, status, conclave_id) VALUES ('TASK-003', 'MISSION-001', 'Task 3 (no conclave)', 'ready', NULL)`)
+	// Link conclave to shipment SHIP-001
+	_, _ = db.Exec("UPDATE conclaves SET shipment_id = 'SHIP-001' WHERE id = ?", conclave.ID)
+
+	// Insert tasks for the shipment (tasks link to shipments, not conclaves directly)
+	_, _ = db.Exec(`INSERT INTO tasks (id, shipment_id, commission_id, title, status) VALUES ('TASK-001', 'SHIP-001', 'MISSION-001', 'Task 1', 'ready')`)
+	_, _ = db.Exec(`INSERT INTO tasks (id, shipment_id, commission_id, title, status) VALUES ('TASK-002', 'SHIP-001', 'MISSION-001', 'Task 2', 'ready')`)
+	_, _ = db.Exec(`INSERT INTO tasks (id, commission_id, title, status) VALUES ('TASK-003', 'MISSION-001', 'Task 3 (no shipment)', 'ready')`)
 
 	tasks, err := repo.GetTasksByConclave(ctx, conclave.ID)
 	if err != nil {
@@ -542,7 +538,7 @@ func TestConclaveRepository_GetTasksByConclave(t *testing.T) {
 	}
 
 	// Verify task data
-	if tasks[0].Title != "Task 1" {
+	if len(tasks) > 0 && tasks[0].Title != "Task 1" {
 		t.Errorf("expected title 'Task 1', got '%s'", tasks[0].Title)
 	}
 }
@@ -581,10 +577,13 @@ func TestConclaveRepository_GetPlansByConclave(t *testing.T) {
 
 	conclave := createTestConclave(t, repo, ctx, "MISSION-001", "Conclave with Plans", "")
 
-	// Insert plans for the conclave
-	_, _ = db.Exec(`INSERT INTO plans (id, commission_id, title, status, conclave_id) VALUES ('PLAN-001', 'MISSION-001', 'Plan 1', 'draft', ?)`, conclave.ID)
-	_, _ = db.Exec(`INSERT INTO plans (id, commission_id, title, status, conclave_id) VALUES ('PLAN-002', 'MISSION-001', 'Plan 2', 'draft', ?)`, conclave.ID)
-	_, _ = db.Exec(`INSERT INTO plans (id, commission_id, title, status, conclave_id) VALUES ('PLAN-003', 'MISSION-001', 'Plan 3 (no conclave)', 'draft', NULL)`)
+	// Link conclave to shipment SHIP-001
+	_, _ = db.Exec("UPDATE conclaves SET shipment_id = 'SHIP-001' WHERE id = ?", conclave.ID)
+
+	// Insert plans for the shipment (plans link to shipments, not conclaves directly)
+	_, _ = db.Exec(`INSERT INTO plans (id, shipment_id, commission_id, title, status) VALUES ('PLAN-001', 'SHIP-001', 'MISSION-001', 'Plan 1', 'draft')`)
+	_, _ = db.Exec(`INSERT INTO plans (id, shipment_id, commission_id, title, status) VALUES ('PLAN-002', 'SHIP-001', 'MISSION-001', 'Plan 2', 'draft')`)
+	_, _ = db.Exec(`INSERT INTO plans (id, commission_id, title, status) VALUES ('PLAN-003', 'MISSION-001', 'Plan 3 (no shipment)', 'draft')`)
 
 	plans, err := repo.GetPlansByConclave(ctx, conclave.ID)
 	if err != nil {
@@ -596,7 +595,7 @@ func TestConclaveRepository_GetPlansByConclave(t *testing.T) {
 	}
 
 	// Verify plan data
-	if plans[0].Title != "Plan 1" {
+	if len(plans) > 0 && plans[0].Title != "Plan 1" {
 		t.Errorf("expected title 'Plan 1', got '%s'", plans[0].Title)
 	}
 }

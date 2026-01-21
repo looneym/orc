@@ -118,16 +118,19 @@ var conclaveShowCmd = &cobra.Command{
 			fmt.Printf("Description: %s\n", conclave.Description)
 		}
 		fmt.Printf("Status: %s\n", conclave.Status)
-		fmt.Printf("Mission: %s\n", conclave.CommissionID)
-		if conclave.AssignedWorkbenchID != "" {
-			fmt.Printf("Assigned Grove: %s\n", conclave.AssignedWorkbenchID)
+		fmt.Printf("Commission: %s\n", conclave.CommissionID)
+		if conclave.ShipmentID != "" {
+			fmt.Printf("Shipment: %s\n", conclave.ShipmentID)
+		}
+		if conclave.Decision != "" {
+			fmt.Printf("Decision: %s\n", conclave.Decision)
 		}
 		if conclave.Pinned {
 			fmt.Printf("Pinned: yes\n")
 		}
 		fmt.Printf("Created: %s\n", conclave.CreatedAt)
-		if conclave.CompletedAt != "" {
-			fmt.Printf("Completed: %s\n", conclave.CompletedAt)
+		if conclave.DecidedAt != "" {
+			fmt.Printf("Decided: %s\n", conclave.DecidedAt)
 		}
 
 		// Show tasks in this conclave

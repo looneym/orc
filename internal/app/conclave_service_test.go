@@ -109,27 +109,17 @@ func (m *mockConclaveRepository) GetNextID(ctx context.Context) (string, error) 
 	return "CON-001", nil
 }
 
-func (m *mockConclaveRepository) UpdateStatus(ctx context.Context, id, status string, setCompleted bool) error {
+func (m *mockConclaveRepository) UpdateStatus(ctx context.Context, id, status string, setDecided bool) error {
 	if m.updateStatusErr != nil {
 		return m.updateStatusErr
 	}
 	if conclave, ok := m.conclaves[id]; ok {
 		conclave.Status = status
-		if setCompleted {
-			conclave.CompletedAt = "2026-01-20T10:00:00Z"
+		if setDecided {
+			conclave.DecidedAt = "2026-01-20T10:00:00Z"
 		}
 	}
 	return nil
-}
-
-func (m *mockConclaveRepository) GetByWorkbench(ctx context.Context, workbenchID string) ([]*secondary.ConclaveRecord, error) {
-	var result []*secondary.ConclaveRecord
-	for _, c := range m.conclaves {
-		if c.AssignedWorkbenchID == workbenchID {
-			result = append(result, c)
-		}
-	}
-	return result, nil
 }
 
 func (m *mockConclaveRepository) CommissionExists(ctx context.Context, missionID string) (bool, error) {
@@ -563,19 +553,19 @@ func TestDeleteConclave_Success(t *testing.T) {
 }
 
 // ============================================================================
-// GetConclavesByGrove Tests
+// GetConclavesByShipment Tests
 // ============================================================================
 
-func TestGetConclavesByGrove_Success(t *testing.T) {
+func TestGetConclavesByShipment_Success(t *testing.T) {
 	service, conclaveRepo := newTestConclaveService()
 	ctx := context.Background()
 
 	conclaveRepo.conclaves["CON-001"] = &secondary.ConclaveRecord{
-		ID:                  "CON-001",
-		CommissionID:        "MISSION-001",
-		Title:               "Assigned Conclave",
-		Status:              "active",
-		AssignedWorkbenchID: "GROVE-001",
+		ID:           "CON-001",
+		CommissionID: "MISSION-001",
+		ShipmentID:   "SHIP-001",
+		Title:        "Assigned Conclave",
+		Status:       "active",
 	}
 	conclaveRepo.conclaves["CON-002"] = &secondary.ConclaveRecord{
 		ID:           "CON-002",
@@ -584,7 +574,7 @@ func TestGetConclavesByGrove_Success(t *testing.T) {
 		Status:       "active",
 	}
 
-	conclaves, err := service.GetConclavesByGrove(ctx, "GROVE-001")
+	conclaves, err := service.GetConclavesByShipment(ctx, "SHIP-001")
 
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)

@@ -251,18 +251,8 @@ func buildIMPPrimeOutput(groveCtx *ctx.GroveContext, cwd string) string {
 		}
 	}
 
-	// Conclaves
-	conclaves, _ := wire.ConclaveService().GetConclavesByGrove(context.Background(), groveCtx.GroveID)
-	for i, conclave := range conclaves {
-		hasAssignments = true
-		output.WriteString(fmt.Sprintf("### Conclave %d: %s\n\n", i+1, conclave.ID))
-		output.WriteString(fmt.Sprintf("**%s** [%s] (Ideation Session)\n\n", conclave.Title, conclave.Status))
-
-		if conclave.Description != "" {
-			output.WriteString(conclave.Description)
-			output.WriteString("\n\n")
-		}
-	}
+	// Conclaves - no longer tied to workbenches, skip for now
+	// Conclaves are now tied to shipments instead
 
 	// Investigations
 	investigations, _ := wire.InvestigationService().GetInvestigationsByGrove(context.Background(), groveCtx.GroveID)

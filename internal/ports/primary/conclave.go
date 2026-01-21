@@ -4,7 +4,7 @@ import "context"
 
 // ConclaveService defines the primary port for conclave operations.
 type ConclaveService interface {
-	// CreateConclave creates a new conclave (ideation session).
+	// CreateConclave creates a new conclave (decision session).
 	CreateConclave(ctx context.Context, req CreateConclaveRequest) (*CreateConclaveResponse, error)
 
 	// GetConclave retrieves a conclave by ID.
@@ -13,7 +13,7 @@ type ConclaveService interface {
 	// ListConclaves lists conclaves with optional filters.
 	ListConclaves(ctx context.Context, filters ConclaveFilters) ([]*Conclave, error)
 
-	// CompleteConclave marks a conclave as complete.
+	// CompleteConclave marks a conclave as decided/complete.
 	CompleteConclave(ctx context.Context, conclaveID string) error
 
 	// PauseConclave pauses an active conclave.
@@ -34,8 +34,8 @@ type ConclaveService interface {
 	// DeleteConclave deletes a conclave.
 	DeleteConclave(ctx context.Context, conclaveID string) error
 
-	// GetConclavesByGrove retrieves conclaves assigned to a grove.
-	GetConclavesByGrove(ctx context.Context, workbenchID string) ([]*Conclave, error)
+	// GetConclavesByShipment retrieves conclaves belonging to a shipment.
+	GetConclavesByShipment(ctx context.Context, shipmentID string) ([]*Conclave, error)
 
 	// GetConclaveTasks retrieves all tasks in a conclave.
 	GetConclaveTasks(ctx context.Context, conclaveID string) ([]*ConclaveTask, error)
@@ -50,6 +50,7 @@ type ConclaveService interface {
 // CreateConclaveRequest contains parameters for creating a conclave.
 type CreateConclaveRequest struct {
 	CommissionID string
+	ShipmentID   string
 	Title        string
 	Description  string
 }
@@ -65,20 +66,22 @@ type UpdateConclaveRequest struct {
 	ConclaveID  string
 	Title       string
 	Description string
+	Decision    string
 }
 
 // Conclave represents a conclave entity at the port boundary.
 type Conclave struct {
-	ID                  string
-	CommissionID        string
-	Title               string
-	Description         string
-	Status              string
-	AssignedWorkbenchID string
-	Pinned              bool
-	CreatedAt           string
-	UpdatedAt           string
-	CompletedAt         string
+	ID           string
+	CommissionID string
+	ShipmentID   string
+	Title        string
+	Description  string
+	Status       string
+	Decision     string
+	Pinned       bool
+	CreatedAt    string
+	UpdatedAt    string
+	DecidedAt    string
 }
 
 // ConclaveFilters contains filter options for listing conclaves.
@@ -103,43 +106,36 @@ type ConclaveTask struct {
 	UpdatedAt           string
 	ClaimedAt           string
 	CompletedAt         string
-	ConclaveID          string
-	PromotedFromID      string
-	PromotedFromType    string
 }
 
 // ConclaveQuestion represents a question associated with a conclave.
 type ConclaveQuestion struct {
-	ID               string
-	InvestigationID  string
-	CommissionID     string
-	Title            string
-	Description      string
-	Status           string
-	Answer           string
-	Pinned           bool
-	CreatedAt        string
-	UpdatedAt        string
-	AnsweredAt       string
-	ConclaveID       string
-	PromotedFromID   string
-	PromotedFromType string
+	ID              string
+	CommissionID    string
+	ShipmentID      string
+	InvestigationID string
+	ConclaveID      string
+	Title           string
+	Content         string
+	Answer          string
+	Status          string
+	Pinned          bool
+	CreatedAt       string
+	UpdatedAt       string
+	AnsweredAt      string
 }
 
 // ConclavePlan represents a plan associated with a conclave.
 type ConclavePlan struct {
-	ID               string
-	ShipmentID       string
-	CommissionID     string
-	Title            string
-	Description      string
-	Status           string
-	Content          string
-	Pinned           bool
-	CreatedAt        string
-	UpdatedAt        string
-	ApprovedAt       string
-	ConclaveID       string
-	PromotedFromID   string
-	PromotedFromType string
+	ID           string
+	CommissionID string
+	ShipmentID   string
+	Title        string
+	Description  string
+	Content      string
+	Status       string
+	Pinned       bool
+	CreatedAt    string
+	UpdatedAt    string
+	ApprovedAt   string
 }
