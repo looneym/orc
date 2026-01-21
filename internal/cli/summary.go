@@ -599,7 +599,7 @@ Examples:
 			}
 
 			// Get flags
-			missionFilter, _ := cmd.Flags().GetString("mission")
+			missionFilter, _ := cmd.Flags().GetString("commission")
 			expandAll, _ := cmd.Flags().GetBool("all")
 			filterStatuses, _ := cmd.Flags().GetStringSlice("filter-statuses")
 			filterContainers, _ := cmd.Flags().GetStringSlice("filter-containers")

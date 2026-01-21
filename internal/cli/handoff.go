@@ -72,7 +72,7 @@ Examples:
 		}
 
 		// Get active context from flags
-		missionID, _ := cmd.Flags().GetString("mission")
+		missionID, _ := cmd.Flags().GetString("commission")
 		groveID, _ := cmd.Flags().GetString("grove")
 		todosFile, _ := cmd.Flags().GetString("todos")
 

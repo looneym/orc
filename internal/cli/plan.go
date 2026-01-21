@@ -25,7 +25,7 @@ var planCreateCmd = &cobra.Command{
 	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		title := args[0]
-		missionID, _ := cmd.Flags().GetString("mission")
+		missionID, _ := cmd.Flags().GetString("commission")
 		description, _ := cmd.Flags().GetString("description")
 		content, _ := cmd.Flags().GetString("content")
 		shipmentID, _ := cmd.Flags().GetString("shipment")
@@ -69,7 +69,7 @@ var planListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List plans",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		missionID, _ := cmd.Flags().GetString("mission")
+		missionID, _ := cmd.Flags().GetString("commission")
 		shipmentID, _ := cmd.Flags().GetString("shipment")
 		status, _ := cmd.Flags().GetString("status")
 

@@ -26,7 +26,7 @@ var taskCreateCmd = &cobra.Command{
 		ctx := context.Background()
 		title := args[0]
 		shipmentID, _ := cmd.Flags().GetString("shipment")
-		missionID, _ := cmd.Flags().GetString("mission")
+		missionID, _ := cmd.Flags().GetString("commission")
 		description, _ := cmd.Flags().GetString("description")
 		taskType, _ := cmd.Flags().GetString("type")
 

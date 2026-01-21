@@ -26,7 +26,7 @@ var shipmentCreateCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
 		title := args[0]
-		missionID, _ := cmd.Flags().GetString("mission")
+		missionID, _ := cmd.Flags().GetString("commission")
 		description, _ := cmd.Flags().GetString("description")
 
 		// Get mission from context or require explicit flag
@@ -60,7 +60,7 @@ var shipmentListCmd = &cobra.Command{
 	Short: "List shipments",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
-		missionID, _ := cmd.Flags().GetString("mission")
+		missionID, _ := cmd.Flags().GetString("commission")
 		status, _ := cmd.Flags().GetString("status")
 
 		// Get mission from context if not specified

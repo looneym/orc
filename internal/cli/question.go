@@ -25,7 +25,7 @@ var questionCreateCmd = &cobra.Command{
 	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		title := args[0]
-		missionID, _ := cmd.Flags().GetString("mission")
+		missionID, _ := cmd.Flags().GetString("commission")
 		description, _ := cmd.Flags().GetString("description")
 		investigationID, _ := cmd.Flags().GetString("investigation")
 
@@ -63,7 +63,7 @@ var questionListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List questions",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		missionID, _ := cmd.Flags().GetString("mission")
+		missionID, _ := cmd.Flags().GetString("commission")
 		investigationID, _ := cmd.Flags().GetString("investigation")
 		status, _ := cmd.Flags().GetString("status")
 

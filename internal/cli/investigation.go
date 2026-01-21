@@ -26,7 +26,7 @@ var investigationCreateCmd = &cobra.Command{
 	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		title := args[0]
-		missionID, _ := cmd.Flags().GetString("mission")
+		missionID, _ := cmd.Flags().GetString("commission")
 		description, _ := cmd.Flags().GetString("description")
 
 		// Get mission from context or require explicit flag
@@ -62,7 +62,7 @@ var investigationListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List investigations",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		missionID, _ := cmd.Flags().GetString("mission")
+		missionID, _ := cmd.Flags().GetString("commission")
 		status, _ := cmd.Flags().GetString("status")
 
 		// Get mission from context if not specified
