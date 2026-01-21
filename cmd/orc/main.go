@@ -50,6 +50,11 @@ It coordinates IMPs (Implementation Agents) working in isolated groves (worktree
 	rootCmd.AddCommand(cli.RepoCmd())
 	rootCmd.AddCommand(cli.PRCmd())
 
+	// Infrastructure commands (Factory/Workshop/Workbench hierarchy)
+	rootCmd.AddCommand(cli.FactoryCmd())
+	rootCmd.AddCommand(cli.WorkshopCmd())
+	rootCmd.AddCommand(cli.WorkbenchCmd())
+
 	// Developer tools
 	rootCmd.AddCommand(cli.ScaffoldCmd())
 

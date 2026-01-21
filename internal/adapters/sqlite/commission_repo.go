@@ -53,7 +53,7 @@ func (r *CommissionRepository) GetByID(ctx context.Context, id string) (*seconda
 		desc        sql.NullString
 		pinned      bool
 		createdAt   time.Time
-		updatedAt   time.Time
+		updatedAt   sql.NullTime
 		completedAt sql.NullTime
 	)
 
@@ -73,6 +73,9 @@ func (r *CommissionRepository) GetByID(ctx context.Context, id string) (*seconda
 	record.Description = desc.String
 	record.Pinned = pinned
 	record.CreatedAt = createdAt.Format(time.RFC3339)
+	if updatedAt.Valid {
+		record.UpdatedAt = updatedAt.Time.Format(time.RFC3339)
+	}
 	if completedAt.Valid {
 		record.CompletedAt = completedAt.Time.Format(time.RFC3339)
 	}
@@ -109,7 +112,7 @@ func (r *CommissionRepository) List(ctx context.Context, filters secondary.Commi
 			desc        sql.NullString
 			pinned      bool
 			createdAt   time.Time
-			updatedAt   time.Time
+			updatedAt   sql.NullTime
 			completedAt sql.NullTime
 		)
 
@@ -122,6 +125,9 @@ func (r *CommissionRepository) List(ctx context.Context, filters secondary.Commi
 		record.Description = desc.String
 		record.Pinned = pinned
 		record.CreatedAt = createdAt.Format(time.RFC3339)
+		if updatedAt.Valid {
+			record.UpdatedAt = updatedAt.Time.Format(time.RFC3339)
+		}
 		if completedAt.Valid {
 			record.CompletedAt = completedAt.Time.Format(time.RFC3339)
 		}

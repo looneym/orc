@@ -42,6 +42,7 @@ type CommissionRecord struct {
 	Status      string
 	Pinned      bool
 	CreatedAt   string
+	UpdatedAt   string
 	StartedAt   string
 	CompletedAt string
 }
@@ -985,4 +986,147 @@ type PRFilters struct {
 	RepoID       string
 	CommissionID string
 	Status       string
+}
+
+// FactoryRepository defines the secondary port for factory persistence.
+// A Factory is a TMux session - the persistent runtime environment.
+type FactoryRepository interface {
+	// Create persists a new factory.
+	Create(ctx context.Context, factory *FactoryRecord) error
+
+	// GetByID retrieves a factory by its ID.
+	GetByID(ctx context.Context, id string) (*FactoryRecord, error)
+
+	// GetByName retrieves a factory by its unique name.
+	GetByName(ctx context.Context, name string) (*FactoryRecord, error)
+
+	// List retrieves factories matching the given filters.
+	List(ctx context.Context, filters FactoryFilters) ([]*FactoryRecord, error)
+
+	// Update updates an existing factory.
+	Update(ctx context.Context, factory *FactoryRecord) error
+
+	// Delete removes a factory from persistence.
+	Delete(ctx context.Context, id string) error
+
+	// GetNextID returns the next available factory ID.
+	GetNextID(ctx context.Context) (string, error)
+
+	// CountWorkshops returns the number of workshops for a factory.
+	CountWorkshops(ctx context.Context, factoryID string) (int, error)
+
+	// CountCommissions returns the number of commissions for a factory.
+	CountCommissions(ctx context.Context, factoryID string) (int, error)
+}
+
+// FactoryRecord represents a factory as stored in persistence.
+type FactoryRecord struct {
+	ID        string
+	Name      string
+	Status    string
+	CreatedAt string
+	UpdatedAt string
+}
+
+// FactoryFilters contains filter options for querying factories.
+type FactoryFilters struct {
+	Status string
+	Limit  int
+}
+
+// WorkshopRepository defines the secondary port for workshop persistence.
+// A Workshop is a persistent place within a Factory, hosting Workbenches.
+type WorkshopRepository interface {
+	// Create persists a new workshop.
+	Create(ctx context.Context, workshop *WorkshopRecord) error
+
+	// GetByID retrieves a workshop by its ID.
+	GetByID(ctx context.Context, id string) (*WorkshopRecord, error)
+
+	// List retrieves workshops matching the given filters.
+	List(ctx context.Context, filters WorkshopFilters) ([]*WorkshopRecord, error)
+
+	// Update updates an existing workshop.
+	Update(ctx context.Context, workshop *WorkshopRecord) error
+
+	// Delete removes a workshop from persistence.
+	Delete(ctx context.Context, id string) error
+
+	// GetNextID returns the next available workshop ID.
+	GetNextID(ctx context.Context) (string, error)
+
+	// CountWorkbenches returns the number of workbenches for a workshop.
+	CountWorkbenches(ctx context.Context, workshopID string) (int, error)
+
+	// CountByFactory returns the number of workshops for a factory.
+	CountByFactory(ctx context.Context, factoryID string) (int, error)
+
+	// FactoryExists checks if a factory exists (for validation).
+	FactoryExists(ctx context.Context, factoryID string) (bool, error)
+}
+
+// WorkshopRecord represents a workshop as stored in persistence.
+type WorkshopRecord struct {
+	ID        string
+	FactoryID string
+	Name      string
+	Status    string
+	CreatedAt string
+	UpdatedAt string
+}
+
+// WorkshopFilters contains filter options for querying workshops.
+type WorkshopFilters struct {
+	FactoryID string
+	Status    string
+	Limit     int
+}
+
+// WorkbenchRepository defines the secondary port for workbench persistence.
+// A Workbench is a git worktree - replaces the Grove concept.
+type WorkbenchRepository interface {
+	// Create persists a new workbench.
+	Create(ctx context.Context, workbench *WorkbenchRecord) error
+
+	// GetByID retrieves a workbench by its ID.
+	GetByID(ctx context.Context, id string) (*WorkbenchRecord, error)
+
+	// GetByPath retrieves a workbench by its file path.
+	GetByPath(ctx context.Context, path string) (*WorkbenchRecord, error)
+
+	// GetByWorkshop retrieves all workbenches for a workshop.
+	GetByWorkshop(ctx context.Context, workshopID string) ([]*WorkbenchRecord, error)
+
+	// List retrieves all workbenches, optionally filtered by workshop.
+	List(ctx context.Context, workshopID string) ([]*WorkbenchRecord, error)
+
+	// Update updates an existing workbench.
+	Update(ctx context.Context, workbench *WorkbenchRecord) error
+
+	// Delete removes a workbench from persistence.
+	Delete(ctx context.Context, id string) error
+
+	// Rename updates the name of a workbench.
+	Rename(ctx context.Context, id, newName string) error
+
+	// UpdatePath updates the path of a workbench.
+	UpdatePath(ctx context.Context, id, newPath string) error
+
+	// GetNextID returns the next available workbench ID.
+	GetNextID(ctx context.Context) (string, error)
+
+	// WorkshopExists checks if a workshop exists (for validation).
+	WorkshopExists(ctx context.Context, workshopID string) (bool, error)
+}
+
+// WorkbenchRecord represents a workbench as stored in persistence.
+type WorkbenchRecord struct {
+	ID           string
+	Name         string
+	WorkshopID   string
+	RepoID       string // Optional - linked repo
+	WorktreePath string
+	Status       string
+	CreatedAt    string
+	UpdatedAt    string
 }

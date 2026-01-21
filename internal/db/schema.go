@@ -3,16 +3,53 @@ package db
 // schemaSQL is the complete modern schema for fresh ORC installs.
 // This schema reflects the current state after all migrations.
 const schemaSQL = `
--- Commissions (Strategic work streams) - renamed from missions
+-- Factories (TMux sessions - runtime environments)
+CREATE TABLE IF NOT EXISTS factories (
+	id TEXT PRIMARY KEY,
+	name TEXT NOT NULL UNIQUE,
+	status TEXT NOT NULL CHECK(status IN ('active', 'archived')) DEFAULT 'active',
+	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+	updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Workshops (Persistent places within factories)
+CREATE TABLE IF NOT EXISTS workshops (
+	id TEXT PRIMARY KEY,
+	factory_id TEXT NOT NULL,
+	name TEXT NOT NULL,
+	status TEXT NOT NULL CHECK(status IN ('active', 'archived')) DEFAULT 'active',
+	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+	updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+	FOREIGN KEY (factory_id) REFERENCES factories(id)
+);
+
+-- Workbenches (Git worktrees - replaces Groves)
+CREATE TABLE IF NOT EXISTS workbenches (
+	id TEXT PRIMARY KEY,
+	workshop_id TEXT NOT NULL,
+	name TEXT NOT NULL,
+	path TEXT NOT NULL UNIQUE,
+	repo_id TEXT,
+	status TEXT NOT NULL CHECK(status IN ('active', 'archived')) DEFAULT 'active',
+	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+	updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+	FOREIGN KEY (workshop_id) REFERENCES workshops(id),
+	FOREIGN KEY (repo_id) REFERENCES repos(id)
+);
+
+-- Commissions (Tracks of work - what you're working on)
 CREATE TABLE IF NOT EXISTS commissions (
 	id TEXT PRIMARY KEY,
+	factory_id TEXT,
 	title TEXT NOT NULL,
 	description TEXT,
 	status TEXT NOT NULL CHECK(status IN ('initial', 'active', 'paused', 'complete', 'archived', 'deleted')) DEFAULT 'initial',
 	pinned INTEGER DEFAULT 0,
 	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+	updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 	started_at DATETIME,
-	completed_at DATETIME
+	completed_at DATETIME,
+	FOREIGN KEY (factory_id) REFERENCES factories(id)
 );
 
 -- Shipments (Work containers) - renamed from epics
@@ -22,13 +59,13 @@ CREATE TABLE IF NOT EXISTS shipments (
 	title TEXT NOT NULL,
 	description TEXT,
 	status TEXT NOT NULL CHECK(status IN ('active', 'paused', 'complete')) DEFAULT 'active',
-	assigned_grove_id TEXT,
+	assigned_workbench_id TEXT,
 	pinned INTEGER DEFAULT 0,
 	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 	updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 	completed_at DATETIME,
 	FOREIGN KEY (commission_id) REFERENCES commissions(id),
-	FOREIGN KEY (assigned_grove_id) REFERENCES groves(id)
+	FOREIGN KEY (assigned_workbench_id) REFERENCES workbenches(id)
 );
 
 -- Tasks (Atomic units of work)
@@ -41,7 +78,7 @@ CREATE TABLE IF NOT EXISTS tasks (
 	type TEXT CHECK(type IN ('research', 'implementation', 'fix', 'documentation', 'maintenance')),
 	status TEXT NOT NULL CHECK(status IN ('ready', 'in_progress', 'blocked', 'paused', 'complete')) DEFAULT 'ready',
 	priority TEXT CHECK(priority IN ('low', 'medium', 'high')),
-	assigned_grove_id TEXT,
+	assigned_workbench_id TEXT,
 	context_ref TEXT,
 	pinned INTEGER DEFAULT 0,
 	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -50,20 +87,7 @@ CREATE TABLE IF NOT EXISTS tasks (
 	completed_at DATETIME,
 	FOREIGN KEY (shipment_id) REFERENCES shipments(id) ON DELETE CASCADE,
 	FOREIGN KEY (commission_id) REFERENCES commissions(id),
-	FOREIGN KEY (assigned_grove_id) REFERENCES groves(id)
-);
-
--- Groves (Physical workspaces) - Commission-level worktrees
-CREATE TABLE IF NOT EXISTS groves (
-	id TEXT PRIMARY KEY,
-	commission_id TEXT NOT NULL,
-	name TEXT NOT NULL,
-	path TEXT NOT NULL UNIQUE,
-	repos TEXT,
-	status TEXT NOT NULL CHECK(status IN ('active', 'archived')) DEFAULT 'active',
-	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-	updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-	FOREIGN KEY (commission_id) REFERENCES commissions(id)
+	FOREIGN KEY (assigned_workbench_id) REFERENCES workbenches(id)
 );
 
 -- Handoffs (Claude-to-Claude context transfer)
@@ -73,10 +97,10 @@ CREATE TABLE IF NOT EXISTS handoffs (
 	handoff_note TEXT NOT NULL,
 	active_commission_id TEXT,
 	active_work_orders TEXT,
-	active_grove_id TEXT,
+	active_workbench_id TEXT,
 	todos_snapshot TEXT,
 	FOREIGN KEY (active_commission_id) REFERENCES commissions(id),
-	FOREIGN KEY (active_grove_id) REFERENCES groves(id)
+	FOREIGN KEY (active_workbench_id) REFERENCES workbenches(id)
 );
 
 -- Messages (Agent mail system)
@@ -251,16 +275,22 @@ CREATE TABLE IF NOT EXISTS prs (
 );
 
 -- Create indexes for common queries
+CREATE INDEX IF NOT EXISTS idx_factories_name ON factories(name);
+CREATE INDEX IF NOT EXISTS idx_factories_status ON factories(status);
+CREATE INDEX IF NOT EXISTS idx_workshops_factory ON workshops(factory_id);
+CREATE INDEX IF NOT EXISTS idx_workshops_status ON workshops(status);
+CREATE INDEX IF NOT EXISTS idx_workbenches_workshop ON workbenches(workshop_id);
+CREATE INDEX IF NOT EXISTS idx_workbenches_status ON workbenches(status);
+CREATE INDEX IF NOT EXISTS idx_workbenches_repo ON workbenches(repo_id);
+CREATE INDEX IF NOT EXISTS idx_commissions_factory ON commissions(factory_id);
 CREATE INDEX IF NOT EXISTS idx_commissions_status ON commissions(status);
 CREATE INDEX IF NOT EXISTS idx_shipments_commission ON shipments(commission_id);
 CREATE INDEX IF NOT EXISTS idx_shipments_status ON shipments(status);
-CREATE INDEX IF NOT EXISTS idx_shipments_grove ON shipments(assigned_grove_id);
+CREATE INDEX IF NOT EXISTS idx_shipments_workbench ON shipments(assigned_workbench_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_shipment ON tasks(shipment_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_commission ON tasks(commission_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
-CREATE INDEX IF NOT EXISTS idx_tasks_grove ON tasks(assigned_grove_id);
-CREATE INDEX IF NOT EXISTS idx_groves_commission ON groves(commission_id);
-CREATE INDEX IF NOT EXISTS idx_groves_status ON groves(status);
+CREATE INDEX IF NOT EXISTS idx_tasks_workbench ON tasks(assigned_workbench_id);
 CREATE INDEX IF NOT EXISTS idx_handoffs_created ON handoffs(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_messages_recipient ON messages(recipient, read);
 CREATE INDEX IF NOT EXISTS idx_messages_commission ON messages(commission_id);
@@ -327,7 +357,7 @@ func InitSchema() error {
 				return err
 			}
 			// Insert all migration versions as applied
-			for i := 1; i <= 24; i++ {
+			for i := 1; i <= 30; i++ {
 				_, err = db.Exec("INSERT INTO schema_version (version) VALUES (?)", i)
 				if err != nil {
 					return err

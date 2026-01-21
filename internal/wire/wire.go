@@ -35,6 +35,9 @@ var (
 	messageService                 primary.MessageService
 	repoService                    primary.RepoService
 	prService                      primary.PRService
+	factoryService                 primary.FactoryService
+	workshopService                primary.WorkshopService
+	workbenchService               primary.WorkbenchService
 	commissionOrchestrationService *app.CommissionOrchestrationService
 	tmuxService                    secondary.TMuxAdapter
 	once                           sync.Once
@@ -136,6 +139,24 @@ func PRService() primary.PRService {
 	return prService
 }
 
+// FactoryService returns the singleton FactoryService instance.
+func FactoryService() primary.FactoryService {
+	once.Do(initServices)
+	return factoryService
+}
+
+// WorkshopService returns the singleton WorkshopService instance.
+func WorkshopService() primary.WorkshopService {
+	once.Do(initServices)
+	return workshopService
+}
+
+// WorkbenchService returns the singleton WorkbenchService instance.
+func WorkbenchService() primary.WorkbenchService {
+	once.Do(initServices)
+	return workbenchService
+}
+
 // CommissionOrchestrationService returns the singleton CommissionOrchestrationService instance.
 func CommissionOrchestrationService() *app.CommissionOrchestrationService {
 	once.Do(initServices)
@@ -210,6 +231,14 @@ func initServices() {
 	prRepo := sqlite.NewPRRepository(database)
 	repoService = app.NewRepoService(repoRepo)
 	prService = app.NewPRService(prRepo, shipmentService)
+
+	// Create factory, workshop, and workbench services
+	factoryRepo := sqlite.NewFactoryRepository(database)
+	workshopRepo := sqlite.NewWorkshopRepository(database)
+	workbenchRepo := sqlite.NewWorkbenchRepository(database)
+	factoryService = app.NewFactoryService(factoryRepo)
+	workshopService = app.NewWorkshopService(workshopRepo)
+	workbenchService = app.NewWorkbenchService(workbenchRepo, workshopRepo, agentProvider, executor)
 
 	// Create orchestration services
 	commissionOrchestrationService = app.NewCommissionOrchestrationService(commissionService, groveService, agentProvider)

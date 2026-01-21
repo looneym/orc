@@ -1,0 +1,323 @@
+// Package sqlite contains SQLite implementations of repository interfaces.
+package sqlite
+
+import (
+	"context"
+	"database/sql"
+	"fmt"
+	"time"
+
+	"github.com/example/orc/internal/ports/secondary"
+)
+
+// WorkbenchRepository implements secondary.WorkbenchRepository with SQLite.
+type WorkbenchRepository struct {
+	db *sql.DB
+}
+
+// NewWorkbenchRepository creates a new SQLite workbench repository.
+func NewWorkbenchRepository(db *sql.DB) *WorkbenchRepository {
+	return &WorkbenchRepository{db: db}
+}
+
+// Create persists a new workbench.
+func (r *WorkbenchRepository) Create(ctx context.Context, workbench *secondary.WorkbenchRecord) error {
+	// Verify workshop exists
+	var exists int
+	err := r.db.QueryRowContext(ctx,
+		"SELECT COUNT(*) FROM workshops WHERE id = ?", workbench.WorkshopID,
+	).Scan(&exists)
+	if err != nil {
+		return fmt.Errorf("failed to verify workshop: %w", err)
+	}
+	if exists == 0 {
+		return fmt.Errorf("workshop %s not found", workbench.WorkshopID)
+	}
+
+	// Generate workbench ID by finding max existing ID
+	var maxID int
+	err = r.db.QueryRowContext(ctx,
+		"SELECT COALESCE(MAX(CAST(SUBSTR(id, 7) AS INTEGER)), 0) FROM workbenches",
+	).Scan(&maxID)
+	if err != nil {
+		return fmt.Errorf("failed to generate workbench ID: %w", err)
+	}
+
+	id := fmt.Sprintf("BENCH-%03d", maxID+1)
+
+	status := workbench.Status
+	if status == "" {
+		status = "active"
+	}
+
+	var repoID sql.NullString
+	if workbench.RepoID != "" {
+		repoID = sql.NullString{String: workbench.RepoID, Valid: true}
+	}
+
+	_, err = r.db.ExecContext(ctx,
+		"INSERT INTO workbenches (id, workshop_id, name, path, repo_id, status) VALUES (?, ?, ?, ?, ?, ?)",
+		id, workbench.WorkshopID, workbench.Name, workbench.WorktreePath, repoID, status,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create workbench: %w", err)
+	}
+
+	// Update the record with the generated ID
+	workbench.ID = id
+	return nil
+}
+
+// GetByID retrieves a workbench by its ID.
+func (r *WorkbenchRepository) GetByID(ctx context.Context, id string) (*secondary.WorkbenchRecord, error) {
+	var (
+		createdAt time.Time
+		updatedAt time.Time
+		repoID    sql.NullString
+	)
+
+	record := &secondary.WorkbenchRecord{}
+	err := r.db.QueryRowContext(ctx,
+		"SELECT id, workshop_id, name, path, repo_id, status, created_at, updated_at FROM workbenches WHERE id = ?",
+		id,
+	).Scan(&record.ID, &record.WorkshopID, &record.Name, &record.WorktreePath, &repoID, &record.Status, &createdAt, &updatedAt)
+
+	if err == sql.ErrNoRows {
+		return nil, fmt.Errorf("workbench %s not found", id)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to get workbench: %w", err)
+	}
+
+	if repoID.Valid {
+		record.RepoID = repoID.String
+	}
+	record.CreatedAt = createdAt.Format(time.RFC3339)
+	record.UpdatedAt = updatedAt.Format(time.RFC3339)
+	return record, nil
+}
+
+// GetByPath retrieves a workbench by its file path.
+func (r *WorkbenchRepository) GetByPath(ctx context.Context, path string) (*secondary.WorkbenchRecord, error) {
+	var (
+		createdAt time.Time
+		updatedAt time.Time
+		repoID    sql.NullString
+	)
+
+	record := &secondary.WorkbenchRecord{}
+	err := r.db.QueryRowContext(ctx,
+		"SELECT id, workshop_id, name, path, repo_id, status, created_at, updated_at FROM workbenches WHERE path = ?",
+		path,
+	).Scan(&record.ID, &record.WorkshopID, &record.Name, &record.WorktreePath, &repoID, &record.Status, &createdAt, &updatedAt)
+
+	if err == sql.ErrNoRows {
+		return nil, fmt.Errorf("workbench with path %s not found", path)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to get workbench by path: %w", err)
+	}
+
+	if repoID.Valid {
+		record.RepoID = repoID.String
+	}
+	record.CreatedAt = createdAt.Format(time.RFC3339)
+	record.UpdatedAt = updatedAt.Format(time.RFC3339)
+	return record, nil
+}
+
+// GetByWorkshop retrieves all workbenches for a workshop.
+func (r *WorkbenchRepository) GetByWorkshop(ctx context.Context, workshopID string) ([]*secondary.WorkbenchRecord, error) {
+	rows, err := r.db.QueryContext(ctx,
+		"SELECT id, workshop_id, name, path, repo_id, status, created_at, updated_at FROM workbenches WHERE workshop_id = ? AND status = 'active' ORDER BY created_at DESC",
+		workshopID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list workbenches: %w", err)
+	}
+	defer rows.Close()
+
+	var workbenches []*secondary.WorkbenchRecord
+	for rows.Next() {
+		var (
+			createdAt time.Time
+			updatedAt time.Time
+			repoID    sql.NullString
+		)
+
+		record := &secondary.WorkbenchRecord{}
+		err := rows.Scan(&record.ID, &record.WorkshopID, &record.Name, &record.WorktreePath, &repoID, &record.Status, &createdAt, &updatedAt)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan workbench: %w", err)
+		}
+
+		if repoID.Valid {
+			record.RepoID = repoID.String
+		}
+		record.CreatedAt = createdAt.Format(time.RFC3339)
+		record.UpdatedAt = updatedAt.Format(time.RFC3339)
+		workbenches = append(workbenches, record)
+	}
+
+	return workbenches, nil
+}
+
+// List retrieves all workbenches, optionally filtered by workshop.
+func (r *WorkbenchRepository) List(ctx context.Context, workshopID string) ([]*secondary.WorkbenchRecord, error) {
+	query := "SELECT id, workshop_id, name, path, repo_id, status, created_at, updated_at FROM workbenches WHERE 1=1"
+	args := []any{}
+
+	if workshopID != "" {
+		query += " AND workshop_id = ?"
+		args = append(args, workshopID)
+	}
+
+	query += " ORDER BY created_at DESC"
+
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list workbenches: %w", err)
+	}
+	defer rows.Close()
+
+	var workbenches []*secondary.WorkbenchRecord
+	for rows.Next() {
+		var (
+			createdAt time.Time
+			updatedAt time.Time
+			repoID    sql.NullString
+		)
+
+		record := &secondary.WorkbenchRecord{}
+		err := rows.Scan(&record.ID, &record.WorkshopID, &record.Name, &record.WorktreePath, &repoID, &record.Status, &createdAt, &updatedAt)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan workbench: %w", err)
+		}
+
+		if repoID.Valid {
+			record.RepoID = repoID.String
+		}
+		record.CreatedAt = createdAt.Format(time.RFC3339)
+		record.UpdatedAt = updatedAt.Format(time.RFC3339)
+		workbenches = append(workbenches, record)
+	}
+
+	return workbenches, nil
+}
+
+// Update updates an existing workbench.
+func (r *WorkbenchRepository) Update(ctx context.Context, workbench *secondary.WorkbenchRecord) error {
+	query := "UPDATE workbenches SET updated_at = CURRENT_TIMESTAMP"
+	args := []any{}
+
+	if workbench.Name != "" {
+		query += ", name = ?"
+		args = append(args, workbench.Name)
+	}
+
+	if workbench.WorktreePath != "" {
+		query += ", path = ?"
+		args = append(args, workbench.WorktreePath)
+	}
+
+	if workbench.Status != "" {
+		query += ", status = ?"
+		args = append(args, workbench.Status)
+	}
+
+	query += " WHERE id = ?"
+	args = append(args, workbench.ID)
+
+	result, err := r.db.ExecContext(ctx, query, args...)
+	if err != nil {
+		return fmt.Errorf("failed to update workbench: %w", err)
+	}
+
+	rowsAffected, _ := result.RowsAffected()
+	if rowsAffected == 0 {
+		return fmt.Errorf("workbench %s not found", workbench.ID)
+	}
+
+	return nil
+}
+
+// Delete removes a workbench from persistence.
+func (r *WorkbenchRepository) Delete(ctx context.Context, id string) error {
+	result, err := r.db.ExecContext(ctx, "DELETE FROM workbenches WHERE id = ?", id)
+	if err != nil {
+		return fmt.Errorf("failed to delete workbench: %w", err)
+	}
+
+	rowsAffected, _ := result.RowsAffected()
+	if rowsAffected == 0 {
+		return fmt.Errorf("workbench %s not found", id)
+	}
+
+	return nil
+}
+
+// Rename updates the name of a workbench.
+func (r *WorkbenchRepository) Rename(ctx context.Context, id, newName string) error {
+	result, err := r.db.ExecContext(ctx,
+		"UPDATE workbenches SET name = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+		newName, id,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to rename workbench: %w", err)
+	}
+
+	rowsAffected, _ := result.RowsAffected()
+	if rowsAffected == 0 {
+		return fmt.Errorf("workbench %s not found", id)
+	}
+
+	return nil
+}
+
+// UpdatePath updates the path of a workbench.
+func (r *WorkbenchRepository) UpdatePath(ctx context.Context, id, newPath string) error {
+	result, err := r.db.ExecContext(ctx,
+		"UPDATE workbenches SET path = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+		newPath, id,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to update workbench path: %w", err)
+	}
+
+	rowsAffected, _ := result.RowsAffected()
+	if rowsAffected == 0 {
+		return fmt.Errorf("workbench %s not found", id)
+	}
+
+	return nil
+}
+
+// GetNextID returns the next available workbench ID.
+func (r *WorkbenchRepository) GetNextID(ctx context.Context) (string, error) {
+	var maxID int
+	err := r.db.QueryRowContext(ctx,
+		"SELECT COALESCE(MAX(CAST(SUBSTR(id, 7) AS INTEGER)), 0) FROM workbenches",
+	).Scan(&maxID)
+	if err != nil {
+		return "", fmt.Errorf("failed to get next workbench ID: %w", err)
+	}
+
+	return fmt.Sprintf("BENCH-%03d", maxID+1), nil
+}
+
+// WorkshopExists checks if a workshop exists.
+func (r *WorkbenchRepository) WorkshopExists(ctx context.Context, workshopID string) (bool, error) {
+	var count int
+	err := r.db.QueryRowContext(ctx,
+		"SELECT COUNT(*) FROM workshops WHERE id = ?",
+		workshopID,
+	).Scan(&count)
+	if err != nil {
+		return false, fmt.Errorf("failed to check workshop existence: %w", err)
+	}
+
+	return count > 0, nil
+}
+
+// Ensure WorkbenchRepository implements the interface
+var _ secondary.WorkbenchRepository = (*WorkbenchRepository)(nil)

@@ -134,6 +134,36 @@ var migrations = []Migration{
 		Name:    "create_prs_table",
 		Up:      migrationV24,
 	},
+	{
+		Version: 25,
+		Name:    "create_factories_from_commissions",
+		Up:      migrationV25,
+	},
+	{
+		Version: 26,
+		Name:    "create_workshops_table",
+		Up:      migrationV26,
+	},
+	{
+		Version: 27,
+		Name:    "rename_groves_to_workbenches",
+		Up:      migrationV27,
+	},
+	{
+		Version: 28,
+		Name:    "recreate_commissions_as_track_of_work",
+		Up:      migrationV28,
+	},
+	{
+		Version: 29,
+		Name:    "reparent_children_to_new_commission",
+		Up:      migrationV29,
+	},
+	{
+		Version: 30,
+		Name:    "add_updated_at_to_commissions",
+		Up:      migrationV30,
+	},
 }
 
 // RunMigrations executes all pending migrations
@@ -2694,6 +2724,289 @@ func migrationV24(db *sql.DB) error {
 	`)
 	if err != nil {
 		return fmt.Errorf("failed to create prs unique index: %w", err)
+	}
+
+	return nil
+}
+
+// migrationV25 creates factories table from current commissions (which were execution envs)
+func migrationV25(db *sql.DB) error {
+	// Step 1: Create factories table
+	_, err := db.Exec(`
+		CREATE TABLE factories (
+			id TEXT PRIMARY KEY,
+			name TEXT NOT NULL UNIQUE,
+			status TEXT NOT NULL CHECK(status IN ('active', 'archived')) DEFAULT 'active',
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		)
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to create factories table: %w", err)
+	}
+
+	// Step 2: Migrate data from commissions (COMM-001 -> FACT-001)
+	// The current commissions table represents execution environments
+	_, err = db.Exec(`
+		INSERT INTO factories (id, name, status, created_at, updated_at)
+		SELECT
+			REPLACE(id, 'COMM-', 'FACT-'),
+			title,
+			CASE WHEN status = 'active' THEN 'active' ELSE 'archived' END,
+			created_at,
+			COALESCE(started_at, created_at)
+		FROM commissions
+		WHERE id != 'COMM-000'
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to migrate commissions to factories: %w", err)
+	}
+
+	// Step 3: Create indexes
+	_, err = db.Exec(`
+		CREATE INDEX idx_factories_name ON factories(name);
+		CREATE INDEX idx_factories_status ON factories(status);
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to create factories indexes: %w", err)
+	}
+
+	return nil
+}
+
+// migrationV26 creates workshops table
+func migrationV26(db *sql.DB) error {
+	// Step 1: Create workshops table
+	_, err := db.Exec(`
+		CREATE TABLE workshops (
+			id TEXT PRIMARY KEY,
+			factory_id TEXT NOT NULL,
+			name TEXT NOT NULL,
+			status TEXT NOT NULL CHECK(status IN ('active', 'archived')) DEFAULT 'active',
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			FOREIGN KEY (factory_id) REFERENCES factories(id)
+		)
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to create workshops table: %w", err)
+	}
+
+	// Step 2: Create default workshop for each factory
+	_, err = db.Exec(`
+		INSERT INTO workshops (id, factory_id, name, status, created_at)
+		SELECT
+			REPLACE(id, 'FACT-', 'WORK-'),
+			id,
+			'Ironmoss Forge',
+			'active',
+			created_at
+		FROM factories
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to create default workshops: %w", err)
+	}
+
+	// Step 3: Create indexes
+	_, err = db.Exec(`
+		CREATE INDEX idx_workshops_factory ON workshops(factory_id);
+		CREATE INDEX idx_workshops_status ON workshops(status);
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to create workshops indexes: %w", err)
+	}
+
+	return nil
+}
+
+// migrationV27 renames groves to workbenches
+func migrationV27(db *sql.DB) error {
+	// Step 1: Create workbenches table
+	_, err := db.Exec(`
+		CREATE TABLE workbenches (
+			id TEXT PRIMARY KEY,
+			workshop_id TEXT NOT NULL,
+			name TEXT NOT NULL,
+			path TEXT NOT NULL UNIQUE,
+			repo_id TEXT,
+			status TEXT NOT NULL CHECK(status IN ('active', 'archived')) DEFAULT 'active',
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			FOREIGN KEY (workshop_id) REFERENCES workshops(id),
+			FOREIGN KEY (repo_id) REFERENCES repos(id)
+		)
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to create workbenches table: %w", err)
+	}
+
+	// Step 2: Migrate groves to workbenches
+	// Link to workshop via commission_id -> WORK-XXX mapping
+	_, err = db.Exec(`
+		INSERT INTO workbenches (id, workshop_id, name, path, status, created_at, updated_at)
+		SELECT
+			REPLACE(id, 'GROVE-', 'BENCH-'),
+			REPLACE(commission_id, 'COMM-', 'WORK-'),
+			name,
+			path,
+			status,
+			created_at,
+			updated_at
+		FROM groves
+		WHERE commission_id != 'COMM-000'
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to migrate groves to workbenches: %w", err)
+	}
+
+	// Step 3: Create indexes
+	_, err = db.Exec(`
+		CREATE INDEX idx_workbenches_workshop ON workbenches(workshop_id);
+		CREATE INDEX idx_workbenches_status ON workbenches(status);
+		CREATE INDEX idx_workbenches_repo ON workbenches(repo_id);
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to create workbenches indexes: %w", err)
+	}
+
+	return nil
+}
+
+// migrationV28 recreates commissions as track-of-work entity
+func migrationV28(db *sql.DB) error {
+	// Step 1: Rename old commissions table
+	_, err := db.Exec(`ALTER TABLE commissions RENAME TO commissions_old`)
+	if err != nil {
+		return fmt.Errorf("failed to rename commissions: %w", err)
+	}
+
+	// Step 2: Create new commissions table with factory_id
+	_, err = db.Exec(`
+		CREATE TABLE commissions (
+			id TEXT PRIMARY KEY,
+			factory_id TEXT,
+			title TEXT NOT NULL,
+			description TEXT,
+			status TEXT NOT NULL CHECK(status IN ('initial', 'active', 'paused', 'complete', 'archived', 'deleted')) DEFAULT 'initial',
+			pinned INTEGER DEFAULT 0,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			started_at DATETIME,
+			completed_at DATETIME,
+			FOREIGN KEY (factory_id) REFERENCES factories(id)
+		)
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to create new commissions table: %w", err)
+	}
+
+	// Step 3: Create COMM-001 "ORC 3.0 Implementation" linked to FACT-001
+	_, err = db.Exec(`
+		INSERT INTO commissions (id, factory_id, title, description, status, pinned, created_at, started_at)
+		SELECT
+			'COMM-001',
+			'FACT-001',
+			'ORC 3.0 Implementation',
+			'Full ORC 3.0 implementation per NOTE-107',
+			'active',
+			1,
+			datetime('now'),
+			datetime('now')
+		WHERE EXISTS (SELECT 1 FROM factories WHERE id = 'FACT-001')
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to create COMM-001: %w", err)
+	}
+
+	// Step 4: Re-create COMM-000 for maintenance tasks (no factory)
+	_, err = db.Exec(`
+		INSERT INTO commissions (id, factory_id, title, description, status, pinned, created_at)
+		VALUES ('COMM-000', NULL, 'Keep the Factory Running', 'Default commission for maintenance and operational tasks', 'active', 1, datetime('now'))
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to create COMM-000: %w", err)
+	}
+
+	// Step 5: Create indexes
+	_, err = db.Exec(`
+		CREATE INDEX idx_commissions_factory ON commissions(factory_id);
+		CREATE INDEX idx_commissions_status ON commissions(status);
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to create commissions indexes: %w", err)
+	}
+
+	return nil
+}
+
+// migrationV29 re-parents all children to the new COMM-001
+func migrationV29(db *sql.DB) error {
+	// Update all child tables to point to new COMM-001
+	// Skip COMM-000 items (maintenance tasks)
+
+	tables := []string{
+		"shipments",
+		"tasks",
+		"notes",
+		"conclaves",
+		"investigations",
+		"questions",
+		"tomes",
+		"plans",
+		"messages",
+		"prs",
+	}
+
+	for _, table := range tables {
+		query := fmt.Sprintf(`
+			UPDATE %s SET commission_id = 'COMM-001'
+			WHERE commission_id != 'COMM-000'
+			AND commission_id IS NOT NULL
+		`, table)
+		_, err := db.Exec(query)
+		if err != nil {
+			return fmt.Errorf("failed to update %s commission_id: %w", table, err)
+		}
+	}
+
+	// Drop old commissions table
+	_, err := db.Exec(`DROP TABLE commissions_old`)
+	if err != nil {
+		return fmt.Errorf("failed to drop commissions_old: %w", err)
+	}
+
+	// Drop old groves table (now replaced by workbenches)
+	_, err = db.Exec(`DROP TABLE groves`)
+	if err != nil {
+		return fmt.Errorf("failed to drop groves: %w", err)
+	}
+
+	return nil
+}
+
+// migrationV30 adds updated_at column to commissions if missing
+func migrationV30(db *sql.DB) error {
+	// Check if column exists
+	var columnExists int
+	err := db.QueryRow(`
+		SELECT COUNT(*) FROM pragma_table_info('commissions') WHERE name = 'updated_at'
+	`).Scan(&columnExists)
+	if err != nil {
+		return fmt.Errorf("failed to check for updated_at column: %w", err)
+	}
+
+	if columnExists == 0 {
+		// SQLite doesn't allow non-constant defaults, so add column without default
+		_, err = db.Exec(`ALTER TABLE commissions ADD COLUMN updated_at DATETIME`)
+		if err != nil {
+			return fmt.Errorf("failed to add updated_at column: %w", err)
+		}
+
+		// Update existing rows to have the current timestamp
+		_, err = db.Exec(`UPDATE commissions SET updated_at = CURRENT_TIMESTAMP WHERE updated_at IS NULL`)
+		if err != nil {
+			return fmt.Errorf("failed to update updated_at values: %w", err)
+		}
 	}
 
 	return nil
