@@ -1,4 +1,4 @@
-.PHONY: install install-binary install-shim uninstall-shim dev build test clean help
+.PHONY: install install-binary install-shim uninstall-shim dev build test lint lint-fix clean help
 
 # Go binary location (handles empty GOBIN)
 GOBIN := $(shell go env GOPATH)/bin
@@ -70,6 +70,27 @@ build: dev
 test:
 	go test ./...
 
+#---------------------------------------------------------------------------
+# Linting
+#---------------------------------------------------------------------------
+
+# Run all linters (golangci-lint + architecture)
+lint:
+	@echo "Running golangci-lint..."
+	@command -v golangci-lint >/dev/null 2>&1 || { echo "golangci-lint not installed. Run: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest"; exit 1; }
+	@golangci-lint run ./...
+	@echo "Running architecture lint..."
+	@command -v go-arch-lint >/dev/null 2>&1 || { echo "go-arch-lint not installed. Run: go install github.com/fe3dback/go-arch-lint@latest"; exit 1; }
+	@go-arch-lint check
+	@echo "✓ All linters passed"
+
+# Run golangci-lint with auto-fix
+lint-fix:
+	@echo "Running golangci-lint with --fix..."
+	@command -v golangci-lint >/dev/null 2>&1 || { echo "golangci-lint not installed. Run: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest"; exit 1; }
+	@golangci-lint run --fix ./...
+	@echo "✓ Lint fixes applied"
+
 # Clean build artifacts
 clean:
 	rm -f orc
@@ -86,6 +107,8 @@ help:
 	@echo "Development:"
 	@echo "  make dev        Build local ./orc for development"
 	@echo "  make test       Run all tests"
+	@echo "  make lint       Run golangci-lint + architecture linting"
+	@echo "  make lint-fix   Run golangci-lint with auto-fix"
 	@echo "  make clean      Remove local build artifacts"
 	@echo ""
 	@echo "Installation:"

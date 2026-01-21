@@ -1,0 +1,144 @@
+# Architecture Rules for go-arch-lint
+# Enforces hexagonal architecture layer boundaries
+#
+# Run: go-arch-lint check
+# Or via Makefile: make lint
+#
+# Note: This config reflects the current codebase patterns. The key rules
+# enforced are dependency directions - inner layers shouldn't depend on outer.
+
+version: 3
+
+workdir: .
+
+allow:
+  depOnAnyVendor: true  # Allow vendor deps (cobra, sqlite3, etc.)
+  deepScan: false       # Disable deep scan - focus on import rules, not DI patterns
+
+excludeFiles:
+  - ".*/scripts/.*"  # Exclude scripts from analysis
+
+components:
+  # Core domain logic - guards, state machines, pure functions
+  core:
+    in: internal/core/**
+
+  # Port interfaces - contracts only
+  ports:
+    in: internal/ports/**
+
+  # Application services - orchestration layer
+  app:
+    in: internal/app/**
+
+  # Adapter implementations - external system bindings
+  adapters:
+    in: internal/adapters/**
+
+  # Models - shared data structures
+  models:
+    in: internal/models/**
+
+  # Database utilities
+  db:
+    in: internal/db/**
+
+  # Dependency injection / wiring
+  wire:
+    in: internal/wire/**
+
+  # CLI commands (Cobra)
+  cli:
+    in: internal/cli/**
+
+  # Entry points
+  cmd:
+    in: cmd/**
+
+  # Supporting packages
+  agent:
+    in: internal/agent/**
+
+  config:
+    in: internal/config/**
+
+  context:
+    in: internal/context/**
+
+  templates:
+    in: internal/templates/**
+
+  tmux:
+    in: internal/tmux/**
+
+deps:
+  # Core can depend on itself (effects, shared types)
+  core:
+    anyProjectDeps: true
+
+  # Ports - interface definitions
+  ports:
+    anyProjectDeps: false
+    anyVendorDeps: true
+
+  # App orchestrates using core, ports, models, and supporting packages
+  app:
+    mayDependOn:
+      - core
+      - ports
+      - models
+      - config
+      - tmux
+      - context
+      - agent
+
+  # Adapters implement ports; can use core, db, and supporting packages
+  adapters:
+    mayDependOn:
+      - ports
+      - models
+      - db
+      - core
+      - agent
+      - tmux
+      - adapters  # Allow self-reference for tests
+
+  # Wire connects everything for dependency injection
+  wire:
+    anyProjectDeps: true
+
+  # CLI uses wire to get dependencies; can access other packages
+  cli:
+    anyProjectDeps: true
+
+  # Entry points bootstrap via CLI
+  cmd:
+    anyProjectDeps: true
+
+  # Models - data structures, minimal deps
+  models:
+    anyProjectDeps: false
+    anyVendorDeps: true
+
+  # DB utilities
+  db:
+    mayDependOn:
+      - models
+
+  # Supporting packages - relaxed rules
+  agent:
+    anyProjectDeps: true
+
+  config:
+    anyProjectDeps: false
+    anyVendorDeps: true
+
+  context:
+    anyProjectDeps: true
+
+  templates:
+    anyProjectDeps: false
+    anyVendorDeps: true
+
+  tmux:
+    anyProjectDeps: true
