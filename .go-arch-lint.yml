@@ -69,6 +69,10 @@ components:
   templates:
     in: internal/templates/**
 
+  # Scaffold code generation
+  scaffold:
+    in: internal/scaffold/**
+
   # tmux executor (imperative)
   tmux:
     in: internal/tmux/**
@@ -85,15 +89,15 @@ deps:
     mayDependOn:
       - core
 
-  # Ports: interfaces only
+  # Ports: interfaces only (self-ref for sub-packages)
   ports:
-    anyProjectDeps: false
-    anyVendorDeps: false
+    mayDependOn:
+      - ports
 
-  # Models: data structures only
+  # Models: data structures only (self-ref for sub-packages)
   models:
-    anyProjectDeps: false
-    anyVendorDeps: false
+    mayDependOn:
+      - models
 
   # App: orchestration using core + ports (no direct I/O)
   app:
@@ -108,6 +112,7 @@ deps:
   # Adapters: perform I/O; implement ports
   adapters:
     mayDependOn:
+      - adapters  # Self-ref for tests
       - ports
       - models
       - db
@@ -140,6 +145,9 @@ deps:
       - config
       - context
       - version
+      - templates  # For prime command
+      - scaffold   # For scaffold command
+      - agent      # For identity detection
 
   # cmd: entrypoints should only bootstrap CLI (and version if needed)
   cmd:
@@ -174,7 +182,12 @@ deps:
       - config
       - context
 
-  # Version: stdlib only
+  # Scaffold: code generation
+  scaffold:
+    mayDependOn:
+      - templates
+
+  # Version: stdlib only (self-ref to satisfy linter)
   version:
-    anyProjectDeps: false
-    anyVendorDeps: false
+    mayDependOn:
+      - version
