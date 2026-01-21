@@ -26,7 +26,7 @@ var noteCreateCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
 		title := args[0]
-		missionID, _ := cmd.Flags().GetString("mission")
+		missionID, _ := cmd.Flags().GetString("commission")
 		content, _ := cmd.Flags().GetString("content")
 		noteType, _ := cmd.Flags().GetString("type")
 		shipmentID, _ := cmd.Flags().GetString("shipment")
@@ -102,7 +102,7 @@ var noteListCmd = &cobra.Command{
 	Short: "List notes",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
-		missionID, _ := cmd.Flags().GetString("mission")
+		missionID, _ := cmd.Flags().GetString("commission")
 		noteType, _ := cmd.Flags().GetString("type")
 		shipmentID, _ := cmd.Flags().GetString("shipment")
 		investigationID, _ := cmd.Flags().GetString("investigation")
