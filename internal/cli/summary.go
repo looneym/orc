@@ -579,7 +579,7 @@ Containers shown:
   - Tomes (TOME-*) with Notes
 
 Filtering:
-  --mission [id]              Show specific mission (or 'current')
+  --commission [id]              Show specific mission (or 'current')
   --filter-statuses paused    Hide items with these statuses
   --filter-containers SHIP    Show only these container types
   --tags research             Show only leaves with these tags
@@ -641,22 +641,22 @@ Examples:
 			focusID := GetCurrentFocus(cfg)
 
 			// Determine mission filter
-			var filterMissionID string
+			var filterCommissionID string
 			if missionFilter == "current" {
 				// Get current mission from context
-				missionCtx, _ := ctx.DetectMissionContext()
-				if missionCtx == nil || missionCtx.MissionID == "" {
-					return fmt.Errorf("--mission current requires being in a mission context (no .orc/config.json found)")
+				commissionCtx, _ := ctx.DetectCommissionContext()
+				if commissionCtx == nil || commissionCtx.CommissionID == "" {
+					return fmt.Errorf("--commission current requires being in a mission context (no .orc/config.json found)")
 				}
-				filterMissionID = missionCtx.MissionID
+				filterCommissionID = commissionCtx.CommissionID
 			} else if missionFilter != "" {
-				filterMissionID = missionFilter
+				filterCommissionID = missionFilter
 			}
 
 			// Build header with filter info
 			headerParts := []string{"📊 ORC Summary"}
-			if filterMissionID != "" {
-				headerParts = append(headerParts, filterMissionID)
+			if filterCommissionID != "" {
+				headerParts = append(headerParts, filterCommissionID)
 			}
 			if len(includeTags) > 0 {
 				headerParts = append(headerParts, fmt.Sprintf("tags=%s", strings.Join(includeTags, ",")))
@@ -664,45 +664,45 @@ Examples:
 			fmt.Println(strings.Join(headerParts, " - "))
 			fmt.Println()
 
-			// Get all non-complete missions via service
-			missions, err := wire.MissionService().ListMissions(context.Background(), primary.MissionFilters{})
+			// Get all non-complete commissions via service
+			commissions, err := wire.CommissionService().ListCommissions(context.Background(), primary.CommissionFilters{})
 			if err != nil {
-				return fmt.Errorf("failed to list missions: %w", err)
+				return fmt.Errorf("failed to list commissions: %w", err)
 			}
 
-			// Filter to open missions (not complete or archived)
-			var openMissions []*primary.Mission
-			for _, m := range missions {
+			// Filter to open commissions (not complete or archived)
+			var openCommissions []*primary.Commission
+			for _, m := range commissions {
 				if m.Status == "complete" || m.Status == "archived" {
 					continue
 				}
 				if filters.statusMap[m.Status] {
 					continue
 				}
-				if filterMissionID != "" && m.ID != filterMissionID {
+				if filterCommissionID != "" && m.ID != filterCommissionID {
 					continue
 				}
-				openMissions = append(openMissions, m)
+				openCommissions = append(openCommissions, m)
 			}
 
-			if len(openMissions) == 0 {
-				if filterMissionID != "" {
-					fmt.Printf("No open containers for %s\n", filterMissionID)
+			if len(openCommissions) == 0 {
+				if filterCommissionID != "" {
+					fmt.Printf("No open containers for %s\n", filterCommissionID)
 				} else {
-					fmt.Println("No open missions")
+					fmt.Println("No open commissions")
 				}
 				return nil
 			}
 
 			// Display each mission
-			for i, mission := range openMissions {
+			for i, commission := range openCommissions {
 				// Collect all active containers for this mission
 				var allContainers []containerInfo
 				var focusedContainer *containerInfo
 
 				// Collect shipments
 				if len(filters.containerTypes) == 0 || filters.containerTypes["SHIP"] {
-					shipments, _ := wire.ShipmentService().ListShipments(context.Background(), primary.ShipmentFilters{MissionID: mission.ID})
+					shipments, _ := wire.ShipmentService().ListShipments(context.Background(), primary.ShipmentFilters{CommissionID: commission.ID})
 					for _, s := range shipments {
 						if s.Status == "complete" || filters.statusMap[s.Status] {
 							continue
@@ -720,7 +720,7 @@ Examples:
 
 				// Collect conclaves
 				if len(filters.containerTypes) == 0 || filters.containerTypes["CON"] {
-					conclaves, _ := wire.ConclaveService().ListConclaves(context.Background(), primary.ConclaveFilters{MissionID: mission.ID})
+					conclaves, _ := wire.ConclaveService().ListConclaves(context.Background(), primary.ConclaveFilters{CommissionID: commission.ID})
 					for _, c := range conclaves {
 						if c.Status == "complete" || filters.statusMap[c.Status] {
 							continue
@@ -738,7 +738,7 @@ Examples:
 
 				// Collect investigations
 				if len(filters.containerTypes) == 0 || filters.containerTypes["INV"] {
-					investigations, _ := wire.InvestigationService().ListInvestigations(context.Background(), primary.InvestigationFilters{MissionID: mission.ID})
+					investigations, _ := wire.InvestigationService().ListInvestigations(context.Background(), primary.InvestigationFilters{CommissionID: commission.ID})
 					for _, inv := range investigations {
 						if inv.Status == "complete" || filters.statusMap[inv.Status] {
 							continue
@@ -756,7 +756,7 @@ Examples:
 
 				// Collect tomes
 				if len(filters.containerTypes) == 0 || filters.containerTypes["TOME"] {
-					tomes, _ := wire.TomeService().ListTomes(context.Background(), primary.TomeFilters{MissionID: mission.ID})
+					tomes, _ := wire.TomeService().ListTomes(context.Background(), primary.TomeFilters{CommissionID: commission.ID})
 					for _, t := range tomes {
 						if t.Status == "complete" || filters.statusMap[t.Status] {
 							continue
@@ -801,7 +801,7 @@ Examples:
 				}
 
 				// Display mission header
-				fmt.Printf("%s - %s\n", colorizeID(mission.ID), mission.Title)
+				fmt.Printf("%s - %s\n", colorizeID(commission.ID), commission.Title)
 				fmt.Println("│")
 
 				if len(containersToShow) == 0 {
@@ -873,7 +873,7 @@ Examples:
 					fmt.Printf("└── %s\n", msg)
 				}
 
-				if i < len(openMissions)-1 {
+				if i < len(openCommissions)-1 {
 					fmt.Println()
 				}
 			}
@@ -884,7 +884,7 @@ Examples:
 		},
 	}
 
-	cmd.Flags().StringP("mission", "m", "", "Mission filter: mission ID or 'current' for context mission")
+	cmd.Flags().StringP("commission", "c", "", "Commission filter: mission ID or 'current' for context commission")
 	cmd.Flags().Bool("all", false, "Show all containers (default: only show focused container if set)")
 	cmd.Flags().StringSlice("filter-statuses", []string{}, "Hide items with these statuses (comma-separated: paused,blocked)")
 	cmd.Flags().StringSlice("filter-containers", []string{}, "Show only these container types (comma-separated: SHIP,CON,INV,TOME)")

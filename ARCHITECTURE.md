@@ -411,7 +411,7 @@ Add to `~/.claude/settings.json`:
   "permissions": {
     "additionalDirectories": [
       "~/src/worktrees",
-      "~/src/missions"
+      "~/src/factories"
     ]
   }
 }

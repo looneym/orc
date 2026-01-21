@@ -21,7 +21,7 @@ func setupShipmentTestDB(t *testing.T) *sql.DB {
 
 	// Create missions table (required for foreign key checks)
 	_, err = db.Exec(`
-		CREATE TABLE missions (
+		CREATE TABLE commissions (
 			id TEXT PRIMARY KEY,
 			title TEXT NOT NULL,
 			description TEXT,
@@ -40,7 +40,7 @@ func setupShipmentTestDB(t *testing.T) *sql.DB {
 	_, err = db.Exec(`
 		CREATE TABLE groves (
 			id TEXT PRIMARY KEY,
-			mission_id TEXT NOT NULL,
+			commission_id TEXT NOT NULL,
 			name TEXT NOT NULL,
 			path TEXT,
 			status TEXT NOT NULL DEFAULT 'active',
@@ -56,7 +56,7 @@ func setupShipmentTestDB(t *testing.T) *sql.DB {
 	_, err = db.Exec(`
 		CREATE TABLE shipments (
 			id TEXT PRIMARY KEY,
-			mission_id TEXT NOT NULL,
+			commission_id TEXT NOT NULL,
 			title TEXT NOT NULL,
 			description TEXT,
 			status TEXT NOT NULL DEFAULT 'active',
@@ -72,7 +72,7 @@ func setupShipmentTestDB(t *testing.T) *sql.DB {
 	}
 
 	// Insert a test mission
-	_, err = db.Exec("INSERT INTO missions (id, title, status) VALUES ('MISSION-001', 'Test Mission', 'active')")
+	_, err = db.Exec("INSERT INTO commissions (id, title, status) VALUES ('MISSION-001', 'Test Mission', 'active')")
 	if err != nil {
 		t.Fatalf("failed to insert test mission: %v", err)
 	}
@@ -94,10 +94,10 @@ func createTestShipment(t *testing.T, repo *sqlite.ShipmentRepository, ctx conte
 	}
 
 	shipment := &secondary.ShipmentRecord{
-		ID:          nextID,
-		MissionID:   missionID,
-		Title:       title,
-		Description: description,
+		ID:           nextID,
+		CommissionID: missionID,
+		Title:        title,
+		Description:  description,
 	}
 
 	err = repo.Create(ctx, shipment)
@@ -114,10 +114,10 @@ func TestShipmentRepository_Create(t *testing.T) {
 	ctx := context.Background()
 
 	shipment := &secondary.ShipmentRecord{
-		ID:          "SHIP-001",
-		MissionID:   "MISSION-001",
-		Title:       "Test Shipment",
-		Description: "A test shipment description",
+		ID:           "SHIP-001",
+		CommissionID: "MISSION-001",
+		Title:        "Test Shipment",
+		Description:  "A test shipment description",
 	}
 
 	err := repo.Create(ctx, shipment)
@@ -202,14 +202,14 @@ func TestShipmentRepository_List_FilterByMission(t *testing.T) {
 	ctx := context.Background()
 
 	// Add another mission
-	_, _ = db.Exec("INSERT INTO missions (id, title, status) VALUES ('MISSION-002', 'Test Mission 2', 'active')")
+	_, _ = db.Exec("INSERT INTO commissions (id, title, status) VALUES ('MISSION-002', 'Test Mission 2', 'active')")
 
 	// Create shipments for different missions
 	createTestShipment(t, repo, ctx, "MISSION-001", "Shipment 1", "")
 	createTestShipment(t, repo, ctx, "MISSION-002", "Shipment 2", "")
 
 	// List only MISSION-001 shipments
-	shipments, err := repo.List(ctx, secondary.ShipmentFilters{MissionID: "MISSION-001"})
+	shipments, err := repo.List(ctx, secondary.ShipmentFilters{CommissionID: "MISSION-001"})
 	if err != nil {
 		t.Fatalf("List failed: %v", err)
 	}
@@ -437,7 +437,7 @@ func TestShipmentRepository_AssignGrove(t *testing.T) {
 	ctx := context.Background()
 
 	// Insert a test grove
-	_, _ = db.Exec("INSERT INTO groves (id, mission_id, name, status) VALUES ('GROVE-001', 'MISSION-001', 'test-grove', 'active')")
+	_, _ = db.Exec("INSERT INTO groves (id, commission_id, name, status) VALUES ('GROVE-001', 'MISSION-001', 'test-grove', 'active')")
 
 	// Create a shipment
 	shipment := createTestShipment(t, repo, ctx, "MISSION-001", "Grove Test", "")
@@ -472,7 +472,7 @@ func TestShipmentRepository_GetByGrove(t *testing.T) {
 	ctx := context.Background()
 
 	// Insert a test grove
-	_, _ = db.Exec("INSERT INTO groves (id, mission_id, name, status) VALUES ('GROVE-001', 'MISSION-001', 'test-grove', 'active')")
+	_, _ = db.Exec("INSERT INTO groves (id, commission_id, name, status) VALUES ('GROVE-001', 'MISSION-001', 'test-grove', 'active')")
 
 	// Create shipments and assign to grove
 	s1 := createTestShipment(t, repo, ctx, "MISSION-001", "Ship 1", "")
@@ -493,24 +493,24 @@ func TestShipmentRepository_GetByGrove(t *testing.T) {
 	}
 }
 
-func TestShipmentRepository_MissionExists(t *testing.T) {
+func TestShipmentRepository_CommissionExists(t *testing.T) {
 	db := setupShipmentTestDB(t)
 	repo := sqlite.NewShipmentRepository(db)
 	ctx := context.Background()
 
 	// Existing mission
-	exists, err := repo.MissionExists(ctx, "MISSION-001")
+	exists, err := repo.CommissionExists(ctx, "MISSION-001")
 	if err != nil {
-		t.Fatalf("MissionExists failed: %v", err)
+		t.Fatalf("CommissionExists failed: %v", err)
 	}
 	if !exists {
 		t.Error("expected mission to exist")
 	}
 
 	// Non-existing mission
-	exists, err = repo.MissionExists(ctx, "MISSION-999")
+	exists, err = repo.CommissionExists(ctx, "MISSION-999")
 	if err != nil {
-		t.Fatalf("MissionExists failed: %v", err)
+		t.Fatalf("CommissionExists failed: %v", err)
 	}
 	if exists {
 		t.Error("expected mission to not exist")
@@ -523,7 +523,7 @@ func TestShipmentRepository_GroveAssignedToOther(t *testing.T) {
 	ctx := context.Background()
 
 	// Insert a test grove
-	_, _ = db.Exec("INSERT INTO groves (id, mission_id, name, status) VALUES ('GROVE-001', 'MISSION-001', 'test-grove', 'active')")
+	_, _ = db.Exec("INSERT INTO groves (id, commission_id, name, status) VALUES ('GROVE-001', 'MISSION-001', 'test-grove', 'active')")
 
 	// Create two shipments
 	s1 := createTestShipment(t, repo, ctx, "MISSION-001", "Ship 1", "")

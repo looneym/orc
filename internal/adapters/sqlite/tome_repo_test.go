@@ -21,7 +21,7 @@ func setupTomeTestDB(t *testing.T) *sql.DB {
 
 	// Create missions table
 	_, err = db.Exec(`
-		CREATE TABLE missions (
+		CREATE TABLE commissions (
 			id TEXT PRIMARY KEY,
 			title TEXT NOT NULL,
 			status TEXT NOT NULL DEFAULT 'active',
@@ -37,7 +37,7 @@ func setupTomeTestDB(t *testing.T) *sql.DB {
 	_, err = db.Exec(`
 		CREATE TABLE groves (
 			id TEXT PRIMARY KEY,
-			mission_id TEXT NOT NULL,
+			commission_id TEXT NOT NULL,
 			name TEXT NOT NULL,
 			status TEXT NOT NULL DEFAULT 'active',
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -52,7 +52,7 @@ func setupTomeTestDB(t *testing.T) *sql.DB {
 	_, err = db.Exec(`
 		CREATE TABLE tomes (
 			id TEXT PRIMARY KEY,
-			mission_id TEXT NOT NULL,
+			commission_id TEXT NOT NULL,
 			title TEXT NOT NULL,
 			description TEXT,
 			status TEXT NOT NULL DEFAULT 'active',
@@ -68,8 +68,8 @@ func setupTomeTestDB(t *testing.T) *sql.DB {
 	}
 
 	// Insert test data
-	_, _ = db.Exec("INSERT INTO missions (id, title, status) VALUES ('MISSION-001', 'Test Mission', 'active')")
-	_, _ = db.Exec("INSERT INTO groves (id, mission_id, name, status) VALUES ('GROVE-001', 'MISSION-001', 'test-grove', 'active')")
+	_, _ = db.Exec("INSERT INTO commissions (id, title, status) VALUES ('MISSION-001', 'Test Mission', 'active')")
+	_, _ = db.Exec("INSERT INTO groves (id, commission_id, name, status) VALUES ('GROVE-001', 'MISSION-001', 'test-grove', 'active')")
 
 	t.Cleanup(func() {
 		db.Close()
@@ -88,10 +88,10 @@ func createTestTome(t *testing.T, repo *sqlite.TomeRepository, ctx context.Conte
 	}
 
 	tome := &secondary.TomeRecord{
-		ID:          nextID,
-		MissionID:   missionID,
-		Title:       title,
-		Description: description,
+		ID:           nextID,
+		CommissionID: missionID,
+		Title:        title,
+		Description:  description,
 	}
 
 	err = repo.Create(ctx, tome)
@@ -108,10 +108,10 @@ func TestTomeRepository_Create(t *testing.T) {
 	ctx := context.Background()
 
 	tome := &secondary.TomeRecord{
-		ID:          "TOME-001",
-		MissionID:   "MISSION-001",
-		Title:       "Test Tome",
-		Description: "A test tome description",
+		ID:           "TOME-001",
+		CommissionID: "MISSION-001",
+		Title:        "Test Tome",
+		Description:  "A test tome description",
 	}
 
 	err := repo.Create(ctx, tome)
@@ -188,12 +188,12 @@ func TestTomeRepository_List_FilterByMission(t *testing.T) {
 	ctx := context.Background()
 
 	// Add another mission
-	_, _ = db.Exec("INSERT INTO missions (id, title, status) VALUES ('MISSION-002', 'Mission 2', 'active')")
+	_, _ = db.Exec("INSERT INTO commissions (id, title, status) VALUES ('MISSION-002', 'Mission 2', 'active')")
 
 	createTestTome(t, repo, ctx, "MISSION-001", "Tome 1", "")
 	createTestTome(t, repo, ctx, "MISSION-002", "Tome 2", "")
 
-	tomes, err := repo.List(ctx, secondary.TomeFilters{MissionID: "MISSION-001"})
+	tomes, err := repo.List(ctx, secondary.TomeFilters{CommissionID: "MISSION-001"})
 	if err != nil {
 		t.Fatalf("List failed: %v", err)
 	}
@@ -451,22 +451,22 @@ func TestTomeRepository_GetByGrove(t *testing.T) {
 	}
 }
 
-func TestTomeRepository_MissionExists(t *testing.T) {
+func TestTomeRepository_CommissionExists(t *testing.T) {
 	db := setupTomeTestDB(t)
 	repo := sqlite.NewTomeRepository(db)
 	ctx := context.Background()
 
-	exists, err := repo.MissionExists(ctx, "MISSION-001")
+	exists, err := repo.CommissionExists(ctx, "MISSION-001")
 	if err != nil {
-		t.Fatalf("MissionExists failed: %v", err)
+		t.Fatalf("CommissionExists failed: %v", err)
 	}
 	if !exists {
 		t.Error("expected mission to exist")
 	}
 
-	exists, err = repo.MissionExists(ctx, "MISSION-999")
+	exists, err = repo.CommissionExists(ctx, "MISSION-999")
 	if err != nil {
-		t.Fatalf("MissionExists failed: %v", err)
+		t.Fatalf("CommissionExists failed: %v", err)
 	}
 	if exists {
 		t.Error("expected mission to not exist")

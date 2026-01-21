@@ -21,7 +21,7 @@ func setupOperationTestDB(t *testing.T) *sql.DB {
 
 	// Create missions table
 	_, err = db.Exec(`
-		CREATE TABLE missions (
+		CREATE TABLE commissions (
 			id TEXT PRIMARY KEY,
 			title TEXT NOT NULL,
 			status TEXT NOT NULL DEFAULT 'active',
@@ -37,7 +37,7 @@ func setupOperationTestDB(t *testing.T) *sql.DB {
 	_, err = db.Exec(`
 		CREATE TABLE operations (
 			id TEXT PRIMARY KEY,
-			mission_id TEXT NOT NULL,
+			commission_id TEXT NOT NULL,
 			title TEXT NOT NULL,
 			description TEXT,
 			status TEXT NOT NULL DEFAULT 'ready',
@@ -51,7 +51,7 @@ func setupOperationTestDB(t *testing.T) *sql.DB {
 	}
 
 	// Insert test mission
-	_, _ = db.Exec("INSERT INTO missions (id, title, status) VALUES ('MISSION-001', 'Test Mission', 'active')")
+	_, _ = db.Exec("INSERT INTO commissions (id, title, status) VALUES ('MISSION-001', 'Test Mission', 'active')")
 
 	t.Cleanup(func() {
 		db.Close()
@@ -70,10 +70,10 @@ func createTestOperation(t *testing.T, repo *sqlite.OperationRepository, ctx con
 	}
 
 	op := &secondary.OperationRecord{
-		ID:          nextID,
-		MissionID:   missionID,
-		Title:       title,
-		Description: description,
+		ID:           nextID,
+		CommissionID: missionID,
+		Title:        title,
+		Description:  description,
 	}
 
 	err = repo.Create(ctx, op)
@@ -90,10 +90,10 @@ func TestOperationRepository_Create(t *testing.T) {
 	ctx := context.Background()
 
 	op := &secondary.OperationRecord{
-		ID:          "OP-001",
-		MissionID:   "MISSION-001",
-		Title:       "Test Operation",
-		Description: "A test operation description",
+		ID:           "OP-001",
+		CommissionID: "MISSION-001",
+		Title:        "Test Operation",
+		Description:  "A test operation description",
 	}
 
 	err := repo.Create(ctx, op)
@@ -170,12 +170,12 @@ func TestOperationRepository_List_FilterByMission(t *testing.T) {
 	ctx := context.Background()
 
 	// Add another mission
-	_, _ = db.Exec("INSERT INTO missions (id, title, status) VALUES ('MISSION-002', 'Mission 2', 'active')")
+	_, _ = db.Exec("INSERT INTO commissions (id, title, status) VALUES ('MISSION-002', 'Mission 2', 'active')")
 
 	createTestOperation(t, repo, ctx, "MISSION-001", "Operation 1", "")
 	createTestOperation(t, repo, ctx, "MISSION-002", "Operation 2", "")
 
-	operations, err := repo.List(ctx, secondary.OperationFilters{MissionID: "MISSION-001"})
+	operations, err := repo.List(ctx, secondary.OperationFilters{CommissionID: "MISSION-001"})
 	if err != nil {
 		t.Fatalf("List failed: %v", err)
 	}
@@ -277,22 +277,22 @@ func TestOperationRepository_GetNextID(t *testing.T) {
 	}
 }
 
-func TestOperationRepository_MissionExists(t *testing.T) {
+func TestOperationRepository_CommissionExists(t *testing.T) {
 	db := setupOperationTestDB(t)
 	repo := sqlite.NewOperationRepository(db)
 	ctx := context.Background()
 
-	exists, err := repo.MissionExists(ctx, "MISSION-001")
+	exists, err := repo.CommissionExists(ctx, "MISSION-001")
 	if err != nil {
-		t.Fatalf("MissionExists failed: %v", err)
+		t.Fatalf("CommissionExists failed: %v", err)
 	}
 	if !exists {
 		t.Error("expected mission to exist")
 	}
 
-	exists, err = repo.MissionExists(ctx, "MISSION-999")
+	exists, err = repo.CommissionExists(ctx, "MISSION-999")
 	if err != nil {
-		t.Fatalf("MissionExists failed: %v", err)
+		t.Fatalf("CommissionExists failed: %v", err)
 	}
 	if exists {
 		t.Error("expected mission to not exist")

@@ -46,9 +46,9 @@ type InvestigationService interface {
 
 // CreateInvestigationRequest contains parameters for creating an investigation.
 type CreateInvestigationRequest struct {
-	MissionID   string
-	Title       string
-	Description string
+	CommissionID string
+	Title        string
+	Description  string
 }
 
 // CreateInvestigationResponse contains the result of creating an investigation.
@@ -67,7 +67,7 @@ type UpdateInvestigationRequest struct {
 // Investigation represents an investigation entity at the port boundary.
 type Investigation struct {
 	ID              string
-	MissionID       string
+	CommissionID    string
 	Title           string
 	Description     string
 	Status          string
@@ -80,15 +80,15 @@ type Investigation struct {
 
 // InvestigationFilters contains filter options for listing investigations.
 type InvestigationFilters struct {
-	MissionID string
-	Status    string
+	CommissionID string
+	Status       string
 }
 
 // InvestigationQuestion represents a question associated with an investigation.
 type InvestigationQuestion struct {
 	ID               string
 	InvestigationID  string
-	MissionID        string
+	CommissionID     string
 	Title            string
 	Description      string
 	Status           string

@@ -33,7 +33,7 @@ func debugSessionInfoCmd() *cobra.Command {
 
 Shows:
 - Current working directory
-- Mission context (.orc/config.json)
+- Commission context (.orc/config.json)
 - Grove context (.orc/config.json with grove config)
 - Environment variables (TMUX, etc.)
 
@@ -54,13 +54,13 @@ Examples:
 			fmt.Printf("  %s\n\n", cwd)
 
 			// Check for mission config
-			fmt.Printf("Mission Context (.orc/config.json):\n")
-			missionCtx, err := context.DetectMissionContext()
-			if err == nil && missionCtx != nil {
-				configPath := filepath.Join(missionCtx.WorkspacePath, ".orc", "config.json")
+			fmt.Printf("Commission Context (.orc/config.json):\n")
+			commissionCtx, err := context.DetectCommissionContext()
+			if err == nil && commissionCtx != nil {
+				configPath := filepath.Join(commissionCtx.WorkspacePath, ".orc", "config.json")
 				fmt.Printf("  ✓ Found: %s\n", configPath)
-				fmt.Printf("  Mission ID: %s\n", missionCtx.MissionID)
-				fmt.Printf("  Workspace: %s\n\n", missionCtx.WorkspacePath)
+				fmt.Printf("  Mission ID: %s\n", commissionCtx.CommissionID)
+				fmt.Printf("  Workspace: %s\n\n", commissionCtx.WorkspacePath)
 
 				// Read and display .orc/config.json content
 				data, err := os.ReadFile(configPath)
@@ -80,8 +80,8 @@ Examples:
 
 			// Check for workspace config
 			fmt.Printf("Workspace Config (.orc/config.json):\n")
-			if missionCtx != nil {
-				configPath := filepath.Join(missionCtx.WorkspacePath, ".orc", "config.json")
+			if commissionCtx != nil {
+				configPath := filepath.Join(commissionCtx.WorkspacePath, ".orc", "config.json")
 				if data, err := os.ReadFile(configPath); err == nil {
 					fmt.Printf("  ✓ Found: %s\n", configPath)
 
@@ -124,9 +124,9 @@ Examples:
 
 			// Context detection result
 			fmt.Printf("\nContext Detection Result:\n")
-			if missionCtx != nil {
-				fmt.Printf("  Context: Mission (mission-specific)\n")
-				fmt.Printf("  Mission: %s\n", missionCtx.MissionID)
+			if commissionCtx != nil {
+				fmt.Printf("  Context: Commission (mission-specific)\n")
+				fmt.Printf("  Mission: %s\n", commissionCtx.CommissionID)
 			} else {
 				fmt.Printf("  Context: Master (global orchestrator)\n")
 			}
@@ -146,13 +146,13 @@ func debugValidateContextCmd() *cobra.Command {
 
 Checks:
 - .orc/config.json exists and is valid JSON
-- Mission ID or grove ID is present
+- Commission ID or grove ID is present
 - Directory structure is correct
 
 Useful for debugging mission workspace setup and grove creation issues.
 
 Examples:
-  orc debug validate-context ~/src/missions/MISSION-001
+  orc debug validate-context ~/src/factories/MISSION-001
   orc debug validate-context ~/src/worktrees/test-grove
   orc debug validate-context .`,
 		Args: cobra.ExactArgs(1),
@@ -215,8 +215,8 @@ Examples:
 							fmt.Printf("   ✓ mission.mission_id present: %s\n", missionID)
 						}
 					} else if state, ok := cfg["state"].(map[string]interface{}); ok {
-						if activeMissionID, ok := state["active_mission_id"].(string); ok && activeMissionID != "" {
-							fmt.Printf("   ✓ state.active_mission_id present: %s\n", activeMissionID)
+						if activeCommissionID, ok := state["active_mission_id"].(string); ok && activeCommissionID != "" {
+							fmt.Printf("   ✓ state.active_mission_id present: %s\n", activeCommissionID)
 						}
 					}
 				} else {

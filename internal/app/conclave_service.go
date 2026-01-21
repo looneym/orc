@@ -24,13 +24,13 @@ func NewConclaveService(
 
 // CreateConclave creates a new conclave (ideation session).
 func (s *ConclaveServiceImpl) CreateConclave(ctx context.Context, req primary.CreateConclaveRequest) (*primary.CreateConclaveResponse, error) {
-	// Validate mission exists
-	exists, err := s.conclaveRepo.MissionExists(ctx, req.MissionID)
+	// Validate commission exists
+	exists, err := s.conclaveRepo.CommissionExists(ctx, req.CommissionID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to validate mission: %w", err)
+		return nil, fmt.Errorf("failed to validate commission: %w", err)
 	}
 	if !exists {
-		return nil, fmt.Errorf("mission %s not found", req.MissionID)
+		return nil, fmt.Errorf("commission %s not found", req.CommissionID)
 	}
 
 	// Get next ID
@@ -41,11 +41,11 @@ func (s *ConclaveServiceImpl) CreateConclave(ctx context.Context, req primary.Cr
 
 	// Create record
 	record := &secondary.ConclaveRecord{
-		ID:          nextID,
-		MissionID:   req.MissionID,
-		Title:       req.Title,
-		Description: req.Description,
-		Status:      "active",
+		ID:           nextID,
+		CommissionID: req.CommissionID,
+		Title:        req.Title,
+		Description:  req.Description,
+		Status:       "active",
 	}
 
 	if err := s.conclaveRepo.Create(ctx, record); err != nil {
@@ -76,8 +76,8 @@ func (s *ConclaveServiceImpl) GetConclave(ctx context.Context, conclaveID string
 // ListConclaves lists conclaves with optional filters.
 func (s *ConclaveServiceImpl) ListConclaves(ctx context.Context, filters primary.ConclaveFilters) ([]*primary.Conclave, error) {
 	records, err := s.conclaveRepo.List(ctx, secondary.ConclaveFilters{
-		MissionID: filters.MissionID,
-		Status:    filters.Status,
+		CommissionID: filters.CommissionID,
+		Status:       filters.Status,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to list conclaves: %w", err)
@@ -221,7 +221,7 @@ func (s *ConclaveServiceImpl) GetConclavePlans(ctx context.Context, conclaveID s
 func (s *ConclaveServiceImpl) recordToConclave(r *secondary.ConclaveRecord) *primary.Conclave {
 	return &primary.Conclave{
 		ID:              r.ID,
-		MissionID:       r.MissionID,
+		CommissionID:    r.CommissionID,
 		Title:           r.Title,
 		Description:     r.Description,
 		Status:          r.Status,
@@ -237,7 +237,7 @@ func (s *ConclaveServiceImpl) taskRecordToConclaveTask(r *secondary.ConclaveTask
 	return &primary.ConclaveTask{
 		ID:               r.ID,
 		ShipmentID:       r.ShipmentID,
-		MissionID:        r.MissionID,
+		CommissionID:     r.CommissionID,
 		Title:            r.Title,
 		Description:      r.Description,
 		Type:             r.Type,
@@ -259,7 +259,7 @@ func (s *ConclaveServiceImpl) questionRecordToConclaveQuestion(r *secondary.Conc
 	return &primary.ConclaveQuestion{
 		ID:               r.ID,
 		InvestigationID:  r.InvestigationID,
-		MissionID:        r.MissionID,
+		CommissionID:     r.CommissionID,
 		Title:            r.Title,
 		Description:      r.Description,
 		Status:           r.Status,
@@ -278,7 +278,7 @@ func (s *ConclaveServiceImpl) planRecordToConclavePlan(r *secondary.ConclavePlan
 	return &primary.ConclavePlan{
 		ID:               r.ID,
 		ShipmentID:       r.ShipmentID,
-		MissionID:        r.MissionID,
+		CommissionID:     r.CommissionID,
 		Title:            r.Title,
 		Description:      r.Description,
 		Status:           r.Status,

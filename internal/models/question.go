@@ -10,7 +10,7 @@ import (
 type Question struct {
 	ID               string
 	InvestigationID  sql.NullString
-	MissionID        string
+	ComcommissionID  string
 	Title            string
 	Description      sql.NullString
 	Status           string

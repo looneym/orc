@@ -57,7 +57,7 @@ func (m *mockConclaveRepository) List(ctx context.Context, filters secondary.Con
 	}
 	var result []*secondary.ConclaveRecord
 	for _, c := range m.conclaves {
-		if filters.MissionID != "" && c.MissionID != filters.MissionID {
+		if filters.CommissionID != "" && c.CommissionID != filters.CommissionID {
 			continue
 		}
 		if filters.Status != "" && c.Status != filters.Status {
@@ -132,7 +132,7 @@ func (m *mockConclaveRepository) GetByGrove(ctx context.Context, groveID string)
 	return result, nil
 }
 
-func (m *mockConclaveRepository) MissionExists(ctx context.Context, missionID string) (bool, error) {
+func (m *mockConclaveRepository) CommissionExists(ctx context.Context, missionID string) (bool, error) {
 	if m.missionExistsErr != nil {
 		return false, m.missionExistsErr
 	}
@@ -170,9 +170,9 @@ func TestCreateConclave_Success(t *testing.T) {
 	ctx := context.Background()
 
 	resp, err := service.CreateConclave(ctx, primary.CreateConclaveRequest{
-		MissionID:   "MISSION-001",
-		Title:       "Test Conclave",
-		Description: "A test conclave",
+		CommissionID: "MISSION-001",
+		Title:        "Test Conclave",
+		Description:  "A test conclave",
 	})
 
 	if err != nil {
@@ -196,9 +196,9 @@ func TestCreateConclave_MissionNotFound(t *testing.T) {
 	conclaveRepo.missionExistsResult = false
 
 	_, err := service.CreateConclave(ctx, primary.CreateConclaveRequest{
-		MissionID:   "MISSION-NONEXISTENT",
-		Title:       "Test Conclave",
-		Description: "A test conclave",
+		CommissionID: "MISSION-NONEXISTENT",
+		Title:        "Test Conclave",
+		Description:  "A test conclave",
 	})
 
 	if err == nil {
@@ -215,10 +215,10 @@ func TestGetConclave_Found(t *testing.T) {
 	ctx := context.Background()
 
 	conclaveRepo.conclaves["CON-001"] = &secondary.ConclaveRecord{
-		ID:        "CON-001",
-		MissionID: "MISSION-001",
-		Title:     "Test Conclave",
-		Status:    "active",
+		ID:           "CON-001",
+		CommissionID: "MISSION-001",
+		Title:        "Test Conclave",
+		Status:       "active",
 	}
 
 	conclave, err := service.GetConclave(ctx, "CON-001")
@@ -251,19 +251,19 @@ func TestListConclaves_FilterByMission(t *testing.T) {
 	ctx := context.Background()
 
 	conclaveRepo.conclaves["CON-001"] = &secondary.ConclaveRecord{
-		ID:        "CON-001",
-		MissionID: "MISSION-001",
-		Title:     "Conclave 1",
-		Status:    "active",
+		ID:           "CON-001",
+		CommissionID: "MISSION-001",
+		Title:        "Conclave 1",
+		Status:       "active",
 	}
 	conclaveRepo.conclaves["CON-002"] = &secondary.ConclaveRecord{
-		ID:        "CON-002",
-		MissionID: "MISSION-002",
-		Title:     "Conclave 2",
-		Status:    "active",
+		ID:           "CON-002",
+		CommissionID: "MISSION-002",
+		Title:        "Conclave 2",
+		Status:       "active",
 	}
 
-	conclaves, err := service.ListConclaves(ctx, primary.ConclaveFilters{MissionID: "MISSION-001"})
+	conclaves, err := service.ListConclaves(ctx, primary.ConclaveFilters{CommissionID: "MISSION-001"})
 
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
@@ -278,16 +278,16 @@ func TestListConclaves_FilterByStatus(t *testing.T) {
 	ctx := context.Background()
 
 	conclaveRepo.conclaves["CON-001"] = &secondary.ConclaveRecord{
-		ID:        "CON-001",
-		MissionID: "MISSION-001",
-		Title:     "Active Conclave",
-		Status:    "active",
+		ID:           "CON-001",
+		CommissionID: "MISSION-001",
+		Title:        "Active Conclave",
+		Status:       "active",
 	}
 	conclaveRepo.conclaves["CON-002"] = &secondary.ConclaveRecord{
-		ID:        "CON-002",
-		MissionID: "MISSION-001",
-		Title:     "Paused Conclave",
-		Status:    "paused",
+		ID:           "CON-002",
+		CommissionID: "MISSION-001",
+		Title:        "Paused Conclave",
+		Status:       "paused",
 	}
 
 	conclaves, err := service.ListConclaves(ctx, primary.ConclaveFilters{Status: "active"})
@@ -309,11 +309,11 @@ func TestCompleteConclave_UnpinnedAllowed(t *testing.T) {
 	ctx := context.Background()
 
 	conclaveRepo.conclaves["CON-001"] = &secondary.ConclaveRecord{
-		ID:        "CON-001",
-		MissionID: "MISSION-001",
-		Title:     "Test Conclave",
-		Status:    "active",
-		Pinned:    false,
+		ID:           "CON-001",
+		CommissionID: "MISSION-001",
+		Title:        "Test Conclave",
+		Status:       "active",
+		Pinned:       false,
 	}
 
 	err := service.CompleteConclave(ctx, "CON-001")
@@ -331,11 +331,11 @@ func TestCompleteConclave_PinnedBlocked(t *testing.T) {
 	ctx := context.Background()
 
 	conclaveRepo.conclaves["CON-001"] = &secondary.ConclaveRecord{
-		ID:        "CON-001",
-		MissionID: "MISSION-001",
-		Title:     "Pinned Conclave",
-		Status:    "active",
-		Pinned:    true,
+		ID:           "CON-001",
+		CommissionID: "MISSION-001",
+		Title:        "Pinned Conclave",
+		Status:       "active",
+		Pinned:       true,
 	}
 
 	err := service.CompleteConclave(ctx, "CON-001")
@@ -365,10 +365,10 @@ func TestPauseConclave_ActiveAllowed(t *testing.T) {
 	ctx := context.Background()
 
 	conclaveRepo.conclaves["CON-001"] = &secondary.ConclaveRecord{
-		ID:        "CON-001",
-		MissionID: "MISSION-001",
-		Title:     "Active Conclave",
-		Status:    "active",
+		ID:           "CON-001",
+		CommissionID: "MISSION-001",
+		Title:        "Active Conclave",
+		Status:       "active",
 	}
 
 	err := service.PauseConclave(ctx, "CON-001")
@@ -386,10 +386,10 @@ func TestPauseConclave_NotActiveBlocked(t *testing.T) {
 	ctx := context.Background()
 
 	conclaveRepo.conclaves["CON-001"] = &secondary.ConclaveRecord{
-		ID:        "CON-001",
-		MissionID: "MISSION-001",
-		Title:     "Paused Conclave",
-		Status:    "paused",
+		ID:           "CON-001",
+		CommissionID: "MISSION-001",
+		Title:        "Paused Conclave",
+		Status:       "paused",
 	}
 
 	err := service.PauseConclave(ctx, "CON-001")
@@ -404,10 +404,10 @@ func TestPauseConclave_CompleteBlocked(t *testing.T) {
 	ctx := context.Background()
 
 	conclaveRepo.conclaves["CON-001"] = &secondary.ConclaveRecord{
-		ID:        "CON-001",
-		MissionID: "MISSION-001",
-		Title:     "Complete Conclave",
-		Status:    "complete",
+		ID:           "CON-001",
+		CommissionID: "MISSION-001",
+		Title:        "Complete Conclave",
+		Status:       "complete",
 	}
 
 	err := service.PauseConclave(ctx, "CON-001")
@@ -426,10 +426,10 @@ func TestResumeConclave_PausedAllowed(t *testing.T) {
 	ctx := context.Background()
 
 	conclaveRepo.conclaves["CON-001"] = &secondary.ConclaveRecord{
-		ID:        "CON-001",
-		MissionID: "MISSION-001",
-		Title:     "Paused Conclave",
-		Status:    "paused",
+		ID:           "CON-001",
+		CommissionID: "MISSION-001",
+		Title:        "Paused Conclave",
+		Status:       "paused",
 	}
 
 	err := service.ResumeConclave(ctx, "CON-001")
@@ -447,10 +447,10 @@ func TestResumeConclave_NotPausedBlocked(t *testing.T) {
 	ctx := context.Background()
 
 	conclaveRepo.conclaves["CON-001"] = &secondary.ConclaveRecord{
-		ID:        "CON-001",
-		MissionID: "MISSION-001",
-		Title:     "Active Conclave",
-		Status:    "active",
+		ID:           "CON-001",
+		CommissionID: "MISSION-001",
+		Title:        "Active Conclave",
+		Status:       "active",
 	}
 
 	err := service.ResumeConclave(ctx, "CON-001")
@@ -469,11 +469,11 @@ func TestPinConclave(t *testing.T) {
 	ctx := context.Background()
 
 	conclaveRepo.conclaves["CON-001"] = &secondary.ConclaveRecord{
-		ID:        "CON-001",
-		MissionID: "MISSION-001",
-		Title:     "Test Conclave",
-		Status:    "active",
-		Pinned:    false,
+		ID:           "CON-001",
+		CommissionID: "MISSION-001",
+		Title:        "Test Conclave",
+		Status:       "active",
+		Pinned:       false,
 	}
 
 	err := service.PinConclave(ctx, "CON-001")
@@ -491,11 +491,11 @@ func TestUnpinConclave(t *testing.T) {
 	ctx := context.Background()
 
 	conclaveRepo.conclaves["CON-001"] = &secondary.ConclaveRecord{
-		ID:        "CON-001",
-		MissionID: "MISSION-001",
-		Title:     "Pinned Conclave",
-		Status:    "active",
-		Pinned:    true,
+		ID:           "CON-001",
+		CommissionID: "MISSION-001",
+		Title:        "Pinned Conclave",
+		Status:       "active",
+		Pinned:       true,
 	}
 
 	err := service.UnpinConclave(ctx, "CON-001")
@@ -517,11 +517,11 @@ func TestUpdateConclave_Title(t *testing.T) {
 	ctx := context.Background()
 
 	conclaveRepo.conclaves["CON-001"] = &secondary.ConclaveRecord{
-		ID:          "CON-001",
-		MissionID:   "MISSION-001",
-		Title:       "Old Title",
-		Description: "Original description",
-		Status:      "active",
+		ID:           "CON-001",
+		CommissionID: "MISSION-001",
+		Title:        "Old Title",
+		Description:  "Original description",
+		Status:       "active",
 	}
 
 	err := service.UpdateConclave(ctx, primary.UpdateConclaveRequest{
@@ -546,10 +546,10 @@ func TestDeleteConclave_Success(t *testing.T) {
 	ctx := context.Background()
 
 	conclaveRepo.conclaves["CON-001"] = &secondary.ConclaveRecord{
-		ID:        "CON-001",
-		MissionID: "MISSION-001",
-		Title:     "Test Conclave",
-		Status:    "active",
+		ID:           "CON-001",
+		CommissionID: "MISSION-001",
+		Title:        "Test Conclave",
+		Status:       "active",
 	}
 
 	err := service.DeleteConclave(ctx, "CON-001")
@@ -572,16 +572,16 @@ func TestGetConclavesByGrove_Success(t *testing.T) {
 
 	conclaveRepo.conclaves["CON-001"] = &secondary.ConclaveRecord{
 		ID:              "CON-001",
-		MissionID:       "MISSION-001",
+		CommissionID:    "MISSION-001",
 		Title:           "Assigned Conclave",
 		Status:          "active",
 		AssignedGroveID: "GROVE-001",
 	}
 	conclaveRepo.conclaves["CON-002"] = &secondary.ConclaveRecord{
-		ID:        "CON-002",
-		MissionID: "MISSION-001",
-		Title:     "Unassigned Conclave",
-		Status:    "active",
+		ID:           "CON-002",
+		CommissionID: "MISSION-001",
+		Title:        "Unassigned Conclave",
+		Status:       "active",
 	}
 
 	conclaves, err := service.GetConclavesByGrove(ctx, "GROVE-001")

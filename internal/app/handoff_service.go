@@ -31,11 +31,11 @@ func (s *HandoffServiceImpl) CreateHandoff(ctx context.Context, req primary.Crea
 
 	// Create record
 	record := &secondary.HandoffRecord{
-		ID:              nextID,
-		HandoffNote:     req.HandoffNote,
-		ActiveMissionID: req.ActiveMissionID,
-		ActiveGroveID:   req.ActiveGroveID,
-		TodosSnapshot:   req.TodosSnapshot,
+		ID:                 nextID,
+		HandoffNote:        req.HandoffNote,
+		ActiveCommissionID: req.ActiveCommissionID,
+		ActiveGroveID:      req.ActiveGroveID,
+		TodosSnapshot:      req.TodosSnapshot,
 	}
 
 	if err := s.handoffRepo.Create(ctx, record); err != nil {
@@ -99,12 +99,12 @@ func (s *HandoffServiceImpl) ListHandoffs(ctx context.Context, limit int) ([]*pr
 
 func (s *HandoffServiceImpl) recordToHandoff(r *secondary.HandoffRecord) *primary.Handoff {
 	return &primary.Handoff{
-		ID:              r.ID,
-		CreatedAt:       r.CreatedAt,
-		HandoffNote:     r.HandoffNote,
-		ActiveMissionID: r.ActiveMissionID,
-		ActiveGroveID:   r.ActiveGroveID,
-		TodosSnapshot:   r.TodosSnapshot,
+		ID:                 r.ID,
+		CreatedAt:          r.CreatedAt,
+		HandoffNote:        r.HandoffNote,
+		ActiveCommissionID: r.ActiveCommissionID,
+		ActiveGroveID:      r.ActiveGroveID,
+		TodosSnapshot:      r.TodosSnapshot,
 	}
 }
 

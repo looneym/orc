@@ -20,8 +20,8 @@ func (r GuardResult) Error() error {
 
 // CreateOperationContext provides context for operation creation guards.
 type CreateOperationContext struct {
-	MissionID     string
-	MissionExists bool
+	CommissionID     string
+	CommissionExists bool
 }
 
 // CompleteOperationContext provides context for operation completion guards.
@@ -32,12 +32,12 @@ type CompleteOperationContext struct {
 
 // CanCreateOperation evaluates whether an operation can be created.
 // Rules:
-// - Mission must exist
+// - Commission must exist
 func CanCreateOperation(ctx CreateOperationContext) GuardResult {
-	if !ctx.MissionExists {
+	if !ctx.CommissionExists {
 		return GuardResult{
 			Allowed: false,
-			Reason:  fmt.Sprintf("mission %s not found", ctx.MissionID),
+			Reason:  fmt.Sprintf("commission %s not found", ctx.CommissionID),
 		}
 	}
 

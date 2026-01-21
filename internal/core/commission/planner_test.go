@@ -1,4 +1,4 @@
-package mission
+package commission
 
 import (
 	"testing"
@@ -6,13 +6,13 @@ import (
 	"github.com/example/orc/internal/core/effects"
 )
 
-func TestGenerateLaunchPlan_BasicMission(t *testing.T) {
+func TestGenerateLaunchPlan_BasicCommission(t *testing.T) {
 	input := LaunchPlanInput{
-		MissionID:     "MISSION-001",
-		MissionTitle:  "Test Mission",
-		WorkspacePath: "/home/user/missions/MISSION-001",
-		CreateTMux:    false,
-		Groves:        []GrovePlanInput{},
+		CommissionID:    "COMM-001",
+		CommissionTitle: "Test Commission",
+		WorkspacePath:   "/home/user/commissions/COMM-001",
+		CreateTMux:      false,
+		Groves:          []GrovePlanInput{},
 	}
 
 	plan := GenerateLaunchPlan(input)
@@ -26,12 +26,12 @@ func TestGenerateLaunchPlan_BasicMission(t *testing.T) {
 	if plan.FilesystemOps[0].Operation != "mkdir" {
 		t.Errorf("First op = %q, want mkdir", plan.FilesystemOps[0].Operation)
 	}
-	if plan.FilesystemOps[0].Path != "/home/user/missions/MISSION-001" {
+	if plan.FilesystemOps[0].Path != "/home/user/commissions/COMM-001" {
 		t.Errorf("First op path = %q, want workspace path", plan.FilesystemOps[0].Path)
 	}
 
 	// Second op should be groves mkdir
-	if plan.FilesystemOps[1].Path != "/home/user/missions/MISSION-001/groves" {
+	if plan.FilesystemOps[1].Path != "/home/user/commissions/COMM-001/groves" {
 		t.Errorf("Second op path = %q, want groves path", plan.FilesystemOps[1].Path)
 	}
 
@@ -48,10 +48,10 @@ func TestGenerateLaunchPlan_BasicMission(t *testing.T) {
 
 func TestGenerateLaunchPlan_WithGrove(t *testing.T) {
 	input := LaunchPlanInput{
-		MissionID:     "MISSION-002",
-		MissionTitle:  "Test Mission",
-		WorkspacePath: "/home/user/missions/MISSION-002",
-		CreateTMux:    false,
+		CommissionID:    "COMM-002",
+		CommissionTitle: "Test Commission",
+		WorkspacePath:   "/home/user/commissions/COMM-002",
+		CreateTMux:      false,
 		Groves: []GrovePlanInput{
 			{
 				ID:          "GROVE-001",
@@ -84,15 +84,15 @@ func TestGenerateLaunchPlan_WithGrove(t *testing.T) {
 
 func TestGenerateLaunchPlan_GrovePathUnchanged(t *testing.T) {
 	input := LaunchPlanInput{
-		MissionID:     "MISSION-003",
-		MissionTitle:  "Test Mission",
-		WorkspacePath: "/home/user/missions/MISSION-003",
-		CreateTMux:    false,
+		CommissionID:    "COMM-003",
+		CommissionTitle: "Test Commission",
+		WorkspacePath:   "/home/user/commissions/COMM-003",
+		CreateTMux:      false,
 		Groves: []GrovePlanInput{
 			{
 				ID:          "GROVE-001",
 				Name:        "web-grove",
-				CurrentPath: "/home/user/missions/MISSION-003/groves/web-grove", // Already correct
+				CurrentPath: "/home/user/commissions/COMM-003/groves/web-grove", // Already correct
 				Repos:       []string{},
 				PathExists:  true,
 			},
@@ -109,21 +109,21 @@ func TestGenerateLaunchPlan_GrovePathUnchanged(t *testing.T) {
 
 func TestGenerateLaunchPlan_WithTMux(t *testing.T) {
 	input := LaunchPlanInput{
-		MissionID:     "MISSION-004",
-		MissionTitle:  "Test Mission",
-		WorkspacePath: "/home/user/missions/MISSION-004",
-		CreateTMux:    true,
+		CommissionID:    "COMM-004",
+		CommissionTitle: "Test Commission",
+		WorkspacePath:   "/home/user/commissions/COMM-004",
+		CreateTMux:      true,
 		Groves: []GrovePlanInput{
 			{
 				ID:          "GROVE-001",
 				Name:        "backend",
-				CurrentPath: "/home/user/missions/MISSION-004/groves/backend",
+				CurrentPath: "/home/user/commissions/COMM-004/groves/backend",
 				PathExists:  true,
 			},
 			{
 				ID:          "GROVE-002",
 				Name:        "frontend",
-				CurrentPath: "/home/user/missions/MISSION-004/groves/frontend",
+				CurrentPath: "/home/user/commissions/COMM-004/groves/frontend",
 				PathExists:  true,
 			},
 		},
@@ -140,8 +140,8 @@ func TestGenerateLaunchPlan_WithTMux(t *testing.T) {
 	if plan.TMuxOps[0].Operation != "new_session" {
 		t.Errorf("First TMux op = %q, want new_session", plan.TMuxOps[0].Operation)
 	}
-	if plan.TMuxOps[0].SessionName != "orc-MISSION-004" {
-		t.Errorf("Session name = %q, want orc-MISSION-004", plan.TMuxOps[0].SessionName)
+	if plan.TMuxOps[0].SessionName != "orc-COMM-004" {
+		t.Errorf("Session name = %q, want orc-COMM-004", plan.TMuxOps[0].SessionName)
 	}
 
 	// Second and third should be new_window
@@ -152,10 +152,10 @@ func TestGenerateLaunchPlan_WithTMux(t *testing.T) {
 
 func TestGenerateLaunchPlan_TMuxSkipsNonExistentPaths(t *testing.T) {
 	input := LaunchPlanInput{
-		MissionID:     "MISSION-005",
-		MissionTitle:  "Test Mission",
-		WorkspacePath: "/home/user/missions/MISSION-005",
-		CreateTMux:    true,
+		CommissionID:    "COMM-005",
+		CommissionTitle: "Test Commission",
+		WorkspacePath:   "/home/user/commissions/COMM-005",
+		CreateTMux:      true,
 		Groves: []GrovePlanInput{
 			{
 				ID:          "GROVE-001",
@@ -182,10 +182,10 @@ func TestGenerateLaunchPlan_TMuxSkipsNonExistentPaths(t *testing.T) {
 
 func TestLaunchPlan_Effects(t *testing.T) {
 	input := LaunchPlanInput{
-		MissionID:     "MISSION-006",
-		MissionTitle:  "Test",
-		WorkspacePath: "/test",
-		CreateTMux:    true,
+		CommissionID:    "COMM-006",
+		CommissionTitle: "Test",
+		WorkspacePath:   "/test",
+		CreateTMux:      true,
 		Groves: []GrovePlanInput{
 			{ID: "GROVE-001", Name: "test", CurrentPath: "/old", PathExists: true},
 		},
@@ -213,13 +213,13 @@ func TestLaunchPlan_Effects(t *testing.T) {
 
 func TestGenerateStartPlan_Basic(t *testing.T) {
 	input := StartPlanInput{
-		MissionID:     "MISSION-007",
-		WorkspacePath: "/home/user/missions/MISSION-007",
+		CommissionID:  "COMM-007",
+		WorkspacePath: "/home/user/commissions/COMM-007",
 		Groves: []GrovePlanInput{
 			{
 				ID:          "GROVE-001",
 				Name:        "main",
-				CurrentPath: "/home/user/missions/MISSION-007/groves/main",
+				CurrentPath: "/home/user/commissions/COMM-007/groves/main",
 				PathExists:  true,
 			},
 		},
@@ -236,15 +236,15 @@ func TestGenerateStartPlan_Basic(t *testing.T) {
 		t.Errorf("First op = %q, want new_session", plan.TMuxOps[0].Operation)
 	}
 
-	if plan.TMuxOps[0].SessionName != "orc-MISSION-007" {
-		t.Errorf("Session name = %q, want orc-MISSION-007", plan.TMuxOps[0].SessionName)
+	if plan.TMuxOps[0].SessionName != "orc-COMM-007" {
+		t.Errorf("Session name = %q, want orc-COMM-007", plan.TMuxOps[0].SessionName)
 	}
 }
 
 func TestGenerateStartPlan_SkipsNonExistent(t *testing.T) {
 	input := StartPlanInput{
-		MissionID:     "MISSION-008",
-		WorkspacePath: "/home/user/missions/MISSION-008",
+		CommissionID:  "COMM-008",
+		WorkspacePath: "/home/user/commissions/COMM-008",
 		Groves: []GrovePlanInput{
 			{ID: "GROVE-001", Name: "exists", PathExists: true},
 			{ID: "GROVE-002", Name: "missing", PathExists: false},
@@ -261,7 +261,7 @@ func TestGenerateStartPlan_SkipsNonExistent(t *testing.T) {
 
 func TestStartPlan_Effects(t *testing.T) {
 	input := StartPlanInput{
-		MissionID:     "MISSION-009",
+		CommissionID:  "COMM-009",
 		WorkspacePath: "/test",
 		Groves: []GrovePlanInput{
 			{ID: "GROVE-001", Name: "test", PathExists: true},
@@ -283,7 +283,7 @@ func TestStartPlan_Effects(t *testing.T) {
 }
 
 func TestGenerateGroveConfig(t *testing.T) {
-	content := generateGroveConfig("GROVE-001", "MISSION-001", "api-grove", []string{"https://github.com/example/api"})
+	content := generateGroveConfig("GROVE-001", "COMM-001", "api-grove", []string{"https://github.com/example/api"})
 
 	if len(content) == 0 {
 		t.Error("generateGroveConfig returned empty content")
@@ -295,7 +295,7 @@ func TestGenerateGroveConfig(t *testing.T) {
 		`"version": "1.0"`,
 		`"type": "grove"`,
 		`"grove_id": "GROVE-001"`,
-		`"mission_id": "MISSION-001"`,
+		`"commission_id": "COMM-001"`,
 		`"name": "api-grove"`,
 	}
 

@@ -53,9 +53,9 @@ This command:
 3. Writes .orc/config.json (grove config)
 
 Examples:
-  orc grove create auth-backend --repos main-app --mission MISSION-001
-  orc grove create frontend --repos main-app --mission MISSION-001
-  orc grove create multi --repos main-app,api-service --mission MISSION-002`,
+  orc grove create auth-backend --repos main-app --commission MISSION-001
+  orc grove create frontend --repos main-app --commission MISSION-001
+  orc grove create multi --repos main-app,api-service --commission MISSION-002`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := context.Background()
@@ -69,18 +69,18 @@ Examples:
 
 			// Get mission from context or require explicit flag
 			if missionID == "" {
-				missionID = orccontext.GetContextMissionID()
+				missionID = orccontext.GetContextCommissionID()
 				if missionID == "" {
-					return fmt.Errorf("no mission context detected\nHint: Use --mission flag or run from a grove/mission directory")
+					return fmt.Errorf("no mission context detected\nHint: Use --commission flag or run from a grove/mission directory")
 				}
 			}
 
 			// Create grove via service (handles DB + directory + config)
 			resp, err := wire.GroveService().CreateGrove(ctx, primary.CreateGroveRequest{
-				Name:      name,
-				MissionID: missionID,
-				Repos:     repos,
-				BasePath:  basePath,
+				Name:         name,
+				CommissionID: missionID,
+				Repos:        repos,
+				BasePath:     basePath,
 			})
 			if err != nil {
 				return fmt.Errorf("failed to create grove: %w", err)
@@ -88,7 +88,7 @@ Examples:
 
 			grove := resp.Grove
 			fmt.Printf("✓ Created grove %s: %s\n", grove.ID, grove.Name)
-			fmt.Printf("  Mission: %s\n", grove.MissionID)
+			fmt.Printf("  Mission: %s\n", grove.CommissionID)
 			fmt.Printf("  Path: %s\n", grove.Path)
 			if len(repos) > 0 {
 				fmt.Printf("  Repos: %v\n", repos)
@@ -118,7 +118,7 @@ Examples:
 		},
 	}
 
-	cmd.Flags().StringVarP(&missionID, "mission", "m", "", "Mission ID (defaults to context)")
+	cmd.Flags().StringVarP(&missionID, "commission", "c", "", "Commission ID (defaults to context)")
 	cmd.Flags().StringSliceVarP(&repos, "repos", "r", nil, "Comma-separated list of repo names")
 	cmd.Flags().StringVarP(&basePath, "path", "p", "", "Base path for worktrees (default: ~/src/worktrees)")
 
@@ -152,7 +152,7 @@ func groveListCmd() *cobra.Command {
 				fmt.Println("No groves found.")
 				fmt.Println()
 				fmt.Println("Create your first grove:")
-				fmt.Println("  orc grove create my-grove --repos main-app --mission MISSION-001")
+				fmt.Println("  orc grove create my-grove --repos main-app --commission MISSION-001")
 				return nil
 			}
 
@@ -164,7 +164,7 @@ func groveListCmd() *cobra.Command {
 				fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n",
 					g.ID,
 					g.Name,
-					g.MissionID,
+					g.CommissionID,
 					g.Status,
 					g.Path,
 				)
@@ -175,7 +175,7 @@ func groveListCmd() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVarP(&missionID, "mission", "m", "", "Filter by mission ID")
+	cmd.Flags().StringVarP(&missionID, "commission", "c", "", "Filter by mission ID")
 
 	return cmd
 }
@@ -427,11 +427,11 @@ func writeGroveMetadata(grove *primary.Grove) error {
 		Version: "1.0",
 		Type:    config.TypeGrove,
 		Grove: &config.GroveConfig{
-			GroveID:   grove.ID,
-			MissionID: grove.MissionID,
-			Name:      grove.Name,
-			Repos:     grove.Repos,
-			CreatedAt: time.Now().Format(time.RFC3339),
+			GroveID:      grove.ID,
+			CommissionID: grove.CommissionID,
+			Name:         grove.Name,
+			Repos:        grove.Repos,
+			CreatedAt:    time.Now().Format(time.RFC3339),
 		},
 	}
 

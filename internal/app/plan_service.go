@@ -25,12 +25,12 @@ func NewPlanService(
 // CreatePlan creates a new plan.
 func (s *PlanServiceImpl) CreatePlan(ctx context.Context, req primary.CreatePlanRequest) (*primary.CreatePlanResponse, error) {
 	// Validate mission exists
-	exists, err := s.planRepo.MissionExists(ctx, req.MissionID)
+	exists, err := s.planRepo.CommissionExists(ctx, req.CommissionID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to validate mission: %w", err)
+		return nil, fmt.Errorf("failed to validate commission: %w", err)
 	}
 	if !exists {
-		return nil, fmt.Errorf("mission %s not found", req.MissionID)
+		return nil, fmt.Errorf("commission %s not found", req.CommissionID)
 	}
 
 	// Validate shipment exists if provided
@@ -61,13 +61,13 @@ func (s *PlanServiceImpl) CreatePlan(ctx context.Context, req primary.CreatePlan
 
 	// Create record
 	record := &secondary.PlanRecord{
-		ID:          nextID,
-		MissionID:   req.MissionID,
-		ShipmentID:  req.ShipmentID,
-		Title:       req.Title,
-		Description: req.Description,
-		Content:     req.Content,
-		Status:      "draft",
+		ID:           nextID,
+		CommissionID: req.CommissionID,
+		ShipmentID:   req.ShipmentID,
+		Title:        req.Title,
+		Description:  req.Description,
+		Content:      req.Content,
+		Status:       "draft",
 	}
 
 	if err := s.planRepo.Create(ctx, record); err != nil {
@@ -98,9 +98,9 @@ func (s *PlanServiceImpl) GetPlan(ctx context.Context, planID string) (*primary.
 // ListPlans lists plans with optional filters.
 func (s *PlanServiceImpl) ListPlans(ctx context.Context, filters primary.PlanFilters) ([]*primary.Plan, error) {
 	records, err := s.planRepo.List(ctx, secondary.PlanFilters{
-		ShipmentID: filters.ShipmentID,
-		MissionID:  filters.MissionID,
-		Status:     filters.Status,
+		ShipmentID:   filters.ShipmentID,
+		CommissionID: filters.CommissionID,
+		Status:       filters.Status,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to list plans: %w", err)
@@ -162,7 +162,7 @@ func (s *PlanServiceImpl) recordToPlan(r *secondary.PlanRecord) *primary.Plan {
 	return &primary.Plan{
 		ID:               r.ID,
 		ShipmentID:       r.ShipmentID,
-		MissionID:        r.MissionID,
+		CommissionID:     r.CommissionID,
 		Title:            r.Title,
 		Description:      r.Description,
 		Status:           r.Status,

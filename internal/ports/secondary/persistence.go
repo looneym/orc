@@ -4,38 +4,38 @@ package secondary
 
 import "context"
 
-// MissionRepository defines the secondary port for mission persistence.
-type MissionRepository interface {
-	// Create persists a new mission.
-	Create(ctx context.Context, mission *MissionRecord) error
+// CommissionRepository defines the secondary port for commission persistence.
+type CommissionRepository interface {
+	// Create persists a new commission.
+	Create(ctx context.Context, commission *CommissionRecord) error
 
-	// GetByID retrieves a mission by its ID.
-	GetByID(ctx context.Context, id string) (*MissionRecord, error)
+	// GetByID retrieves a commission by its ID.
+	GetByID(ctx context.Context, id string) (*CommissionRecord, error)
 
-	// Update updates an existing mission.
-	Update(ctx context.Context, mission *MissionRecord) error
+	// Update updates an existing commission.
+	Update(ctx context.Context, commission *CommissionRecord) error
 
-	// Delete removes a mission from persistence.
+	// Delete removes a commission from persistence.
 	Delete(ctx context.Context, id string) error
 
-	// List retrieves missions matching the given filters.
-	List(ctx context.Context, filters MissionFilters) ([]*MissionRecord, error)
+	// List retrieves commissions matching the given filters.
+	List(ctx context.Context, filters CommissionFilters) ([]*CommissionRecord, error)
 
-	// Pin pins a mission to keep it visible.
+	// Pin pins a commission to keep it visible.
 	Pin(ctx context.Context, id string) error
 
-	// Unpin unpins a mission.
+	// Unpin unpins a commission.
 	Unpin(ctx context.Context, id string) error
 
-	// GetNextID returns the next available mission ID.
+	// GetNextID returns the next available commission ID.
 	GetNextID(ctx context.Context) (string, error)
 
-	// CountShipments returns the number of shipments for a mission.
-	CountShipments(ctx context.Context, missionID string) (int, error)
+	// CountShipments returns the number of shipments for a commission.
+	CountShipments(ctx context.Context, commissionID string) (int, error)
 }
 
-// MissionRecord represents a mission as stored in persistence.
-type MissionRecord struct {
+// CommissionRecord represents a commission as stored in persistence.
+type CommissionRecord struct {
 	ID          string
 	Title       string
 	Description string
@@ -46,8 +46,8 @@ type MissionRecord struct {
 	CompletedAt string
 }
 
-// MissionFilters contains filter options for querying missions.
-type MissionFilters struct {
+// CommissionFilters contains filter options for querying commissions.
+type CommissionFilters struct {
 	Status string
 	Limit  int
 }
@@ -63,11 +63,11 @@ type GroveRepository interface {
 	// GetByPath retrieves a grove by its file path.
 	GetByPath(ctx context.Context, path string) (*GroveRecord, error)
 
-	// GetByMission retrieves all groves for a mission.
-	GetByMission(ctx context.Context, missionID string) ([]*GroveRecord, error)
+	// GetByCommission retrieves all groves for a commission.
+	GetByCommission(ctx context.Context, commissionID string) ([]*GroveRecord, error)
 
-	// List retrieves all groves, optionally filtered by mission.
-	List(ctx context.Context, missionID string) ([]*GroveRecord, error)
+	// List retrieves all groves, optionally filtered by commission.
+	List(ctx context.Context, commissionID string) ([]*GroveRecord, error)
 
 	// Update updates an existing grove.
 	Update(ctx context.Context, grove *GroveRecord) error
@@ -89,7 +89,7 @@ type GroveRepository interface {
 type GroveRecord struct {
 	ID           string
 	Name         string
-	MissionID    string
+	CommissionID string
 	WorktreePath string
 	Status       string
 	CreatedAt    string
@@ -104,10 +104,10 @@ type AgentIdentityProvider interface {
 
 // AgentIdentity represents an agent's identity as provided by the secondary port.
 type AgentIdentity struct {
-	Type      AgentType
-	ID        string // "ORC" for orchestrator, Grove ID for IMP
-	FullID    string // Complete ID like "ORC" or "IMP-GROVE-001"
-	MissionID string // Mission ID (empty for ORC outside mission)
+	Type         AgentType
+	ID           string // "ORC" for orchestrator, Grove ID for IMP
+	FullID       string // Complete ID like "ORC" or "IMP-GROVE-001"
+	CommissionID string // Commission ID (empty for ORC outside commission)
 }
 
 // AgentType represents the type of agent.
@@ -155,8 +155,8 @@ type ShipmentRepository interface {
 	// UpdateStatus updates the status and optionally completed_at timestamp.
 	UpdateStatus(ctx context.Context, id, status string, setCompleted bool) error
 
-	// MissionExists checks if a mission exists (for validation).
-	MissionExists(ctx context.Context, missionID string) (bool, error)
+	// CommissionExists checks if a commission exists (for validation).
+	CommissionExists(ctx context.Context, commissionID string) (bool, error)
 
 	// GroveAssignedToOther checks if grove is assigned to another shipment.
 	GroveAssignedToOther(ctx context.Context, groveID, excludeShipmentID string) (string, error)
@@ -165,7 +165,7 @@ type ShipmentRepository interface {
 // ShipmentRecord represents a shipment as stored in persistence.
 type ShipmentRecord struct {
 	ID              string
-	MissionID       string
+	CommissionID    string
 	Title           string
 	Description     string // Empty string means null
 	Status          string
@@ -178,8 +178,8 @@ type ShipmentRecord struct {
 
 // ShipmentFilters contains filter options for querying shipments.
 type ShipmentFilters struct {
-	MissionID string
-	Status    string
+	CommissionID string
+	Status       string
 }
 
 // TaskRepository defines the secondary port for task persistence.
@@ -223,8 +223,8 @@ type TaskRepository interface {
 	// AssignGroveByShipment assigns all tasks of a shipment to a grove.
 	AssignGroveByShipment(ctx context.Context, shipmentID, groveID string) error
 
-	// MissionExists checks if a mission exists (for validation).
-	MissionExists(ctx context.Context, missionID string) (bool, error)
+	// CommissionExists checks if a commission exists (for validation).
+	CommissionExists(ctx context.Context, commissionID string) (bool, error)
 
 	// ShipmentExists checks if a shipment exists (for validation).
 	ShipmentExists(ctx context.Context, shipmentID string) (bool, error)
@@ -249,7 +249,7 @@ type TaskRepository interface {
 type TaskRecord struct {
 	ID               string
 	ShipmentID       string // Empty string means null
-	MissionID        string
+	CommissionID     string
 	Title            string
 	Description      string // Empty string means null
 	Type             string // Empty string means null
@@ -268,9 +268,9 @@ type TaskRecord struct {
 
 // TaskFilters contains filter options for querying tasks.
 type TaskFilters struct {
-	ShipmentID string
-	Status     string
-	MissionID  string
+	ShipmentID   string
+	Status       string
+	CommissionID string
 }
 
 // TagRecord represents a tag as stored in persistence.
@@ -335,8 +335,8 @@ type NoteRepository interface {
 	// GetByContainer retrieves notes for a specific container.
 	GetByContainer(ctx context.Context, containerType, containerID string) ([]*NoteRecord, error)
 
-	// MissionExists checks if a mission exists (for validation).
-	MissionExists(ctx context.Context, missionID string) (bool, error)
+	// CommissionExists checks if a commission exists (for validation).
+	CommissionExists(ctx context.Context, commissionID string) (bool, error)
 
 	// UpdateStatus updates the status of a note (open/closed).
 	UpdateStatus(ctx context.Context, id string, status string) error
@@ -345,7 +345,7 @@ type NoteRepository interface {
 // NoteRecord represents a note as stored in persistence.
 type NoteRecord struct {
 	ID               string
-	MissionID        string
+	CommissionID     string
 	Title            string
 	Content          string // Empty string means null
 	Type             string // Empty string means null
@@ -364,8 +364,8 @@ type NoteRecord struct {
 
 // NoteFilters contains filter options for querying notes.
 type NoteFilters struct {
-	Type      string
-	MissionID string
+	Type         string
+	CommissionID string
 }
 
 // HandoffRepository defines the secondary port for handoff persistence.
@@ -392,12 +392,12 @@ type HandoffRepository interface {
 
 // HandoffRecord represents a handoff as stored in persistence.
 type HandoffRecord struct {
-	ID              string
-	CreatedAt       string
-	HandoffNote     string
-	ActiveMissionID string // Empty string means null
-	ActiveGroveID   string // Empty string means null
-	TodosSnapshot   string // Empty string means null
+	ID                 string
+	CreatedAt          string
+	HandoffNote        string
+	ActiveCommissionID string // Empty string means null
+	ActiveGroveID      string // Empty string means null
+	TodosSnapshot      string // Empty string means null
 }
 
 // TomeRepository defines the secondary port for tome persistence.
@@ -435,14 +435,14 @@ type TomeRepository interface {
 	// AssignGrove assigns a tome to a grove.
 	AssignGrove(ctx context.Context, tomeID, groveID string) error
 
-	// MissionExists checks if a mission exists (for validation).
-	MissionExists(ctx context.Context, missionID string) (bool, error)
+	// CommissionExists checks if a commission exists (for validation).
+	CommissionExists(ctx context.Context, commissionID string) (bool, error)
 }
 
 // TomeRecord represents a tome as stored in persistence.
 type TomeRecord struct {
 	ID              string
-	MissionID       string
+	CommissionID    string
 	Title           string
 	Description     string // Empty string means null
 	Status          string
@@ -455,8 +455,8 @@ type TomeRecord struct {
 
 // TomeFilters contains filter options for querying tomes.
 type TomeFilters struct {
-	MissionID string
-	Status    string
+	CommissionID string
+	Status       string
 }
 
 // ConclaveRepository defines the secondary port for conclave persistence.
@@ -491,8 +491,8 @@ type ConclaveRepository interface {
 	// GetByGrove retrieves conclaves assigned to a grove.
 	GetByGrove(ctx context.Context, groveID string) ([]*ConclaveRecord, error)
 
-	// MissionExists checks if a mission exists (for validation).
-	MissionExists(ctx context.Context, missionID string) (bool, error)
+	// CommissionExists checks if a commission exists (for validation).
+	CommissionExists(ctx context.Context, commissionID string) (bool, error)
 
 	// GetTasksByConclave retrieves tasks belonging to a conclave.
 	GetTasksByConclave(ctx context.Context, conclaveID string) ([]*ConclaveTaskRecord, error)
@@ -507,7 +507,7 @@ type ConclaveRepository interface {
 // ConclaveRecord represents a conclave as stored in persistence.
 type ConclaveRecord struct {
 	ID              string
-	MissionID       string
+	CommissionID    string
 	Title           string
 	Description     string // Empty string means null
 	Status          string
@@ -520,15 +520,15 @@ type ConclaveRecord struct {
 
 // ConclaveFilters contains filter options for querying conclaves.
 type ConclaveFilters struct {
-	MissionID string
-	Status    string
+	CommissionID string
+	Status       string
 }
 
 // ConclaveTaskRecord represents a task as returned from conclave cross-entity query.
 type ConclaveTaskRecord struct {
 	ID               string
 	ShipmentID       string
-	MissionID        string
+	CommissionID     string
 	Title            string
 	Description      string
 	Type             string
@@ -549,7 +549,7 @@ type ConclaveTaskRecord struct {
 type ConclaveQuestionRecord struct {
 	ID               string
 	InvestigationID  string
-	MissionID        string
+	CommissionID     string
 	Title            string
 	Description      string
 	Status           string
@@ -567,7 +567,7 @@ type ConclaveQuestionRecord struct {
 type ConclavePlanRecord struct {
 	ID               string
 	ShipmentID       string
-	MissionID        string
+	CommissionID     string
 	Title            string
 	Description      string
 	Status           string
@@ -599,26 +599,26 @@ type OperationRepository interface {
 	// GetNextID returns the next available operation ID.
 	GetNextID(ctx context.Context) (string, error)
 
-	// MissionExists checks if a mission exists (for validation).
-	MissionExists(ctx context.Context, missionID string) (bool, error)
+	// CommissionExists checks if a commission exists (for validation).
+	CommissionExists(ctx context.Context, commissionID string) (bool, error)
 }
 
 // OperationRecord represents an operation as stored in persistence.
 type OperationRecord struct {
-	ID          string
-	MissionID   string
-	Title       string
-	Description string // Empty string means null
-	Status      string
-	CreatedAt   string
-	UpdatedAt   string
-	CompletedAt string // Empty string means null
+	ID           string
+	CommissionID string
+	Title        string
+	Description  string // Empty string means null
+	Status       string
+	CreatedAt    string
+	UpdatedAt    string
+	CompletedAt  string // Empty string means null
 }
 
 // OperationFilters contains filter options for querying operations.
 type OperationFilters struct {
-	MissionID string
-	Status    string
+	CommissionID string
+	Status       string
 }
 
 // InvestigationRepository defines the secondary port for investigation persistence.
@@ -656,8 +656,8 @@ type InvestigationRepository interface {
 	// AssignGrove assigns an investigation to a grove.
 	AssignGrove(ctx context.Context, investigationID, groveID string) error
 
-	// MissionExists checks if a mission exists (for validation).
-	MissionExists(ctx context.Context, missionID string) (bool, error)
+	// CommissionExists checks if a commission exists (for validation).
+	CommissionExists(ctx context.Context, commissionID string) (bool, error)
 
 	// GetQuestionsByInvestigation retrieves questions for an investigation.
 	GetQuestionsByInvestigation(ctx context.Context, investigationID string) ([]*InvestigationQuestionRecord, error)
@@ -666,7 +666,7 @@ type InvestigationRepository interface {
 // InvestigationRecord represents an investigation as stored in persistence.
 type InvestigationRecord struct {
 	ID              string
-	MissionID       string
+	CommissionID    string
 	Title           string
 	Description     string // Empty string means null
 	Status          string
@@ -679,15 +679,15 @@ type InvestigationRecord struct {
 
 // InvestigationFilters contains filter options for querying investigations.
 type InvestigationFilters struct {
-	MissionID string
-	Status    string
+	CommissionID string
+	Status       string
 }
 
 // InvestigationQuestionRecord represents a question as returned from investigation cross-entity query.
 type InvestigationQuestionRecord struct {
 	ID               string
 	InvestigationID  string
-	MissionID        string
+	CommissionID     string
 	Title            string
 	Description      string
 	Status           string
@@ -730,8 +730,8 @@ type QuestionRepository interface {
 	// Answer sets the answer for a question and marks it as answered.
 	Answer(ctx context.Context, id, answer string) error
 
-	// MissionExists checks if a mission exists (for validation).
-	MissionExists(ctx context.Context, missionID string) (bool, error)
+	// CommissionExists checks if a commission exists (for validation).
+	CommissionExists(ctx context.Context, commissionID string) (bool, error)
 
 	// InvestigationExists checks if an investigation exists (for validation).
 	InvestigationExists(ctx context.Context, investigationID string) (bool, error)
@@ -741,7 +741,7 @@ type QuestionRepository interface {
 type QuestionRecord struct {
 	ID               string
 	InvestigationID  string // Empty string means null
-	MissionID        string
+	CommissionID     string
 	Title            string
 	Description      string // Empty string means null
 	Status           string
@@ -758,7 +758,7 @@ type QuestionRecord struct {
 // QuestionFilters contains filter options for querying questions.
 type QuestionFilters struct {
 	InvestigationID string
-	MissionID       string
+	CommissionID    string
 	Status          string
 }
 
@@ -797,8 +797,8 @@ type PlanRepository interface {
 	// HasActivePlanForShipment checks if a shipment has an active (draft) plan.
 	HasActivePlanForShipment(ctx context.Context, shipmentID string) (bool, error)
 
-	// MissionExists checks if a mission exists (for validation).
-	MissionExists(ctx context.Context, missionID string) (bool, error)
+	// CommissionExists checks if a commission exists (for validation).
+	CommissionExists(ctx context.Context, commissionID string) (bool, error)
 
 	// ShipmentExists checks if a shipment exists (for validation).
 	ShipmentExists(ctx context.Context, shipmentID string) (bool, error)
@@ -808,7 +808,7 @@ type PlanRepository interface {
 type PlanRecord struct {
 	ID               string
 	ShipmentID       string // Empty string means null
-	MissionID        string
+	CommissionID     string
 	Title            string
 	Description      string // Empty string means null
 	Status           string
@@ -824,9 +824,9 @@ type PlanRecord struct {
 
 // PlanFilters contains filter options for querying plans.
 type PlanFilters struct {
-	ShipmentID string
-	MissionID  string
-	Status     string
+	ShipmentID   string
+	CommissionID string
+	Status       string
 }
 
 // MessageRepository defines the secondary port for message persistence.
@@ -849,23 +849,23 @@ type MessageRepository interface {
 	// GetUnreadCount returns the count of unread messages for a recipient.
 	GetUnreadCount(ctx context.Context, recipient string) (int, error)
 
-	// GetNextID returns the next available message ID for a mission.
-	GetNextID(ctx context.Context, missionID string) (string, error)
+	// GetNextID returns the next available message ID for a commission.
+	GetNextID(ctx context.Context, commissionID string) (string, error)
 
-	// MissionExists checks if a mission exists (for validation).
-	MissionExists(ctx context.Context, missionID string) (bool, error)
+	// CommissionExists checks if a commission exists (for validation).
+	CommissionExists(ctx context.Context, commissionID string) (bool, error)
 }
 
 // MessageRecord represents a message as stored in persistence.
 type MessageRecord struct {
-	ID        string
-	Sender    string
-	Recipient string
-	Subject   string
-	Body      string
-	Timestamp string
-	Read      bool
-	MissionID string
+	ID           string
+	Sender       string
+	Recipient    string
+	Subject      string
+	Body         string
+	Timestamp    string
+	Read         bool
+	CommissionID string
 }
 
 // MessageFilters contains filter options for querying messages.

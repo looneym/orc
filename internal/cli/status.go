@@ -26,15 +26,15 @@ func StatusCmd() *cobra.Command {
 This provides a focused view of "where am I right now?"`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Check if we're in a mission context first
-			missionCtx, _ := ctx.DetectMissionContext()
-			var activeMissionID string
+			commissionCtx, _ := ctx.DetectCommissionContext()
+			var activeCommissionID string
 			var currentHandoffID string
 			var lastUpdated string
 			var currentFocus string
 
-			if missionCtx != nil {
-				// Mission context - try to load config from workspace or current directory
-				cfg, err := config.LoadConfig(missionCtx.WorkspacePath)
+			if commissionCtx != nil {
+				// Commission context - try to load config from workspace or current directory
+				cfg, err := config.LoadConfig(commissionCtx.WorkspacePath)
 				if err != nil {
 					// Try current directory
 					cwd, _ := os.Getwd()
@@ -45,13 +45,13 @@ This provides a focused view of "where am I right now?"`,
 					// Extract fields based on config type
 					switch cfg.Type {
 					case config.TypeGrove:
-						activeMissionID = cfg.Grove.MissionID
+						activeCommissionID = cfg.Grove.CommissionID
 						currentFocus = cfg.Grove.CurrentFocus
-					case config.TypeMission:
-						activeMissionID = cfg.Mission.MissionID
-						currentFocus = cfg.Mission.CurrentFocus
+					case config.TypeCommission:
+						activeCommissionID = cfg.Commission.CommissionID
+						currentFocus = cfg.Commission.CurrentFocus
 					case config.TypeGlobal:
-						activeMissionID = cfg.State.ActiveMissionID
+						activeCommissionID = cfg.State.ActiveCommissionID
 						currentHandoffID = cfg.State.CurrentHandoffID
 						lastUpdated = cfg.State.LastUpdated
 						currentFocus = cfg.State.CurrentFocus
@@ -59,10 +59,10 @@ This provides a focused view of "where am I right now?"`,
 				}
 
 				// If still no active mission, use mission from .orc-mission file
-				if activeMissionID == "" {
-					activeMissionID = missionCtx.MissionID
+				if activeCommissionID == "" {
+					activeCommissionID = commissionCtx.CommissionID
 				}
-				fmt.Println("🎯 ORC Status - Mission Context")
+				fmt.Println("🎯 ORC Status - Commission Context")
 			} else {
 				// Master context - read from global config.json
 				homeDir, err := os.UserHomeDir()
@@ -76,7 +76,7 @@ This provides a focused view of "where am I right now?"`,
 				}
 
 				if cfg.State != nil {
-					activeMissionID = cfg.State.ActiveMissionID
+					activeCommissionID = cfg.State.ActiveCommissionID
 					currentHandoffID = cfg.State.CurrentHandoffID
 					lastUpdated = cfg.State.LastUpdated
 					currentFocus = cfg.State.CurrentFocus
@@ -86,19 +86,19 @@ This provides a focused view of "where am I right now?"`,
 			}
 			fmt.Println()
 
-			// Display active mission
-			if activeMissionID != "" {
-				mission, err := wire.MissionService().GetMission(context.Background(), activeMissionID)
+			// Display active commission
+			if activeCommissionID != "" {
+				commission, err := wire.CommissionService().GetCommission(context.Background(), activeCommissionID)
 				if err != nil {
-					fmt.Printf("❌ Mission: %s (error loading: %v)\n", activeMissionID, err)
+					fmt.Printf("❌ Commission: %s (error loading: %v)\n", activeCommissionID, err)
 				} else {
-					fmt.Printf("🎯 Mission: %s - %s [%s]\n", mission.ID, mission.Title, mission.Status)
-					if mission.Description != "" {
-						fmt.Printf("   %s\n", mission.Description)
+					fmt.Printf("🎯 Commission: %s - %s [%s]\n", commission.ID, commission.Title, commission.Status)
+					if commission.Description != "" {
+						fmt.Printf("   %s\n", commission.Description)
 					}
 				}
 			} else {
-				fmt.Println("🎯 Mission: (none active)")
+				fmt.Println("🎯 Commission: (none active)")
 			}
 			fmt.Println()
 

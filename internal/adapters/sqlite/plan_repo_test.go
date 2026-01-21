@@ -21,7 +21,7 @@ func setupPlanTestDB(t *testing.T) *sql.DB {
 
 	// Create missions table
 	_, err = db.Exec(`
-		CREATE TABLE missions (
+		CREATE TABLE commissions (
 			id TEXT PRIMARY KEY,
 			title TEXT NOT NULL,
 			status TEXT NOT NULL DEFAULT 'active',
@@ -37,7 +37,7 @@ func setupPlanTestDB(t *testing.T) *sql.DB {
 	_, err = db.Exec(`
 		CREATE TABLE shipments (
 			id TEXT PRIMARY KEY,
-			mission_id TEXT NOT NULL,
+			commission_id TEXT NOT NULL,
 			title TEXT NOT NULL,
 			status TEXT NOT NULL DEFAULT 'active',
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -53,7 +53,7 @@ func setupPlanTestDB(t *testing.T) *sql.DB {
 		CREATE TABLE plans (
 			id TEXT PRIMARY KEY,
 			shipment_id TEXT,
-			mission_id TEXT NOT NULL,
+			commission_id TEXT NOT NULL,
 			title TEXT NOT NULL,
 			description TEXT,
 			status TEXT NOT NULL DEFAULT 'draft',
@@ -72,8 +72,8 @@ func setupPlanTestDB(t *testing.T) *sql.DB {
 	}
 
 	// Insert test data
-	_, _ = db.Exec("INSERT INTO missions (id, title, status) VALUES ('MISSION-001', 'Test Mission', 'active')")
-	_, _ = db.Exec("INSERT INTO shipments (id, mission_id, title, status) VALUES ('SHIP-001', 'MISSION-001', 'Test Shipment', 'active')")
+	_, _ = db.Exec("INSERT INTO commissions (id, title, status) VALUES ('MISSION-001', 'Test Mission', 'active')")
+	_, _ = db.Exec("INSERT INTO shipments (id, commission_id, title, status) VALUES ('SHIP-001', 'MISSION-001', 'Test Shipment', 'active')")
 
 	t.Cleanup(func() {
 		db.Close()
@@ -92,10 +92,10 @@ func createTestPlan(t *testing.T, repo *sqlite.PlanRepository, ctx context.Conte
 	}
 
 	plan := &secondary.PlanRecord{
-		ID:         nextID,
-		MissionID:  missionID,
-		ShipmentID: shipmentID,
-		Title:      title,
+		ID:           nextID,
+		CommissionID: missionID,
+		ShipmentID:   shipmentID,
+		Title:        title,
 	}
 
 	err = repo.Create(ctx, plan)
@@ -112,12 +112,12 @@ func TestPlanRepository_Create(t *testing.T) {
 	ctx := context.Background()
 
 	plan := &secondary.PlanRecord{
-		ID:          "PLAN-001",
-		MissionID:   "MISSION-001",
-		ShipmentID:  "SHIP-001",
-		Title:       "Test Plan",
-		Description: "A test plan description",
-		Content:     "## Plan Content\n\n1. Step one\n2. Step two",
+		ID:           "PLAN-001",
+		CommissionID: "MISSION-001",
+		ShipmentID:   "SHIP-001",
+		Title:        "Test Plan",
+		Description:  "A test plan description",
+		Content:      "## Plan Content\n\n1. Step one\n2. Step two",
 	}
 
 	err := repo.Create(ctx, plan)
@@ -147,9 +147,9 @@ func TestPlanRepository_Create_WithoutShipment(t *testing.T) {
 	ctx := context.Background()
 
 	plan := &secondary.PlanRecord{
-		ID:        "PLAN-001",
-		MissionID: "MISSION-001",
-		Title:     "Standalone Plan",
+		ID:           "PLAN-001",
+		CommissionID: "MISSION-001",
+		Title:        "Standalone Plan",
 	}
 
 	err := repo.Create(ctx, plan)
@@ -178,8 +178,8 @@ func TestPlanRepository_GetByID(t *testing.T) {
 	if retrieved.Title != "Test Plan" {
 		t.Errorf("expected title 'Test Plan', got '%s'", retrieved.Title)
 	}
-	if retrieved.MissionID != "MISSION-001" {
-		t.Errorf("expected mission 'MISSION-001', got '%s'", retrieved.MissionID)
+	if retrieved.CommissionID != "MISSION-001" {
+		t.Errorf("expected mission 'MISSION-001', got '%s'", retrieved.CommissionID)
 	}
 }
 
@@ -219,7 +219,7 @@ func TestPlanRepository_List_FilterByShipment(t *testing.T) {
 	ctx := context.Background()
 
 	// Add another shipment
-	_, _ = db.Exec("INSERT INTO shipments (id, mission_id, title) VALUES ('SHIP-002', 'MISSION-001', 'Ship 2')")
+	_, _ = db.Exec("INSERT INTO shipments (id, commission_id, title) VALUES ('SHIP-002', 'MISSION-001', 'Ship 2')")
 
 	createTestPlan(t, repo, ctx, "MISSION-001", "SHIP-001", "Plan 1")
 	createTestPlan(t, repo, ctx, "MISSION-001", "SHIP-002", "Plan 2")
@@ -240,12 +240,12 @@ func TestPlanRepository_List_FilterByMission(t *testing.T) {
 	ctx := context.Background()
 
 	// Add another mission
-	_, _ = db.Exec("INSERT INTO missions (id, title, status) VALUES ('MISSION-002', 'Mission 2', 'active')")
+	_, _ = db.Exec("INSERT INTO commissions (id, title, status) VALUES ('MISSION-002', 'Mission 2', 'active')")
 
 	createTestPlan(t, repo, ctx, "MISSION-001", "", "Plan 1")
 	createTestPlan(t, repo, ctx, "MISSION-002", "", "Plan 2")
 
-	plans, err := repo.List(ctx, secondary.PlanFilters{MissionID: "MISSION-001"})
+	plans, err := repo.List(ctx, secondary.PlanFilters{CommissionID: "MISSION-001"})
 	if err != nil {
 		t.Fatalf("List failed: %v", err)
 	}
@@ -525,22 +525,22 @@ func TestPlanRepository_HasActivePlanForShipment(t *testing.T) {
 	}
 }
 
-func TestPlanRepository_MissionExists(t *testing.T) {
+func TestPlanRepository_CommissionExists(t *testing.T) {
 	db := setupPlanTestDB(t)
 	repo := sqlite.NewPlanRepository(db)
 	ctx := context.Background()
 
-	exists, err := repo.MissionExists(ctx, "MISSION-001")
+	exists, err := repo.CommissionExists(ctx, "MISSION-001")
 	if err != nil {
-		t.Fatalf("MissionExists failed: %v", err)
+		t.Fatalf("CommissionExists failed: %v", err)
 	}
 	if !exists {
 		t.Error("expected mission to exist")
 	}
 
-	exists, err = repo.MissionExists(ctx, "MISSION-999")
+	exists, err = repo.CommissionExists(ctx, "MISSION-999")
 	if err != nil {
-		t.Fatalf("MissionExists failed: %v", err)
+		t.Fatalf("CommissionExists failed: %v", err)
 	}
 	if exists {
 		t.Error("expected mission to not exist")

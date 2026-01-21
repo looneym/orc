@@ -17,26 +17,28 @@ func setupIntegrationDB(t *testing.T) *sql.DB {
 		t.Fatalf("failed to open test db: %v", err)
 	}
 
-	// Create missions table
+	// Create commissions table
 	_, err = db.Exec(`
-		CREATE TABLE missions (
+		CREATE TABLE commissions (
 			id TEXT PRIMARY KEY,
 			title TEXT NOT NULL,
 			description TEXT,
 			status TEXT NOT NULL DEFAULT 'active',
+			pinned INTEGER NOT NULL DEFAULT 0,
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			completed_at DATETIME
 		)
 	`)
 	if err != nil {
-		t.Fatalf("failed to create missions table: %v", err)
+		t.Fatalf("failed to create commissions table: %v", err)
 	}
 
 	// Create groves table
 	_, err = db.Exec(`
 		CREATE TABLE groves (
 			id TEXT PRIMARY KEY,
-			mission_id TEXT NOT NULL,
+			commission_id TEXT NOT NULL,
 			name TEXT NOT NULL,
 			status TEXT NOT NULL DEFAULT 'active',
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -51,7 +53,7 @@ func setupIntegrationDB(t *testing.T) *sql.DB {
 	_, err = db.Exec(`
 		CREATE TABLE shipments (
 			id TEXT PRIMARY KEY,
-			mission_id TEXT NOT NULL,
+			commission_id TEXT NOT NULL,
 			title TEXT NOT NULL,
 			description TEXT,
 			status TEXT NOT NULL DEFAULT 'active',
@@ -71,7 +73,7 @@ func setupIntegrationDB(t *testing.T) *sql.DB {
 		CREATE TABLE tasks (
 			id TEXT PRIMARY KEY,
 			shipment_id TEXT,
-			mission_id TEXT NOT NULL,
+			commission_id TEXT NOT NULL,
 			title TEXT NOT NULL,
 			description TEXT,
 			type TEXT,
@@ -97,7 +99,7 @@ func setupIntegrationDB(t *testing.T) *sql.DB {
 		CREATE TABLE plans (
 			id TEXT PRIMARY KEY,
 			shipment_id TEXT,
-			mission_id TEXT NOT NULL,
+			commission_id TEXT NOT NULL,
 			title TEXT NOT NULL,
 			description TEXT,
 			status TEXT NOT NULL DEFAULT 'draft',
@@ -119,7 +121,7 @@ func setupIntegrationDB(t *testing.T) *sql.DB {
 	_, err = db.Exec(`
 		CREATE TABLE investigations (
 			id TEXT PRIMARY KEY,
-			mission_id TEXT NOT NULL,
+			commission_id TEXT NOT NULL,
 			title TEXT NOT NULL,
 			description TEXT,
 			status TEXT NOT NULL DEFAULT 'active',
@@ -139,7 +141,7 @@ func setupIntegrationDB(t *testing.T) *sql.DB {
 		CREATE TABLE questions (
 			id TEXT PRIMARY KEY,
 			investigation_id TEXT,
-			mission_id TEXT NOT NULL,
+			commission_id TEXT NOT NULL,
 			title TEXT NOT NULL,
 			description TEXT,
 			status TEXT NOT NULL DEFAULT 'open',
@@ -161,7 +163,7 @@ func setupIntegrationDB(t *testing.T) *sql.DB {
 	_, err = db.Exec(`
 		CREATE TABLE conclaves (
 			id TEXT PRIMARY KEY,
-			mission_id TEXT NOT NULL,
+			commission_id TEXT NOT NULL,
 			title TEXT NOT NULL,
 			description TEXT,
 			status TEXT NOT NULL DEFAULT 'active',
@@ -207,7 +209,7 @@ func setupIntegrationDB(t *testing.T) *sql.DB {
 	_, err = db.Exec(`
 		CREATE TABLE operations (
 			id TEXT PRIMARY KEY,
-			mission_id TEXT NOT NULL,
+			commission_id TEXT NOT NULL,
 			title TEXT NOT NULL,
 			description TEXT,
 			status TEXT NOT NULL DEFAULT 'ready',
@@ -226,7 +228,7 @@ func setupIntegrationDB(t *testing.T) *sql.DB {
 			id TEXT PRIMARY KEY,
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 			handoff_note TEXT NOT NULL,
-			active_mission_id TEXT,
+			active_commission_id TEXT,
 			active_grove_id TEXT,
 			todos_snapshot TEXT
 		)
@@ -245,7 +247,7 @@ func setupIntegrationDB(t *testing.T) *sql.DB {
 			body TEXT NOT NULL,
 			timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
 			read INTEGER NOT NULL DEFAULT 0,
-			mission_id TEXT NOT NULL
+			commission_id TEXT NOT NULL
 		)
 	`)
 	if err != nil {
@@ -256,7 +258,7 @@ func setupIntegrationDB(t *testing.T) *sql.DB {
 	_, err = db.Exec(`
 		CREATE TABLE notes (
 			id TEXT PRIMARY KEY,
-			mission_id TEXT NOT NULL,
+			commission_id TEXT NOT NULL,
 			title TEXT NOT NULL,
 			content TEXT,
 			type TEXT,
@@ -281,7 +283,7 @@ func setupIntegrationDB(t *testing.T) *sql.DB {
 	_, err = db.Exec(`
 		CREATE TABLE tomes (
 			id TEXT PRIMARY KEY,
-			mission_id TEXT NOT NULL,
+			commission_id TEXT NOT NULL,
 			title TEXT NOT NULL,
 			description TEXT,
 			status TEXT NOT NULL DEFAULT 'active',
@@ -303,12 +305,13 @@ func setupIntegrationDB(t *testing.T) *sql.DB {
 	return db
 }
 
-// seedMission inserts a test mission and returns its ID.
+// seedMission inserts a test commission and returns its ID.
+// Note: Function name kept for backwards compatibility with existing tests.
 func seedMission(t *testing.T, db *sql.DB, id, title string) string {
 	t.Helper()
-	_, err := db.Exec("INSERT INTO missions (id, title, status) VALUES (?, ?, 'active')", id, title)
+	_, err := db.Exec("INSERT INTO commissions (id, title, status) VALUES (?, ?, 'active')", id, title)
 	if err != nil {
-		t.Fatalf("failed to seed mission: %v", err)
+		t.Fatalf("failed to seed commission: %v", err)
 	}
 	return id
 }
@@ -316,7 +319,7 @@ func seedMission(t *testing.T, db *sql.DB, id, title string) string {
 // seedGrove inserts a test grove and returns its ID.
 func seedGrove(t *testing.T, db *sql.DB, id, missionID, name string) string {
 	t.Helper()
-	_, err := db.Exec("INSERT INTO groves (id, mission_id, name, status) VALUES (?, ?, ?, 'active')", id, missionID, name)
+	_, err := db.Exec("INSERT INTO groves (id, commission_id, name, status) VALUES (?, ?, ?, 'active')", id, missionID, name)
 	if err != nil {
 		t.Fatalf("failed to seed grove: %v", err)
 	}

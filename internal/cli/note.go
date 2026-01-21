@@ -36,9 +36,9 @@ var noteCreateCmd = &cobra.Command{
 
 		// Get mission from context or require explicit flag
 		if missionID == "" {
-			missionID = orccontext.GetContextMissionID()
+			missionID = orccontext.GetContextCommissionID()
 			if missionID == "" {
-				return fmt.Errorf("no mission context detected\nHint: Use --mission flag or run from a grove/mission directory")
+				return fmt.Errorf("no mission context detected\nHint: Use --commission flag or run from a grove/mission directory")
 			}
 		}
 
@@ -73,7 +73,7 @@ var noteCreateCmd = &cobra.Command{
 		}
 
 		resp, err := wire.NoteService().CreateNote(ctx, primary.CreateNoteRequest{
-			MissionID:     missionID,
+			CommissionID:  missionID,
 			Title:         title,
 			Content:       content,
 			Type:          noteType,
@@ -92,7 +92,7 @@ var noteCreateCmd = &cobra.Command{
 		if containerID != "" {
 			fmt.Printf("  Container: %s (%s)\n", containerID, containerType)
 		}
-		fmt.Printf("  Mission: %s\n", note.MissionID)
+		fmt.Printf("  Mission: %s\n", note.CommissionID)
 		return nil
 	},
 }
@@ -110,7 +110,7 @@ var noteListCmd = &cobra.Command{
 
 		// Get mission from context if not specified
 		if missionID == "" {
-			missionID = orccontext.GetContextMissionID()
+			missionID = orccontext.GetContextCommissionID()
 		}
 
 		var notes []*primary.Note
@@ -125,8 +125,8 @@ var noteListCmd = &cobra.Command{
 			notes, err = wire.NoteService().GetNotesByContainer(ctx, "tome", tomeID)
 		} else {
 			notes, err = wire.NoteService().ListNotes(ctx, primary.NoteFilters{
-				Type:      noteType,
-				MissionID: missionID,
+				Type:         noteType,
+				CommissionID: missionID,
 			})
 		}
 
@@ -198,7 +198,7 @@ var noteShowCmd = &cobra.Command{
 			status = "open"
 		}
 		fmt.Printf("Status: %s\n", status)
-		fmt.Printf("Mission: %s\n", note.MissionID)
+		fmt.Printf("Mission: %s\n", note.CommissionID)
 		if note.ShipmentID != "" {
 			fmt.Printf("Shipment: %s\n", note.ShipmentID)
 		}
@@ -344,7 +344,7 @@ var noteReopenCmd = &cobra.Command{
 
 func init() {
 	// note create flags
-	noteCreateCmd.Flags().StringP("mission", "m", "", "Mission ID (defaults to context)")
+	noteCreateCmd.Flags().StringP("commission", "c", "", "Commission ID (defaults to context)")
 	noteCreateCmd.Flags().StringP("content", "c", "", "Note content")
 	noteCreateCmd.Flags().StringP("type", "t", "", "Note type (learning, concern, finding, frq, bug, investigation_report)")
 	noteCreateCmd.Flags().String("shipment", "", "Shipment ID to attach note to")
@@ -353,7 +353,7 @@ func init() {
 	noteCreateCmd.Flags().String("tome", "", "Tome ID to attach note to")
 
 	// note list flags
-	noteListCmd.Flags().StringP("mission", "m", "", "Filter by mission")
+	noteListCmd.Flags().StringP("commission", "c", "", "Filter by mission")
 	noteListCmd.Flags().StringP("type", "t", "", "Filter by type")
 	noteListCmd.Flags().String("shipment", "", "Filter by shipment")
 	noteListCmd.Flags().String("investigation", "", "Filter by investigation")

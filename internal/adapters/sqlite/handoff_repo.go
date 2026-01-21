@@ -25,8 +25,8 @@ func NewHandoffRepository(db *sql.DB) *HandoffRepository {
 func (r *HandoffRepository) Create(ctx context.Context, handoff *secondary.HandoffRecord) error {
 	var missionID, groveID, todos sql.NullString
 
-	if handoff.ActiveMissionID != "" {
-		missionID = sql.NullString{String: handoff.ActiveMissionID, Valid: true}
+	if handoff.ActiveCommissionID != "" {
+		missionID = sql.NullString{String: handoff.ActiveCommissionID, Valid: true}
 	}
 	if handoff.ActiveGroveID != "" {
 		groveID = sql.NullString{String: handoff.ActiveGroveID, Valid: true}
@@ -36,7 +36,7 @@ func (r *HandoffRepository) Create(ctx context.Context, handoff *secondary.Hando
 	}
 
 	_, err := r.db.ExecContext(ctx,
-		`INSERT INTO handoffs (id, handoff_note, active_mission_id, active_grove_id, todos_snapshot)
+		`INSERT INTO handoffs (id, handoff_note, active_commission_id, active_grove_id, todos_snapshot)
 		 VALUES (?, ?, ?, ?, ?)`,
 		handoff.ID, handoff.HandoffNote, missionID, groveID, todos,
 	)
@@ -58,7 +58,7 @@ func (r *HandoffRepository) GetByID(ctx context.Context, id string) (*secondary.
 
 	record := &secondary.HandoffRecord{}
 	err := r.db.QueryRowContext(ctx,
-		`SELECT id, created_at, handoff_note, active_mission_id, active_grove_id, todos_snapshot
+		`SELECT id, created_at, handoff_note, active_commission_id, active_grove_id, todos_snapshot
 		 FROM handoffs WHERE id = ?`,
 		id,
 	).Scan(&record.ID, &createdAt, &record.HandoffNote, &missionID, &groveID, &todos)
@@ -71,7 +71,7 @@ func (r *HandoffRepository) GetByID(ctx context.Context, id string) (*secondary.
 	}
 
 	record.CreatedAt = createdAt.Format(time.RFC3339)
-	record.ActiveMissionID = missionID.String
+	record.ActiveCommissionID = missionID.String
 	record.ActiveGroveID = groveID.String
 	record.TodosSnapshot = todos.String
 
@@ -89,7 +89,7 @@ func (r *HandoffRepository) GetLatest(ctx context.Context) (*secondary.HandoffRe
 
 	record := &secondary.HandoffRecord{}
 	err := r.db.QueryRowContext(ctx,
-		`SELECT id, created_at, handoff_note, active_mission_id, active_grove_id, todos_snapshot
+		`SELECT id, created_at, handoff_note, active_commission_id, active_grove_id, todos_snapshot
 		 FROM handoffs ORDER BY created_at DESC LIMIT 1`,
 	).Scan(&record.ID, &createdAt, &record.HandoffNote, &missionID, &groveID, &todos)
 
@@ -101,7 +101,7 @@ func (r *HandoffRepository) GetLatest(ctx context.Context) (*secondary.HandoffRe
 	}
 
 	record.CreatedAt = createdAt.Format(time.RFC3339)
-	record.ActiveMissionID = missionID.String
+	record.ActiveCommissionID = missionID.String
 	record.ActiveGroveID = groveID.String
 	record.TodosSnapshot = todos.String
 
@@ -119,7 +119,7 @@ func (r *HandoffRepository) GetLatestForGrove(ctx context.Context, groveID strin
 
 	record := &secondary.HandoffRecord{}
 	err := r.db.QueryRowContext(ctx,
-		`SELECT id, created_at, handoff_note, active_mission_id, active_grove_id, todos_snapshot
+		`SELECT id, created_at, handoff_note, active_commission_id, active_grove_id, todos_snapshot
 		 FROM handoffs WHERE active_grove_id = ? ORDER BY created_at DESC LIMIT 1`,
 		groveID,
 	).Scan(&record.ID, &createdAt, &record.HandoffNote, &missionID, &grove, &todos)
@@ -132,7 +132,7 @@ func (r *HandoffRepository) GetLatestForGrove(ctx context.Context, groveID strin
 	}
 
 	record.CreatedAt = createdAt.Format(time.RFC3339)
-	record.ActiveMissionID = missionID.String
+	record.ActiveCommissionID = missionID.String
 	record.ActiveGroveID = grove.String
 	record.TodosSnapshot = todos.String
 
@@ -141,7 +141,7 @@ func (r *HandoffRepository) GetLatestForGrove(ctx context.Context, groveID strin
 
 // List retrieves handoffs with optional limit.
 func (r *HandoffRepository) List(ctx context.Context, limit int) ([]*secondary.HandoffRecord, error) {
-	query := `SELECT id, created_at, handoff_note, active_mission_id, active_grove_id, todos_snapshot
+	query := `SELECT id, created_at, handoff_note, active_commission_id, active_grove_id, todos_snapshot
 	          FROM handoffs ORDER BY created_at DESC`
 
 	if limit > 0 {
@@ -170,7 +170,7 @@ func (r *HandoffRepository) List(ctx context.Context, limit int) ([]*secondary.H
 		}
 
 		record.CreatedAt = createdAt.Format(time.RFC3339)
-		record.ActiveMissionID = missionID.String
+		record.ActiveCommissionID = missionID.String
 		record.ActiveGroveID = groveID.String
 		record.TodosSnapshot = todos.String
 

@@ -28,8 +28,8 @@ func (r *TomeRepository) Create(ctx context.Context, tome *secondary.TomeRecord)
 	}
 
 	_, err := r.db.ExecContext(ctx,
-		"INSERT INTO tomes (id, mission_id, title, description, status) VALUES (?, ?, ?, ?, ?)",
-		tome.ID, tome.MissionID, tome.Title, desc, "active",
+		"INSERT INTO tomes (id, commission_id, title, description, status) VALUES (?, ?, ?, ?, ?)",
+		tome.ID, tome.CommissionID, tome.Title, desc, "active",
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create tome: %w", err)
@@ -51,9 +51,9 @@ func (r *TomeRepository) GetByID(ctx context.Context, id string) (*secondary.Tom
 
 	record := &secondary.TomeRecord{}
 	err := r.db.QueryRowContext(ctx,
-		"SELECT id, mission_id, title, description, status, assigned_grove_id, pinned, created_at, updated_at, completed_at FROM tomes WHERE id = ?",
+		"SELECT id, commission_id, title, description, status, assigned_grove_id, pinned, created_at, updated_at, completed_at FROM tomes WHERE id = ?",
 		id,
-	).Scan(&record.ID, &record.MissionID, &record.Title, &desc, &record.Status, &assignedGroveID, &pinned, &createdAt, &updatedAt, &completedAt)
+	).Scan(&record.ID, &record.CommissionID, &record.Title, &desc, &record.Status, &assignedGroveID, &pinned, &createdAt, &updatedAt, &completedAt)
 
 	if err == sql.ErrNoRows {
 		return nil, fmt.Errorf("tome %s not found", id)
@@ -76,12 +76,12 @@ func (r *TomeRepository) GetByID(ctx context.Context, id string) (*secondary.Tom
 
 // List retrieves tomes matching the given filters.
 func (r *TomeRepository) List(ctx context.Context, filters secondary.TomeFilters) ([]*secondary.TomeRecord, error) {
-	query := "SELECT id, mission_id, title, description, status, assigned_grove_id, pinned, created_at, updated_at, completed_at FROM tomes WHERE 1=1"
+	query := "SELECT id, commission_id, title, description, status, assigned_grove_id, pinned, created_at, updated_at, completed_at FROM tomes WHERE 1=1"
 	args := []any{}
 
-	if filters.MissionID != "" {
-		query += " AND mission_id = ?"
-		args = append(args, filters.MissionID)
+	if filters.CommissionID != "" {
+		query += " AND commission_id = ?"
+		args = append(args, filters.CommissionID)
 	}
 
 	if filters.Status != "" {
@@ -109,7 +109,7 @@ func (r *TomeRepository) List(ctx context.Context, filters secondary.TomeFilters
 		)
 
 		record := &secondary.TomeRecord{}
-		err := rows.Scan(&record.ID, &record.MissionID, &record.Title, &desc, &record.Status, &assignedGroveID, &pinned, &createdAt, &updatedAt, &completedAt)
+		err := rows.Scan(&record.ID, &record.CommissionID, &record.Title, &desc, &record.Status, &assignedGroveID, &pinned, &createdAt, &updatedAt, &completedAt)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan tome: %w", err)
 		}
@@ -252,7 +252,7 @@ func (r *TomeRepository) UpdateStatus(ctx context.Context, id, status string, se
 
 // GetByGrove retrieves tomes assigned to a grove.
 func (r *TomeRepository) GetByGrove(ctx context.Context, groveID string) ([]*secondary.TomeRecord, error) {
-	query := "SELECT id, mission_id, title, description, status, assigned_grove_id, pinned, created_at, updated_at, completed_at FROM tomes WHERE assigned_grove_id = ?"
+	query := "SELECT id, commission_id, title, description, status, assigned_grove_id, pinned, created_at, updated_at, completed_at FROM tomes WHERE assigned_grove_id = ?"
 	rows, err := r.db.QueryContext(ctx, query, groveID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get tomes by grove: %w", err)
@@ -271,7 +271,7 @@ func (r *TomeRepository) GetByGrove(ctx context.Context, groveID string) ([]*sec
 		)
 
 		record := &secondary.TomeRecord{}
-		err := rows.Scan(&record.ID, &record.MissionID, &record.Title, &desc, &record.Status, &assignedGroveID, &pinned, &createdAt, &updatedAt, &completedAt)
+		err := rows.Scan(&record.ID, &record.CommissionID, &record.Title, &desc, &record.Status, &assignedGroveID, &pinned, &createdAt, &updatedAt, &completedAt)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan tome: %w", err)
 		}
@@ -309,10 +309,10 @@ func (r *TomeRepository) AssignGrove(ctx context.Context, tomeID, groveID string
 	return nil
 }
 
-// MissionExists checks if a mission exists.
-func (r *TomeRepository) MissionExists(ctx context.Context, missionID string) (bool, error) {
+// CommissionExists checks if a mission exists.
+func (r *TomeRepository) CommissionExists(ctx context.Context, missionID string) (bool, error) {
 	var count int
-	err := r.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM missions WHERE id = ?", missionID).Scan(&count)
+	err := r.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM commissions WHERE id = ?", missionID).Scan(&count)
 	if err != nil {
 		return false, fmt.Errorf("failed to check mission existence: %w", err)
 	}

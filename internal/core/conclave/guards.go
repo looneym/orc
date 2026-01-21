@@ -20,8 +20,8 @@ func (r GuardResult) Error() error {
 
 // CreateConclaveContext provides context for conclave creation guards.
 type CreateConclaveContext struct {
-	MissionID     string
-	MissionExists bool
+	CommissionID     string
+	CommissionExists bool
 }
 
 // CompleteConclaveContext provides context for conclave completion guards.
@@ -38,12 +38,12 @@ type StatusTransitionContext struct {
 
 // CanCreateConclave evaluates whether a conclave can be created.
 // Rules:
-// - Mission must exist
+// - Commission must exist
 func CanCreateConclave(ctx CreateConclaveContext) GuardResult {
-	if !ctx.MissionExists {
+	if !ctx.CommissionExists {
 		return GuardResult{
 			Allowed: false,
-			Reason:  fmt.Sprintf("mission %s not found", ctx.MissionID),
+			Reason:  fmt.Sprintf("commission %s not found", ctx.CommissionID),
 		}
 	}
 

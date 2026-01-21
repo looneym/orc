@@ -11,11 +11,11 @@ import (
 
 // CreateGrovePlanInput contains pre-fetched data for grove creation.
 type CreateGrovePlanInput struct {
-	GroveID   string
-	GroveName string
-	MissionID string
-	BasePath  string   // e.g., ~/src/worktrees
-	Repos     []string // Repository names
+	GroveID      string
+	GroveName    string
+	CommissionID string
+	BasePath     string   // e.g., ~/src/worktrees
+	Repos        []string // Repository names
 }
 
 // OpenGrovePlanInput contains pre-fetched data for grove opening.
@@ -70,8 +70,8 @@ func (p OpenGrovePlan) Effects() []effects.Effect {
 // GenerateCreateGrovePlan creates a plan for grove creation.
 // This is a pure function - all input data must be pre-fetched.
 func GenerateCreateGrovePlan(input CreateGrovePlanInput) CreateGrovePlan {
-	// Build grove path: {basePath}/{missionID}-{groveName}
-	grovePathName := fmt.Sprintf("%s-%s", input.MissionID, input.GroveName)
+	// Build grove path: {basePath}/{commissionID}-{groveName}
+	grovePathName := fmt.Sprintf("%s-%s", input.CommissionID, input.GroveName)
 	grovePath := filepath.Join(input.BasePath, grovePathName)
 
 	plan := CreateGrovePlan{
@@ -95,7 +95,7 @@ func GenerateCreateGrovePlan(input CreateGrovePlanInput) CreateGrovePlan {
 	})
 
 	// 3. Write .orc/config.json
-	configContent := generateGroveConfig(input.GroveID, input.MissionID, input.GroveName, input.Repos)
+	configContent := generateGroveConfig(input.GroveID, input.CommissionID, input.GroveName, input.Repos)
 	plan.FilesystemOps = append(plan.FilesystemOps, effects.FileEffect{
 		Operation: "write",
 		Path:      filepath.Join(orcDir, "config.json"),
@@ -191,14 +191,14 @@ type groveConfig struct {
 }
 
 type groveConfigInner struct {
-	GroveID   string   `json:"grove_id"`
-	MissionID string   `json:"mission_id"`
-	Name      string   `json:"name"`
-	Repos     []string `json:"repos"`
-	CreatedAt string   `json:"created_at"`
+	GroveID      string   `json:"grove_id"`
+	CommissionID string   `json:"commission_id"`
+	Name         string   `json:"name"`
+	Repos        []string `json:"repos"`
+	CreatedAt    string   `json:"created_at"`
 }
 
-func generateGroveConfig(groveID, missionID, name string, repos []string) []byte {
+func generateGroveConfig(groveID, commissionID, name string, repos []string) []byte {
 	if repos == nil {
 		repos = []string{}
 	}
@@ -206,11 +206,11 @@ func generateGroveConfig(groveID, missionID, name string, repos []string) []byte
 		Version: "1.0",
 		Type:    "grove",
 		Grove: groveConfigInner{
-			GroveID:   groveID,
-			MissionID: missionID,
-			Name:      name,
-			Repos:     repos,
-			CreatedAt: time.Now().UTC().Format(time.RFC3339),
+			GroveID:      groveID,
+			CommissionID: commissionID,
+			Name:         name,
+			Repos:        repos,
+			CreatedAt:    time.Now().UTC().Format(time.RFC3339),
 		},
 	}
 

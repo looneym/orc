@@ -29,12 +29,12 @@ func NewShipmentService(
 // CreateShipment creates a new shipment for a mission.
 func (s *ShipmentServiceImpl) CreateShipment(ctx context.Context, req primary.CreateShipmentRequest) (*primary.CreateShipmentResponse, error) {
 	// Validate mission exists
-	exists, err := s.shipmentRepo.MissionExists(ctx, req.MissionID)
+	exists, err := s.shipmentRepo.CommissionExists(ctx, req.CommissionID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to validate mission: %w", err)
+		return nil, fmt.Errorf("failed to validate commission: %w", err)
 	}
 	if !exists {
-		return nil, fmt.Errorf("mission %s not found", req.MissionID)
+		return nil, fmt.Errorf("commission %s not found", req.CommissionID)
 	}
 
 	// Get next ID
@@ -45,11 +45,11 @@ func (s *ShipmentServiceImpl) CreateShipment(ctx context.Context, req primary.Cr
 
 	// Create record
 	record := &secondary.ShipmentRecord{
-		ID:          nextID,
-		MissionID:   req.MissionID,
-		Title:       req.Title,
-		Description: req.Description,
-		Status:      "active",
+		ID:           nextID,
+		CommissionID: req.CommissionID,
+		Title:        req.Title,
+		Description:  req.Description,
+		Status:       "active",
 	}
 
 	if err := s.shipmentRepo.Create(ctx, record); err != nil {
@@ -80,8 +80,8 @@ func (s *ShipmentServiceImpl) GetShipment(ctx context.Context, shipmentID string
 // ListShipments lists shipments with optional filters.
 func (s *ShipmentServiceImpl) ListShipments(ctx context.Context, filters primary.ShipmentFilters) ([]*primary.Shipment, error) {
 	records, err := s.shipmentRepo.List(ctx, secondary.ShipmentFilters{
-		MissionID: filters.MissionID,
-		Status:    filters.Status,
+		CommissionID: filters.CommissionID,
+		Status:       filters.Status,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to list shipments: %w", err)
@@ -223,7 +223,7 @@ func (s *ShipmentServiceImpl) DeleteShipment(ctx context.Context, shipmentID str
 func (s *ShipmentServiceImpl) recordToShipment(r *secondary.ShipmentRecord) *primary.Shipment {
 	return &primary.Shipment{
 		ID:              r.ID,
-		MissionID:       r.MissionID,
+		CommissionID:    r.CommissionID,
 		Title:           r.Title,
 		Description:     r.Description,
 		Status:          r.Status,
@@ -240,7 +240,7 @@ func recordToTask(r *secondary.TaskRecord) *primary.Task {
 	return &primary.Task{
 		ID:               r.ID,
 		ShipmentID:       r.ShipmentID,
-		MissionID:        r.MissionID,
+		CommissionID:     r.CommissionID,
 		Title:            r.Title,
 		Description:      r.Description,
 		Type:             r.Type,

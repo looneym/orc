@@ -10,9 +10,9 @@ import (
 type ConfigType string
 
 const (
-	TypeMission ConfigType = "mission"
-	TypeGrove   ConfigType = "grove"
-	TypeGlobal  ConfigType = "global"
+	TypeCommission ConfigType = "commission"
+	TypeGrove      ConfigType = "grove"
+	TypeGlobal     ConfigType = "global"
 )
 
 // Role constants
@@ -25,13 +25,14 @@ type Config struct {
 	Version string     `json:"version"`
 	Type    ConfigType `json:"type"`
 
-	Mission *MissionConfig `json:"mission,omitempty"`
-	Grove   *GroveConfig   `json:"grove,omitempty"`
-	State   *StateConfig   `json:"state,omitempty"`
+	Commission *CommissionConfig `json:"commission,omitempty"`
+	Grove      *GroveConfig      `json:"grove,omitempty"`
+	State      *StateConfig      `json:"state,omitempty"`
 }
 
-type MissionConfig struct {
-	MissionID     string `json:"mission_id"`
+// CommissionConfig represents commission workspace configuration
+type CommissionConfig struct {
+	CommissionID  string `json:"commission_id"`
 	WorkspacePath string `json:"workspace_path"`
 	IsMaster      bool   `json:"is_master,omitempty"`
 	Role          string `json:"role,omitempty"`          // "ORC", "IMP", or empty
@@ -41,7 +42,7 @@ type MissionConfig struct {
 
 type GroveConfig struct {
 	GroveID      string   `json:"grove_id"`
-	MissionID    string   `json:"mission_id"`
+	CommissionID string   `json:"commission_id"`
 	Name         string   `json:"name"`
 	Repos        []string `json:"repos"`
 	Role         string   `json:"role,omitempty"`          // "IMP" typically, or empty
@@ -50,11 +51,11 @@ type GroveConfig struct {
 }
 
 type StateConfig struct {
-	ActiveMissionID  string `json:"active_mission_id"`
-	CurrentHandoffID string `json:"current_handoff_id"`
-	Role             string `json:"role,omitempty"`          // "ORC" for global orchestrator
-	CurrentFocus     string `json:"current_focus,omitempty"` // Focused container ID (SHIP-*, CON-*, INV-*, TOME-*)
-	LastUpdated      string `json:"last_updated"`
+	ActiveCommissionID string `json:"active_commission_id"`
+	CurrentHandoffID   string `json:"current_handoff_id"`
+	Role               string `json:"role,omitempty"`          // "ORC" for global orchestrator
+	CurrentFocus       string `json:"current_focus,omitempty"` // Focused container ID (SHIP-*, CON-*, INV-*, TOME-*)
+	LastUpdated        string `json:"last_updated"`
 }
 
 // LoadConfig reads config.json from directory
@@ -105,25 +106,25 @@ func SaveConfig(dir string, cfg *Config) error {
 // Validate ensures config structure matches type
 func (c *Config) Validate() error {
 	switch c.Type {
-	case TypeMission:
-		if c.Mission == nil {
-			return fmt.Errorf("type 'mission' requires mission field")
+	case TypeCommission:
+		if c.Commission == nil {
+			return fmt.Errorf("type 'commission' requires commission field")
 		}
 		if c.Grove != nil || c.State != nil {
-			return fmt.Errorf("type 'mission' should only have mission field")
+			return fmt.Errorf("type 'commission' should only have commission field")
 		}
 	case TypeGrove:
 		if c.Grove == nil {
 			return fmt.Errorf("type 'grove' requires grove field")
 		}
-		if c.Mission != nil || c.State != nil {
+		if c.Commission != nil || c.State != nil {
 			return fmt.Errorf("type 'grove' should only have grove field")
 		}
 	case TypeGlobal:
 		if c.State == nil {
 			return fmt.Errorf("type 'global' requires state field")
 		}
-		if c.Mission != nil || c.Grove != nil {
+		if c.Commission != nil || c.Grove != nil {
 			return fmt.Errorf("type 'global' should only have state field")
 		}
 	default:
@@ -138,11 +139,11 @@ func LoadConfigWithFallback(dir string) (*Config, error) {
 	return LoadConfig(dir)
 }
 
-// DefaultWorkspacePath returns the default workspace path for a mission.
-func DefaultWorkspacePath(missionID string) (string, error) {
+// DefaultWorkspacePath returns the default workspace path for a commission.
+func DefaultWorkspacePath(commissionID string) (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return "", fmt.Errorf("failed to get home directory: %w", err)
 	}
-	return filepath.Join(home, "src", "missions", missionID), nil
+	return filepath.Join(home, "src", "commissions", commissionID), nil
 }

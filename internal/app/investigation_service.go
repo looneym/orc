@@ -24,13 +24,13 @@ func NewInvestigationService(
 
 // CreateInvestigation creates a new investigation (research container).
 func (s *InvestigationServiceImpl) CreateInvestigation(ctx context.Context, req primary.CreateInvestigationRequest) (*primary.CreateInvestigationResponse, error) {
-	// Validate mission exists
-	exists, err := s.investigationRepo.MissionExists(ctx, req.MissionID)
+	// Validate commission exists
+	exists, err := s.investigationRepo.CommissionExists(ctx, req.CommissionID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to validate mission: %w", err)
+		return nil, fmt.Errorf("failed to validate commission: %w", err)
 	}
 	if !exists {
-		return nil, fmt.Errorf("mission %s not found", req.MissionID)
+		return nil, fmt.Errorf("commission %s not found", req.CommissionID)
 	}
 
 	// Get next ID
@@ -41,11 +41,11 @@ func (s *InvestigationServiceImpl) CreateInvestigation(ctx context.Context, req 
 
 	// Create record
 	record := &secondary.InvestigationRecord{
-		ID:          nextID,
-		MissionID:   req.MissionID,
-		Title:       req.Title,
-		Description: req.Description,
-		Status:      "active",
+		ID:           nextID,
+		CommissionID: req.CommissionID,
+		Title:        req.Title,
+		Description:  req.Description,
+		Status:       "active",
 	}
 
 	if err := s.investigationRepo.Create(ctx, record); err != nil {
@@ -76,8 +76,8 @@ func (s *InvestigationServiceImpl) GetInvestigation(ctx context.Context, investi
 // ListInvestigations lists investigations with optional filters.
 func (s *InvestigationServiceImpl) ListInvestigations(ctx context.Context, filters primary.InvestigationFilters) ([]*primary.Investigation, error) {
 	records, err := s.investigationRepo.List(ctx, secondary.InvestigationFilters{
-		MissionID: filters.MissionID,
-		Status:    filters.Status,
+		CommissionID: filters.CommissionID,
+		Status:       filters.Status,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to list investigations: %w", err)
@@ -198,7 +198,7 @@ func (s *InvestigationServiceImpl) GetInvestigationQuestions(ctx context.Context
 func (s *InvestigationServiceImpl) recordToInvestigation(r *secondary.InvestigationRecord) *primary.Investigation {
 	return &primary.Investigation{
 		ID:              r.ID,
-		MissionID:       r.MissionID,
+		CommissionID:    r.CommissionID,
 		Title:           r.Title,
 		Description:     r.Description,
 		Status:          r.Status,
@@ -214,7 +214,7 @@ func (s *InvestigationServiceImpl) questionRecordToInvestigationQuestion(r *seco
 	return &primary.InvestigationQuestion{
 		ID:               r.ID,
 		InvestigationID:  r.InvestigationID,
-		MissionID:        r.MissionID,
+		CommissionID:     r.CommissionID,
 		Title:            r.Title,
 		Description:      r.Description,
 		Status:           r.Status,

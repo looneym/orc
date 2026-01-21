@@ -49,9 +49,9 @@ type ConclaveService interface {
 
 // CreateConclaveRequest contains parameters for creating a conclave.
 type CreateConclaveRequest struct {
-	MissionID   string
-	Title       string
-	Description string
+	CommissionID string
+	Title        string
+	Description  string
 }
 
 // CreateConclaveResponse contains the result of creating a conclave.
@@ -70,7 +70,7 @@ type UpdateConclaveRequest struct {
 // Conclave represents a conclave entity at the port boundary.
 type Conclave struct {
 	ID              string
-	MissionID       string
+	CommissionID    string
 	Title           string
 	Description     string
 	Status          string
@@ -83,15 +83,15 @@ type Conclave struct {
 
 // ConclaveFilters contains filter options for listing conclaves.
 type ConclaveFilters struct {
-	MissionID string
-	Status    string
+	CommissionID string
+	Status       string
 }
 
 // ConclaveTask represents a task associated with a conclave.
 type ConclaveTask struct {
 	ID               string
 	ShipmentID       string
-	MissionID        string
+	CommissionID     string
 	Title            string
 	Description      string
 	Type             string
@@ -112,7 +112,7 @@ type ConclaveTask struct {
 type ConclaveQuestion struct {
 	ID               string
 	InvestigationID  string
-	MissionID        string
+	CommissionID     string
 	Title            string
 	Description      string
 	Status           string
@@ -130,7 +130,7 @@ type ConclaveQuestion struct {
 type ConclavePlan struct {
 	ID               string
 	ShipmentID       string
-	MissionID        string
+	CommissionID     string
 	Title            string
 	Description      string
 	Status           string

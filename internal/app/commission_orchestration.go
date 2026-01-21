@@ -10,67 +10,67 @@ import (
 	"time"
 
 	"github.com/example/orc/internal/config"
-	coremission "github.com/example/orc/internal/core/mission"
+	corecommission "github.com/example/orc/internal/core/commission"
 	"github.com/example/orc/internal/ports/primary"
 	"github.com/example/orc/internal/ports/secondary"
 )
 
-// MissionOrchestrationService handles complex mission infrastructure operations.
+// CommissionOrchestrationService handles complex commission infrastructure operations.
 // It implements the plan/apply pattern for idempotent infrastructure management.
-type MissionOrchestrationService struct {
-	missionSvc    primary.MissionService
+type CommissionOrchestrationService struct {
+	commissionSvc primary.CommissionService
 	groveSvc      primary.GroveService
 	agentProvider secondary.AgentIdentityProvider
 }
 
-// NewMissionOrchestrationService creates a new orchestration service.
-func NewMissionOrchestrationService(missionSvc primary.MissionService, groveSvc primary.GroveService, agentProvider secondary.AgentIdentityProvider) *MissionOrchestrationService {
-	return &MissionOrchestrationService{
-		missionSvc:    missionSvc,
+// NewCommissionOrchestrationService creates a new orchestration service.
+func NewCommissionOrchestrationService(commissionSvc primary.CommissionService, groveSvc primary.GroveService, agentProvider secondary.AgentIdentityProvider) *CommissionOrchestrationService {
+	return &CommissionOrchestrationService{
+		commissionSvc: commissionSvc,
 		groveSvc:      groveSvc,
 		agentProvider: agentProvider,
 	}
 }
 
-// CheckLaunchPermission verifies the current agent can launch/start missions.
+// CheckLaunchPermission verifies the current agent can launch/start commissions.
 // Returns nil if allowed, error with user-friendly message if not.
-func (s *MissionOrchestrationService) CheckLaunchPermission(ctx context.Context) error {
+func (s *CommissionOrchestrationService) CheckLaunchPermission(ctx context.Context) error {
 	identity, err := s.agentProvider.GetCurrentIdentity(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get agent identity: %w", err)
 	}
 
-	guardCtx := coremission.GuardContext{
-		AgentType: coremission.AgentType(identity.Type),
-		AgentID:   identity.FullID,
-		MissionID: identity.MissionID,
+	guardCtx := corecommission.GuardContext{
+		AgentType:    corecommission.AgentType(identity.Type),
+		AgentID:      identity.FullID,
+		CommissionID: identity.CommissionID,
 	}
-	if result := coremission.CanLaunchMission(guardCtx); !result.Allowed {
+	if result := corecommission.CanLaunchCommission(guardCtx); !result.Allowed {
 		return result.Error()
 	}
 	return nil
 }
 
-// LoadMissionState loads the mission and its groves from the database.
-func (s *MissionOrchestrationService) LoadMissionState(ctx context.Context, missionID string) (*primary.MissionState, error) {
-	mission, err := s.missionSvc.GetMission(ctx, missionID)
+// LoadCommissionState loads the commission and its groves from the database.
+func (s *CommissionOrchestrationService) LoadCommissionState(ctx context.Context, commissionID string) (*primary.CommissionState, error) {
+	commission, err := s.commissionSvc.GetCommission(ctx, commissionID)
 	if err != nil {
-		return nil, fmt.Errorf("mission not found: %w", err)
+		return nil, fmt.Errorf("commission not found: %w", err)
 	}
 
-	groves, err := s.groveSvc.ListGroves(ctx, primary.GroveFilters{MissionID: missionID})
+	groves, err := s.groveSvc.ListGroves(ctx, primary.GroveFilters{CommissionID: commissionID})
 	if err != nil {
 		return nil, fmt.Errorf("failed to load groves: %w", err)
 	}
 
-	return &primary.MissionState{
-		Mission: mission,
-		Groves:  groves,
+	return &primary.CommissionState{
+		Commission: commission,
+		Groves:     groves,
 	}, nil
 }
 
-// AnalyzeInfrastructure generates a plan for setting up mission infrastructure.
-func (s *MissionOrchestrationService) AnalyzeInfrastructure(state *primary.MissionState, workspacePath string) *primary.InfrastructurePlan {
+// AnalyzeInfrastructure generates a plan for setting up commission infrastructure.
+func (s *CommissionOrchestrationService) AnalyzeInfrastructure(state *primary.CommissionState, workspacePath string) *primary.InfrastructurePlan {
 	plan := &primary.InfrastructurePlan{
 		WorkspacePath: workspacePath,
 		GrovesDir:     filepath.Join(workspacePath, "groves"),
@@ -117,19 +117,10 @@ func (s *MissionOrchestrationService) AnalyzeInfrastructure(state *primary.Missi
 		}
 	}
 
-	// Check for old .orc-mission files to clean up
-	oldMissionFile := filepath.Join(workspacePath, ".orc-mission")
-	if _, err := os.Stat(oldMissionFile); err == nil {
-		plan.Cleanups = append(plan.Cleanups, primary.CleanupAction{
-			Path:   oldMissionFile,
-			Reason: "legacy .orc-mission file",
-		})
-	}
-
 	return plan
 }
 
-func (s *MissionOrchestrationService) analyzeGroveAction(grove *primary.Grove, currentPath, desiredPath string) primary.GroveAction {
+func (s *CommissionOrchestrationService) analyzeGroveAction(grove *primary.Grove, currentPath, desiredPath string) primary.GroveAction {
 	action := primary.GroveAction{
 		GroveID:     grove.ID,
 		GroveName:   grove.Name,
@@ -174,7 +165,7 @@ func (s *MissionOrchestrationService) analyzeGroveAction(grove *primary.Grove, c
 	return action
 }
 
-func (s *MissionOrchestrationService) generateGroveConfigPreview(grove *primary.Grove) string {
+func (s *CommissionOrchestrationService) generateGroveConfigPreview(grove *primary.Grove) string {
 	reposJSON := "[]"
 	if len(grove.Repos) > 0 {
 		reposBytes, _ := json.Marshal(grove.Repos)
@@ -186,15 +177,15 @@ func (s *MissionOrchestrationService) generateGroveConfigPreview(grove *primary.
   "type": "grove",
   "grove": {
     "grove_id": "%s",
-    "mission_id": "%s",
+    "commission_id": "%s",
     "name": "%s",
     "repos": %s,
     "created_at": "<timestamp>"
   }
-}`, grove.ID, grove.MissionID, grove.Name, reposJSON)
+}`, grove.ID, grove.CommissionID, grove.Name, reposJSON)
 }
 
-func (s *MissionOrchestrationService) generateClaudeSettingsPreview() string {
+func (s *CommissionOrchestrationService) generateClaudeSettingsPreview() string {
 	return `{
   "permissions": {
     "defaultMode": "default"
@@ -207,7 +198,7 @@ func (s *MissionOrchestrationService) generateClaudeSettingsPreview() string {
 }
 
 // ApplyInfrastructure applies the infrastructure plan.
-func (s *MissionOrchestrationService) ApplyInfrastructure(ctx context.Context, plan *primary.InfrastructurePlan) *primary.InfrastructureApplyResult {
+func (s *CommissionOrchestrationService) ApplyInfrastructure(ctx context.Context, plan *primary.InfrastructurePlan) *primary.InfrastructureApplyResult {
 	result := &primary.InfrastructureApplyResult{}
 
 	// Create workspace directory
@@ -293,7 +284,7 @@ func (s *MissionOrchestrationService) ApplyInfrastructure(ctx context.Context, p
 	return result
 }
 
-func (s *MissionOrchestrationService) writeGroveConfig(path string, grove *primary.Grove) error {
+func (s *CommissionOrchestrationService) writeGroveConfig(path string, grove *primary.Grove) error {
 	// Ensure directory exists
 	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0755); err != nil {
@@ -304,11 +295,11 @@ func (s *MissionOrchestrationService) writeGroveConfig(path string, grove *prima
 		Version: "1.0",
 		Type:    config.TypeGrove,
 		Grove: &config.GroveConfig{
-			GroveID:   grove.ID,
-			MissionID: grove.MissionID,
-			Name:      grove.Name,
-			Repos:     grove.Repos,
-			CreatedAt: grove.CreatedAt,
+			GroveID:      grove.ID,
+			CommissionID: grove.CommissionID,
+			Name:         grove.Name,
+			Repos:        grove.Repos,
+			CreatedAt:    grove.CreatedAt,
 		},
 	}
 
@@ -317,7 +308,7 @@ func (s *MissionOrchestrationService) writeGroveConfig(path string, grove *prima
 	return config.SaveConfig(grovePath, cfg)
 }
 
-func (s *MissionOrchestrationService) writeClaudeSettings(path string) error {
+func (s *CommissionOrchestrationService) writeClaudeSettings(path string) error {
 	// Ensure directory exists
 	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0755); err != nil {
@@ -347,7 +338,7 @@ func (s *MissionOrchestrationService) writeClaudeSettings(path string) error {
 }
 
 // PlanTmuxSession generates a plan for the TMux session.
-func (s *MissionOrchestrationService) PlanTmuxSession(state *primary.MissionState, workspacePath, sessionName string, sessionExists bool, windowChecker primary.TmuxWindowChecker) *primary.TmuxSessionPlan {
+func (s *CommissionOrchestrationService) PlanTmuxSession(state *primary.CommissionState, workspacePath, sessionName string, sessionExists bool, windowChecker primary.TmuxWindowChecker) *primary.TmuxSessionPlan {
 	plan := &primary.TmuxSessionPlan{
 		SessionName:   sessionName,
 		WorkingDir:    workspacePath,

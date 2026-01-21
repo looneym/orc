@@ -28,8 +28,8 @@ func (r *InvestigationRepository) Create(ctx context.Context, investigation *sec
 	}
 
 	_, err := r.db.ExecContext(ctx,
-		"INSERT INTO investigations (id, mission_id, title, description, status) VALUES (?, ?, ?, ?, ?)",
-		investigation.ID, investigation.MissionID, investigation.Title, desc, "active",
+		"INSERT INTO investigations (id, commission_id, title, description, status) VALUES (?, ?, ?, ?, ?)",
+		investigation.ID, investigation.CommissionID, investigation.Title, desc, "active",
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create investigation: %w", err)
@@ -51,9 +51,9 @@ func (r *InvestigationRepository) GetByID(ctx context.Context, id string) (*seco
 
 	record := &secondary.InvestigationRecord{}
 	err := r.db.QueryRowContext(ctx,
-		"SELECT id, mission_id, title, description, status, assigned_grove_id, pinned, created_at, updated_at, completed_at FROM investigations WHERE id = ?",
+		"SELECT id, commission_id, title, description, status, assigned_grove_id, pinned, created_at, updated_at, completed_at FROM investigations WHERE id = ?",
 		id,
-	).Scan(&record.ID, &record.MissionID, &record.Title, &desc, &record.Status, &assignedGroveID, &pinned, &createdAt, &updatedAt, &completedAt)
+	).Scan(&record.ID, &record.CommissionID, &record.Title, &desc, &record.Status, &assignedGroveID, &pinned, &createdAt, &updatedAt, &completedAt)
 
 	if err == sql.ErrNoRows {
 		return nil, fmt.Errorf("investigation %s not found", id)
@@ -76,12 +76,12 @@ func (r *InvestigationRepository) GetByID(ctx context.Context, id string) (*seco
 
 // List retrieves investigations matching the given filters.
 func (r *InvestigationRepository) List(ctx context.Context, filters secondary.InvestigationFilters) ([]*secondary.InvestigationRecord, error) {
-	query := "SELECT id, mission_id, title, description, status, assigned_grove_id, pinned, created_at, updated_at, completed_at FROM investigations WHERE 1=1"
+	query := "SELECT id, commission_id, title, description, status, assigned_grove_id, pinned, created_at, updated_at, completed_at FROM investigations WHERE 1=1"
 	args := []any{}
 
-	if filters.MissionID != "" {
-		query += " AND mission_id = ?"
-		args = append(args, filters.MissionID)
+	if filters.CommissionID != "" {
+		query += " AND commission_id = ?"
+		args = append(args, filters.CommissionID)
 	}
 
 	if filters.Status != "" {
@@ -109,7 +109,7 @@ func (r *InvestigationRepository) List(ctx context.Context, filters secondary.In
 		)
 
 		record := &secondary.InvestigationRecord{}
-		err := rows.Scan(&record.ID, &record.MissionID, &record.Title, &desc, &record.Status, &assignedGroveID, &pinned, &createdAt, &updatedAt, &completedAt)
+		err := rows.Scan(&record.ID, &record.CommissionID, &record.Title, &desc, &record.Status, &assignedGroveID, &pinned, &createdAt, &updatedAt, &completedAt)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan investigation: %w", err)
 		}
@@ -252,7 +252,7 @@ func (r *InvestigationRepository) UpdateStatus(ctx context.Context, id, status s
 
 // GetByGrove retrieves investigations assigned to a grove.
 func (r *InvestigationRepository) GetByGrove(ctx context.Context, groveID string) ([]*secondary.InvestigationRecord, error) {
-	query := "SELECT id, mission_id, title, description, status, assigned_grove_id, pinned, created_at, updated_at, completed_at FROM investigations WHERE assigned_grove_id = ?"
+	query := "SELECT id, commission_id, title, description, status, assigned_grove_id, pinned, created_at, updated_at, completed_at FROM investigations WHERE assigned_grove_id = ?"
 	rows, err := r.db.QueryContext(ctx, query, groveID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get investigations by grove: %w", err)
@@ -271,7 +271,7 @@ func (r *InvestigationRepository) GetByGrove(ctx context.Context, groveID string
 		)
 
 		record := &secondary.InvestigationRecord{}
-		err := rows.Scan(&record.ID, &record.MissionID, &record.Title, &desc, &record.Status, &assignedGroveID, &pinned, &createdAt, &updatedAt, &completedAt)
+		err := rows.Scan(&record.ID, &record.CommissionID, &record.Title, &desc, &record.Status, &assignedGroveID, &pinned, &createdAt, &updatedAt, &completedAt)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan investigation: %w", err)
 		}
@@ -309,10 +309,10 @@ func (r *InvestigationRepository) AssignGrove(ctx context.Context, investigation
 	return nil
 }
 
-// MissionExists checks if a mission exists.
-func (r *InvestigationRepository) MissionExists(ctx context.Context, missionID string) (bool, error) {
+// CommissionExists checks if a mission exists.
+func (r *InvestigationRepository) CommissionExists(ctx context.Context, missionID string) (bool, error) {
 	var count int
-	err := r.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM missions WHERE id = ?", missionID).Scan(&count)
+	err := r.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM commissions WHERE id = ?", missionID).Scan(&count)
 	if err != nil {
 		return false, fmt.Errorf("failed to check mission existence: %w", err)
 	}
@@ -321,7 +321,7 @@ func (r *InvestigationRepository) MissionExists(ctx context.Context, missionID s
 
 // GetQuestionsByInvestigation retrieves questions for an investigation.
 func (r *InvestigationRepository) GetQuestionsByInvestigation(ctx context.Context, investigationID string) ([]*secondary.InvestigationQuestionRecord, error) {
-	query := `SELECT id, investigation_id, mission_id, title, description, status, answer, pinned,
+	query := `SELECT id, investigation_id, commission_id, title, description, status, answer, pinned,
 		created_at, updated_at, answered_at, conclave_id, promoted_from_id, promoted_from_type
 		FROM questions WHERE investigation_id = ? ORDER BY created_at ASC`
 
@@ -347,7 +347,7 @@ func (r *InvestigationRepository) GetQuestionsByInvestigation(ctx context.Contex
 		)
 
 		record := &secondary.InvestigationQuestionRecord{}
-		err := rows.Scan(&record.ID, &investigationIDCol, &record.MissionID, &record.Title, &desc, &record.Status, &answer, &pinned,
+		err := rows.Scan(&record.ID, &investigationIDCol, &record.CommissionID, &record.Title, &desc, &record.Status, &answer, &pinned,
 			&createdAt, &updatedAt, &answeredAt, &conclaveID, &promotedFromID, &promotedFromType)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan question: %w", err)

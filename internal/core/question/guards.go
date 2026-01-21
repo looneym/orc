@@ -20,8 +20,8 @@ func (r GuardResult) Error() error {
 
 // CreateQuestionContext provides context for question creation guards.
 type CreateQuestionContext struct {
-	MissionID           string
-	MissionExists       bool
+	CommissionID        string
+	CommissionExists    bool
 	InvestigationID     string // Optional - empty string means no investigation
 	InvestigationExists bool   // Only checked if InvestigationID != ""
 }
@@ -35,14 +35,14 @@ type AnswerQuestionContext struct {
 
 // CanCreateQuestion evaluates whether a question can be created.
 // Rules:
-// - Mission must exist
+// - Commission must exist
 // - Investigation must exist if provided
 func CanCreateQuestion(ctx CreateQuestionContext) GuardResult {
 	// Check mission exists
-	if !ctx.MissionExists {
+	if !ctx.CommissionExists {
 		return GuardResult{
 			Allowed: false,
-			Reason:  fmt.Sprintf("mission %s not found", ctx.MissionID),
+			Reason:  fmt.Sprintf("commission %s not found", ctx.CommissionID),
 		}
 	}
 

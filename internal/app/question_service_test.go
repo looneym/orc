@@ -60,7 +60,7 @@ func (m *mockQuestionRepository) List(ctx context.Context, filters secondary.Que
 	}
 	var result []*secondary.QuestionRecord
 	for _, q := range m.questions {
-		if filters.MissionID != "" && q.MissionID != filters.MissionID {
+		if filters.CommissionID != "" && q.CommissionID != filters.CommissionID {
 			continue
 		}
 		if filters.InvestigationID != "" && q.InvestigationID != filters.InvestigationID {
@@ -127,7 +127,7 @@ func (m *mockQuestionRepository) Answer(ctx context.Context, id, answer string) 
 	return nil
 }
 
-func (m *mockQuestionRepository) MissionExists(ctx context.Context, missionID string) (bool, error) {
+func (m *mockQuestionRepository) CommissionExists(ctx context.Context, missionID string) (bool, error) {
 	if m.missionExistsErr != nil {
 		return false, m.missionExistsErr
 	}
@@ -160,9 +160,9 @@ func TestCreateQuestion_Success(t *testing.T) {
 	ctx := context.Background()
 
 	resp, err := service.CreateQuestion(ctx, primary.CreateQuestionRequest{
-		MissionID:   "MISSION-001",
-		Title:       "Test Question",
-		Description: "A test question",
+		CommissionID: "MISSION-001",
+		Title:        "Test Question",
+		Description:  "A test question",
 	})
 
 	if err != nil {
@@ -184,7 +184,7 @@ func TestCreateQuestion_WithInvestigation(t *testing.T) {
 	ctx := context.Background()
 
 	resp, err := service.CreateQuestion(ctx, primary.CreateQuestionRequest{
-		MissionID:       "MISSION-001",
+		CommissionID:    "MISSION-001",
 		InvestigationID: "INV-001",
 		Title:           "Investigation Question",
 		Description:     "A question for an investigation",
@@ -205,9 +205,9 @@ func TestCreateQuestion_MissionNotFound(t *testing.T) {
 	questionRepo.missionExistsResult = false
 
 	_, err := service.CreateQuestion(ctx, primary.CreateQuestionRequest{
-		MissionID:   "MISSION-NONEXISTENT",
-		Title:       "Test Question",
-		Description: "A test question",
+		CommissionID: "MISSION-NONEXISTENT",
+		Title:        "Test Question",
+		Description:  "A test question",
 	})
 
 	if err == nil {
@@ -222,7 +222,7 @@ func TestCreateQuestion_InvestigationNotFound(t *testing.T) {
 	questionRepo.investigationExistsResult = false
 
 	_, err := service.CreateQuestion(ctx, primary.CreateQuestionRequest{
-		MissionID:       "MISSION-001",
+		CommissionID:    "MISSION-001",
 		InvestigationID: "INV-NONEXISTENT",
 		Title:           "Test Question",
 		Description:     "A test question",
@@ -242,10 +242,10 @@ func TestGetQuestion_Found(t *testing.T) {
 	ctx := context.Background()
 
 	questionRepo.questions["QUESTION-001"] = &secondary.QuestionRecord{
-		ID:        "QUESTION-001",
-		MissionID: "MISSION-001",
-		Title:     "Test Question",
-		Status:    "open",
+		ID:           "QUESTION-001",
+		CommissionID: "MISSION-001",
+		Title:        "Test Question",
+		Status:       "open",
 	}
 
 	question, err := service.GetQuestion(ctx, "QUESTION-001")
@@ -278,19 +278,19 @@ func TestListQuestions_FilterByMission(t *testing.T) {
 	ctx := context.Background()
 
 	questionRepo.questions["QUESTION-001"] = &secondary.QuestionRecord{
-		ID:        "QUESTION-001",
-		MissionID: "MISSION-001",
-		Title:     "Question 1",
-		Status:    "open",
+		ID:           "QUESTION-001",
+		CommissionID: "MISSION-001",
+		Title:        "Question 1",
+		Status:       "open",
 	}
 	questionRepo.questions["QUESTION-002"] = &secondary.QuestionRecord{
-		ID:        "QUESTION-002",
-		MissionID: "MISSION-002",
-		Title:     "Question 2",
-		Status:    "open",
+		ID:           "QUESTION-002",
+		CommissionID: "MISSION-002",
+		Title:        "Question 2",
+		Status:       "open",
 	}
 
-	questions, err := service.ListQuestions(ctx, primary.QuestionFilters{MissionID: "MISSION-001"})
+	questions, err := service.ListQuestions(ctx, primary.QuestionFilters{CommissionID: "MISSION-001"})
 
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
@@ -306,16 +306,16 @@ func TestListQuestions_FilterByInvestigation(t *testing.T) {
 
 	questionRepo.questions["QUESTION-001"] = &secondary.QuestionRecord{
 		ID:              "QUESTION-001",
-		MissionID:       "MISSION-001",
+		CommissionID:    "MISSION-001",
 		InvestigationID: "INV-001",
 		Title:           "Investigation Question",
 		Status:          "open",
 	}
 	questionRepo.questions["QUESTION-002"] = &secondary.QuestionRecord{
-		ID:        "QUESTION-002",
-		MissionID: "MISSION-001",
-		Title:     "Standalone Question",
-		Status:    "open",
+		ID:           "QUESTION-002",
+		CommissionID: "MISSION-001",
+		Title:        "Standalone Question",
+		Status:       "open",
 	}
 
 	questions, err := service.ListQuestions(ctx, primary.QuestionFilters{InvestigationID: "INV-001"})
@@ -333,16 +333,16 @@ func TestListQuestions_FilterByStatus(t *testing.T) {
 	ctx := context.Background()
 
 	questionRepo.questions["QUESTION-001"] = &secondary.QuestionRecord{
-		ID:        "QUESTION-001",
-		MissionID: "MISSION-001",
-		Title:     "Open Question",
-		Status:    "open",
+		ID:           "QUESTION-001",
+		CommissionID: "MISSION-001",
+		Title:        "Open Question",
+		Status:       "open",
 	}
 	questionRepo.questions["QUESTION-002"] = &secondary.QuestionRecord{
-		ID:        "QUESTION-002",
-		MissionID: "MISSION-001",
-		Title:     "Answered Question",
-		Status:    "answered",
+		ID:           "QUESTION-002",
+		CommissionID: "MISSION-001",
+		Title:        "Answered Question",
+		Status:       "answered",
 	}
 
 	questions, err := service.ListQuestions(ctx, primary.QuestionFilters{Status: "open"})
@@ -364,10 +364,10 @@ func TestAnswerQuestion_Success(t *testing.T) {
 	ctx := context.Background()
 
 	questionRepo.questions["QUESTION-001"] = &secondary.QuestionRecord{
-		ID:        "QUESTION-001",
-		MissionID: "MISSION-001",
-		Title:     "Test Question",
-		Status:    "open",
+		ID:           "QUESTION-001",
+		CommissionID: "MISSION-001",
+		Title:        "Test Question",
+		Status:       "open",
 	}
 
 	err := service.AnswerQuestion(ctx, "QUESTION-001", "This is the answer")
@@ -392,11 +392,11 @@ func TestPinQuestion(t *testing.T) {
 	ctx := context.Background()
 
 	questionRepo.questions["QUESTION-001"] = &secondary.QuestionRecord{
-		ID:        "QUESTION-001",
-		MissionID: "MISSION-001",
-		Title:     "Test Question",
-		Status:    "open",
-		Pinned:    false,
+		ID:           "QUESTION-001",
+		CommissionID: "MISSION-001",
+		Title:        "Test Question",
+		Status:       "open",
+		Pinned:       false,
 	}
 
 	err := service.PinQuestion(ctx, "QUESTION-001")
@@ -414,11 +414,11 @@ func TestUnpinQuestion(t *testing.T) {
 	ctx := context.Background()
 
 	questionRepo.questions["QUESTION-001"] = &secondary.QuestionRecord{
-		ID:        "QUESTION-001",
-		MissionID: "MISSION-001",
-		Title:     "Pinned Question",
-		Status:    "open",
-		Pinned:    true,
+		ID:           "QUESTION-001",
+		CommissionID: "MISSION-001",
+		Title:        "Pinned Question",
+		Status:       "open",
+		Pinned:       true,
 	}
 
 	err := service.UnpinQuestion(ctx, "QUESTION-001")
@@ -440,11 +440,11 @@ func TestUpdateQuestion_Title(t *testing.T) {
 	ctx := context.Background()
 
 	questionRepo.questions["QUESTION-001"] = &secondary.QuestionRecord{
-		ID:          "QUESTION-001",
-		MissionID:   "MISSION-001",
-		Title:       "Old Title",
-		Description: "Original description",
-		Status:      "open",
+		ID:           "QUESTION-001",
+		CommissionID: "MISSION-001",
+		Title:        "Old Title",
+		Description:  "Original description",
+		Status:       "open",
 	}
 
 	err := service.UpdateQuestion(ctx, primary.UpdateQuestionRequest{
@@ -469,10 +469,10 @@ func TestDeleteQuestion_Success(t *testing.T) {
 	ctx := context.Background()
 
 	questionRepo.questions["QUESTION-001"] = &secondary.QuestionRecord{
-		ID:        "QUESTION-001",
-		MissionID: "MISSION-001",
-		Title:     "Test Question",
-		Status:    "open",
+		ID:           "QUESTION-001",
+		CommissionID: "MISSION-001",
+		Title:        "Test Question",
+		Status:       "open",
 	}
 
 	err := service.DeleteQuestion(ctx, "QUESTION-001")

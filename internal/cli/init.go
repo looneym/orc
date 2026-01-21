@@ -66,10 +66,10 @@ func initConfig() error {
 		Version: "1.0",
 		Type:    config.TypeGlobal,
 		State: &config.StateConfig{
-			ActiveMissionID:  "",
-			CurrentHandoffID: "",
-			CurrentFocus:     "",
-			LastUpdated:      time.Now().Format(time.RFC3339),
+			ActiveCommissionID: "",
+			CurrentHandoffID:   "",
+			CurrentFocus:       "",
+			LastUpdated:        time.Now().Format(time.RFC3339),
 		},
 	}
 

@@ -20,8 +20,8 @@ func (r GuardResult) Error() error {
 
 // CreateShipmentContext provides context for shipment creation guards.
 type CreateShipmentContext struct {
-	MissionID     string
-	MissionExists bool
+	CommissionID     string
+	CommissionExists bool
 }
 
 // CompleteShipmentContext provides context for shipment completion guards.
@@ -46,12 +46,12 @@ type AssignGroveContext struct {
 
 // CanCreateShipment evaluates whether a shipment can be created.
 // Rules:
-// - Mission must exist
+// - Commission must exist
 func CanCreateShipment(ctx CreateShipmentContext) GuardResult {
-	if !ctx.MissionExists {
+	if !ctx.CommissionExists {
 		return GuardResult{
 			Allowed: false,
-			Reason:  fmt.Sprintf("mission %s not found", ctx.MissionID),
+			Reason:  fmt.Sprintf("commission %s not found", ctx.CommissionID),
 		}
 	}
 

@@ -13,24 +13,24 @@ import (
 
 // GroveServiceImpl implements the GroveService interface.
 type GroveServiceImpl struct {
-	groveRepo     secondary.GroveRepository
-	missionRepo   secondary.MissionRepository
-	agentProvider secondary.AgentIdentityProvider
-	executor      EffectExecutor
+	groveRepo      secondary.GroveRepository
+	commissionRepo secondary.CommissionRepository
+	agentProvider  secondary.AgentIdentityProvider
+	executor       EffectExecutor
 }
 
 // NewGroveService creates a new GroveService with injected dependencies.
 func NewGroveService(
 	groveRepo secondary.GroveRepository,
-	missionRepo secondary.MissionRepository,
+	commissionRepo secondary.CommissionRepository,
 	agentProvider secondary.AgentIdentityProvider,
 	executor EffectExecutor,
 ) *GroveServiceImpl {
 	return &GroveServiceImpl{
-		groveRepo:     groveRepo,
-		missionRepo:   missionRepo,
-		agentProvider: agentProvider,
-		executor:      executor,
+		groveRepo:      groveRepo,
+		commissionRepo: commissionRepo,
+		agentProvider:  agentProvider,
+		executor:       executor,
 	}
 }
 
@@ -43,17 +43,17 @@ func (s *GroveServiceImpl) CreateGrove(ctx context.Context, req primary.CreateGr
 	}
 
 	// 2. Check if mission exists
-	_, err = s.missionRepo.GetByID(ctx, req.MissionID)
-	missionExists := err == nil
+	_, err = s.commissionRepo.GetByID(ctx, req.CommissionID)
+	commissionExists := err == nil
 
 	// 3. Guard check
 	guardCtx := coregrove.CreateGroveContext{
 		GuardContext: coregrove.GuardContext{
-			AgentType: coregrove.AgentType(identity.Type),
-			AgentID:   identity.FullID,
-			MissionID: req.MissionID,
+			AgentType:    coregrove.AgentType(identity.Type),
+			AgentID:      identity.FullID,
+			CommissionID: req.CommissionID,
 		},
-		MissionExists: missionExists,
+		CommissionExists: commissionExists,
 	}
 	if result := coregrove.CanCreateGrove(guardCtx); !result.Allowed {
 		return nil, result.Error()
@@ -61,9 +61,9 @@ func (s *GroveServiceImpl) CreateGrove(ctx context.Context, req primary.CreateGr
 
 	// 4. Create grove record in DB first to get ID
 	record := &secondary.GroveRecord{
-		Name:      req.Name,
-		MissionID: req.MissionID,
-		Status:    "active",
+		Name:         req.Name,
+		CommissionID: req.CommissionID,
+		Status:       "active",
 	}
 	if err := s.groveRepo.Create(ctx, record); err != nil {
 		return nil, fmt.Errorf("failed to create grove: %w", err)
@@ -76,11 +76,11 @@ func (s *GroveServiceImpl) CreateGrove(ctx context.Context, req primary.CreateGr
 	}
 
 	planInput := coregrove.CreateGrovePlanInput{
-		GroveID:   record.ID,
-		GroveName: req.Name,
-		MissionID: req.MissionID,
-		BasePath:  basePath,
-		Repos:     req.Repos,
+		GroveID:      record.ID,
+		GroveName:    req.Name,
+		CommissionID: req.CommissionID,
+		BasePath:     basePath,
+		Repos:        req.Repos,
 	}
 	plan := coregrove.GenerateCreateGrovePlan(planInput)
 
@@ -184,7 +184,7 @@ func (s *GroveServiceImpl) UpdateGrovePath(ctx context.Context, groveID, newPath
 // ListGroves lists groves with optional filters.
 func (s *GroveServiceImpl) ListGroves(ctx context.Context, filters primary.GroveFilters) ([]*primary.Grove, error) {
 	// Use List which handles empty missionID (lists all groves)
-	records, err := s.groveRepo.List(ctx, filters.MissionID)
+	records, err := s.groveRepo.List(ctx, filters.CommissionID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list groves: %w", err)
 	}
@@ -247,12 +247,12 @@ func (s *GroveServiceImpl) DeleteGrove(ctx context.Context, req primary.DeleteGr
 
 func (s *GroveServiceImpl) recordToGrove(r *secondary.GroveRecord) *primary.Grove {
 	return &primary.Grove{
-		ID:        r.ID,
-		Name:      r.Name,
-		MissionID: r.MissionID,
-		Path:      r.WorktreePath,
-		Status:    r.Status,
-		CreatedAt: r.CreatedAt,
+		ID:           r.ID,
+		Name:         r.Name,
+		CommissionID: r.CommissionID,
+		Path:         r.WorktreePath,
+		Status:       r.Status,
+		CreatedAt:    r.CreatedAt,
 	}
 }
 

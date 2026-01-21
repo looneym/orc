@@ -50,7 +50,7 @@ Examples:
 				}
 
 				// Update identity with mission ID for session check
-				identity.MissionID = grove.MissionID
+				identity.CommissionID = grove.CommissionID
 			} else {
 				// ORC
 				target, err = agent.ResolveTMuxTarget(agentID, "")
@@ -62,7 +62,7 @@ Examples:
 			// Check if session exists
 			ctx := context.Background()
 			tmuxAdapter := wire.TMuxAdapter()
-			sessionName := fmt.Sprintf("orc-%s", identity.MissionID)
+			sessionName := fmt.Sprintf("orc-%s", identity.CommissionID)
 			if !tmuxAdapter.SessionExists(ctx, sessionName) {
 				return fmt.Errorf("tmux session %s not running - agent may not be active", sessionName)
 			}

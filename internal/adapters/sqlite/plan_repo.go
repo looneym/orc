@@ -38,8 +38,8 @@ func (r *PlanRepository) Create(ctx context.Context, plan *secondary.PlanRecord)
 	}
 
 	_, err := r.db.ExecContext(ctx,
-		"INSERT INTO plans (id, shipment_id, mission_id, title, description, content, status) VALUES (?, ?, ?, ?, ?, ?, ?)",
-		plan.ID, shipmentID, plan.MissionID, plan.Title, desc, content, "draft",
+		"INSERT INTO plans (id, shipment_id, commission_id, title, description, content, status) VALUES (?, ?, ?, ?, ?, ?, ?)",
+		plan.ID, shipmentID, plan.CommissionID, plan.Title, desc, content, "draft",
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create plan: %w", err)
@@ -65,11 +65,11 @@ func (r *PlanRepository) GetByID(ctx context.Context, id string) (*secondary.Pla
 
 	record := &secondary.PlanRecord{}
 	err := r.db.QueryRowContext(ctx,
-		`SELECT id, shipment_id, mission_id, title, description, status, content, pinned,
+		`SELECT id, shipment_id, commission_id, title, description, status, content, pinned,
 			created_at, updated_at, approved_at, conclave_id, promoted_from_id, promoted_from_type
 		FROM plans WHERE id = ?`,
 		id,
-	).Scan(&record.ID, &shipmentID, &record.MissionID, &record.Title, &desc, &record.Status, &content, &pinned,
+	).Scan(&record.ID, &shipmentID, &record.CommissionID, &record.Title, &desc, &record.Status, &content, &pinned,
 		&createdAt, &updatedAt, &approvedAt, &conclaveID, &promotedFromID, &promotedFromType)
 
 	if err == sql.ErrNoRows {
@@ -97,7 +97,7 @@ func (r *PlanRepository) GetByID(ctx context.Context, id string) (*secondary.Pla
 
 // List retrieves plans matching the given filters.
 func (r *PlanRepository) List(ctx context.Context, filters secondary.PlanFilters) ([]*secondary.PlanRecord, error) {
-	query := `SELECT id, shipment_id, mission_id, title, description, status, content, pinned,
+	query := `SELECT id, shipment_id, commission_id, title, description, status, content, pinned,
 		created_at, updated_at, approved_at, conclave_id, promoted_from_id, promoted_from_type
 		FROM plans WHERE 1=1`
 	args := []any{}
@@ -107,9 +107,9 @@ func (r *PlanRepository) List(ctx context.Context, filters secondary.PlanFilters
 		args = append(args, filters.ShipmentID)
 	}
 
-	if filters.MissionID != "" {
-		query += " AND mission_id = ?"
-		args = append(args, filters.MissionID)
+	if filters.CommissionID != "" {
+		query += " AND commission_id = ?"
+		args = append(args, filters.CommissionID)
 	}
 
 	if filters.Status != "" {
@@ -141,7 +141,7 @@ func (r *PlanRepository) List(ctx context.Context, filters secondary.PlanFilters
 		)
 
 		record := &secondary.PlanRecord{}
-		err := rows.Scan(&record.ID, &shipmentID, &record.MissionID, &record.Title, &desc, &record.Status, &content, &pinned,
+		err := rows.Scan(&record.ID, &shipmentID, &record.CommissionID, &record.Title, &desc, &record.Status, &content, &pinned,
 			&createdAt, &updatedAt, &approvedAt, &conclaveID, &promotedFromID, &promotedFromType)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan plan: %w", err)
@@ -301,11 +301,11 @@ func (r *PlanRepository) GetActivePlanForShipment(ctx context.Context, shipmentI
 
 	record := &secondary.PlanRecord{}
 	err := r.db.QueryRowContext(ctx,
-		`SELECT id, shipment_id, mission_id, title, description, status, content, pinned,
+		`SELECT id, shipment_id, commission_id, title, description, status, content, pinned,
 			created_at, updated_at, approved_at, conclave_id, promoted_from_id, promoted_from_type
 		FROM plans WHERE shipment_id = ? AND status = 'draft' LIMIT 1`,
 		shipmentID,
-	).Scan(&record.ID, &shipmentIDCol, &record.MissionID, &record.Title, &desc, &record.Status, &content, &pinned,
+	).Scan(&record.ID, &shipmentIDCol, &record.CommissionID, &record.Title, &desc, &record.Status, &content, &pinned,
 		&createdAt, &updatedAt, &approvedAt, &conclaveID, &promotedFromID, &promotedFromType)
 
 	if err == sql.ErrNoRows {
@@ -344,10 +344,10 @@ func (r *PlanRepository) HasActivePlanForShipment(ctx context.Context, shipmentI
 	return count > 0, nil
 }
 
-// MissionExists checks if a mission exists.
-func (r *PlanRepository) MissionExists(ctx context.Context, missionID string) (bool, error) {
+// CommissionExists checks if a mission exists.
+func (r *PlanRepository) CommissionExists(ctx context.Context, missionID string) (bool, error) {
 	var count int
-	err := r.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM missions WHERE id = ?", missionID).Scan(&count)
+	err := r.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM commissions WHERE id = ?", missionID).Scan(&count)
 	if err != nil {
 		return false, fmt.Errorf("failed to check mission existence: %w", err)
 	}

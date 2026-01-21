@@ -31,7 +31,7 @@ type QuestionService interface {
 
 // CreateQuestionRequest contains parameters for creating a question.
 type CreateQuestionRequest struct {
-	MissionID       string
+	CommissionID    string
 	InvestigationID string // Optional
 	Title           string
 	Description     string
@@ -54,7 +54,7 @@ type UpdateQuestionRequest struct {
 type Question struct {
 	ID               string
 	InvestigationID  string
-	MissionID        string
+	CommissionID     string
 	Title            string
 	Description      string
 	Status           string
@@ -71,6 +71,6 @@ type Question struct {
 // QuestionFilters contains filter options for listing questions.
 type QuestionFilters struct {
 	InvestigationID string
-	MissionID       string
+	CommissionID    string
 	Status          string
 }

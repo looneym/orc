@@ -21,7 +21,7 @@ func setupGroveTestDB(t *testing.T) *sql.DB {
 
 	// Create missions table (required for foreign key)
 	_, err = db.Exec(`
-		CREATE TABLE missions (
+		CREATE TABLE commissions (
 			id TEXT PRIMARY KEY,
 			title TEXT NOT NULL,
 			description TEXT,
@@ -40,7 +40,7 @@ func setupGroveTestDB(t *testing.T) *sql.DB {
 	_, err = db.Exec(`
 		CREATE TABLE groves (
 			id TEXT PRIMARY KEY,
-			mission_id TEXT NOT NULL,
+			commission_id TEXT NOT NULL,
 			name TEXT NOT NULL,
 			path TEXT,
 			repos TEXT,
@@ -54,7 +54,7 @@ func setupGroveTestDB(t *testing.T) *sql.DB {
 	}
 
 	// Insert a test mission
-	_, err = db.Exec("INSERT INTO missions (id, title) VALUES ('MISSION-001', 'Test Mission')")
+	_, err = db.Exec("INSERT INTO commissions (id, title) VALUES ('MISSION-001', 'Test Mission')")
 	if err != nil {
 		t.Fatalf("failed to insert test mission: %v", err)
 	}
@@ -72,7 +72,7 @@ func TestGroveRepository_Create(t *testing.T) {
 	ctx := context.Background()
 
 	grove := &secondary.GroveRecord{
-		MissionID:    "MISSION-001",
+		CommissionID: "MISSION-001",
 		Name:         "test-grove",
 		WorktreePath: "/path/to/worktree",
 	}
@@ -97,7 +97,7 @@ func TestGroveRepository_Create_MissionNotFound(t *testing.T) {
 	ctx := context.Background()
 
 	grove := &secondary.GroveRecord{
-		MissionID:    "MISSION-999",
+		CommissionID: "MISSION-999",
 		Name:         "test-grove",
 		WorktreePath: "/path/to/worktree",
 	}
@@ -115,7 +115,7 @@ func TestGroveRepository_GetByID(t *testing.T) {
 
 	// Create a grove first
 	grove := &secondary.GroveRecord{
-		MissionID:    "MISSION-001",
+		CommissionID: "MISSION-001",
 		Name:         "test-grove",
 		WorktreePath: "/path/to/worktree",
 	}
@@ -158,7 +158,7 @@ func TestGroveRepository_GetByPath(t *testing.T) {
 
 	// Create a grove
 	grove := &secondary.GroveRecord{
-		MissionID:    "MISSION-001",
+		CommissionID: "MISSION-001",
 		Name:         "test-grove",
 		WorktreePath: "/unique/path/here",
 	}
@@ -175,18 +175,18 @@ func TestGroveRepository_GetByPath(t *testing.T) {
 	}
 }
 
-func TestGroveRepository_GetByMission(t *testing.T) {
+func TestGroveRepository_GetByCommission(t *testing.T) {
 	db := setupGroveTestDB(t)
 	repo := sqlite.NewGroveRepository(db)
 	ctx := context.Background()
 
 	// Create multiple groves
-	_ = repo.Create(ctx, &secondary.GroveRecord{MissionID: "MISSION-001", Name: "grove-1"})
-	_ = repo.Create(ctx, &secondary.GroveRecord{MissionID: "MISSION-001", Name: "grove-2"})
+	_ = repo.Create(ctx, &secondary.GroveRecord{CommissionID: "MISSION-001", Name: "grove-1"})
+	_ = repo.Create(ctx, &secondary.GroveRecord{CommissionID: "MISSION-001", Name: "grove-2"})
 
-	groves, err := repo.GetByMission(ctx, "MISSION-001")
+	groves, err := repo.GetByCommission(ctx, "MISSION-001")
 	if err != nil {
-		t.Fatalf("GetByMission failed: %v", err)
+		t.Fatalf("GetByCommission failed: %v", err)
 	}
 
 	if len(groves) != 2 {
@@ -200,9 +200,9 @@ func TestGroveRepository_List(t *testing.T) {
 	ctx := context.Background()
 
 	// Create groves
-	_ = repo.Create(ctx, &secondary.GroveRecord{MissionID: "MISSION-001", Name: "grove-1"})
-	_ = repo.Create(ctx, &secondary.GroveRecord{MissionID: "MISSION-001", Name: "grove-2"})
-	_ = repo.Create(ctx, &secondary.GroveRecord{MissionID: "MISSION-001", Name: "grove-3"})
+	_ = repo.Create(ctx, &secondary.GroveRecord{CommissionID: "MISSION-001", Name: "grove-1"})
+	_ = repo.Create(ctx, &secondary.GroveRecord{CommissionID: "MISSION-001", Name: "grove-2"})
+	_ = repo.Create(ctx, &secondary.GroveRecord{CommissionID: "MISSION-001", Name: "grove-3"})
 
 	// List all
 	groves, err := repo.List(ctx, "")
@@ -232,7 +232,7 @@ func TestGroveRepository_Update(t *testing.T) {
 
 	// Create a grove
 	grove := &secondary.GroveRecord{
-		MissionID:    "MISSION-001",
+		CommissionID: "MISSION-001",
 		Name:         "original-name",
 		WorktreePath: "/original/path",
 	}
@@ -264,7 +264,7 @@ func TestGroveRepository_Delete(t *testing.T) {
 	ctx := context.Background()
 
 	// Create a grove
-	grove := &secondary.GroveRecord{MissionID: "MISSION-001", Name: "to-delete"}
+	grove := &secondary.GroveRecord{CommissionID: "MISSION-001", Name: "to-delete"}
 	_ = repo.Create(ctx, grove)
 
 	// Delete it
@@ -286,7 +286,7 @@ func TestGroveRepository_Rename(t *testing.T) {
 	ctx := context.Background()
 
 	// Create a grove
-	grove := &secondary.GroveRecord{MissionID: "MISSION-001", Name: "original"}
+	grove := &secondary.GroveRecord{CommissionID: "MISSION-001", Name: "original"}
 	_ = repo.Create(ctx, grove)
 
 	// Rename it
@@ -309,7 +309,7 @@ func TestGroveRepository_UpdatePath(t *testing.T) {
 
 	// Create a grove
 	grove := &secondary.GroveRecord{
-		MissionID:    "MISSION-001",
+		CommissionID: "MISSION-001",
 		Name:         "test",
 		WorktreePath: "/old/path",
 	}
@@ -343,7 +343,7 @@ func TestGroveRepository_GetNextID(t *testing.T) {
 	}
 
 	// Create a grove
-	_ = repo.Create(ctx, &secondary.GroveRecord{MissionID: "MISSION-001", Name: "test"})
+	_ = repo.Create(ctx, &secondary.GroveRecord{CommissionID: "MISSION-001", Name: "test"})
 
 	// Next ID should be GROVE-002
 	id, err = repo.GetNextID(ctx)

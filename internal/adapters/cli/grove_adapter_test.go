@@ -47,12 +47,12 @@ func (m *mockGroveService) GetGrove(ctx context.Context, groveID string) (*prima
 		return m.getGroveFn(ctx, groveID)
 	}
 	return &primary.Grove{
-		ID:        groveID,
-		Name:      "test-grove",
-		MissionID: "MISSION-001",
-		Path:      "/tmp/groves/test-grove",
-		Status:    "active",
-		CreatedAt: "2026-01-19",
+		ID:           groveID,
+		Name:         "test-grove",
+		CommissionID: "MISSION-001",
+		Path:         "/tmp/groves/test-grove",
+		Status:       "active",
+		CreatedAt:    "2026-01-19",
 	}, nil
 }
 
@@ -95,8 +95,8 @@ func TestGroveAdapter_List_WithResults(t *testing.T) {
 	mock := &mockGroveService{
 		listGrovesFn: func(ctx context.Context, filters primary.GroveFilters) ([]*primary.Grove, error) {
 			return []*primary.Grove{
-				{ID: "GROVE-001", Name: "backend", MissionID: "MISSION-001", Status: "active", Path: "/tmp/backend"},
-				{ID: "GROVE-002", Name: "frontend", MissionID: "MISSION-001", Status: "active", Path: "/tmp/frontend"},
+				{ID: "GROVE-001", Name: "backend", CommissionID: "MISSION-001", Status: "active", Path: "/tmp/backend"},
+				{ID: "GROVE-002", Name: "frontend", CommissionID: "MISSION-001", Status: "active", Path: "/tmp/frontend"},
 			}, nil
 		},
 	}
@@ -143,10 +143,10 @@ func TestGroveAdapter_List_Empty(t *testing.T) {
 }
 
 func TestGroveAdapter_List_FilterByMission(t *testing.T) {
-	var capturedMissionID string
+	var capturedCommissionID string
 	mock := &mockGroveService{
 		listGrovesFn: func(ctx context.Context, filters primary.GroveFilters) ([]*primary.Grove, error) {
-			capturedMissionID = filters.MissionID
+			capturedCommissionID = filters.CommissionID
 			return []*primary.Grove{}, nil
 		},
 	}
@@ -155,8 +155,8 @@ func TestGroveAdapter_List_FilterByMission(t *testing.T) {
 
 	_, _ = adapter.List(context.Background(), "MISSION-002")
 
-	if capturedMissionID != "MISSION-002" {
-		t.Errorf("expected mission filter 'MISSION-002', got '%s'", capturedMissionID)
+	if capturedCommissionID != "MISSION-002" {
+		t.Errorf("expected mission filter 'MISSION-002', got '%s'", capturedCommissionID)
 	}
 }
 
@@ -168,12 +168,12 @@ func TestGroveAdapter_Show_Success(t *testing.T) {
 	mock := &mockGroveService{
 		getGroveFn: func(ctx context.Context, groveID string) (*primary.Grove, error) {
 			return &primary.Grove{
-				ID:        groveID,
-				Name:      "auth-backend",
-				MissionID: "MISSION-001",
-				Path:      "/home/user/src/worktrees/auth-backend",
-				Status:    "active",
-				CreatedAt: "2026-01-19",
+				ID:           groveID,
+				Name:         "auth-backend",
+				CommissionID: "MISSION-001",
+				Path:         "/home/user/src/worktrees/auth-backend",
+				Status:       "active",
+				CreatedAt:    "2026-01-19",
 			}, nil
 		},
 	}

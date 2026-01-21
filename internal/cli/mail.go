@@ -70,38 +70,38 @@ Examples:
 
 			// Determine mission ID for message
 			// Messages must be scoped to a mission for database storage
-			missionID := identity.MissionID
+			missionID := identity.CommissionID
 
 			if identity.Type == agent.AgentTypeORC {
 				// ORC sending: use recipient's mission ID (must be IMP)
 				if recipientIdentity.Type == agent.AgentTypeIMP {
 					// Need to look up grove to get mission ID
-					if recipientIdentity.MissionID == "" {
+					if recipientIdentity.CommissionID == "" {
 						// Try to extract from grove
 						grove, err := wire.GroveService().GetGrove(ctx, recipientIdentity.ID)
 						if err != nil {
 							return fmt.Errorf("failed to resolve IMP mission: %w", err)
 						}
-						missionID = grove.MissionID
+						missionID = grove.CommissionID
 					} else {
-						missionID = recipientIdentity.MissionID
+						missionID = recipientIdentity.CommissionID
 					}
 				} else {
 					return fmt.Errorf("ORC can only send to IMP agents")
 				}
 			} else if recipientIdentity.Type == agent.AgentTypeORC {
 				// Sending TO ORC: use sender's mission ID (IMPs reporting to ORC)
-				missionID = identity.MissionID
+				missionID = identity.CommissionID
 			}
 			// Otherwise: IMP to IMP, use sender's mission ID (already set)
 
 			// Create message
 			resp, err := wire.MessageService().CreateMessage(ctx, primary.CreateMessageRequest{
-				Sender:    identity.FullID,
-				Recipient: recipientIdentity.FullID,
-				Subject:   subject,
-				Body:      body,
-				MissionID: missionID,
+				Sender:       identity.FullID,
+				Recipient:    recipientIdentity.FullID,
+				Subject:      subject,
+				Body:         body,
+				CommissionID: missionID,
 			})
 			if err != nil {
 				return fmt.Errorf("failed to create message: %w", err)

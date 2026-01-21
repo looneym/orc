@@ -23,8 +23,8 @@ func NewMessageRepository(db *sql.DB) *MessageRepository {
 // Create persists a new message.
 func (r *MessageRepository) Create(ctx context.Context, message *secondary.MessageRecord) error {
 	_, err := r.db.ExecContext(ctx,
-		"INSERT INTO messages (id, sender, recipient, subject, body, mission_id, read) VALUES (?, ?, ?, ?, ?, ?, ?)",
-		message.ID, message.Sender, message.Recipient, message.Subject, message.Body, message.MissionID, 0,
+		"INSERT INTO messages (id, sender, recipient, subject, body, commission_id, read) VALUES (?, ?, ?, ?, ?, ?, ?)",
+		message.ID, message.Sender, message.Recipient, message.Subject, message.Body, message.CommissionID, 0,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create message: %w", err)
@@ -42,9 +42,9 @@ func (r *MessageRepository) GetByID(ctx context.Context, id string) (*secondary.
 
 	record := &secondary.MessageRecord{}
 	err := r.db.QueryRowContext(ctx,
-		"SELECT id, sender, recipient, subject, body, timestamp, read, mission_id FROM messages WHERE id = ?",
+		"SELECT id, sender, recipient, subject, body, timestamp, read, commission_id FROM messages WHERE id = ?",
 		id,
-	).Scan(&record.ID, &record.Sender, &record.Recipient, &record.Subject, &record.Body, &timestamp, &readInt, &record.MissionID)
+	).Scan(&record.ID, &record.Sender, &record.Recipient, &record.Subject, &record.Body, &timestamp, &readInt, &record.CommissionID)
 
 	if err == sql.ErrNoRows {
 		return nil, fmt.Errorf("message %s not found", id)
@@ -61,7 +61,7 @@ func (r *MessageRepository) GetByID(ctx context.Context, id string) (*secondary.
 
 // List retrieves messages for a recipient, optionally filtering to unread only.
 func (r *MessageRepository) List(ctx context.Context, filters secondary.MessageFilters) ([]*secondary.MessageRecord, error) {
-	query := "SELECT id, sender, recipient, subject, body, timestamp, read, mission_id FROM messages WHERE recipient = ?"
+	query := "SELECT id, sender, recipient, subject, body, timestamp, read, commission_id FROM messages WHERE recipient = ?"
 	args := []any{filters.Recipient}
 
 	if filters.UnreadOnly {
@@ -84,7 +84,7 @@ func (r *MessageRepository) List(ctx context.Context, filters secondary.MessageF
 		)
 
 		record := &secondary.MessageRecord{}
-		err := rows.Scan(&record.ID, &record.Sender, &record.Recipient, &record.Subject, &record.Body, &timestamp, &readInt, &record.MissionID)
+		err := rows.Scan(&record.ID, &record.Sender, &record.Recipient, &record.Subject, &record.Body, &timestamp, &readInt, &record.CommissionID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan message: %w", err)
 		}
@@ -116,7 +116,7 @@ func (r *MessageRepository) MarkRead(ctx context.Context, id string) error {
 // GetConversation retrieves all messages between two agents.
 func (r *MessageRepository) GetConversation(ctx context.Context, agent1, agent2 string) ([]*secondary.MessageRecord, error) {
 	query := `
-		SELECT id, sender, recipient, subject, body, timestamp, read, mission_id
+		SELECT id, sender, recipient, subject, body, timestamp, read, commission_id
 		FROM messages
 		WHERE (sender = ? AND recipient = ?) OR (sender = ? AND recipient = ?)
 		ORDER BY timestamp ASC
@@ -136,7 +136,7 @@ func (r *MessageRepository) GetConversation(ctx context.Context, agent1, agent2 
 		)
 
 		record := &secondary.MessageRecord{}
-		err := rows.Scan(&record.ID, &record.Sender, &record.Recipient, &record.Subject, &record.Body, &timestamp, &readInt, &record.MissionID)
+		err := rows.Scan(&record.ID, &record.Sender, &record.Recipient, &record.Subject, &record.Body, &timestamp, &readInt, &record.CommissionID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan message: %w", err)
 		}
@@ -169,7 +169,7 @@ func (r *MessageRepository) GetNextID(ctx context.Context, missionID string) (st
 	prefix := fmt.Sprintf("MSG-%s-", missionID)
 	var maxID int
 	err := r.db.QueryRowContext(ctx,
-		"SELECT COALESCE(MAX(CAST(REPLACE(id, ?, '') AS INTEGER)), 0) FROM messages WHERE mission_id = ?",
+		"SELECT COALESCE(MAX(CAST(REPLACE(id, ?, '') AS INTEGER)), 0) FROM messages WHERE commission_id = ?",
 		prefix, missionID,
 	).Scan(&maxID)
 	if err != nil {
@@ -179,10 +179,10 @@ func (r *MessageRepository) GetNextID(ctx context.Context, missionID string) (st
 	return fmt.Sprintf("MSG-%s-%03d", missionID, maxID+1), nil
 }
 
-// MissionExists checks if a mission exists.
-func (r *MessageRepository) MissionExists(ctx context.Context, missionID string) (bool, error) {
+// CommissionExists checks if a mission exists.
+func (r *MessageRepository) CommissionExists(ctx context.Context, missionID string) (bool, error) {
 	var count int
-	err := r.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM missions WHERE id = ?", missionID).Scan(&count)
+	err := r.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM commissions WHERE id = ?", missionID).Scan(&count)
 	if err != nil {
 		return false, fmt.Errorf("failed to check mission existence: %w", err)
 	}

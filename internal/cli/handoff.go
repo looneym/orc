@@ -93,10 +93,10 @@ Examples:
 		}
 
 		resp, err := wire.HandoffService().CreateHandoff(ctx, primary.CreateHandoffRequest{
-			HandoffNote:     note,
-			ActiveMissionID: missionID,
-			ActiveGroveID:   groveID,
-			TodosSnapshot:   todosJSON,
+			HandoffNote:        note,
+			ActiveCommissionID: missionID,
+			ActiveGroveID:      groveID,
+			TodosSnapshot:      todosJSON,
 		})
 		if err != nil {
 			return fmt.Errorf("failed to create handoff: %w", err)
@@ -105,8 +105,8 @@ Examples:
 		handoff := resp.Handoff
 		fmt.Printf("✓ Created handoff %s\n", handoff.ID)
 		fmt.Printf("  Created: %s\n", handoff.CreatedAt)
-		if handoff.ActiveMissionID != "" {
-			fmt.Printf("  Mission: %s\n", handoff.ActiveMissionID)
+		if handoff.ActiveCommissionID != "" {
+			fmt.Printf("  Mission: %s\n", handoff.ActiveCommissionID)
 		}
 		if handoff.ActiveGroveID != "" {
 			fmt.Printf("  Grove: %s\n", handoff.ActiveGroveID)
@@ -138,8 +138,8 @@ var handoffShowCmd = &cobra.Command{
 
 		fmt.Printf("\nHandoff: %s\n", handoff.ID)
 		fmt.Printf("Created: %s\n", handoff.CreatedAt)
-		if handoff.ActiveMissionID != "" {
-			fmt.Printf("Mission: %s\n", handoff.ActiveMissionID)
+		if handoff.ActiveCommissionID != "" {
+			fmt.Printf("Mission: %s\n", handoff.ActiveCommissionID)
 		}
 		if handoff.ActiveGroveID != "" {
 			fmt.Printf("Grove: %s\n", handoff.ActiveGroveID)
@@ -176,8 +176,8 @@ var handoffListCmd = &cobra.Command{
 		fmt.Println("────────────────────────────────────────────────────────────────")
 		for _, h := range handoffs {
 			mission := "-"
-			if h.ActiveMissionID != "" {
-				mission = h.ActiveMissionID
+			if h.ActiveCommissionID != "" {
+				mission = h.ActiveCommissionID
 			}
 			grove := "-"
 			if h.ActiveGroveID != "" {
@@ -203,15 +203,15 @@ func updateMetadata(handoff *primary.Handoff) error {
 		return err
 	}
 
-	activeMissionID := handoff.ActiveMissionID
+	activeCommissionID := handoff.ActiveCommissionID
 
 	cfg := &config.Config{
 		Version: "1.0",
 		Type:    config.TypeGlobal,
 		State: &config.StateConfig{
-			ActiveMissionID:  activeMissionID,
-			CurrentHandoffID: handoff.ID,
-			LastUpdated:      time.Now().Format(time.RFC3339),
+			ActiveCommissionID: activeCommissionID,
+			CurrentHandoffID:   handoff.ID,
+			LastUpdated:        time.Now().Format(time.RFC3339),
 		},
 	}
 
@@ -224,7 +224,7 @@ func HandoffCmd() *cobra.Command {
 	handoffCreateCmd.Flags().StringP("note", "n", "", "Handoff note text")
 	handoffCreateCmd.Flags().StringP("file", "f", "", "Read handoff note from file")
 	handoffCreateCmd.Flags().Bool("stdin", false, "Read handoff note from stdin")
-	handoffCreateCmd.Flags().StringP("mission", "m", "", "Active mission ID")
+	handoffCreateCmd.Flags().StringP("commission", "c", "", "Active mission ID")
 	handoffCreateCmd.Flags().String("grove", "", "Active grove ID (for IMP handoffs)")
 	handoffCreateCmd.Flags().StringP("todos", "t", "", "Path to todos JSON file")
 

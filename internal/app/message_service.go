@@ -23,28 +23,28 @@ func NewMessageService(messageRepo secondary.MessageRepository) *MessageServiceI
 // CreateMessage creates a new message.
 func (s *MessageServiceImpl) CreateMessage(ctx context.Context, req primary.CreateMessageRequest) (*primary.CreateMessageResponse, error) {
 	// Validate mission exists
-	exists, err := s.messageRepo.MissionExists(ctx, req.MissionID)
+	exists, err := s.messageRepo.CommissionExists(ctx, req.CommissionID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to validate mission: %w", err)
+		return nil, fmt.Errorf("failed to validate commission: %w", err)
 	}
 	if !exists {
-		return nil, fmt.Errorf("mission %s not found", req.MissionID)
+		return nil, fmt.Errorf("commission %s not found", req.CommissionID)
 	}
 
 	// Get next ID
-	nextID, err := s.messageRepo.GetNextID(ctx, req.MissionID)
+	nextID, err := s.messageRepo.GetNextID(ctx, req.CommissionID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate message ID: %w", err)
 	}
 
 	// Create record
 	record := &secondary.MessageRecord{
-		ID:        nextID,
-		Sender:    req.Sender,
-		Recipient: req.Recipient,
-		Subject:   req.Subject,
-		Body:      req.Body,
-		MissionID: req.MissionID,
+		ID:           nextID,
+		Sender:       req.Sender,
+		Recipient:    req.Recipient,
+		Subject:      req.Subject,
+		Body:         req.Body,
+		CommissionID: req.CommissionID,
 	}
 
 	if err := s.messageRepo.Create(ctx, record); err != nil {
@@ -117,14 +117,14 @@ func (s *MessageServiceImpl) GetUnreadCount(ctx context.Context, recipient strin
 
 func (s *MessageServiceImpl) recordToMessage(r *secondary.MessageRecord) *primary.Message {
 	return &primary.Message{
-		ID:        r.ID,
-		Sender:    r.Sender,
-		Recipient: r.Recipient,
-		Subject:   r.Subject,
-		Body:      r.Body,
-		Timestamp: r.Timestamp,
-		Read:      r.Read,
-		MissionID: r.MissionID,
+		ID:           r.ID,
+		Sender:       r.Sender,
+		Recipient:    r.Recipient,
+		Subject:      r.Subject,
+		Body:         r.Body,
+		Timestamp:    r.Timestamp,
+		Read:         r.Read,
+		CommissionID: r.CommissionID,
 	}
 }
 

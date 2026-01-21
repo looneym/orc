@@ -13,7 +13,7 @@ import (
 type Task struct {
 	ID               string
 	ShipmentID       sql.NullString
-	MissionID        string
+	ComcommissionID  string
 	Title            string
 	Description      sql.NullString
 	Type             sql.NullString

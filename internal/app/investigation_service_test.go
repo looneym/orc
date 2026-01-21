@@ -57,7 +57,7 @@ func (m *mockInvestigationRepository) List(ctx context.Context, filters secondar
 	}
 	var result []*secondary.InvestigationRecord
 	for _, inv := range m.investigations {
-		if filters.MissionID != "" && inv.MissionID != filters.MissionID {
+		if filters.CommissionID != "" && inv.CommissionID != filters.CommissionID {
 			continue
 		}
 		if filters.Status != "" && inv.Status != filters.Status {
@@ -139,7 +139,7 @@ func (m *mockInvestigationRepository) AssignGrove(ctx context.Context, investiga
 	return nil
 }
 
-func (m *mockInvestigationRepository) MissionExists(ctx context.Context, missionID string) (bool, error) {
+func (m *mockInvestigationRepository) CommissionExists(ctx context.Context, missionID string) (bool, error) {
 	if m.missionExistsErr != nil {
 		return false, m.missionExistsErr
 	}
@@ -169,9 +169,9 @@ func TestCreateInvestigation_Success(t *testing.T) {
 	ctx := context.Background()
 
 	resp, err := service.CreateInvestigation(ctx, primary.CreateInvestigationRequest{
-		MissionID:   "MISSION-001",
-		Title:       "Test Investigation",
-		Description: "A test investigation",
+		CommissionID: "MISSION-001",
+		Title:        "Test Investigation",
+		Description:  "A test investigation",
 	})
 
 	if err != nil {
@@ -195,9 +195,9 @@ func TestCreateInvestigation_MissionNotFound(t *testing.T) {
 	investigationRepo.missionExistsResult = false
 
 	_, err := service.CreateInvestigation(ctx, primary.CreateInvestigationRequest{
-		MissionID:   "MISSION-NONEXISTENT",
-		Title:       "Test Investigation",
-		Description: "A test investigation",
+		CommissionID: "MISSION-NONEXISTENT",
+		Title:        "Test Investigation",
+		Description:  "A test investigation",
 	})
 
 	if err == nil {
@@ -214,10 +214,10 @@ func TestGetInvestigation_Found(t *testing.T) {
 	ctx := context.Background()
 
 	investigationRepo.investigations["INV-001"] = &secondary.InvestigationRecord{
-		ID:        "INV-001",
-		MissionID: "MISSION-001",
-		Title:     "Test Investigation",
-		Status:    "active",
+		ID:           "INV-001",
+		CommissionID: "MISSION-001",
+		Title:        "Test Investigation",
+		Status:       "active",
 	}
 
 	investigation, err := service.GetInvestigation(ctx, "INV-001")
@@ -250,19 +250,19 @@ func TestListInvestigations_FilterByMission(t *testing.T) {
 	ctx := context.Background()
 
 	investigationRepo.investigations["INV-001"] = &secondary.InvestigationRecord{
-		ID:        "INV-001",
-		MissionID: "MISSION-001",
-		Title:     "Investigation 1",
-		Status:    "active",
+		ID:           "INV-001",
+		CommissionID: "MISSION-001",
+		Title:        "Investigation 1",
+		Status:       "active",
 	}
 	investigationRepo.investigations["INV-002"] = &secondary.InvestigationRecord{
-		ID:        "INV-002",
-		MissionID: "MISSION-002",
-		Title:     "Investigation 2",
-		Status:    "active",
+		ID:           "INV-002",
+		CommissionID: "MISSION-002",
+		Title:        "Investigation 2",
+		Status:       "active",
 	}
 
-	investigations, err := service.ListInvestigations(ctx, primary.InvestigationFilters{MissionID: "MISSION-001"})
+	investigations, err := service.ListInvestigations(ctx, primary.InvestigationFilters{CommissionID: "MISSION-001"})
 
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
@@ -277,16 +277,16 @@ func TestListInvestigations_FilterByStatus(t *testing.T) {
 	ctx := context.Background()
 
 	investigationRepo.investigations["INV-001"] = &secondary.InvestigationRecord{
-		ID:        "INV-001",
-		MissionID: "MISSION-001",
-		Title:     "Active Investigation",
-		Status:    "active",
+		ID:           "INV-001",
+		CommissionID: "MISSION-001",
+		Title:        "Active Investigation",
+		Status:       "active",
 	}
 	investigationRepo.investigations["INV-002"] = &secondary.InvestigationRecord{
-		ID:        "INV-002",
-		MissionID: "MISSION-001",
-		Title:     "Paused Investigation",
-		Status:    "paused",
+		ID:           "INV-002",
+		CommissionID: "MISSION-001",
+		Title:        "Paused Investigation",
+		Status:       "paused",
 	}
 
 	investigations, err := service.ListInvestigations(ctx, primary.InvestigationFilters{Status: "active"})
@@ -308,11 +308,11 @@ func TestCompleteInvestigation_UnpinnedAllowed(t *testing.T) {
 	ctx := context.Background()
 
 	investigationRepo.investigations["INV-001"] = &secondary.InvestigationRecord{
-		ID:        "INV-001",
-		MissionID: "MISSION-001",
-		Title:     "Test Investigation",
-		Status:    "active",
-		Pinned:    false,
+		ID:           "INV-001",
+		CommissionID: "MISSION-001",
+		Title:        "Test Investigation",
+		Status:       "active",
+		Pinned:       false,
 	}
 
 	err := service.CompleteInvestigation(ctx, "INV-001")
@@ -330,11 +330,11 @@ func TestCompleteInvestigation_PinnedBlocked(t *testing.T) {
 	ctx := context.Background()
 
 	investigationRepo.investigations["INV-001"] = &secondary.InvestigationRecord{
-		ID:        "INV-001",
-		MissionID: "MISSION-001",
-		Title:     "Pinned Investigation",
-		Status:    "active",
-		Pinned:    true,
+		ID:           "INV-001",
+		CommissionID: "MISSION-001",
+		Title:        "Pinned Investigation",
+		Status:       "active",
+		Pinned:       true,
 	}
 
 	err := service.CompleteInvestigation(ctx, "INV-001")
@@ -364,10 +364,10 @@ func TestPauseInvestigation_ActiveAllowed(t *testing.T) {
 	ctx := context.Background()
 
 	investigationRepo.investigations["INV-001"] = &secondary.InvestigationRecord{
-		ID:        "INV-001",
-		MissionID: "MISSION-001",
-		Title:     "Active Investigation",
-		Status:    "active",
+		ID:           "INV-001",
+		CommissionID: "MISSION-001",
+		Title:        "Active Investigation",
+		Status:       "active",
 	}
 
 	err := service.PauseInvestigation(ctx, "INV-001")
@@ -385,10 +385,10 @@ func TestPauseInvestigation_NotActiveBlocked(t *testing.T) {
 	ctx := context.Background()
 
 	investigationRepo.investigations["INV-001"] = &secondary.InvestigationRecord{
-		ID:        "INV-001",
-		MissionID: "MISSION-001",
-		Title:     "Paused Investigation",
-		Status:    "paused",
+		ID:           "INV-001",
+		CommissionID: "MISSION-001",
+		Title:        "Paused Investigation",
+		Status:       "paused",
 	}
 
 	err := service.PauseInvestigation(ctx, "INV-001")
@@ -403,10 +403,10 @@ func TestPauseInvestigation_CompleteBlocked(t *testing.T) {
 	ctx := context.Background()
 
 	investigationRepo.investigations["INV-001"] = &secondary.InvestigationRecord{
-		ID:        "INV-001",
-		MissionID: "MISSION-001",
-		Title:     "Complete Investigation",
-		Status:    "complete",
+		ID:           "INV-001",
+		CommissionID: "MISSION-001",
+		Title:        "Complete Investigation",
+		Status:       "complete",
 	}
 
 	err := service.PauseInvestigation(ctx, "INV-001")
@@ -425,10 +425,10 @@ func TestResumeInvestigation_PausedAllowed(t *testing.T) {
 	ctx := context.Background()
 
 	investigationRepo.investigations["INV-001"] = &secondary.InvestigationRecord{
-		ID:        "INV-001",
-		MissionID: "MISSION-001",
-		Title:     "Paused Investigation",
-		Status:    "paused",
+		ID:           "INV-001",
+		CommissionID: "MISSION-001",
+		Title:        "Paused Investigation",
+		Status:       "paused",
 	}
 
 	err := service.ResumeInvestigation(ctx, "INV-001")
@@ -446,10 +446,10 @@ func TestResumeInvestigation_NotPausedBlocked(t *testing.T) {
 	ctx := context.Background()
 
 	investigationRepo.investigations["INV-001"] = &secondary.InvestigationRecord{
-		ID:        "INV-001",
-		MissionID: "MISSION-001",
-		Title:     "Active Investigation",
-		Status:    "active",
+		ID:           "INV-001",
+		CommissionID: "MISSION-001",
+		Title:        "Active Investigation",
+		Status:       "active",
 	}
 
 	err := service.ResumeInvestigation(ctx, "INV-001")
@@ -468,11 +468,11 @@ func TestPinInvestigation(t *testing.T) {
 	ctx := context.Background()
 
 	investigationRepo.investigations["INV-001"] = &secondary.InvestigationRecord{
-		ID:        "INV-001",
-		MissionID: "MISSION-001",
-		Title:     "Test Investigation",
-		Status:    "active",
-		Pinned:    false,
+		ID:           "INV-001",
+		CommissionID: "MISSION-001",
+		Title:        "Test Investigation",
+		Status:       "active",
+		Pinned:       false,
 	}
 
 	err := service.PinInvestigation(ctx, "INV-001")
@@ -490,11 +490,11 @@ func TestUnpinInvestigation(t *testing.T) {
 	ctx := context.Background()
 
 	investigationRepo.investigations["INV-001"] = &secondary.InvestigationRecord{
-		ID:        "INV-001",
-		MissionID: "MISSION-001",
-		Title:     "Pinned Investigation",
-		Status:    "active",
-		Pinned:    true,
+		ID:           "INV-001",
+		CommissionID: "MISSION-001",
+		Title:        "Pinned Investigation",
+		Status:       "active",
+		Pinned:       true,
 	}
 
 	err := service.UnpinInvestigation(ctx, "INV-001")
@@ -516,11 +516,11 @@ func TestUpdateInvestigation_Title(t *testing.T) {
 	ctx := context.Background()
 
 	investigationRepo.investigations["INV-001"] = &secondary.InvestigationRecord{
-		ID:          "INV-001",
-		MissionID:   "MISSION-001",
-		Title:       "Old Title",
-		Description: "Original description",
-		Status:      "active",
+		ID:           "INV-001",
+		CommissionID: "MISSION-001",
+		Title:        "Old Title",
+		Description:  "Original description",
+		Status:       "active",
 	}
 
 	err := service.UpdateInvestigation(ctx, primary.UpdateInvestigationRequest{
@@ -545,10 +545,10 @@ func TestDeleteInvestigation_Success(t *testing.T) {
 	ctx := context.Background()
 
 	investigationRepo.investigations["INV-001"] = &secondary.InvestigationRecord{
-		ID:        "INV-001",
-		MissionID: "MISSION-001",
-		Title:     "Test Investigation",
-		Status:    "active",
+		ID:           "INV-001",
+		CommissionID: "MISSION-001",
+		Title:        "Test Investigation",
+		Status:       "active",
 	}
 
 	err := service.DeleteInvestigation(ctx, "INV-001")
@@ -570,10 +570,10 @@ func TestAssignInvestigationToGrove_Success(t *testing.T) {
 	ctx := context.Background()
 
 	investigationRepo.investigations["INV-001"] = &secondary.InvestigationRecord{
-		ID:        "INV-001",
-		MissionID: "MISSION-001",
-		Title:     "Test Investigation",
-		Status:    "active",
+		ID:           "INV-001",
+		CommissionID: "MISSION-001",
+		Title:        "Test Investigation",
+		Status:       "active",
 	}
 
 	err := service.AssignInvestigationToGrove(ctx, "INV-001", "GROVE-001")
@@ -596,16 +596,16 @@ func TestGetInvestigationsByGrove_Success(t *testing.T) {
 
 	investigationRepo.investigations["INV-001"] = &secondary.InvestigationRecord{
 		ID:              "INV-001",
-		MissionID:       "MISSION-001",
+		CommissionID:    "MISSION-001",
 		Title:           "Assigned Investigation",
 		Status:          "active",
 		AssignedGroveID: "GROVE-001",
 	}
 	investigationRepo.investigations["INV-002"] = &secondary.InvestigationRecord{
-		ID:        "INV-002",
-		MissionID: "MISSION-001",
-		Title:     "Unassigned Investigation",
-		Status:    "active",
+		ID:           "INV-002",
+		CommissionID: "MISSION-001",
+		Title:        "Unassigned Investigation",
+		Status:       "active",
 	}
 
 	investigations, err := service.GetInvestigationsByGrove(ctx, "GROVE-001")

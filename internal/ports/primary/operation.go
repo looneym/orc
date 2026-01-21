@@ -23,9 +23,9 @@ type OperationService interface {
 
 // CreateOperationRequest contains parameters for creating an operation.
 type CreateOperationRequest struct {
-	MissionID   string
-	Title       string
-	Description string
+	CommissionID string
+	Title        string
+	Description  string
 }
 
 // CreateOperationResponse contains the result of creating an operation.
@@ -36,18 +36,18 @@ type CreateOperationResponse struct {
 
 // Operation represents an operation entity at the port boundary.
 type Operation struct {
-	ID          string
-	MissionID   string
-	Title       string
-	Description string
-	Status      string
-	CreatedAt   string
-	UpdatedAt   string
-	CompletedAt string
+	ID           string
+	CommissionID string
+	Title        string
+	Description  string
+	Status       string
+	CreatedAt    string
+	UpdatedAt    string
+	CompletedAt  string
 }
 
 // OperationFilters contains filter options for listing operations.
 type OperationFilters struct {
-	MissionID string
-	Status    string
+	CommissionID string
+	Status       string
 }

@@ -31,10 +31,10 @@ type GroveService interface {
 
 // CreateGroveRequest contains parameters for creating a grove.
 type CreateGroveRequest struct {
-	Name      string
-	MissionID string   // Required or derived from context
-	Repos     []string // Optional repository names
-	BasePath  string   // Optional, defaults to ~/src/worktrees
+	Name         string
+	CommissionID string   // Required or derived from context
+	Repos        []string // Optional repository names
+	BasePath     string   // Optional, defaults to ~/src/worktrees
 }
 
 // CreateGroveResponse contains the result of grove creation.
@@ -72,18 +72,18 @@ type DeleteGroveRequest struct {
 
 // Grove represents a grove entity at the port boundary.
 type Grove struct {
-	ID        string
-	Name      string
-	MissionID string
-	Path      string
-	Repos     []string
-	Status    string
-	CreatedAt string
+	ID           string
+	Name         string
+	CommissionID string
+	Path         string
+	Repos        []string
+	Status       string
+	CreatedAt    string
 }
 
 // GroveFilters contains filter options for listing groves.
 type GroveFilters struct {
-	MissionID string
-	Status    string
-	Limit     int
+	CommissionID string
+	Status       string
+	Limit        int
 }

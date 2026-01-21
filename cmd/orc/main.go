@@ -13,16 +13,16 @@ import (
 func main() {
 	rootCmd := &cobra.Command{
 		Use:     "orc",
-		Short:   "ORC - Orchestrator for Forest Factory missions",
+		Short:   "ORC - Orchestrator for Forest Factory commissions",
 		Version: version.String(),
-		Long: `ORC is a CLI tool for managing missions, groves, shipments, and tasks.
+		Long: `ORC is a CLI tool for managing commissions, groves, shipments, and tasks.
 It coordinates IMPs (Implementation Agents) working in isolated groves (worktrees).`,
 	}
 
 	// Add subcommands
 	rootCmd.AddCommand(cli.InitCmd())
 	rootCmd.AddCommand(cli.DoctorCmd())
-	rootCmd.AddCommand(cli.MissionCmd())
+	rootCmd.AddCommand(cli.CommissionCmd())
 	rootCmd.AddCommand(cli.ShipmentCmd())
 	rootCmd.AddCommand(cli.TaskCmd())
 	rootCmd.AddCommand(cli.TagCmd())

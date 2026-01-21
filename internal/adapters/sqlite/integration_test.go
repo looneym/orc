@@ -14,34 +14,34 @@ import (
 // Mission Lifecycle Tests
 // ============================================================================
 
-func TestIntegration_MissionWithShipmentsAndTasks(t *testing.T) {
+func TestIntegration_CommissionWithShipmentsAndTasks(t *testing.T) {
 	db := setupIntegrationDB(t)
 	ctx := context.Background()
 
-	missionRepo := sqlite.NewMissionRepository(db)
+	missionRepo := sqlite.NewCommissionRepository(db)
 	shipmentRepo := sqlite.NewShipmentRepository(db)
 	taskRepo := sqlite.NewTaskRepository(db)
 
 	// Create mission with status pre-populated (required by repo)
-	mission := &secondary.MissionRecord{
+	mission := &secondary.CommissionRecord{
 		ID:     "MISSION-001",
 		Title:  "Integration Test Mission",
 		Status: "active",
 	}
 	if err := missionRepo.Create(ctx, mission); err != nil {
-		t.Fatalf("Create mission failed: %v", err)
+		t.Fatalf("Create commission failed: %v", err)
 	}
 
 	// Create shipments under mission
 	ship1 := &secondary.ShipmentRecord{
-		ID:        "SHIP-001",
-		MissionID: "MISSION-001",
-		Title:     "Shipment 1",
+		ID:           "SHIP-001",
+		CommissionID: "MISSION-001",
+		Title:        "Shipment 1",
 	}
 	ship2 := &secondary.ShipmentRecord{
-		ID:        "SHIP-002",
-		MissionID: "MISSION-001",
-		Title:     "Shipment 2",
+		ID:           "SHIP-002",
+		CommissionID: "MISSION-001",
+		Title:        "Shipment 2",
 	}
 	if err := shipmentRepo.Create(ctx, ship1); err != nil {
 		t.Fatalf("Create shipment 1 failed: %v", err)
@@ -52,16 +52,16 @@ func TestIntegration_MissionWithShipmentsAndTasks(t *testing.T) {
 
 	// Create tasks under shipments
 	task1 := &secondary.TaskRecord{
-		ID:         "TASK-001",
-		MissionID:  "MISSION-001",
-		ShipmentID: "SHIP-001",
-		Title:      "Task 1",
+		ID:           "TASK-001",
+		CommissionID: "MISSION-001",
+		ShipmentID:   "SHIP-001",
+		Title:        "Task 1",
 	}
 	task2 := &secondary.TaskRecord{
-		ID:         "TASK-002",
-		MissionID:  "MISSION-001",
-		ShipmentID: "SHIP-001",
-		Title:      "Task 2",
+		ID:           "TASK-002",
+		CommissionID: "MISSION-001",
+		ShipmentID:   "SHIP-001",
+		Title:        "Task 2",
 	}
 	if err := taskRepo.Create(ctx, task1); err != nil {
 		t.Fatalf("Create task 1 failed: %v", err)
@@ -71,13 +71,13 @@ func TestIntegration_MissionWithShipmentsAndTasks(t *testing.T) {
 	}
 
 	// Verify mission exists check works
-	exists, _ := shipmentRepo.MissionExists(ctx, "MISSION-001")
+	exists, _ := shipmentRepo.CommissionExists(ctx, "MISSION-001")
 	if !exists {
 		t.Error("expected mission to exist")
 	}
 
 	// Verify shipment listing by mission
-	shipments, err := shipmentRepo.List(ctx, secondary.ShipmentFilters{MissionID: "MISSION-001"})
+	shipments, err := shipmentRepo.List(ctx, secondary.ShipmentFilters{CommissionID: "MISSION-001"})
 	if err != nil {
 		t.Fatalf("List shipments failed: %v", err)
 	}
@@ -95,14 +95,14 @@ func TestIntegration_MissionWithShipmentsAndTasks(t *testing.T) {
 	}
 }
 
-func TestIntegration_MissionExistsConstraint(t *testing.T) {
+func TestIntegration_CommissionExistsConstraint(t *testing.T) {
 	db := setupIntegrationDB(t)
 	ctx := context.Background()
 
 	shipmentRepo := sqlite.NewShipmentRepository(db)
 
 	// Verify mission doesn't exist
-	exists, _ := shipmentRepo.MissionExists(ctx, "MISSION-999")
+	exists, _ := shipmentRepo.CommissionExists(ctx, "MISSION-999")
 	if exists {
 		t.Error("expected mission to not exist")
 	}
@@ -124,9 +124,9 @@ func TestIntegration_ShipmentWithPlanAndTasks(t *testing.T) {
 
 	// Create shipment
 	shipment := &secondary.ShipmentRecord{
-		ID:        "SHIP-001",
-		MissionID: "MISSION-001",
-		Title:     "Feature Shipment",
+		ID:           "SHIP-001",
+		CommissionID: "MISSION-001",
+		Title:        "Feature Shipment",
 	}
 	if err := shipmentRepo.Create(ctx, shipment); err != nil {
 		t.Fatalf("Create shipment failed: %v", err)
@@ -134,11 +134,11 @@ func TestIntegration_ShipmentWithPlanAndTasks(t *testing.T) {
 
 	// Create plan for shipment
 	plan := &secondary.PlanRecord{
-		ID:         "PLAN-001",
-		MissionID:  "MISSION-001",
-		ShipmentID: "SHIP-001",
-		Title:      "Implementation Plan",
-		Content:    "Plan content...",
+		ID:           "PLAN-001",
+		CommissionID: "MISSION-001",
+		ShipmentID:   "SHIP-001",
+		Title:        "Implementation Plan",
+		Content:      "Plan content...",
 	}
 	if err := planRepo.Create(ctx, plan); err != nil {
 		t.Fatalf("Create plan failed: %v", err)
@@ -163,10 +163,10 @@ func TestIntegration_ShipmentWithPlanAndTasks(t *testing.T) {
 
 	// Create tasks for shipment
 	task := &secondary.TaskRecord{
-		ID:         "TASK-001",
-		MissionID:  "MISSION-001",
-		ShipmentID: "SHIP-001",
-		Title:      "Implementation Task",
+		ID:           "TASK-001",
+		CommissionID: "MISSION-001",
+		ShipmentID:   "SHIP-001",
+		Title:        "Implementation Task",
 	}
 	if err := taskRepo.Create(ctx, task); err != nil {
 		t.Fatalf("Create task failed: %v", err)
@@ -195,9 +195,9 @@ func TestIntegration_GroveAssignmentPropagation(t *testing.T) {
 
 	// Create shipment
 	shipment := &secondary.ShipmentRecord{
-		ID:        "SHIP-001",
-		MissionID: "MISSION-001",
-		Title:     "Feature Shipment",
+		ID:           "SHIP-001",
+		CommissionID: "MISSION-001",
+		Title:        "Feature Shipment",
 	}
 	if err := shipmentRepo.Create(ctx, shipment); err != nil {
 		t.Fatalf("Create shipment failed: %v", err)
@@ -205,16 +205,16 @@ func TestIntegration_GroveAssignmentPropagation(t *testing.T) {
 
 	// Create tasks
 	task1 := &secondary.TaskRecord{
-		ID:         "TASK-001",
-		MissionID:  "MISSION-001",
-		ShipmentID: "SHIP-001",
-		Title:      "Task 1",
+		ID:           "TASK-001",
+		CommissionID: "MISSION-001",
+		ShipmentID:   "SHIP-001",
+		Title:        "Task 1",
 	}
 	task2 := &secondary.TaskRecord{
-		ID:         "TASK-002",
-		MissionID:  "MISSION-001",
-		ShipmentID: "SHIP-001",
-		Title:      "Task 2",
+		ID:           "TASK-002",
+		CommissionID: "MISSION-001",
+		ShipmentID:   "SHIP-001",
+		Title:        "Task 2",
 	}
 	_ = taskRepo.Create(ctx, task1)
 	_ = taskRepo.Create(ctx, task2)
@@ -254,17 +254,17 @@ func TestIntegration_MultipleEntitiesAssignedToGrove(t *testing.T) {
 	tomeRepo := sqlite.NewTomeRepository(db)
 
 	// Create and assign shipment
-	shipment := &secondary.ShipmentRecord{ID: "SHIP-001", MissionID: "MISSION-001", Title: "Shipment"}
+	shipment := &secondary.ShipmentRecord{ID: "SHIP-001", CommissionID: "MISSION-001", Title: "Shipment"}
 	_ = shipmentRepo.Create(ctx, shipment)
 	_ = shipmentRepo.AssignGrove(ctx, "SHIP-001", "GROVE-001")
 
 	// Create and assign investigation
-	inv := &secondary.InvestigationRecord{ID: "INV-001", MissionID: "MISSION-001", Title: "Investigation"}
+	inv := &secondary.InvestigationRecord{ID: "INV-001", CommissionID: "MISSION-001", Title: "Investigation"}
 	_ = investigationRepo.Create(ctx, inv)
 	_ = investigationRepo.AssignGrove(ctx, "INV-001", "GROVE-001")
 
 	// Create and assign tome
-	tome := &secondary.TomeRecord{ID: "TOME-001", MissionID: "MISSION-001", Title: "Tome"}
+	tome := &secondary.TomeRecord{ID: "TOME-001", CommissionID: "MISSION-001", Title: "Tome"}
 	_ = tomeRepo.Create(ctx, tome)
 	_ = tomeRepo.AssignGrove(ctx, "TOME-001", "GROVE-001")
 
@@ -300,9 +300,9 @@ func TestIntegration_InvestigationWithQuestions(t *testing.T) {
 
 	// Create investigation
 	inv := &secondary.InvestigationRecord{
-		ID:        "INV-001",
-		MissionID: "MISSION-001",
-		Title:     "Performance Investigation",
+		ID:           "INV-001",
+		CommissionID: "MISSION-001",
+		Title:        "Performance Investigation",
 	}
 	if err := investigationRepo.Create(ctx, inv); err != nil {
 		t.Fatalf("Create investigation failed: %v", err)
@@ -311,13 +311,13 @@ func TestIntegration_InvestigationWithQuestions(t *testing.T) {
 	// Create questions for investigation
 	q1 := &secondary.QuestionRecord{
 		ID:              "Q-001",
-		MissionID:       "MISSION-001",
+		CommissionID:    "MISSION-001",
 		InvestigationID: "INV-001",
 		Title:           "What is the root cause?",
 	}
 	q2 := &secondary.QuestionRecord{
 		ID:              "Q-002",
-		MissionID:       "MISSION-001",
+		CommissionID:    "MISSION-001",
 		InvestigationID: "INV-001",
 		Title:           "What are the affected components?",
 	}
@@ -359,18 +359,18 @@ func TestIntegration_ConclaveWithTasksQuestionsPlans(t *testing.T) {
 
 	// Create conclave
 	conclave := &secondary.ConclaveRecord{
-		ID:        "CON-001",
-		MissionID: "MISSION-001",
-		Title:     "Architecture Review",
+		ID:           "CON-001",
+		CommissionID: "MISSION-001",
+		Title:        "Architecture Review",
 	}
 	if err := conclaveRepo.Create(ctx, conclave); err != nil {
 		t.Fatalf("Create conclave failed: %v", err)
 	}
 
 	// Create entities linked to conclave via direct SQL (Create methods don't support conclave_id)
-	_, _ = db.Exec(`INSERT INTO tasks (id, mission_id, title, status, conclave_id) VALUES ('TASK-001', 'MISSION-001', 'Review Task', 'ready', 'CON-001')`)
-	_, _ = db.Exec(`INSERT INTO questions (id, mission_id, title, status, conclave_id) VALUES ('Q-001', 'MISSION-001', 'Review Question', 'open', 'CON-001')`)
-	_, _ = db.Exec(`INSERT INTO plans (id, mission_id, title, status, conclave_id) VALUES ('PLAN-001', 'MISSION-001', 'Review Plan', 'draft', 'CON-001')`)
+	_, _ = db.Exec(`INSERT INTO tasks (id, commission_id, title, status, conclave_id) VALUES ('TASK-001', 'MISSION-001', 'Review Task', 'ready', 'CON-001')`)
+	_, _ = db.Exec(`INSERT INTO questions (id, commission_id, title, status, conclave_id) VALUES ('Q-001', 'MISSION-001', 'Review Question', 'open', 'CON-001')`)
+	_, _ = db.Exec(`INSERT INTO plans (id, commission_id, title, status, conclave_id) VALUES ('PLAN-001', 'MISSION-001', 'Review Plan', 'draft', 'CON-001')`)
 
 	// Verify all entities linked to conclave
 	tasks, _ := conclaveRepo.GetTasksByConclave(ctx, "CON-001")
@@ -404,9 +404,9 @@ func TestIntegration_TagAcrossEntities(t *testing.T) {
 	tagRepo := sqlite.NewTagRepository(db)
 
 	// Create tasks
-	task1 := &secondary.TaskRecord{ID: "TASK-001", MissionID: "MISSION-001", Title: "Task 1"}
-	task2 := &secondary.TaskRecord{ID: "TASK-002", MissionID: "MISSION-001", Title: "Task 2"}
-	task3 := &secondary.TaskRecord{ID: "TASK-003", MissionID: "MISSION-001", Title: "Task 3"}
+	task1 := &secondary.TaskRecord{ID: "TASK-001", CommissionID: "MISSION-001", Title: "Task 1"}
+	task2 := &secondary.TaskRecord{ID: "TASK-002", CommissionID: "MISSION-001", Title: "Task 2"}
+	task3 := &secondary.TaskRecord{ID: "TASK-003", CommissionID: "MISSION-001", Title: "Task 3"}
 	_ = taskRepo.Create(ctx, task1)
 	_ = taskRepo.Create(ctx, task2)
 	_ = taskRepo.Create(ctx, task3)
@@ -459,9 +459,9 @@ func TestIntegration_HandoffWithContext(t *testing.T) {
 	handoffRepo := sqlite.NewHandoffRepository(db)
 
 	// Create handoffs with explicit timestamps
-	_, _ = db.Exec(`INSERT INTO handoffs (id, handoff_note, active_mission_id, active_grove_id, todos_snapshot, created_at)
+	_, _ = db.Exec(`INSERT INTO handoffs (id, handoff_note, active_commission_id, active_grove_id, todos_snapshot, created_at)
 		VALUES ('HO-001', 'First session complete', 'MISSION-001', 'GROVE-001', '[{"task":"Task 1"}]', '2024-01-01 10:00:00')`)
-	_, _ = db.Exec(`INSERT INTO handoffs (id, handoff_note, active_mission_id, active_grove_id, todos_snapshot, created_at)
+	_, _ = db.Exec(`INSERT INTO handoffs (id, handoff_note, active_commission_id, active_grove_id, todos_snapshot, created_at)
 		VALUES ('HO-002', 'Second session - continued work', 'MISSION-001', 'GROVE-001', '[{"task":"Task 2"}]', '2024-01-01 11:00:00')`)
 
 	// Get latest handoff
@@ -472,8 +472,8 @@ func TestIntegration_HandoffWithContext(t *testing.T) {
 	if latest.ID != "HO-002" {
 		t.Errorf("expected latest HO-002, got %s", latest.ID)
 	}
-	if latest.ActiveMissionID != "MISSION-001" {
-		t.Errorf("expected mission MISSION-001, got %s", latest.ActiveMissionID)
+	if latest.ActiveCommissionID != "MISSION-001" {
+		t.Errorf("expected mission MISSION-001, got %s", latest.ActiveCommissionID)
 	}
 	if latest.ActiveGroveID != "GROVE-001" {
 		t.Errorf("expected grove GROVE-001, got %s", latest.ActiveGroveID)
@@ -506,16 +506,16 @@ func TestIntegration_NotesAcrossContainers(t *testing.T) {
 	tomeRepo := sqlite.NewTomeRepository(db)
 
 	// Create containers
-	_ = shipmentRepo.Create(ctx, &secondary.ShipmentRecord{ID: "SHIP-001", MissionID: "MISSION-001", Title: "Shipment"})
-	_ = investigationRepo.Create(ctx, &secondary.InvestigationRecord{ID: "INV-001", MissionID: "MISSION-001", Title: "Investigation"})
-	_ = conclaveRepo.Create(ctx, &secondary.ConclaveRecord{ID: "CON-001", MissionID: "MISSION-001", Title: "Conclave"})
-	_ = tomeRepo.Create(ctx, &secondary.TomeRecord{ID: "TOME-001", MissionID: "MISSION-001", Title: "Tome"})
+	_ = shipmentRepo.Create(ctx, &secondary.ShipmentRecord{ID: "SHIP-001", CommissionID: "MISSION-001", Title: "Shipment"})
+	_ = investigationRepo.Create(ctx, &secondary.InvestigationRecord{ID: "INV-001", CommissionID: "MISSION-001", Title: "Investigation"})
+	_ = conclaveRepo.Create(ctx, &secondary.ConclaveRecord{ID: "CON-001", CommissionID: "MISSION-001", Title: "Conclave"})
+	_ = tomeRepo.Create(ctx, &secondary.TomeRecord{ID: "TOME-001", CommissionID: "MISSION-001", Title: "Tome"})
 
 	// Create notes for each container
-	shipmentNote := &secondary.NoteRecord{ID: "NOTE-001", MissionID: "MISSION-001", Title: "Shipment Note", ShipmentID: "SHIP-001"}
-	invNote := &secondary.NoteRecord{ID: "NOTE-002", MissionID: "MISSION-001", Title: "Investigation Note", InvestigationID: "INV-001"}
-	conclaveNote := &secondary.NoteRecord{ID: "NOTE-003", MissionID: "MISSION-001", Title: "Conclave Note", ConclaveID: "CON-001"}
-	tomeNote := &secondary.NoteRecord{ID: "NOTE-004", MissionID: "MISSION-001", Title: "Tome Note", TomeID: "TOME-001"}
+	shipmentNote := &secondary.NoteRecord{ID: "NOTE-001", CommissionID: "MISSION-001", Title: "Shipment Note", ShipmentID: "SHIP-001"}
+	invNote := &secondary.NoteRecord{ID: "NOTE-002", CommissionID: "MISSION-001", Title: "Investigation Note", InvestigationID: "INV-001"}
+	conclaveNote := &secondary.NoteRecord{ID: "NOTE-003", CommissionID: "MISSION-001", Title: "Conclave Note", ConclaveID: "CON-001"}
+	tomeNote := &secondary.NoteRecord{ID: "NOTE-004", CommissionID: "MISSION-001", Title: "Tome Note", TomeID: "TOME-001"}
 
 	_ = noteRepo.Create(ctx, shipmentNote)
 	_ = noteRepo.Create(ctx, invNote)
@@ -544,7 +544,7 @@ func TestIntegration_NotesAcrossContainers(t *testing.T) {
 	}
 
 	// Verify all notes in mission
-	allNotes, _ := noteRepo.List(ctx, secondary.NoteFilters{MissionID: "MISSION-001"})
+	allNotes, _ := noteRepo.List(ctx, secondary.NoteFilters{CommissionID: "MISSION-001"})
 	if len(allNotes) != 4 {
 		t.Errorf("expected 4 notes total, got %d", len(allNotes))
 	}
@@ -564,28 +564,28 @@ func TestIntegration_MessageConversations(t *testing.T) {
 
 	// Create conversation between ORC and IMP
 	msg1 := &secondary.MessageRecord{
-		ID:        "MSG-001",
-		MissionID: "MISSION-001",
-		Sender:    "ORC",
-		Recipient: "IMP-001",
-		Subject:   "Task Assignment",
-		Body:      "Please work on...",
+		ID:           "MSG-001",
+		CommissionID: "MISSION-001",
+		Sender:       "ORC",
+		Recipient:    "IMP-001",
+		Subject:      "Task Assignment",
+		Body:         "Please work on...",
 	}
 	msg2 := &secondary.MessageRecord{
-		ID:        "MSG-002",
-		MissionID: "MISSION-001",
-		Sender:    "IMP-001",
-		Recipient: "ORC",
-		Subject:   "Re: Task Assignment",
-		Body:      "I'm on it",
+		ID:           "MSG-002",
+		CommissionID: "MISSION-001",
+		Sender:       "IMP-001",
+		Recipient:    "ORC",
+		Subject:      "Re: Task Assignment",
+		Body:         "I'm on it",
 	}
 	msg3 := &secondary.MessageRecord{
-		ID:        "MSG-003",
-		MissionID: "MISSION-001",
-		Sender:    "ORC",
-		Recipient: "IMP-002",
-		Subject:   "Different IMP",
-		Body:      "Different conversation",
+		ID:           "MSG-003",
+		CommissionID: "MISSION-001",
+		Sender:       "ORC",
+		Recipient:    "IMP-002",
+		Subject:      "Different IMP",
+		Body:         "Different conversation",
 	}
 
 	_ = messageRepo.Create(ctx, msg1)
@@ -632,9 +632,9 @@ func TestIntegration_EntityStatusWorkflows(t *testing.T) {
 	operationRepo := sqlite.NewOperationRepository(db)
 
 	// Create entities
-	shipment := &secondary.ShipmentRecord{ID: "SHIP-001", MissionID: "MISSION-001", Title: "Shipment"}
-	task := &secondary.TaskRecord{ID: "TASK-001", MissionID: "MISSION-001", Title: "Task"}
-	operation := &secondary.OperationRecord{ID: "OP-001", MissionID: "MISSION-001", Title: "Operation"}
+	shipment := &secondary.ShipmentRecord{ID: "SHIP-001", CommissionID: "MISSION-001", Title: "Shipment"}
+	task := &secondary.TaskRecord{ID: "TASK-001", CommissionID: "MISSION-001", Title: "Task"}
+	operation := &secondary.OperationRecord{ID: "OP-001", CommissionID: "MISSION-001", Title: "Operation"}
 
 	_ = shipmentRepo.Create(ctx, shipment)
 	_ = taskRepo.Create(ctx, task)
@@ -697,9 +697,9 @@ func TestIntegration_PinAcrossEntities(t *testing.T) {
 	noteRepo := sqlite.NewNoteRepository(db)
 
 	// Create entities
-	_ = shipmentRepo.Create(ctx, &secondary.ShipmentRecord{ID: "SHIP-001", MissionID: "MISSION-001", Title: "Shipment"})
-	_ = taskRepo.Create(ctx, &secondary.TaskRecord{ID: "TASK-001", MissionID: "MISSION-001", Title: "Task"})
-	_ = noteRepo.Create(ctx, &secondary.NoteRecord{ID: "NOTE-001", MissionID: "MISSION-001", Title: "Note"})
+	_ = shipmentRepo.Create(ctx, &secondary.ShipmentRecord{ID: "SHIP-001", CommissionID: "MISSION-001", Title: "Shipment"})
+	_ = taskRepo.Create(ctx, &secondary.TaskRecord{ID: "TASK-001", CommissionID: "MISSION-001", Title: "Task"})
+	_ = noteRepo.Create(ctx, &secondary.NoteRecord{ID: "NOTE-001", CommissionID: "MISSION-001", Title: "Note"})
 
 	// Pin entities
 	_ = shipmentRepo.Pin(ctx, "SHIP-001")
@@ -770,8 +770,8 @@ func TestIntegration_IDGenerationAcrossRepositories(t *testing.T) {
 	}
 
 	// Create entities
-	_ = shipmentRepo.Create(ctx, &secondary.ShipmentRecord{ID: shipID, MissionID: "MISSION-001", Title: "S1"})
-	_ = taskRepo.Create(ctx, &secondary.TaskRecord{ID: taskID, MissionID: "MISSION-001", Title: "T1"})
+	_ = shipmentRepo.Create(ctx, &secondary.ShipmentRecord{ID: shipID, CommissionID: "MISSION-001", Title: "S1"})
+	_ = taskRepo.Create(ctx, &secondary.TaskRecord{ID: taskID, CommissionID: "MISSION-001", Title: "T1"})
 
 	// Get next IDs
 	shipID2, _ := shipmentRepo.GetNextID(ctx)

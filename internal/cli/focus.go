@@ -156,9 +156,9 @@ func getCurrentFocus(cfg *config.Config) string {
 		return ""
 	}
 	switch cfg.Type {
-	case config.TypeMission:
-		if cfg.Mission != nil {
-			return cfg.Mission.CurrentFocus
+	case config.TypeCommission:
+		if cfg.Commission != nil {
+			return cfg.Commission.CurrentFocus
 		}
 	case config.TypeGrove:
 		if cfg.Grove != nil {
@@ -175,9 +175,9 @@ func getCurrentFocus(cfg *config.Config) string {
 // setFocus sets the focus in the config
 func setFocus(cfg *config.Config, configDir, containerID, containerType, title string) error {
 	switch cfg.Type {
-	case config.TypeMission:
-		if cfg.Mission != nil {
-			cfg.Mission.CurrentFocus = containerID
+	case config.TypeCommission:
+		if cfg.Commission != nil {
+			cfg.Commission.CurrentFocus = containerID
 		}
 	case config.TypeGrove:
 		if cfg.Grove != nil {
@@ -202,9 +202,9 @@ func setFocus(cfg *config.Config, configDir, containerID, containerType, title s
 // clearFocus clears the current focus
 func clearFocus(cfg *config.Config, configDir string) error {
 	switch cfg.Type {
-	case config.TypeMission:
-		if cfg.Mission != nil {
-			cfg.Mission.CurrentFocus = ""
+	case config.TypeCommission:
+		if cfg.Commission != nil {
+			cfg.Commission.CurrentFocus = ""
 		}
 	case config.TypeGrove:
 		if cfg.Grove != nil {

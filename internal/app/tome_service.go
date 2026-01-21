@@ -28,12 +28,12 @@ func NewTomeService(
 // CreateTome creates a new tome (knowledge container).
 func (s *TomeServiceImpl) CreateTome(ctx context.Context, req primary.CreateTomeRequest) (*primary.CreateTomeResponse, error) {
 	// Validate mission exists
-	exists, err := s.tomeRepo.MissionExists(ctx, req.MissionID)
+	exists, err := s.tomeRepo.CommissionExists(ctx, req.CommissionID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to validate mission: %w", err)
+		return nil, fmt.Errorf("failed to validate commission: %w", err)
 	}
 	if !exists {
-		return nil, fmt.Errorf("mission %s not found", req.MissionID)
+		return nil, fmt.Errorf("commission %s not found", req.CommissionID)
 	}
 
 	// Get next ID
@@ -44,11 +44,11 @@ func (s *TomeServiceImpl) CreateTome(ctx context.Context, req primary.CreateTome
 
 	// Create record
 	record := &secondary.TomeRecord{
-		ID:          nextID,
-		MissionID:   req.MissionID,
-		Title:       req.Title,
-		Description: req.Description,
-		Status:      "active",
+		ID:           nextID,
+		CommissionID: req.CommissionID,
+		Title:        req.Title,
+		Description:  req.Description,
+		Status:       "active",
 	}
 
 	if err := s.tomeRepo.Create(ctx, record); err != nil {
@@ -79,8 +79,8 @@ func (s *TomeServiceImpl) GetTome(ctx context.Context, tomeID string) (*primary.
 // ListTomes lists tomes with optional filters.
 func (s *TomeServiceImpl) ListTomes(ctx context.Context, filters primary.TomeFilters) ([]*primary.Tome, error) {
 	records, err := s.tomeRepo.List(ctx, secondary.TomeFilters{
-		MissionID: filters.MissionID,
-		Status:    filters.Status,
+		CommissionID: filters.CommissionID,
+		Status:       filters.Status,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to list tomes: %w", err)
@@ -199,7 +199,7 @@ func (s *TomeServiceImpl) GetTomeNotes(ctx context.Context, tomeID string) ([]*p
 func (s *TomeServiceImpl) recordToTome(r *secondary.TomeRecord) *primary.Tome {
 	return &primary.Tome{
 		ID:              r.ID,
-		MissionID:       r.MissionID,
+		CommissionID:    r.CommissionID,
 		Title:           r.Title,
 		Description:     r.Description,
 		Status:          r.Status,

@@ -25,12 +25,12 @@ func NewOperationService(
 // CreateOperation creates a new operation.
 func (s *OperationServiceImpl) CreateOperation(ctx context.Context, req primary.CreateOperationRequest) (*primary.CreateOperationResponse, error) {
 	// Validate mission exists
-	exists, err := s.operationRepo.MissionExists(ctx, req.MissionID)
+	exists, err := s.operationRepo.CommissionExists(ctx, req.CommissionID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to validate mission: %w", err)
+		return nil, fmt.Errorf("failed to validate commission: %w", err)
 	}
 	if !exists {
-		return nil, fmt.Errorf("mission %s not found", req.MissionID)
+		return nil, fmt.Errorf("commission %s not found", req.CommissionID)
 	}
 
 	// Get next ID
@@ -41,11 +41,11 @@ func (s *OperationServiceImpl) CreateOperation(ctx context.Context, req primary.
 
 	// Create record
 	record := &secondary.OperationRecord{
-		ID:          nextID,
-		MissionID:   req.MissionID,
-		Title:       req.Title,
-		Description: req.Description,
-		Status:      "ready",
+		ID:           nextID,
+		CommissionID: req.CommissionID,
+		Title:        req.Title,
+		Description:  req.Description,
+		Status:       "ready",
 	}
 
 	if err := s.operationRepo.Create(ctx, record); err != nil {
@@ -76,8 +76,8 @@ func (s *OperationServiceImpl) GetOperation(ctx context.Context, operationID str
 // ListOperations lists operations with optional filters.
 func (s *OperationServiceImpl) ListOperations(ctx context.Context, filters primary.OperationFilters) ([]*primary.Operation, error) {
 	records, err := s.operationRepo.List(ctx, secondary.OperationFilters{
-		MissionID: filters.MissionID,
-		Status:    filters.Status,
+		CommissionID: filters.CommissionID,
+		Status:       filters.Status,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to list operations: %w", err)
@@ -106,14 +106,14 @@ func (s *OperationServiceImpl) CompleteOperation(ctx context.Context, operationI
 
 func (s *OperationServiceImpl) recordToOperation(r *secondary.OperationRecord) *primary.Operation {
 	return &primary.Operation{
-		ID:          r.ID,
-		MissionID:   r.MissionID,
-		Title:       r.Title,
-		Description: r.Description,
-		Status:      r.Status,
-		CreatedAt:   r.CreatedAt,
-		UpdatedAt:   r.UpdatedAt,
-		CompletedAt: r.CompletedAt,
+		ID:           r.ID,
+		CommissionID: r.CommissionID,
+		Title:        r.Title,
+		Description:  r.Description,
+		Status:       r.Status,
+		CreatedAt:    r.CreatedAt,
+		UpdatedAt:    r.UpdatedAt,
+		CompletedAt:  r.CompletedAt,
 	}
 }
 

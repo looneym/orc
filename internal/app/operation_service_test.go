@@ -55,7 +55,7 @@ func (m *mockOperationRepository) List(ctx context.Context, filters secondary.Op
 	}
 	var result []*secondary.OperationRecord
 	for _, op := range m.operations {
-		if filters.MissionID != "" && op.MissionID != filters.MissionID {
+		if filters.CommissionID != "" && op.CommissionID != filters.CommissionID {
 			continue
 		}
 		if filters.Status != "" && op.Status != filters.Status {
@@ -83,7 +83,7 @@ func (m *mockOperationRepository) GetNextID(ctx context.Context) (string, error)
 	return "OP-001", nil
 }
 
-func (m *mockOperationRepository) MissionExists(ctx context.Context, missionID string) (bool, error) {
+func (m *mockOperationRepository) CommissionExists(ctx context.Context, missionID string) (bool, error) {
 	if m.missionExistsErr != nil {
 		return false, m.missionExistsErr
 	}
@@ -109,9 +109,9 @@ func TestCreateOperation_Success(t *testing.T) {
 	ctx := context.Background()
 
 	resp, err := service.CreateOperation(ctx, primary.CreateOperationRequest{
-		MissionID:   "MISSION-001",
-		Title:       "Test Operation",
-		Description: "A test operation",
+		CommissionID: "MISSION-001",
+		Title:        "Test Operation",
+		Description:  "A test operation",
 	})
 
 	if err != nil {
@@ -135,9 +135,9 @@ func TestCreateOperation_MissionNotFound(t *testing.T) {
 	operationRepo.missionExistsResult = false
 
 	_, err := service.CreateOperation(ctx, primary.CreateOperationRequest{
-		MissionID:   "MISSION-NONEXISTENT",
-		Title:       "Test Operation",
-		Description: "A test operation",
+		CommissionID: "MISSION-NONEXISTENT",
+		Title:        "Test Operation",
+		Description:  "A test operation",
 	})
 
 	if err == nil {
@@ -152,9 +152,9 @@ func TestCreateOperation_MissionValidationError(t *testing.T) {
 	operationRepo.missionExistsErr = errors.New("database error")
 
 	_, err := service.CreateOperation(ctx, primary.CreateOperationRequest{
-		MissionID:   "MISSION-001",
-		Title:       "Test Operation",
-		Description: "A test operation",
+		CommissionID: "MISSION-001",
+		Title:        "Test Operation",
+		Description:  "A test operation",
 	})
 
 	if err == nil {
@@ -171,10 +171,10 @@ func TestGetOperation_Found(t *testing.T) {
 	ctx := context.Background()
 
 	operationRepo.operations["OP-001"] = &secondary.OperationRecord{
-		ID:        "OP-001",
-		MissionID: "MISSION-001",
-		Title:     "Test Operation",
-		Status:    "ready",
+		ID:           "OP-001",
+		CommissionID: "MISSION-001",
+		Title:        "Test Operation",
+		Status:       "ready",
 	}
 
 	operation, err := service.GetOperation(ctx, "OP-001")
@@ -207,19 +207,19 @@ func TestListOperations_FilterByMission(t *testing.T) {
 	ctx := context.Background()
 
 	operationRepo.operations["OP-001"] = &secondary.OperationRecord{
-		ID:        "OP-001",
-		MissionID: "MISSION-001",
-		Title:     "Operation 1",
-		Status:    "ready",
+		ID:           "OP-001",
+		CommissionID: "MISSION-001",
+		Title:        "Operation 1",
+		Status:       "ready",
 	}
 	operationRepo.operations["OP-002"] = &secondary.OperationRecord{
-		ID:        "OP-002",
-		MissionID: "MISSION-002",
-		Title:     "Operation 2",
-		Status:    "ready",
+		ID:           "OP-002",
+		CommissionID: "MISSION-002",
+		Title:        "Operation 2",
+		Status:       "ready",
 	}
 
-	operations, err := service.ListOperations(ctx, primary.OperationFilters{MissionID: "MISSION-001"})
+	operations, err := service.ListOperations(ctx, primary.OperationFilters{CommissionID: "MISSION-001"})
 
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
@@ -234,16 +234,16 @@ func TestListOperations_FilterByStatus(t *testing.T) {
 	ctx := context.Background()
 
 	operationRepo.operations["OP-001"] = &secondary.OperationRecord{
-		ID:        "OP-001",
-		MissionID: "MISSION-001",
-		Title:     "Ready Operation",
-		Status:    "ready",
+		ID:           "OP-001",
+		CommissionID: "MISSION-001",
+		Title:        "Ready Operation",
+		Status:       "ready",
 	}
 	operationRepo.operations["OP-002"] = &secondary.OperationRecord{
-		ID:        "OP-002",
-		MissionID: "MISSION-001",
-		Title:     "Complete Operation",
-		Status:    "complete",
+		ID:           "OP-002",
+		CommissionID: "MISSION-001",
+		Title:        "Complete Operation",
+		Status:       "complete",
 	}
 
 	operations, err := service.ListOperations(ctx, primary.OperationFilters{Status: "ready"})
@@ -265,10 +265,10 @@ func TestUpdateOperationStatus_ToInProgress(t *testing.T) {
 	ctx := context.Background()
 
 	operationRepo.operations["OP-001"] = &secondary.OperationRecord{
-		ID:        "OP-001",
-		MissionID: "MISSION-001",
-		Title:     "Test Operation",
-		Status:    "ready",
+		ID:           "OP-001",
+		CommissionID: "MISSION-001",
+		Title:        "Test Operation",
+		Status:       "ready",
 	}
 
 	err := service.UpdateOperationStatus(ctx, "OP-001", "in_progress")
@@ -286,10 +286,10 @@ func TestUpdateOperationStatus_ToComplete(t *testing.T) {
 	ctx := context.Background()
 
 	operationRepo.operations["OP-001"] = &secondary.OperationRecord{
-		ID:        "OP-001",
-		MissionID: "MISSION-001",
-		Title:     "Test Operation",
-		Status:    "in_progress",
+		ID:           "OP-001",
+		CommissionID: "MISSION-001",
+		Title:        "Test Operation",
+		Status:       "in_progress",
 	}
 
 	err := service.UpdateOperationStatus(ctx, "OP-001", "complete")
@@ -314,10 +314,10 @@ func TestCompleteOperation_Success(t *testing.T) {
 	ctx := context.Background()
 
 	operationRepo.operations["OP-001"] = &secondary.OperationRecord{
-		ID:        "OP-001",
-		MissionID: "MISSION-001",
-		Title:     "Test Operation",
-		Status:    "in_progress",
+		ID:           "OP-001",
+		CommissionID: "MISSION-001",
+		Title:        "Test Operation",
+		Status:       "in_progress",
 	}
 
 	err := service.CompleteOperation(ctx, "OP-001")

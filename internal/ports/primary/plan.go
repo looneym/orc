@@ -34,11 +34,11 @@ type PlanService interface {
 
 // CreatePlanRequest contains parameters for creating a plan.
 type CreatePlanRequest struct {
-	MissionID   string
-	ShipmentID  string // Optional
-	Title       string
-	Description string
-	Content     string
+	CommissionID string
+	ShipmentID   string // Optional
+	Title        string
+	Description  string
+	Content      string
 }
 
 // CreatePlanResponse contains the result of creating a plan.
@@ -59,7 +59,7 @@ type UpdatePlanRequest struct {
 type Plan struct {
 	ID               string
 	ShipmentID       string
-	MissionID        string
+	CommissionID     string
 	Title            string
 	Description      string
 	Status           string
@@ -75,7 +75,7 @@ type Plan struct {
 
 // PlanFilters contains filter options for listing plans.
 type PlanFilters struct {
-	ShipmentID string
-	MissionID  string
-	Status     string
+	ShipmentID   string
+	CommissionID string
+	Status       string
 }

@@ -7,7 +7,7 @@ import (
 
 type Tome struct {
 	ID              string
-	MissionID       string
+	ComcommissionID string
 	Title           string
 	Description     sql.NullString
 	Status          string

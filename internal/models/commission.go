@@ -7,10 +7,10 @@ import (
 	"time"
 )
 
-// Mission represents a mission entity.
+// Commission represents a commission entity.
 // This is the domain type used within the models package.
 // For persistence, use the repository interfaces in ports/secondary.
-type Mission struct {
+type Commission struct {
 	ID          string
 	Title       string
 	Description sql.NullString
@@ -21,9 +21,9 @@ type Mission struct {
 	CompletedAt sql.NullTime
 }
 
-// MissionStatus constants
+// CommissionStatus constants
 const (
-	MissionStatusActive   = "active"
-	MissionStatusComplete = "complete"
-	MissionStatusArchived = "archived"
+	CommissionStatusActive   = "active"
+	CommissionStatusComplete = "complete"
+	CommissionStatusArchived = "archived"
 )

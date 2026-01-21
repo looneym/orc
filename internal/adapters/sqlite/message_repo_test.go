@@ -21,7 +21,7 @@ func setupMessageTestDB(t *testing.T) *sql.DB {
 
 	// Create missions table
 	_, err = db.Exec(`
-		CREATE TABLE missions (
+		CREATE TABLE commissions (
 			id TEXT PRIMARY KEY,
 			title TEXT NOT NULL,
 			status TEXT NOT NULL DEFAULT 'active',
@@ -43,7 +43,7 @@ func setupMessageTestDB(t *testing.T) *sql.DB {
 			body TEXT NOT NULL,
 			timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
 			read INTEGER NOT NULL DEFAULT 0,
-			mission_id TEXT NOT NULL
+			commission_id TEXT NOT NULL
 		)
 	`)
 	if err != nil {
@@ -51,7 +51,7 @@ func setupMessageTestDB(t *testing.T) *sql.DB {
 	}
 
 	// Insert test mission
-	_, _ = db.Exec("INSERT INTO missions (id, title, status) VALUES ('MISSION-001', 'Test Mission', 'active')")
+	_, _ = db.Exec("INSERT INTO commissions (id, title, status) VALUES ('MISSION-001', 'Test Mission', 'active')")
 
 	t.Cleanup(func() {
 		db.Close()
@@ -70,12 +70,12 @@ func createTestMessage(t *testing.T, repo *sqlite.MessageRepository, ctx context
 	}
 
 	msg := &secondary.MessageRecord{
-		ID:        nextID,
-		MissionID: missionID,
-		Sender:    sender,
-		Recipient: recipient,
-		Subject:   subject,
-		Body:      body,
+		ID:           nextID,
+		CommissionID: missionID,
+		Sender:       sender,
+		Recipient:    recipient,
+		Subject:      subject,
+		Body:         body,
 	}
 
 	err = repo.Create(ctx, msg)
@@ -92,12 +92,12 @@ func TestMessageRepository_Create(t *testing.T) {
 	ctx := context.Background()
 
 	msg := &secondary.MessageRecord{
-		ID:        "MSG-MISSION-001-001",
-		MissionID: "MISSION-001",
-		Sender:    "ORC",
-		Recipient: "IMP-001",
-		Subject:   "Task Assignment",
-		Body:      "Please complete the following task...",
+		ID:           "MSG-MISSION-001-001",
+		CommissionID: "MISSION-001",
+		Sender:       "ORC",
+		Recipient:    "IMP-001",
+		Subject:      "Task Assignment",
+		Body:         "Please complete the following task...",
 	}
 
 	err := repo.Create(ctx, msg)
@@ -346,7 +346,7 @@ func TestMessageRepository_GetNextID_DifferentMissions(t *testing.T) {
 	ctx := context.Background()
 
 	// Add another mission
-	_, _ = db.Exec("INSERT INTO missions (id, title, status) VALUES ('MISSION-002', 'Mission 2', 'active')")
+	_, _ = db.Exec("INSERT INTO commissions (id, title, status) VALUES ('MISSION-002', 'Mission 2', 'active')")
 
 	createTestMessage(t, repo, ctx, "MISSION-001", "ORC", "IMP-001", "Test", "Body")
 	createTestMessage(t, repo, ctx, "MISSION-001", "ORC", "IMP-001", "Test 2", "Body")
@@ -361,22 +361,22 @@ func TestMessageRepository_GetNextID_DifferentMissions(t *testing.T) {
 	}
 }
 
-func TestMessageRepository_MissionExists(t *testing.T) {
+func TestMessageRepository_CommissionExists(t *testing.T) {
 	db := setupMessageTestDB(t)
 	repo := sqlite.NewMessageRepository(db)
 	ctx := context.Background()
 
-	exists, err := repo.MissionExists(ctx, "MISSION-001")
+	exists, err := repo.CommissionExists(ctx, "MISSION-001")
 	if err != nil {
-		t.Fatalf("MissionExists failed: %v", err)
+		t.Fatalf("CommissionExists failed: %v", err)
 	}
 	if !exists {
 		t.Error("expected mission to exist")
 	}
 
-	exists, err = repo.MissionExists(ctx, "MISSION-999")
+	exists, err = repo.CommissionExists(ctx, "MISSION-999")
 	if err != nil {
-		t.Fatalf("MissionExists failed: %v", err)
+		t.Fatalf("CommissionExists failed: %v", err)
 	}
 	if exists {
 		t.Error("expected mission to not exist")

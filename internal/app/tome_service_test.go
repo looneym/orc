@@ -58,7 +58,7 @@ func (m *mockTomeRepository) List(ctx context.Context, filters secondary.TomeFil
 	}
 	var result []*secondary.TomeRecord
 	for _, t := range m.tomes {
-		if filters.MissionID != "" && t.MissionID != filters.MissionID {
+		if filters.CommissionID != "" && t.CommissionID != filters.CommissionID {
 			continue
 		}
 		if filters.Status != "" && t.Status != filters.Status {
@@ -143,7 +143,7 @@ func (m *mockTomeRepository) AssignGrove(ctx context.Context, tomeID, groveID st
 	return nil
 }
 
-func (m *mockTomeRepository) MissionExists(ctx context.Context, missionID string) (bool, error) {
+func (m *mockTomeRepository) CommissionExists(ctx context.Context, missionID string) (bool, error) {
 	if m.missionExistsErr != nil {
 		return false, m.missionExistsErr
 	}
@@ -224,9 +224,9 @@ func TestCreateTome_Success(t *testing.T) {
 	ctx := context.Background()
 
 	resp, err := service.CreateTome(ctx, primary.CreateTomeRequest{
-		MissionID:   "MISSION-001",
-		Title:       "Test Tome",
-		Description: "A test tome",
+		CommissionID: "MISSION-001",
+		Title:        "Test Tome",
+		Description:  "A test tome",
 	})
 
 	if err != nil {
@@ -250,9 +250,9 @@ func TestCreateTome_MissionNotFound(t *testing.T) {
 	tomeRepo.missionExistsResult = false
 
 	_, err := service.CreateTome(ctx, primary.CreateTomeRequest{
-		MissionID:   "MISSION-NONEXISTENT",
-		Title:       "Test Tome",
-		Description: "A test tome",
+		CommissionID: "MISSION-NONEXISTENT",
+		Title:        "Test Tome",
+		Description:  "A test tome",
 	})
 
 	if err == nil {
@@ -269,10 +269,10 @@ func TestGetTome_Found(t *testing.T) {
 	ctx := context.Background()
 
 	tomeRepo.tomes["TOME-001"] = &secondary.TomeRecord{
-		ID:        "TOME-001",
-		MissionID: "MISSION-001",
-		Title:     "Test Tome",
-		Status:    "active",
+		ID:           "TOME-001",
+		CommissionID: "MISSION-001",
+		Title:        "Test Tome",
+		Status:       "active",
 	}
 
 	tome, err := service.GetTome(ctx, "TOME-001")
@@ -305,19 +305,19 @@ func TestListTomes_FilterByMission(t *testing.T) {
 	ctx := context.Background()
 
 	tomeRepo.tomes["TOME-001"] = &secondary.TomeRecord{
-		ID:        "TOME-001",
-		MissionID: "MISSION-001",
-		Title:     "Tome 1",
-		Status:    "active",
+		ID:           "TOME-001",
+		CommissionID: "MISSION-001",
+		Title:        "Tome 1",
+		Status:       "active",
 	}
 	tomeRepo.tomes["TOME-002"] = &secondary.TomeRecord{
-		ID:        "TOME-002",
-		MissionID: "MISSION-002",
-		Title:     "Tome 2",
-		Status:    "active",
+		ID:           "TOME-002",
+		CommissionID: "MISSION-002",
+		Title:        "Tome 2",
+		Status:       "active",
 	}
 
-	tomes, err := service.ListTomes(ctx, primary.TomeFilters{MissionID: "MISSION-001"})
+	tomes, err := service.ListTomes(ctx, primary.TomeFilters{CommissionID: "MISSION-001"})
 
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
@@ -332,16 +332,16 @@ func TestListTomes_FilterByStatus(t *testing.T) {
 	ctx := context.Background()
 
 	tomeRepo.tomes["TOME-001"] = &secondary.TomeRecord{
-		ID:        "TOME-001",
-		MissionID: "MISSION-001",
-		Title:     "Active Tome",
-		Status:    "active",
+		ID:           "TOME-001",
+		CommissionID: "MISSION-001",
+		Title:        "Active Tome",
+		Status:       "active",
 	}
 	tomeRepo.tomes["TOME-002"] = &secondary.TomeRecord{
-		ID:        "TOME-002",
-		MissionID: "MISSION-001",
-		Title:     "Paused Tome",
-		Status:    "paused",
+		ID:           "TOME-002",
+		CommissionID: "MISSION-001",
+		Title:        "Paused Tome",
+		Status:       "paused",
 	}
 
 	tomes, err := service.ListTomes(ctx, primary.TomeFilters{Status: "active"})
@@ -363,11 +363,11 @@ func TestCompleteTome_UnpinnedAllowed(t *testing.T) {
 	ctx := context.Background()
 
 	tomeRepo.tomes["TOME-001"] = &secondary.TomeRecord{
-		ID:        "TOME-001",
-		MissionID: "MISSION-001",
-		Title:     "Test Tome",
-		Status:    "active",
-		Pinned:    false,
+		ID:           "TOME-001",
+		CommissionID: "MISSION-001",
+		Title:        "Test Tome",
+		Status:       "active",
+		Pinned:       false,
 	}
 
 	err := service.CompleteTome(ctx, "TOME-001")
@@ -385,11 +385,11 @@ func TestCompleteTome_PinnedBlocked(t *testing.T) {
 	ctx := context.Background()
 
 	tomeRepo.tomes["TOME-001"] = &secondary.TomeRecord{
-		ID:        "TOME-001",
-		MissionID: "MISSION-001",
-		Title:     "Pinned Tome",
-		Status:    "active",
-		Pinned:    true,
+		ID:           "TOME-001",
+		CommissionID: "MISSION-001",
+		Title:        "Pinned Tome",
+		Status:       "active",
+		Pinned:       true,
 	}
 
 	err := service.CompleteTome(ctx, "TOME-001")
@@ -419,10 +419,10 @@ func TestPauseTome_ActiveAllowed(t *testing.T) {
 	ctx := context.Background()
 
 	tomeRepo.tomes["TOME-001"] = &secondary.TomeRecord{
-		ID:        "TOME-001",
-		MissionID: "MISSION-001",
-		Title:     "Active Tome",
-		Status:    "active",
+		ID:           "TOME-001",
+		CommissionID: "MISSION-001",
+		Title:        "Active Tome",
+		Status:       "active",
 	}
 
 	err := service.PauseTome(ctx, "TOME-001")
@@ -440,10 +440,10 @@ func TestPauseTome_NotActiveBlocked(t *testing.T) {
 	ctx := context.Background()
 
 	tomeRepo.tomes["TOME-001"] = &secondary.TomeRecord{
-		ID:        "TOME-001",
-		MissionID: "MISSION-001",
-		Title:     "Paused Tome",
-		Status:    "paused",
+		ID:           "TOME-001",
+		CommissionID: "MISSION-001",
+		Title:        "Paused Tome",
+		Status:       "paused",
 	}
 
 	err := service.PauseTome(ctx, "TOME-001")
@@ -462,10 +462,10 @@ func TestResumeTome_PausedAllowed(t *testing.T) {
 	ctx := context.Background()
 
 	tomeRepo.tomes["TOME-001"] = &secondary.TomeRecord{
-		ID:        "TOME-001",
-		MissionID: "MISSION-001",
-		Title:     "Paused Tome",
-		Status:    "paused",
+		ID:           "TOME-001",
+		CommissionID: "MISSION-001",
+		Title:        "Paused Tome",
+		Status:       "paused",
 	}
 
 	err := service.ResumeTome(ctx, "TOME-001")
@@ -483,10 +483,10 @@ func TestResumeTome_NotPausedBlocked(t *testing.T) {
 	ctx := context.Background()
 
 	tomeRepo.tomes["TOME-001"] = &secondary.TomeRecord{
-		ID:        "TOME-001",
-		MissionID: "MISSION-001",
-		Title:     "Active Tome",
-		Status:    "active",
+		ID:           "TOME-001",
+		CommissionID: "MISSION-001",
+		Title:        "Active Tome",
+		Status:       "active",
 	}
 
 	err := service.ResumeTome(ctx, "TOME-001")
@@ -505,11 +505,11 @@ func TestPinTome(t *testing.T) {
 	ctx := context.Background()
 
 	tomeRepo.tomes["TOME-001"] = &secondary.TomeRecord{
-		ID:        "TOME-001",
-		MissionID: "MISSION-001",
-		Title:     "Test Tome",
-		Status:    "active",
-		Pinned:    false,
+		ID:           "TOME-001",
+		CommissionID: "MISSION-001",
+		Title:        "Test Tome",
+		Status:       "active",
+		Pinned:       false,
 	}
 
 	err := service.PinTome(ctx, "TOME-001")
@@ -527,11 +527,11 @@ func TestUnpinTome(t *testing.T) {
 	ctx := context.Background()
 
 	tomeRepo.tomes["TOME-001"] = &secondary.TomeRecord{
-		ID:        "TOME-001",
-		MissionID: "MISSION-001",
-		Title:     "Pinned Tome",
-		Status:    "active",
-		Pinned:    true,
+		ID:           "TOME-001",
+		CommissionID: "MISSION-001",
+		Title:        "Pinned Tome",
+		Status:       "active",
+		Pinned:       true,
 	}
 
 	err := service.UnpinTome(ctx, "TOME-001")
@@ -553,11 +553,11 @@ func TestUpdateTome_Title(t *testing.T) {
 	ctx := context.Background()
 
 	tomeRepo.tomes["TOME-001"] = &secondary.TomeRecord{
-		ID:          "TOME-001",
-		MissionID:   "MISSION-001",
-		Title:       "Old Title",
-		Description: "Original description",
-		Status:      "active",
+		ID:           "TOME-001",
+		CommissionID: "MISSION-001",
+		Title:        "Old Title",
+		Description:  "Original description",
+		Status:       "active",
 	}
 
 	err := service.UpdateTome(ctx, primary.UpdateTomeRequest{
@@ -582,10 +582,10 @@ func TestDeleteTome_Success(t *testing.T) {
 	ctx := context.Background()
 
 	tomeRepo.tomes["TOME-001"] = &secondary.TomeRecord{
-		ID:        "TOME-001",
-		MissionID: "MISSION-001",
-		Title:     "Test Tome",
-		Status:    "active",
+		ID:           "TOME-001",
+		CommissionID: "MISSION-001",
+		Title:        "Test Tome",
+		Status:       "active",
 	}
 
 	err := service.DeleteTome(ctx, "TOME-001")
@@ -607,10 +607,10 @@ func TestAssignTomeToGrove_Success(t *testing.T) {
 	ctx := context.Background()
 
 	tomeRepo.tomes["TOME-001"] = &secondary.TomeRecord{
-		ID:        "TOME-001",
-		MissionID: "MISSION-001",
-		Title:     "Test Tome",
-		Status:    "active",
+		ID:           "TOME-001",
+		CommissionID: "MISSION-001",
+		Title:        "Test Tome",
+		Status:       "active",
 	}
 
 	err := service.AssignTomeToGrove(ctx, "TOME-001", "GROVE-001")
@@ -644,16 +644,16 @@ func TestGetTomesByGrove_Success(t *testing.T) {
 
 	tomeRepo.tomes["TOME-001"] = &secondary.TomeRecord{
 		ID:              "TOME-001",
-		MissionID:       "MISSION-001",
+		CommissionID:    "MISSION-001",
 		Title:           "Assigned Tome",
 		Status:          "active",
 		AssignedGroveID: "GROVE-001",
 	}
 	tomeRepo.tomes["TOME-002"] = &secondary.TomeRecord{
-		ID:        "TOME-002",
-		MissionID: "MISSION-001",
-		Title:     "Unassigned Tome",
-		Status:    "active",
+		ID:           "TOME-002",
+		CommissionID: "MISSION-001",
+		Title:        "Unassigned Tome",
+		Status:       "active",
 	}
 
 	tomes, err := service.GetTomesByGrove(ctx, "GROVE-001")

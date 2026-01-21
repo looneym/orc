@@ -21,7 +21,7 @@ func setupNoteTestDB(t *testing.T) *sql.DB {
 
 	// Create missions table
 	_, err = db.Exec(`
-		CREATE TABLE missions (
+		CREATE TABLE commissions (
 			id TEXT PRIMARY KEY,
 			title TEXT NOT NULL,
 			status TEXT NOT NULL DEFAULT 'active',
@@ -37,7 +37,7 @@ func setupNoteTestDB(t *testing.T) *sql.DB {
 	_, err = db.Exec(`
 		CREATE TABLE notes (
 			id TEXT PRIMARY KEY,
-			mission_id TEXT NOT NULL,
+			commission_id TEXT NOT NULL,
 			title TEXT NOT NULL,
 			content TEXT,
 			type TEXT,
@@ -59,7 +59,7 @@ func setupNoteTestDB(t *testing.T) *sql.DB {
 	}
 
 	// Insert test mission
-	_, _ = db.Exec("INSERT INTO missions (id, title, status) VALUES ('MISSION-001', 'Test Mission', 'active')")
+	_, _ = db.Exec("INSERT INTO commissions (id, title, status) VALUES ('MISSION-001', 'Test Mission', 'active')")
 
 	t.Cleanup(func() {
 		db.Close()
@@ -78,10 +78,10 @@ func createTestNote(t *testing.T, repo *sqlite.NoteRepository, ctx context.Conte
 	}
 
 	note := &secondary.NoteRecord{
-		ID:        nextID,
-		MissionID: missionID,
-		Title:     title,
-		Content:   content,
+		ID:           nextID,
+		CommissionID: missionID,
+		Title:        title,
+		Content:      content,
 	}
 
 	err = repo.Create(ctx, note)
@@ -98,11 +98,11 @@ func TestNoteRepository_Create(t *testing.T) {
 	ctx := context.Background()
 
 	note := &secondary.NoteRecord{
-		ID:        "NOTE-001",
-		MissionID: "MISSION-001",
-		Title:     "Test Note",
-		Content:   "This is the note content",
-		Type:      "observation",
+		ID:           "NOTE-001",
+		CommissionID: "MISSION-001",
+		Title:        "Test Note",
+		Content:      "This is the note content",
+		Type:         "observation",
 	}
 
 	err := repo.Create(ctx, note)
@@ -132,10 +132,10 @@ func TestNoteRepository_Create_WithContainer(t *testing.T) {
 	ctx := context.Background()
 
 	note := &secondary.NoteRecord{
-		ID:         "NOTE-001",
-		MissionID:  "MISSION-001",
-		Title:      "Shipment Note",
-		ShipmentID: "SHIP-001",
+		ID:           "NOTE-001",
+		CommissionID: "MISSION-001",
+		Title:        "Shipment Note",
+		ShipmentID:   "SHIP-001",
 	}
 
 	err := repo.Create(ctx, note)
@@ -227,12 +227,12 @@ func TestNoteRepository_List_FilterByMission(t *testing.T) {
 	ctx := context.Background()
 
 	// Add another mission
-	_, _ = db.Exec("INSERT INTO missions (id, title, status) VALUES ('MISSION-002', 'Mission 2', 'active')")
+	_, _ = db.Exec("INSERT INTO commissions (id, title, status) VALUES ('MISSION-002', 'Mission 2', 'active')")
 
 	createTestNote(t, repo, ctx, "MISSION-001", "Note 1", "")
 	createTestNote(t, repo, ctx, "MISSION-002", "Note 2", "")
 
-	notes, err := repo.List(ctx, secondary.NoteFilters{MissionID: "MISSION-001"})
+	notes, err := repo.List(ctx, secondary.NoteFilters{CommissionID: "MISSION-001"})
 	if err != nil {
 		t.Fatalf("List failed: %v", err)
 	}
@@ -383,9 +383,9 @@ func TestNoteRepository_GetByContainer_Shipment(t *testing.T) {
 	ctx := context.Background()
 
 	// Create notes for different containers
-	_, _ = db.Exec(`INSERT INTO notes (id, mission_id, title, shipment_id) VALUES ('NOTE-001', 'MISSION-001', 'Ship Note 1', 'SHIP-001')`)
-	_, _ = db.Exec(`INSERT INTO notes (id, mission_id, title, shipment_id) VALUES ('NOTE-002', 'MISSION-001', 'Ship Note 2', 'SHIP-001')`)
-	_, _ = db.Exec(`INSERT INTO notes (id, mission_id, title, investigation_id) VALUES ('NOTE-003', 'MISSION-001', 'Inv Note', 'INV-001')`)
+	_, _ = db.Exec(`INSERT INTO notes (id, commission_id, title, shipment_id) VALUES ('NOTE-001', 'MISSION-001', 'Ship Note 1', 'SHIP-001')`)
+	_, _ = db.Exec(`INSERT INTO notes (id, commission_id, title, shipment_id) VALUES ('NOTE-002', 'MISSION-001', 'Ship Note 2', 'SHIP-001')`)
+	_, _ = db.Exec(`INSERT INTO notes (id, commission_id, title, investigation_id) VALUES ('NOTE-003', 'MISSION-001', 'Inv Note', 'INV-001')`)
 
 	notes, err := repo.GetByContainer(ctx, "shipment", "SHIP-001")
 	if err != nil {
@@ -402,9 +402,9 @@ func TestNoteRepository_GetByContainer_Investigation(t *testing.T) {
 	repo := sqlite.NewNoteRepository(db)
 	ctx := context.Background()
 
-	_, _ = db.Exec(`INSERT INTO notes (id, mission_id, title, investigation_id) VALUES ('NOTE-001', 'MISSION-001', 'Inv Note 1', 'INV-001')`)
-	_, _ = db.Exec(`INSERT INTO notes (id, mission_id, title, investigation_id) VALUES ('NOTE-002', 'MISSION-001', 'Inv Note 2', 'INV-001')`)
-	_, _ = db.Exec(`INSERT INTO notes (id, mission_id, title, investigation_id) VALUES ('NOTE-003', 'MISSION-001', 'Inv Note 3', 'INV-002')`)
+	_, _ = db.Exec(`INSERT INTO notes (id, commission_id, title, investigation_id) VALUES ('NOTE-001', 'MISSION-001', 'Inv Note 1', 'INV-001')`)
+	_, _ = db.Exec(`INSERT INTO notes (id, commission_id, title, investigation_id) VALUES ('NOTE-002', 'MISSION-001', 'Inv Note 2', 'INV-001')`)
+	_, _ = db.Exec(`INSERT INTO notes (id, commission_id, title, investigation_id) VALUES ('NOTE-003', 'MISSION-001', 'Inv Note 3', 'INV-002')`)
 
 	notes, err := repo.GetByContainer(ctx, "investigation", "INV-001")
 	if err != nil {
@@ -421,7 +421,7 @@ func TestNoteRepository_GetByContainer_Conclave(t *testing.T) {
 	repo := sqlite.NewNoteRepository(db)
 	ctx := context.Background()
 
-	_, _ = db.Exec(`INSERT INTO notes (id, mission_id, title, conclave_id) VALUES ('NOTE-001', 'MISSION-001', 'Conclave Note', 'CON-001')`)
+	_, _ = db.Exec(`INSERT INTO notes (id, commission_id, title, conclave_id) VALUES ('NOTE-001', 'MISSION-001', 'Conclave Note', 'CON-001')`)
 
 	notes, err := repo.GetByContainer(ctx, "conclave", "CON-001")
 	if err != nil {
@@ -438,7 +438,7 @@ func TestNoteRepository_GetByContainer_Tome(t *testing.T) {
 	repo := sqlite.NewNoteRepository(db)
 	ctx := context.Background()
 
-	_, _ = db.Exec(`INSERT INTO notes (id, mission_id, title, tome_id) VALUES ('NOTE-001', 'MISSION-001', 'Tome Note', 'TOME-001')`)
+	_, _ = db.Exec(`INSERT INTO notes (id, commission_id, title, tome_id) VALUES ('NOTE-001', 'MISSION-001', 'Tome Note', 'TOME-001')`)
 
 	notes, err := repo.GetByContainer(ctx, "tome", "TOME-001")
 	if err != nil {
@@ -461,22 +461,22 @@ func TestNoteRepository_GetByContainer_UnknownType(t *testing.T) {
 	}
 }
 
-func TestNoteRepository_MissionExists(t *testing.T) {
+func TestNoteRepository_CommissionExists(t *testing.T) {
 	db := setupNoteTestDB(t)
 	repo := sqlite.NewNoteRepository(db)
 	ctx := context.Background()
 
-	exists, err := repo.MissionExists(ctx, "MISSION-001")
+	exists, err := repo.CommissionExists(ctx, "MISSION-001")
 	if err != nil {
-		t.Fatalf("MissionExists failed: %v", err)
+		t.Fatalf("CommissionExists failed: %v", err)
 	}
 	if !exists {
 		t.Error("expected mission to exist")
 	}
 
-	exists, err = repo.MissionExists(ctx, "MISSION-999")
+	exists, err = repo.CommissionExists(ctx, "MISSION-999")
 	if err != nil {
-		t.Fatalf("MissionExists failed: %v", err)
+		t.Fatalf("CommissionExists failed: %v", err)
 	}
 	if exists {
 		t.Error("expected mission to not exist")

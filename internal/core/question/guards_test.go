@@ -12,17 +12,17 @@ func TestCanCreateQuestion(t *testing.T) {
 		{
 			name: "can create question when mission exists and no investigation",
 			ctx: CreateQuestionContext{
-				MissionID:       "MISSION-001",
-				MissionExists:   true,
-				InvestigationID: "",
+				CommissionID:     "MISSION-001",
+				CommissionExists: true,
+				InvestigationID:  "",
 			},
 			wantAllowed: true,
 		},
 		{
 			name: "can create question when mission exists with investigation",
 			ctx: CreateQuestionContext{
-				MissionID:           "MISSION-001",
-				MissionExists:       true,
+				CommissionID:        "MISSION-001",
+				CommissionExists:    true,
 				InvestigationID:     "INV-001",
 				InvestigationExists: true,
 			},
@@ -31,17 +31,17 @@ func TestCanCreateQuestion(t *testing.T) {
 		{
 			name: "cannot create question when mission not found",
 			ctx: CreateQuestionContext{
-				MissionID:     "MISSION-999",
-				MissionExists: false,
+				CommissionID:     "MISSION-999",
+				CommissionExists: false,
 			},
 			wantAllowed: false,
-			wantReason:  "mission MISSION-999 not found",
+			wantReason:  "commission MISSION-999 not found",
 		},
 		{
 			name: "cannot create question when investigation not found",
 			ctx: CreateQuestionContext{
-				MissionID:           "MISSION-001",
-				MissionExists:       true,
+				CommissionID:        "MISSION-001",
+				CommissionExists:    true,
 				InvestigationID:     "INV-999",
 				InvestigationExists: false,
 			},

@@ -31,16 +31,16 @@ var tomeCreateCmd = &cobra.Command{
 
 		// Get mission from context or require explicit flag
 		if missionID == "" {
-			missionID = orccontext.GetContextMissionID()
+			missionID = orccontext.GetContextCommissionID()
 			if missionID == "" {
-				return fmt.Errorf("no mission context detected\nHint: Use --mission flag or run from a grove/mission directory")
+				return fmt.Errorf("no mission context detected\nHint: Use --commission flag or run from a grove/mission directory")
 			}
 		}
 
 		resp, err := wire.TomeService().CreateTome(ctx, primary.CreateTomeRequest{
-			MissionID:   missionID,
-			Title:       title,
-			Description: description,
+			CommissionID: missionID,
+			Title:        title,
+			Description:  description,
 		})
 		if err != nil {
 			return fmt.Errorf("failed to create tome: %w", err)
@@ -48,7 +48,7 @@ var tomeCreateCmd = &cobra.Command{
 
 		tome := resp.Tome
 		fmt.Printf("✓ Created tome %s: %s\n", tome.ID, tome.Title)
-		fmt.Printf("  Mission: %s\n", tome.MissionID)
+		fmt.Printf("  Mission: %s\n", tome.CommissionID)
 		fmt.Printf("  Status: %s\n", tome.Status)
 		fmt.Println()
 		fmt.Println("Next steps:")
@@ -67,12 +67,12 @@ var tomeListCmd = &cobra.Command{
 
 		// Get mission from context if not specified
 		if missionID == "" {
-			missionID = orccontext.GetContextMissionID()
+			missionID = orccontext.GetContextCommissionID()
 		}
 
 		tomes, err := wire.TomeService().ListTomes(ctx, primary.TomeFilters{
-			MissionID: missionID,
-			Status:    status,
+			CommissionID: missionID,
+			Status:       status,
 		})
 		if err != nil {
 			return fmt.Errorf("failed to list tomes: %w", err)
@@ -95,7 +95,7 @@ var tomeListCmd = &cobra.Command{
 			if t.Status == "complete" {
 				statusIcon = "✅"
 			}
-			fmt.Fprintf(w, "%s\t%s%s\t%s %s\t%s\n", t.ID, t.Title, pinnedMark, statusIcon, t.Status, t.MissionID)
+			fmt.Fprintf(w, "%s\t%s%s\t%s %s\t%s\n", t.ID, t.Title, pinnedMark, statusIcon, t.Status, t.CommissionID)
 		}
 		w.Flush()
 		return nil
@@ -121,7 +121,7 @@ var tomeShowCmd = &cobra.Command{
 			fmt.Printf("Description: %s\n", tome.Description)
 		}
 		fmt.Printf("Status: %s\n", tome.Status)
-		fmt.Printf("Mission: %s\n", tome.MissionID)
+		fmt.Printf("Mission: %s\n", tome.CommissionID)
 		if tome.Pinned {
 			fmt.Printf("Pinned: yes\n")
 		}
@@ -289,11 +289,11 @@ var tomeDeleteCmd = &cobra.Command{
 
 func init() {
 	// tome create flags
-	tomeCreateCmd.Flags().StringP("mission", "m", "", "Mission ID (defaults to context)")
+	tomeCreateCmd.Flags().StringP("commission", "c", "", "Commission ID (defaults to context)")
 	tomeCreateCmd.Flags().StringP("description", "d", "", "Tome description")
 
 	// tome list flags
-	tomeListCmd.Flags().StringP("mission", "m", "", "Filter by mission")
+	tomeListCmd.Flags().StringP("commission", "c", "", "Filter by mission")
 	tomeListCmd.Flags().StringP("status", "s", "", "Filter by status (active, complete)")
 
 	// tome update flags

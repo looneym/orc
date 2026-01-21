@@ -18,17 +18,17 @@ type EffectExecutor interface {
 
 // DefaultEffectExecutor implements EffectExecutor with real I/O.
 type DefaultEffectExecutor struct {
-	groveRepo   secondary.GroveRepository
-	missionRepo secondary.MissionRepository
-	tmuxAdapter secondary.TMuxAdapter
+	groveRepo         secondary.GroveRepository
+	comcommissionRepo secondary.CommissionRepository
+	tmuxAdapter       secondary.TMuxAdapter
 }
 
 // NewEffectExecutor creates a new DefaultEffectExecutor with injected dependencies.
-func NewEffectExecutor(groveRepo secondary.GroveRepository, missionRepo secondary.MissionRepository, tmuxAdapter secondary.TMuxAdapter) *DefaultEffectExecutor {
+func NewEffectExecutor(groveRepo secondary.GroveRepository, comcommissionRepo secondary.CommissionRepository, tmuxAdapter secondary.TMuxAdapter) *DefaultEffectExecutor {
 	return &DefaultEffectExecutor{
-		groveRepo:   groveRepo,
-		missionRepo: missionRepo,
-		tmuxAdapter: tmuxAdapter,
+		groveRepo:         groveRepo,
+		comcommissionRepo: comcommissionRepo,
+		tmuxAdapter:       tmuxAdapter,
 	}
 }
 
@@ -83,8 +83,8 @@ func (e *DefaultEffectExecutor) executePersist(ctx context.Context, eff effects.
 	switch eff.Entity {
 	case "grove":
 		return e.executeGroveOp(ctx, eff)
-	case "mission":
-		return e.executeMissionOp(ctx, eff)
+	case "commission":
+		return e.executeCommissionOp(ctx, eff)
 	default:
 		return fmt.Errorf("unknown entity: %s", eff.Entity)
 	}
@@ -106,19 +106,19 @@ func (e *DefaultEffectExecutor) executeGroveOp(ctx context.Context, eff effects.
 	}
 }
 
-func (e *DefaultEffectExecutor) executeMissionOp(ctx context.Context, eff effects.PersistEffect) error {
+func (e *DefaultEffectExecutor) executeCommissionOp(ctx context.Context, eff effects.PersistEffect) error {
 	switch eff.Operation {
 	case "update_status":
 		data, ok := eff.Data.(map[string]string)
 		if !ok {
-			return fmt.Errorf("invalid mission update data type: %T", eff.Data)
+			return fmt.Errorf("invalid comcommission update data type: %T", eff.Data)
 		}
-		return e.missionRepo.Update(ctx, &secondary.MissionRecord{
+		return e.comcommissionRepo.Update(ctx, &secondary.CommissionRecord{
 			ID:     data["id"],
 			Status: data["status"],
 		})
 	default:
-		return fmt.Errorf("unknown mission operation: %s", eff.Operation)
+		return fmt.Errorf("unknown comcommission operation: %s", eff.Operation)
 	}
 }
 

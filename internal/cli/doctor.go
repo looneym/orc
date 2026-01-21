@@ -25,7 +25,7 @@ func DoctorCmd() *cobra.Command {
 
 Validates:
 - Claude Code workspace trust configuration (CRITICAL)
-- Directory structure (worktrees, missions)
+- Directory structure (worktrees, factories)
 - Database existence and integrity
 - Binary installation and PATH
 
@@ -55,7 +55,7 @@ Examples:
 				fmt.Println("   ✓ Valid JSON structure")
 				fmt.Println("   ✓ permissions.additionalDirectories configured")
 				fmt.Println("   ✓ ~/src/worktrees in trusted directories")
-				fmt.Println("   ✓ ~/src/missions in trusted directories")
+				fmt.Println("   ✓ ~/src/factories in trusted directories")
 				fmt.Println()
 			}
 
@@ -141,7 +141,7 @@ func checkClaudeSettings(quiet bool) error {
      "permissions": {
        "additionalDirectories": [
          "~/src/worktrees",
-         "~/src/missions"
+         "~/src/factories"
        ]
      }
    }
@@ -170,7 +170,7 @@ func checkClaudeSettings(quiet bool) error {
      "permissions": {
        "additionalDirectories": [
          "~/src/worktrees",
-         "~/src/missions"
+         "~/src/factories"
        ]
      }
    }`)
@@ -184,7 +184,7 @@ func checkClaudeSettings(quiet bool) error {
 
    "additionalDirectories": [
      "~/src/worktrees",
-     "~/src/missions"
+     "~/src/factories"
    ]`)
 	}
 
@@ -197,15 +197,15 @@ func checkClaudeSettings(quiet bool) error {
 	}
 
 	missingWorktrees := !foundDirs["~/src/worktrees"]
-	missingMissions := !foundDirs["~/src/missions"]
+	missingFactories := !foundDirs["~/src/factories"]
 
-	if missingWorktrees || missingMissions {
+	if missingWorktrees || missingFactories {
 		msg := "✗ Missing required directories:\n"
 		if missingWorktrees {
 			msg += "     - ~/src/worktrees\n"
 		}
-		if missingMissions {
-			msg += "     - ~/src/missions\n"
+		if missingFactories {
+			msg += "     - ~/src/factories\n"
 		}
 		msg += "\n   FIX: Add missing directories to additionalDirectories array"
 		return errors.New(msg)
@@ -246,10 +246,10 @@ func checkDirectories(quiet bool) error {
 		if missionsExists {
 			// Count missions
 			entries, _ := os.ReadDir(missionsPath)
-			missionCount := len(entries)
-			fmt.Printf("   ✓ ~/src/missions exists (%d missions)\n", missionCount)
+			factoryCount := len(entries)
+			fmt.Printf("   ✓ ~/src/factories exists (%d factories)\n", factoryCount)
 		} else {
-			fmt.Println("   ⚠️  ~/src/missions does not exist (will be created on first mission)")
+			fmt.Println("   ⚠️  ~/src/factories does not exist (will be created on first mission)")
 		}
 		fmt.Println()
 	}

@@ -50,8 +50,8 @@ func (r *NoteRepository) Create(ctx context.Context, note *secondary.NoteRecord)
 	}
 
 	_, err := r.db.ExecContext(ctx,
-		"INSERT INTO notes (id, mission_id, title, content, type, status, shipment_id, investigation_id, conclave_id, tome_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-		note.ID, note.MissionID, note.Title, content, noteType, status, shipmentID, investigationID, conclaveID, tomeID,
+		"INSERT INTO notes (id, commission_id, title, content, type, status, shipment_id, investigation_id, conclave_id, tome_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+		note.ID, note.CommissionID, note.Title, content, noteType, status, shipmentID, investigationID, conclaveID, tomeID,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create note: %w", err)
@@ -80,9 +80,9 @@ func (r *NoteRepository) GetByID(ctx context.Context, id string) (*secondary.Not
 
 	record := &secondary.NoteRecord{}
 	err := r.db.QueryRowContext(ctx,
-		"SELECT id, mission_id, title, content, type, status, shipment_id, investigation_id, conclave_id, tome_id, pinned, created_at, updated_at, closed_at, promoted_from_id, promoted_from_type FROM notes WHERE id = ?",
+		"SELECT id, commission_id, title, content, type, status, shipment_id, investigation_id, conclave_id, tome_id, pinned, created_at, updated_at, closed_at, promoted_from_id, promoted_from_type FROM notes WHERE id = ?",
 		id,
-	).Scan(&record.ID, &record.MissionID, &record.Title, &content, &noteType, &status, &shipmentID, &investigationID, &conclaveID, &tomeID, &pinned, &createdAt, &updatedAt, &closedAt, &promotedFromID, &promotedFromType)
+	).Scan(&record.ID, &record.CommissionID, &record.Title, &content, &noteType, &status, &shipmentID, &investigationID, &conclaveID, &tomeID, &pinned, &createdAt, &updatedAt, &closedAt, &promotedFromID, &promotedFromType)
 
 	if err == sql.ErrNoRows {
 		return nil, fmt.Errorf("note %s not found", id)
@@ -112,7 +112,7 @@ func (r *NoteRepository) GetByID(ctx context.Context, id string) (*secondary.Not
 
 // List retrieves notes matching the given filters.
 func (r *NoteRepository) List(ctx context.Context, filters secondary.NoteFilters) ([]*secondary.NoteRecord, error) {
-	query := "SELECT id, mission_id, title, content, type, status, shipment_id, investigation_id, conclave_id, tome_id, pinned, created_at, updated_at, closed_at, promoted_from_id, promoted_from_type FROM notes WHERE 1=1"
+	query := "SELECT id, commission_id, title, content, type, status, shipment_id, investigation_id, conclave_id, tome_id, pinned, created_at, updated_at, closed_at, promoted_from_id, promoted_from_type FROM notes WHERE 1=1"
 	args := []any{}
 
 	if filters.Type != "" {
@@ -120,9 +120,9 @@ func (r *NoteRepository) List(ctx context.Context, filters secondary.NoteFilters
 		args = append(args, filters.Type)
 	}
 
-	if filters.MissionID != "" {
-		query += " AND mission_id = ?"
-		args = append(args, filters.MissionID)
+	if filters.CommissionID != "" {
+		query += " AND commission_id = ?"
+		args = append(args, filters.CommissionID)
 	}
 
 	query += " ORDER BY created_at DESC"
@@ -152,7 +152,7 @@ func (r *NoteRepository) List(ctx context.Context, filters secondary.NoteFilters
 		)
 
 		record := &secondary.NoteRecord{}
-		err := rows.Scan(&record.ID, &record.MissionID, &record.Title, &content, &noteType, &status, &shipmentID, &investigationID, &conclaveID, &tomeID, &pinned, &createdAt, &updatedAt, &closedAt, &promotedFromID, &promotedFromType)
+		err := rows.Scan(&record.ID, &record.CommissionID, &record.Title, &content, &noteType, &status, &shipmentID, &investigationID, &conclaveID, &tomeID, &pinned, &createdAt, &updatedAt, &closedAt, &promotedFromID, &promotedFromType)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan note: %w", err)
 		}
@@ -279,13 +279,13 @@ func (r *NoteRepository) GetByContainer(ctx context.Context, containerType, cont
 	var query string
 	switch containerType {
 	case "shipment":
-		query = "SELECT id, mission_id, title, content, type, status, shipment_id, investigation_id, conclave_id, tome_id, pinned, created_at, updated_at, closed_at, promoted_from_id, promoted_from_type FROM notes WHERE shipment_id = ? ORDER BY created_at DESC"
+		query = "SELECT id, commission_id, title, content, type, status, shipment_id, investigation_id, conclave_id, tome_id, pinned, created_at, updated_at, closed_at, promoted_from_id, promoted_from_type FROM notes WHERE shipment_id = ? ORDER BY created_at DESC"
 	case "investigation":
-		query = "SELECT id, mission_id, title, content, type, status, shipment_id, investigation_id, conclave_id, tome_id, pinned, created_at, updated_at, closed_at, promoted_from_id, promoted_from_type FROM notes WHERE investigation_id = ? ORDER BY created_at DESC"
+		query = "SELECT id, commission_id, title, content, type, status, shipment_id, investigation_id, conclave_id, tome_id, pinned, created_at, updated_at, closed_at, promoted_from_id, promoted_from_type FROM notes WHERE investigation_id = ? ORDER BY created_at DESC"
 	case "conclave":
-		query = "SELECT id, mission_id, title, content, type, status, shipment_id, investigation_id, conclave_id, tome_id, pinned, created_at, updated_at, closed_at, promoted_from_id, promoted_from_type FROM notes WHERE conclave_id = ? ORDER BY created_at DESC"
+		query = "SELECT id, commission_id, title, content, type, status, shipment_id, investigation_id, conclave_id, tome_id, pinned, created_at, updated_at, closed_at, promoted_from_id, promoted_from_type FROM notes WHERE conclave_id = ? ORDER BY created_at DESC"
 	case "tome":
-		query = "SELECT id, mission_id, title, content, type, status, shipment_id, investigation_id, conclave_id, tome_id, pinned, created_at, updated_at, closed_at, promoted_from_id, promoted_from_type FROM notes WHERE tome_id = ? ORDER BY created_at DESC"
+		query = "SELECT id, commission_id, title, content, type, status, shipment_id, investigation_id, conclave_id, tome_id, pinned, created_at, updated_at, closed_at, promoted_from_id, promoted_from_type FROM notes WHERE tome_id = ? ORDER BY created_at DESC"
 	default:
 		return nil, fmt.Errorf("unknown container type: %s", containerType)
 	}
@@ -315,7 +315,7 @@ func (r *NoteRepository) GetByContainer(ctx context.Context, containerType, cont
 		)
 
 		record := &secondary.NoteRecord{}
-		err := rows.Scan(&record.ID, &record.MissionID, &record.Title, &content, &noteType, &status, &shipmentID, &investigationID, &conclaveID, &tomeID, &pinned, &createdAt, &updatedAt, &closedAt, &promotedFromID, &promotedFromType)
+		err := rows.Scan(&record.ID, &record.CommissionID, &record.Title, &content, &noteType, &status, &shipmentID, &investigationID, &conclaveID, &tomeID, &pinned, &createdAt, &updatedAt, &closedAt, &promotedFromID, &promotedFromType)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan note: %w", err)
 		}
@@ -342,10 +342,10 @@ func (r *NoteRepository) GetByContainer(ctx context.Context, containerType, cont
 	return notes, nil
 }
 
-// MissionExists checks if a mission exists.
-func (r *NoteRepository) MissionExists(ctx context.Context, missionID string) (bool, error) {
+// CommissionExists checks if a mission exists.
+func (r *NoteRepository) CommissionExists(ctx context.Context, missionID string) (bool, error) {
 	var count int
-	err := r.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM missions WHERE id = ?", missionID).Scan(&count)
+	err := r.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM commissions WHERE id = ?", missionID).Scan(&count)
 	if err != nil {
 		return false, fmt.Errorf("failed to check mission existence: %w", err)
 	}

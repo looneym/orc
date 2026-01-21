@@ -11,62 +11,62 @@ import (
 	"github.com/example/orc/internal/ports/secondary"
 )
 
-// MockMissionService for testing
-type mockMissionService struct {
-	missions map[string]*primary.Mission
+// MockCommissionService for testing
+type mockCommissionService struct {
+	commissions map[string]*primary.Commission
 }
 
-func newMockMissionService() *mockMissionService {
-	return &mockMissionService{
-		missions: make(map[string]*primary.Mission),
+func newMockCommissionService() *mockCommissionService {
+	return &mockCommissionService{
+		commissions: make(map[string]*primary.Commission),
 	}
 }
 
-func (m *mockMissionService) GetMission(ctx context.Context, id string) (*primary.Mission, error) {
-	mission, ok := m.missions[id]
+func (m *mockCommissionService) GetCommission(ctx context.Context, id string) (*primary.Commission, error) {
+	commission, ok := m.commissions[id]
 	if !ok {
 		return nil, os.ErrNotExist
 	}
-	return mission, nil
+	return commission, nil
 }
 
-func (m *mockMissionService) CreateMission(ctx context.Context, req primary.CreateMissionRequest) (*primary.CreateMissionResponse, error) {
+func (m *mockCommissionService) CreateCommission(ctx context.Context, req primary.CreateCommissionRequest) (*primary.CreateCommissionResponse, error) {
 	return nil, nil
 }
 
-func (m *mockMissionService) StartMission(ctx context.Context, req primary.StartMissionRequest) (*primary.StartMissionResponse, error) {
+func (m *mockCommissionService) StartCommission(ctx context.Context, req primary.StartCommissionRequest) (*primary.StartCommissionResponse, error) {
 	return nil, nil
 }
 
-func (m *mockMissionService) LaunchMission(ctx context.Context, req primary.LaunchMissionRequest) (*primary.LaunchMissionResponse, error) {
+func (m *mockCommissionService) LaunchCommission(ctx context.Context, req primary.LaunchCommissionRequest) (*primary.LaunchCommissionResponse, error) {
 	return nil, nil
 }
 
-func (m *mockMissionService) ListMissions(ctx context.Context, filters primary.MissionFilters) ([]*primary.Mission, error) {
+func (m *mockCommissionService) ListCommissions(ctx context.Context, filters primary.CommissionFilters) ([]*primary.Commission, error) {
 	return nil, nil
 }
 
-func (m *mockMissionService) CompleteMission(ctx context.Context, missionID string) error {
+func (m *mockCommissionService) CompleteCommission(ctx context.Context, commissionID string) error {
 	return nil
 }
 
-func (m *mockMissionService) ArchiveMission(ctx context.Context, missionID string) error {
+func (m *mockCommissionService) ArchiveCommission(ctx context.Context, commissionID string) error {
 	return nil
 }
 
-func (m *mockMissionService) UpdateMission(ctx context.Context, req primary.UpdateMissionRequest) error {
+func (m *mockCommissionService) UpdateCommission(ctx context.Context, req primary.UpdateCommissionRequest) error {
 	return nil
 }
 
-func (m *mockMissionService) DeleteMission(ctx context.Context, req primary.DeleteMissionRequest) error {
+func (m *mockCommissionService) DeleteCommission(ctx context.Context, req primary.DeleteCommissionRequest) error {
 	return nil
 }
 
-func (m *mockMissionService) PinMission(ctx context.Context, missionID string) error {
+func (m *mockCommissionService) PinCommission(ctx context.Context, commissionID string) error {
 	return nil
 }
 
-func (m *mockMissionService) UnpinMission(ctx context.Context, missionID string) error {
+func (m *mockCommissionService) UnpinCommission(ctx context.Context, commissionID string) error {
 	return nil
 }
 
@@ -98,7 +98,7 @@ func (m *mockGroveService) GetGroveByPath(ctx context.Context, path string) (*pr
 }
 
 func (m *mockGroveService) ListGroves(ctx context.Context, filters primary.GroveFilters) ([]*primary.Grove, error) {
-	groves, ok := m.groves[filters.MissionID]
+	groves, ok := m.groves[filters.CommissionID]
 	if !ok {
 		return []*primary.Grove{}, nil
 	}
@@ -117,32 +117,32 @@ func (m *mockGroveService) DeleteGrove(ctx context.Context, req primary.DeleteGr
 	return nil
 }
 
-func TestMissionOrchestrationService_LoadMissionState(t *testing.T) {
+func TestCommissionOrchestrationService_LoadCommissionState(t *testing.T) {
 	ctx := context.Background()
 
-	missionSvc := newMockMissionService()
+	commissionSvc := newMockCommissionService()
 	groveSvc := newMockGroveService()
 	agentProvider := newMockAgentProvider(secondary.AgentTypeORC)
 
-	missionSvc.missions["MISSION-001"] = &primary.Mission{
-		ID:    "MISSION-001",
-		Title: "Test Mission",
+	commissionSvc.commissions["COMM-001"] = &primary.Commission{
+		ID:    "COMM-001",
+		Title: "Test Commission",
 	}
 
-	groveSvc.groves["MISSION-001"] = []*primary.Grove{
-		{ID: "GROVE-001", Name: "grove-a", MissionID: "MISSION-001"},
-		{ID: "GROVE-002", Name: "grove-b", MissionID: "MISSION-001"},
+	groveSvc.groves["COMM-001"] = []*primary.Grove{
+		{ID: "GROVE-001", Name: "grove-a", CommissionID: "COMM-001"},
+		{ID: "GROVE-002", Name: "grove-b", CommissionID: "COMM-001"},
 	}
 
-	svc := NewMissionOrchestrationService(missionSvc, groveSvc, agentProvider)
+	svc := NewCommissionOrchestrationService(commissionSvc, groveSvc, agentProvider)
 
-	state, err := svc.LoadMissionState(ctx, "MISSION-001")
+	state, err := svc.LoadCommissionState(ctx, "COMM-001")
 	if err != nil {
-		t.Fatalf("LoadMissionState failed: %v", err)
+		t.Fatalf("LoadCommissionState failed: %v", err)
 	}
 
-	if state.Mission.ID != "MISSION-001" {
-		t.Errorf("expected mission ID MISSION-001, got %s", state.Mission.ID)
+	if state.Commission.ID != "COMM-001" {
+		t.Errorf("expected commission ID COMM-001, got %s", state.Commission.ID)
 	}
 
 	if len(state.Groves) != 2 {
@@ -150,31 +150,31 @@ func TestMissionOrchestrationService_LoadMissionState(t *testing.T) {
 	}
 }
 
-func TestMissionOrchestrationService_LoadMissionState_NotFound(t *testing.T) {
+func TestCommissionOrchestrationService_LoadCommissionState_NotFound(t *testing.T) {
 	ctx := context.Background()
 
-	missionSvc := newMockMissionService()
+	commissionSvc := newMockCommissionService()
 	groveSvc := newMockGroveService()
 	agentProvider := newMockAgentProvider(secondary.AgentTypeORC)
 
-	svc := NewMissionOrchestrationService(missionSvc, groveSvc, agentProvider)
+	svc := NewCommissionOrchestrationService(commissionSvc, groveSvc, agentProvider)
 
-	_, err := svc.LoadMissionState(ctx, "MISSION-999")
+	_, err := svc.LoadCommissionState(ctx, "COMM-999")
 	if err == nil {
-		t.Error("expected error for non-existent mission")
+		t.Error("expected error for non-existent commission")
 	}
 }
 
-func TestMissionOrchestrationService_AnalyzeInfrastructure(t *testing.T) {
-	missionSvc := newMockMissionService()
+func TestCommissionOrchestrationService_AnalyzeInfrastructure(t *testing.T) {
+	commissionSvc := newMockCommissionService()
 	groveSvc := newMockGroveService()
 	agentProvider := newMockAgentProvider(secondary.AgentTypeORC)
-	svc := NewMissionOrchestrationService(missionSvc, groveSvc, agentProvider)
+	svc := NewCommissionOrchestrationService(commissionSvc, groveSvc, agentProvider)
 
-	state := &primary.MissionState{
-		Mission: &primary.Mission{ID: "MISSION-001", Title: "Test"},
+	state := &primary.CommissionState{
+		Commission: &primary.Commission{ID: "COMM-001", Title: "Test"},
 		Groves: []*primary.Grove{
-			{ID: "GROVE-001", Name: "grove-a", MissionID: "MISSION-001", Path: "/some/path/grove-a"},
+			{ID: "GROVE-001", Name: "grove-a", CommissionID: "COMM-001", Path: "/some/path/grove-a"},
 		},
 	}
 
@@ -201,13 +201,13 @@ func TestMissionOrchestrationService_AnalyzeInfrastructure(t *testing.T) {
 	}
 }
 
-func TestMissionOrchestrationService_ApplyInfrastructure(t *testing.T) {
+func TestCommissionOrchestrationService_ApplyInfrastructure(t *testing.T) {
 	ctx := context.Background()
 
-	missionSvc := newMockMissionService()
+	commissionSvc := newMockCommissionService()
 	groveSvc := newMockGroveService()
 	agentProvider := newMockAgentProvider(secondary.AgentTypeORC)
-	svc := NewMissionOrchestrationService(missionSvc, groveSvc, agentProvider)
+	svc := NewCommissionOrchestrationService(commissionSvc, groveSvc, agentProvider)
 
 	// Create a temp directory for testing
 	tempDir, err := os.MkdirTemp("", "orc-test-*")
@@ -216,7 +216,7 @@ func TestMissionOrchestrationService_ApplyInfrastructure(t *testing.T) {
 	}
 	defer os.RemoveAll(tempDir)
 
-	workspacePath := filepath.Join(tempDir, "mission-workspace")
+	workspacePath := filepath.Join(tempDir, "commission-workspace")
 	grovesDir := filepath.Join(workspacePath, "groves")
 
 	plan := &primary.InfrastructurePlan{
@@ -253,11 +253,11 @@ func TestMissionOrchestrationService_ApplyInfrastructure(t *testing.T) {
 	}
 }
 
-func TestMissionOrchestrationService_PlanTmuxSession(t *testing.T) {
-	missionSvc := newMockMissionService()
+func TestCommissionOrchestrationService_PlanTmuxSession(t *testing.T) {
+	commissionSvc := newMockCommissionService()
 	groveSvc := newMockGroveService()
 	agentProvider := newMockAgentProvider(secondary.AgentTypeORC)
-	svc := NewMissionOrchestrationService(missionSvc, groveSvc, agentProvider)
+	svc := NewCommissionOrchestrationService(commissionSvc, groveSvc, agentProvider)
 
 	// Create a temp directory with a grove
 	tempDir, err := os.MkdirTemp("", "orc-test-*")
@@ -269,17 +269,17 @@ func TestMissionOrchestrationService_PlanTmuxSession(t *testing.T) {
 	grovePath := filepath.Join(tempDir, "groves", "grove-a")
 	os.MkdirAll(grovePath, 0755)
 
-	state := &primary.MissionState{
-		Mission: &primary.Mission{ID: "MISSION-001", Title: "Test"},
+	state := &primary.CommissionState{
+		Commission: &primary.Commission{ID: "COMM-001", Title: "Test"},
 		Groves: []*primary.Grove{
-			{ID: "GROVE-001", Name: "grove-a", MissionID: "MISSION-001", Path: grovePath},
+			{ID: "GROVE-001", Name: "grove-a", CommissionID: "COMM-001", Path: grovePath},
 		},
 	}
 
-	plan := svc.PlanTmuxSession(state, tempDir, "orc-MISSION-001", false, nil)
+	plan := svc.PlanTmuxSession(state, tempDir, "orc-COMM-001", false, nil)
 
-	if plan.SessionName != "orc-MISSION-001" {
-		t.Errorf("expected session name orc-MISSION-001, got %s", plan.SessionName)
+	if plan.SessionName != "orc-COMM-001" {
+		t.Errorf("expected session name orc-COMM-001, got %s", plan.SessionName)
 	}
 
 	if plan.SessionExists {
@@ -298,11 +298,11 @@ func TestMissionOrchestrationService_PlanTmuxSession(t *testing.T) {
 func TestCheckLaunchPermission_ORCAllowed(t *testing.T) {
 	ctx := context.Background()
 
-	missionSvc := newMockMissionService()
+	commissionSvc := newMockCommissionService()
 	groveSvc := newMockGroveService()
 	agentProvider := newMockAgentProvider(secondary.AgentTypeORC)
 
-	svc := NewMissionOrchestrationService(missionSvc, groveSvc, agentProvider)
+	svc := NewCommissionOrchestrationService(commissionSvc, groveSvc, agentProvider)
 
 	err := svc.CheckLaunchPermission(ctx)
 	if err != nil {
@@ -313,11 +313,11 @@ func TestCheckLaunchPermission_ORCAllowed(t *testing.T) {
 func TestCheckLaunchPermission_IMPDenied(t *testing.T) {
 	ctx := context.Background()
 
-	missionSvc := newMockMissionService()
+	commissionSvc := newMockCommissionService()
 	groveSvc := newMockGroveService()
 	agentProvider := newMockAgentProvider(secondary.AgentTypeIMP)
 
-	svc := NewMissionOrchestrationService(missionSvc, groveSvc, agentProvider)
+	svc := NewCommissionOrchestrationService(commissionSvc, groveSvc, agentProvider)
 
 	err := svc.CheckLaunchPermission(ctx)
 	if err == nil {

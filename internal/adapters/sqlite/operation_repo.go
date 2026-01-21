@@ -28,8 +28,8 @@ func (r *OperationRepository) Create(ctx context.Context, operation *secondary.O
 	}
 
 	_, err := r.db.ExecContext(ctx,
-		"INSERT INTO operations (id, mission_id, title, description, status) VALUES (?, ?, ?, ?, ?)",
-		operation.ID, operation.MissionID, operation.Title, desc, "ready",
+		"INSERT INTO operations (id, commission_id, title, description, status) VALUES (?, ?, ?, ?, ?)",
+		operation.ID, operation.CommissionID, operation.Title, desc, "ready",
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create operation: %w", err)
@@ -49,9 +49,9 @@ func (r *OperationRepository) GetByID(ctx context.Context, id string) (*secondar
 
 	record := &secondary.OperationRecord{}
 	err := r.db.QueryRowContext(ctx,
-		"SELECT id, mission_id, title, description, status, created_at, updated_at, completed_at FROM operations WHERE id = ?",
+		"SELECT id, commission_id, title, description, status, created_at, updated_at, completed_at FROM operations WHERE id = ?",
 		id,
-	).Scan(&record.ID, &record.MissionID, &record.Title, &desc, &record.Status, &createdAt, &updatedAt, &completedAt)
+	).Scan(&record.ID, &record.CommissionID, &record.Title, &desc, &record.Status, &createdAt, &updatedAt, &completedAt)
 
 	if err == sql.ErrNoRows {
 		return nil, fmt.Errorf("operation %s not found", id)
@@ -72,12 +72,12 @@ func (r *OperationRepository) GetByID(ctx context.Context, id string) (*secondar
 
 // List retrieves operations matching the given filters.
 func (r *OperationRepository) List(ctx context.Context, filters secondary.OperationFilters) ([]*secondary.OperationRecord, error) {
-	query := "SELECT id, mission_id, title, description, status, created_at, updated_at, completed_at FROM operations WHERE 1=1"
+	query := "SELECT id, commission_id, title, description, status, created_at, updated_at, completed_at FROM operations WHERE 1=1"
 	args := []any{}
 
-	if filters.MissionID != "" {
-		query += " AND mission_id = ?"
-		args = append(args, filters.MissionID)
+	if filters.CommissionID != "" {
+		query += " AND commission_id = ?"
+		args = append(args, filters.CommissionID)
 	}
 
 	if filters.Status != "" {
@@ -103,7 +103,7 @@ func (r *OperationRepository) List(ctx context.Context, filters secondary.Operat
 		)
 
 		record := &secondary.OperationRecord{}
-		err := rows.Scan(&record.ID, &record.MissionID, &record.Title, &desc, &record.Status, &createdAt, &updatedAt, &completedAt)
+		err := rows.Scan(&record.ID, &record.CommissionID, &record.Title, &desc, &record.Status, &createdAt, &updatedAt, &completedAt)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan operation: %w", err)
 		}
@@ -160,10 +160,10 @@ func (r *OperationRepository) GetNextID(ctx context.Context) (string, error) {
 	return fmt.Sprintf("OP-%03d", maxID+1), nil
 }
 
-// MissionExists checks if a mission exists.
-func (r *OperationRepository) MissionExists(ctx context.Context, missionID string) (bool, error) {
+// CommissionExists checks if a mission exists.
+func (r *OperationRepository) CommissionExists(ctx context.Context, missionID string) (bool, error) {
 	var count int
-	err := r.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM missions WHERE id = ?", missionID).Scan(&count)
+	err := r.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM commissions WHERE id = ?", missionID).Scan(&count)
 	if err != nil {
 		return false, fmt.Errorf("failed to check mission existence: %w", err)
 	}

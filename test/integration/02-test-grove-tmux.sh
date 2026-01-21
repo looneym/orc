@@ -9,7 +9,7 @@ source "$SCRIPT_DIR/test-helpers.sh"
 # Test identifiers
 # MISSION-420 is the dedicated test mission - use it if it exists
 TEST_MISSION_ID="MISSION-420"
-TEST_MISSION_DIR="$HOME/src/missions/MISSION-420"
+TEST_MISSION_DIR="$HOME/src/factories/MISSION-420"
 TEST_GROVE_NAME="test-canary-$(date +%s)"
 # NOTE: Grove path includes mission ID prefix (e.g., MISSION-XXX-grove-name)
 TEST_GROVE_PATH=""  # Will be set after mission is known
@@ -50,7 +50,7 @@ setup_mission() {
     if orc mission list 2>&1 | grep -q "MISSION-420"; then
         log_info "Using dedicated test mission: MISSION-420"
         TEST_MISSION_ID="MISSION-420"
-        TEST_MISSION_DIR="$HOME/src/missions/MISSION-420"
+        TEST_MISSION_DIR="$HOME/src/factories/MISSION-420"
     else
         log_warn "MISSION-420 not found, creating temporary mission"
 
@@ -66,7 +66,7 @@ setup_mission() {
         fi
 
         log_info "Created temporary mission: $TEST_MISSION_ID"
-        TEST_MISSION_DIR="$HOME/src/missions/$TEST_MISSION_ID"
+        TEST_MISSION_DIR="$HOME/src/factories/$TEST_MISSION_ID"
         CREATED_MISSION=true
     fi
 

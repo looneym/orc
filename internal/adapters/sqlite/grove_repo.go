@@ -25,13 +25,13 @@ func (r *GroveRepository) Create(ctx context.Context, grove *secondary.GroveReco
 	// Verify mission exists
 	var exists int
 	err := r.db.QueryRowContext(ctx,
-		"SELECT COUNT(*) FROM missions WHERE id = ?", grove.MissionID,
+		"SELECT COUNT(*) FROM commissions WHERE id = ?", grove.CommissionID,
 	).Scan(&exists)
 	if err != nil {
 		return fmt.Errorf("failed to verify mission: %w", err)
 	}
 	if exists == 0 {
-		return fmt.Errorf("mission %s not found", grove.MissionID)
+		return fmt.Errorf("mission %s not found", grove.CommissionID)
 	}
 
 	// Generate grove ID by finding max existing ID
@@ -46,8 +46,8 @@ func (r *GroveRepository) Create(ctx context.Context, grove *secondary.GroveReco
 	id := fmt.Sprintf("GROVE-%03d", maxID+1)
 
 	_, err = r.db.ExecContext(ctx,
-		"INSERT INTO groves (id, mission_id, name, path, status) VALUES (?, ?, ?, ?, ?)",
-		id, grove.MissionID, grove.Name, grove.WorktreePath, "active",
+		"INSERT INTO groves (id, commission_id, name, path, status) VALUES (?, ?, ?, ?, ?)",
+		id, grove.CommissionID, grove.Name, grove.WorktreePath, "active",
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create grove: %w", err)
@@ -67,9 +67,9 @@ func (r *GroveRepository) GetByID(ctx context.Context, id string) (*secondary.Gr
 
 	record := &secondary.GroveRecord{}
 	err := r.db.QueryRowContext(ctx,
-		"SELECT id, mission_id, name, path, status, created_at FROM groves WHERE id = ?",
+		"SELECT id, commission_id, name, path, status, created_at FROM groves WHERE id = ?",
 		id,
-	).Scan(&record.ID, &record.MissionID, &record.Name, &record.WorktreePath, &record.Status, &createdAt)
+	).Scan(&record.ID, &record.CommissionID, &record.Name, &record.WorktreePath, &record.Status, &createdAt)
 
 	if err == sql.ErrNoRows {
 		return nil, fmt.Errorf("grove %s not found", id)
@@ -91,9 +91,9 @@ func (r *GroveRepository) GetByPath(ctx context.Context, path string) (*secondar
 
 	record := &secondary.GroveRecord{}
 	err := r.db.QueryRowContext(ctx,
-		"SELECT id, mission_id, name, path, status, created_at FROM groves WHERE path = ?",
+		"SELECT id, commission_id, name, path, status, created_at FROM groves WHERE path = ?",
 		path,
-	).Scan(&record.ID, &record.MissionID, &record.Name, &record.WorktreePath, &record.Status, &createdAt)
+	).Scan(&record.ID, &record.CommissionID, &record.Name, &record.WorktreePath, &record.Status, &createdAt)
 
 	if err == sql.ErrNoRows {
 		return nil, fmt.Errorf("grove with path %s not found", path)
@@ -106,10 +106,10 @@ func (r *GroveRepository) GetByPath(ctx context.Context, path string) (*secondar
 	return record, nil
 }
 
-// GetByMission retrieves all groves for a mission.
-func (r *GroveRepository) GetByMission(ctx context.Context, missionID string) ([]*secondary.GroveRecord, error) {
+// GetByCommission retrieves all groves for a mission.
+func (r *GroveRepository) GetByCommission(ctx context.Context, missionID string) ([]*secondary.GroveRecord, error) {
 	rows, err := r.db.QueryContext(ctx,
-		"SELECT id, mission_id, name, path, status, created_at FROM groves WHERE mission_id = ? AND status = 'active' ORDER BY created_at DESC",
+		"SELECT id, commission_id, name, path, status, created_at FROM groves WHERE commission_id = ? AND status = 'active' ORDER BY created_at DESC",
 		missionID,
 	)
 	if err != nil {
@@ -122,7 +122,7 @@ func (r *GroveRepository) GetByMission(ctx context.Context, missionID string) ([
 		var createdAt time.Time
 		record := &secondary.GroveRecord{}
 
-		err := rows.Scan(&record.ID, &record.MissionID, &record.Name, &record.WorktreePath, &record.Status, &createdAt)
+		err := rows.Scan(&record.ID, &record.CommissionID, &record.Name, &record.WorktreePath, &record.Status, &createdAt)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan grove: %w", err)
 		}
@@ -136,11 +136,11 @@ func (r *GroveRepository) GetByMission(ctx context.Context, missionID string) ([
 
 // List retrieves all groves, optionally filtered by mission.
 func (r *GroveRepository) List(ctx context.Context, missionID string) ([]*secondary.GroveRecord, error) {
-	query := "SELECT id, mission_id, name, path, status, created_at FROM groves WHERE 1=1"
+	query := "SELECT id, commission_id, name, path, status, created_at FROM groves WHERE 1=1"
 	args := []any{}
 
 	if missionID != "" {
-		query += " AND mission_id = ?"
+		query += " AND commission_id = ?"
 		args = append(args, missionID)
 	}
 
@@ -157,7 +157,7 @@ func (r *GroveRepository) List(ctx context.Context, missionID string) ([]*second
 		var createdAt time.Time
 		record := &secondary.GroveRecord{}
 
-		err := rows.Scan(&record.ID, &record.MissionID, &record.Name, &record.WorktreePath, &record.Status, &createdAt)
+		err := rows.Scan(&record.ID, &record.CommissionID, &record.Name, &record.WorktreePath, &record.Status, &createdAt)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan grove: %w", err)
 		}

@@ -1,25 +1,25 @@
-# Mission Provisioning Finite State Machine
-# Single source of truth for mission lifecycle in ORC
+# Commission Provisioning Finite State Machine
+# Single source of truth for commission lifecycle in ORC
 #
 # Generated: 2026-01-19
 # Context: CON-003 FSM-First Testing Strategy
 
-name: mission-provisioning
+name: commission-provisioning
 version: "1.0"
 description: |
-  Defines the complete lifecycle of a Mission entity in ORC.
-  Missions are the top-level coordination scope for work.
+  Defines the complete lifecycle of a Commission entity in ORC.
+  Commissions are the top-level coordination scope for work.
 
 # =============================================================================
 # STATES
 # =============================================================================
 states:
   initial:
-    description: No mission exists yet (pre-creation)
+    description: No commission exists yet (pre-creation)
     terminal: false
 
   active:
-    description: Mission is created and available for work
+    description: Commission is created and available for work
     terminal: false
     invariants:
       - status == "active"
@@ -27,29 +27,29 @@ states:
       - updated_at >= created_at
 
   paused:
-    description: Mission is temporarily suspended (defined but rarely used)
+    description: Commission is temporarily suspended (defined but rarely used)
     terminal: false
     invariants:
       - status == "paused"
       - previous_status == "active"
 
   complete:
-    description: Mission work is finished, completed_at is set
+    description: Commission work is finished, completed_at is set
     terminal: false  # Can still archive
     invariants:
       - status == "complete"
       - completed_at is set
-      - not pinned  # Invariant: completed missions cannot be pinned
+      - not pinned  # Invariant: completed commissions cannot be pinned
 
   archived:
-    description: Mission is historical record, no longer active
+    description: Commission is historical record, no longer active
     terminal: true  # Terminal for normal operations (delete still possible)
     invariants:
       - status == "archived"
-      - not pinned  # Invariant: archived missions cannot be pinned
+      - not pinned  # Invariant: archived commissions cannot be pinned
 
   deleted:
-    description: Mission removed from database (true terminal state)
+    description: Commission removed from database (true terminal state)
     terminal: true
 
 # =============================================================================
@@ -57,13 +57,13 @@ states:
 # =============================================================================
 events:
   create:
-    description: Create a new mission with title and optional description
+    description: Create a new commission with title and optional description
     payload:
       title: { type: string, required: true }
       description: { type: string, required: false }
 
   update:
-    description: Update mission title and/or description
+    description: Update commission title and/or description
     payload:
       title: { type: string, required: false }
       description: { type: string, required: false }
@@ -71,7 +71,7 @@ events:
   start:
     description: Legacy command - create workspace and TMux session
     payload:
-      workspace_path: { type: string, required: false, default: "~/src/missions/{MISSION_ID}" }
+      workspace_path: { type: string, required: false, default: "~/src/commissions/{COMM_ID}" }
 
   launch:
     description: Plan/apply pattern for infrastructure provisioning (idempotent)
@@ -80,23 +80,23 @@ events:
       create_tmux: { type: boolean, required: false, default: false }
 
   complete:
-    description: Mark mission as finished
+    description: Mark commission as finished
     payload: {}
 
   archive:
-    description: Archive mission for historical record
+    description: Archive commission for historical record
     payload: {}
 
   pin:
-    description: Pin mission to prevent completion/archiving
+    description: Pin commission to prevent completion/archiving
     payload: {}
 
   unpin:
-    description: Unpin mission to allow completion/archiving
+    description: Unpin commission to allow completion/archiving
     payload: {}
 
   delete:
-    description: Remove mission from database
+    description: Remove commission from database
     payload:
       force: { type: boolean, required: false, default: false }
 
@@ -105,27 +105,27 @@ events:
 # =============================================================================
 transitions:
   # --- Creation ---
-  - name: create_mission
+  - name: create_commission
     from: initial
     to: active
     event: create
     guards:
-      - is_orc  # Only ORC can create missions
+      - is_orc  # Only ORC can create commissions
     effects:
-      - { type: WriteDB, operation: INSERT, table: missions }
+      - { type: WriteDB, operation: INSERT, table: commissions }
     test_cases:
-      - "ORC creates mission with title only"
-      - "ORC creates mission with title and description"
-      - "IMP blocked from creating mission"
+      - "ORC creates commission with title only"
+      - "ORC creates commission with title and description"
+      - "IMP blocked from creating commission"
 
   # --- Updates (while active) ---
-  - name: update_mission
+  - name: update_commission
     from: active
     to: active
     event: update
     guards: []
     effects:
-      - { type: WriteDB, operation: UPDATE, table: missions, fields: [title, description, updated_at] }
+      - { type: WriteDB, operation: UPDATE, table: commissions, fields: [title, description, updated_at] }
     test_cases:
       - "Update title only"
       - "Update description only"
@@ -133,7 +133,7 @@ transitions:
       - "Update with empty values (no-op)"
 
   # --- Infrastructure Provisioning ---
-  - name: start_mission
+  - name: start_commission
     from: active
     to: active
     event: start
@@ -142,16 +142,16 @@ transitions:
       - not_in_orc_source
     effects:
       - { type: CreateWorkspace, path: "{workspace_path}" }
-      - { type: WriteConfig, path: "{workspace_path}/.orc/config.json", config_type: mission }
-      - { type: SpawnTmux, session: "orc-{MISSION_ID}" }
+      - { type: WriteConfig, path: "{workspace_path}/.orc/config.json", config_type: commission }
+      - { type: SpawnTmux, session: "orc-{COMM_ID}" }
     test_cases:
-      - "ORC starts mission, creates workspace"
-      - "ORC starts mission with custom workspace path"
-      - "IMP blocked from starting mission"
+      - "ORC starts commission, creates workspace"
+      - "ORC starts commission with custom workspace path"
+      - "IMP blocked from starting commission"
       - "Start from ORC source directory blocked"
       - "Start with existing TMux session (error)"
 
-  - name: launch_mission
+  - name: launch_commission
     from: active
     to: active
     event: launch
@@ -164,7 +164,7 @@ transitions:
       - { type: WriteConfig, path: "{grove_path}/.orc/config.json", config_type: grove, foreach: groves }
       - { type: WriteConfig, path: "{grove_path}/.claude/settings.local.json", foreach: groves }
       - { type: UpdateDB, operation: UPDATE, table: groves, fields: [path], condition: "path changed" }
-      - { type: SpawnTmux, session: "orc-{MISSION_ID}", conditional: "create_tmux == true" }
+      - { type: SpawnTmux, session: "orc-{COMM_ID}", conditional: "create_tmux == true" }
     test_cases:
       - "Launch creates workspace and groves directory"
       - "Launch moves groves to standard location"
@@ -172,121 +172,121 @@ transitions:
       - "Launch with --tmux creates session"
       - "Launch without --tmux skips TMux"
       - "Launch is idempotent (run twice, same result)"
-      - "IMP blocked from launching mission"
+      - "IMP blocked from launching commission"
 
   # --- Pinning ---
-  - name: pin_mission
+  - name: pin_commission
     from: active
     to: active
     event: pin
     guards:
-      - exists  # Mission must exist
+      - exists  # Commission must exist
     effects:
-      - { type: WriteDB, operation: UPDATE, table: missions, fields: [pinned, updated_at], values: [1] }
+      - { type: WriteDB, operation: UPDATE, table: commissions, fields: [pinned, updated_at], values: [1] }
     test_cases:
-      - "Pin active mission"
-      - "Pin already-pinned mission (no-op)"
-      - "Pin non-existent mission (error)"
+      - "Pin active commission"
+      - "Pin already-pinned commission (no-op)"
+      - "Pin non-existent commission (error)"
 
-  - name: unpin_mission
+  - name: unpin_commission
     from: active
     to: active
     event: unpin
     guards:
       - exists
     effects:
-      - { type: WriteDB, operation: UPDATE, table: missions, fields: [pinned, updated_at], values: [0] }
+      - { type: WriteDB, operation: UPDATE, table: commissions, fields: [pinned, updated_at], values: [0] }
     test_cases:
-      - "Unpin pinned mission"
-      - "Unpin unpinned mission (no-op)"
+      - "Unpin pinned commission"
+      - "Unpin unpinned commission (no-op)"
 
   # --- Completion ---
-  - name: complete_mission
+  - name: complete_commission
     from: active
     to: complete
     event: complete
     guards:
-      - not_pinned  # Cannot complete pinned mission
+      - not_pinned  # Cannot complete pinned commission
     effects:
-      - { type: WriteDB, operation: UPDATE, table: missions, fields: [status, completed_at, updated_at] }
+      - { type: WriteDB, operation: UPDATE, table: commissions, fields: [status, completed_at, updated_at] }
     test_cases:
-      - "Complete unpinned mission"
-      - "Complete pinned mission (error with helpful message)"
-      - "Complete already-complete mission (no-op or error)"
+      - "Complete unpinned commission"
+      - "Complete pinned commission (error with helpful message)"
+      - "Complete already-complete commission (no-op or error)"
 
   # --- Archiving ---
-  - name: archive_active_mission
+  - name: archive_active_commission
     from: active
     to: archived
     event: archive
     guards:
       - not_pinned
     effects:
-      - { type: WriteDB, operation: UPDATE, table: missions, fields: [status, updated_at] }
+      - { type: WriteDB, operation: UPDATE, table: commissions, fields: [status, updated_at] }
     test_cases:
-      - "Archive active unpinned mission"
-      - "Archive pinned mission (error)"
+      - "Archive active unpinned commission"
+      - "Archive pinned commission (error)"
 
-  - name: archive_complete_mission
+  - name: archive_complete_commission
     from: complete
     to: archived
     event: archive
     guards:
       - not_pinned  # Should already be unpinned, but defensive
     effects:
-      - { type: WriteDB, operation: UPDATE, table: missions, fields: [status, updated_at] }
+      - { type: WriteDB, operation: UPDATE, table: commissions, fields: [status, updated_at] }
     test_cases:
-      - "Archive completed mission"
+      - "Archive completed commission"
 
   # --- Pausing (rarely used) ---
-  - name: pause_mission
+  - name: pause_commission
     from: active
     to: paused
     event: update
     guards:
       - status_change_to_paused  # Explicit status in update
     effects:
-      - { type: WriteDB, operation: UPDATE, table: missions, fields: [status, updated_at] }
+      - { type: WriteDB, operation: UPDATE, table: commissions, fields: [status, updated_at] }
     test_cases:
-      - "Pause active mission"
+      - "Pause active commission"
 
-  - name: resume_mission
+  - name: resume_commission
     from: paused
     to: active
     event: update
     guards:
       - status_change_to_active
     effects:
-      - { type: WriteDB, operation: UPDATE, table: missions, fields: [status, updated_at] }
+      - { type: WriteDB, operation: UPDATE, table: commissions, fields: [status, updated_at] }
     test_cases:
-      - "Resume paused mission"
+      - "Resume paused commission"
 
   # --- Deletion ---
-  - name: delete_active_mission
+  - name: delete_active_commission
     from: active
     to: deleted
     event: delete
     guards:
       - no_dependents_or_force  # No groves/shipments, or --force flag
     effects:
-      - { type: WriteDB, operation: DELETE, table: missions }
+      - { type: WriteDB, operation: DELETE, table: commissions }
       # TODO: Cascade delete when implemented
     test_cases:
-      - "Delete mission with no dependents"
-      - "Delete mission with groves (error without --force)"
-      - "Delete mission with shipments (error without --force)"
-      - "Delete mission with --force (succeeds, orphans dependents)"
+      - "Delete commission with no dependents"
+      - "Delete commission with groves (error without --force)"
+      - "Delete commission with shipments (error without --force)"
+      - "Delete commission with --force (succeeds, orphans dependents)"
 
-  - name: delete_archived_mission
+  - name: delete_archived_commission
     from: archived
     to: deleted
     event: delete
     guards:
       - no_dependents_or_force
     effects:
-      - { type: WriteDB, operation: DELETE, table: missions }
+      - { type: WriteDB, operation: DELETE, table: commissions }
     test_cases:
-      - "Delete archived mission"
+      - "Delete archived commission"
 
 # =============================================================================
 # GUARDS
@@ -295,20 +295,20 @@ guards:
   is_orc:
     description: |
       Check that current agent is ORC (not IMP).
-      IMPs are blocked from mission lifecycle operations.
+      IMPs are blocked from commission lifecycle operations.
     implementation: |
       identity, err := agent.GetCurrentAgentID()
       return err != nil || identity.Type != agent.AgentTypeIMP
-    error_message: "IMPs cannot {action} missions - only ORC can {action} missions"
+    error_message: "IMPs cannot {action} commissions - only ORC can {action} commissions"
 
   not_pinned:
     description: |
-      Check that mission is not pinned.
-      Pinned missions cannot be completed or archived.
+      Check that commission is not pinned.
+      Pinned commissions cannot be completed or archived.
     implementation: |
-      mission, _ := models.GetMission(id)
-      return !mission.Pinned
-    error_message: "Cannot {action} pinned mission {id}. Unpin first with: orc mission unpin {id}"
+      commission, _ := models.GetCommission(id)
+      return !commission.Pinned
+    error_message: "Cannot {action} pinned commission {id}. Unpin first with: orc commission unpin {id}"
 
   not_in_orc_source:
     description: |
@@ -324,17 +324,17 @@ guards:
       Bypassed with --force flag (but orphans dependents).
     implementation: |
       if force { return true }
-      groves, _ := models.GetGrovesByMission(id)
+      groves, _ := models.GetGrovesByCommission(id)
       shipments, _ := models.ListShipments(id, "")
       return len(groves) == 0 && len(shipments) == 0
-    error_message: "Mission has {count} groves and {count} shipments. Use --force to delete anyway (will orphan dependents)"
+    error_message: "Commission has {count} groves and {count} shipments. Use --force to delete anyway (will orphan dependents)"
 
   exists:
-    description: Mission must exist in database
+    description: Commission must exist in database
     implementation: |
-      _, err := models.GetMission(id)
+      _, err := models.GetCommission(id)
       return err == nil
-    error_message: "Mission {id} not found"
+    error_message: "Commission {id} not found"
 
 # =============================================================================
 # EFFECTS
@@ -358,7 +358,7 @@ effects:
     description: Write JSON config file
     parameters:
       path: { type: string }
-      config_type: { type: enum, values: [mission, grove, global, claude_settings] }
+      config_type: { type: enum, values: [commission, grove, global, claude_settings] }
     idempotent: true
 
   SpawnTmux:
@@ -380,19 +380,19 @@ effects:
 # =============================================================================
 invariants:
   - name: id_format
-    description: Mission IDs follow MISSION-XXX format
-    check: id matches /^MISSION-\d{3}$/
+    description: Commission IDs follow COMM-XXX format
+    check: id matches /^COMM-\d{3}$/
 
   - name: id_unique
-    description: Mission IDs are unique
-    check: COUNT(SELECT id FROM missions WHERE id = {id}) == 1
+    description: Commission IDs are unique
+    check: COUNT(SELECT id FROM commissions WHERE id = {id}) == 1
 
   - name: status_valid
     description: Status is one of valid values
     check: status IN ('active', 'paused', 'complete', 'archived')
 
   - name: pinned_blocks_terminal
-    description: Pinned missions cannot be in terminal states
+    description: Pinned commissions cannot be in terminal states
     check: NOT (pinned AND status IN ('complete', 'archived'))
 
   - name: completed_has_timestamp

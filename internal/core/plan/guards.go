@@ -20,8 +20,8 @@ func (r GuardResult) Error() error {
 
 // CreatePlanContext provides context for plan creation guards.
 type CreatePlanContext struct {
-	MissionID             string
-	MissionExists         bool
+	CommissionID          string
+	CommissionExists      bool
 	ShipmentID            string // Optional - empty string means no shipment
 	ShipmentExists        bool   // Only checked if ShipmentID != ""
 	ShipmentHasActivePlan bool   // Only checked if ShipmentID != ""
@@ -42,15 +42,15 @@ type DeletePlanContext struct {
 
 // CanCreatePlan evaluates whether a plan can be created.
 // Rules:
-// - Mission must exist
+// - Commission must exist
 // - Shipment must exist if provided
 // - No active (draft) plan for shipment if provided
 func CanCreatePlan(ctx CreatePlanContext) GuardResult {
 	// Check mission exists
-	if !ctx.MissionExists {
+	if !ctx.CommissionExists {
 		return GuardResult{
 			Allowed: false,
-			Reason:  fmt.Sprintf("mission %s not found", ctx.MissionID),
+			Reason:  fmt.Sprintf("commission %s not found", ctx.CommissionID),
 		}
 	}
 

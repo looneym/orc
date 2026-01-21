@@ -30,23 +30,23 @@ var conclaveCreateCmd = &cobra.Command{
 
 		// Get mission from context or require explicit flag
 		if missionID == "" {
-			missionID = orcctx.GetContextMissionID()
+			missionID = orcctx.GetContextCommissionID()
 			if missionID == "" {
-				return fmt.Errorf("no mission context detected\nHint: Use --mission flag or run from a grove/mission directory")
+				return fmt.Errorf("no mission context detected\nHint: Use --commission flag or run from a grove/mission directory")
 			}
 		}
 
 		resp, err := wire.ConclaveService().CreateConclave(context.Background(), primary.CreateConclaveRequest{
-			MissionID:   missionID,
-			Title:       title,
-			Description: description,
+			CommissionID: missionID,
+			Title:        title,
+			Description:  description,
 		})
 		if err != nil {
 			return fmt.Errorf("failed to create conclave: %w", err)
 		}
 
 		fmt.Printf("✓ Created conclave %s: %s\n", resp.Conclave.ID, resp.Conclave.Title)
-		fmt.Printf("  Mission: %s\n", resp.Conclave.MissionID)
+		fmt.Printf("  Mission: %s\n", resp.Conclave.CommissionID)
 		fmt.Printf("  Status: %s\n", resp.Conclave.Status)
 		fmt.Println()
 		fmt.Println("Next steps:")
@@ -64,12 +64,12 @@ var conclaveListCmd = &cobra.Command{
 
 		// Get mission from context if not specified
 		if missionID == "" {
-			missionID = orcctx.GetContextMissionID()
+			missionID = orcctx.GetContextCommissionID()
 		}
 
 		conclaves, err := wire.ConclaveService().ListConclaves(context.Background(), primary.ConclaveFilters{
-			MissionID: missionID,
-			Status:    status,
+			CommissionID: missionID,
+			Status:       status,
 		})
 		if err != nil {
 			return fmt.Errorf("failed to list conclaves: %w", err)
@@ -92,7 +92,7 @@ var conclaveListCmd = &cobra.Command{
 			if c.Status == "complete" {
 				statusIcon = "✅"
 			}
-			fmt.Fprintf(w, "%s\t%s%s\t%s %s\t%s\n", c.ID, c.Title, pinnedMark, statusIcon, c.Status, c.MissionID)
+			fmt.Fprintf(w, "%s\t%s%s\t%s %s\t%s\n", c.ID, c.Title, pinnedMark, statusIcon, c.Status, c.CommissionID)
 		}
 		w.Flush()
 		return nil
@@ -118,7 +118,7 @@ var conclaveShowCmd = &cobra.Command{
 			fmt.Printf("Description: %s\n", conclave.Description)
 		}
 		fmt.Printf("Status: %s\n", conclave.Status)
-		fmt.Printf("Mission: %s\n", conclave.MissionID)
+		fmt.Printf("Mission: %s\n", conclave.CommissionID)
 		if conclave.AssignedGroveID != "" {
 			fmt.Printf("Assigned Grove: %s\n", conclave.AssignedGroveID)
 		}
@@ -313,11 +313,11 @@ var conclaveDeleteCmd = &cobra.Command{
 
 func init() {
 	// conclave create flags
-	conclaveCreateCmd.Flags().StringP("mission", "m", "", "Mission ID (defaults to context)")
+	conclaveCreateCmd.Flags().StringP("commission", "c", "", "Commission ID (defaults to context)")
 	conclaveCreateCmd.Flags().StringP("description", "d", "", "Conclave description")
 
 	// conclave list flags
-	conclaveListCmd.Flags().StringP("mission", "m", "", "Filter by mission")
+	conclaveListCmd.Flags().StringP("commission", "c", "", "Filter by mission")
 	conclaveListCmd.Flags().StringP("status", "s", "", "Filter by status (active, complete)")
 
 	// conclave update flags

@@ -25,11 +25,11 @@ type MessageService interface {
 
 // CreateMessageRequest contains parameters for creating a message.
 type CreateMessageRequest struct {
-	Sender    string
-	Recipient string
-	Subject   string
-	Body      string
-	MissionID string
+	Sender       string
+	Recipient    string
+	Subject      string
+	Body         string
+	CommissionID string
 }
 
 // CreateMessageResponse contains the result of creating a message.
@@ -40,12 +40,12 @@ type CreateMessageResponse struct {
 
 // Message represents a message entity at the port boundary.
 type Message struct {
-	ID        string
-	Sender    string
-	Recipient string
-	Subject   string
-	Body      string
-	Timestamp string
-	Read      bool
-	MissionID string
+	ID           string
+	Sender       string
+	Recipient    string
+	Subject      string
+	Body         string
+	Timestamp    string
+	Read         bool
+	CommissionID string
 }

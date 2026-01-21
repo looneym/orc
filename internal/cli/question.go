@@ -31,15 +31,15 @@ var questionCreateCmd = &cobra.Command{
 
 		// Get mission from context or require explicit flag
 		if missionID == "" {
-			missionID = orcctx.GetContextMissionID()
+			missionID = orcctx.GetContextCommissionID()
 			if missionID == "" {
-				return fmt.Errorf("no mission context detected\nHint: Use --mission flag or run from a grove/mission directory")
+				return fmt.Errorf("no mission context detected\nHint: Use --commission flag or run from a grove/mission directory")
 			}
 		}
 
 		ctx := context.Background()
 		resp, err := wire.QuestionService().CreateQuestion(ctx, primary.CreateQuestionRequest{
-			MissionID:       missionID,
+			CommissionID:    missionID,
 			InvestigationID: investigationID,
 			Title:           title,
 			Description:     description,
@@ -53,7 +53,7 @@ var questionCreateCmd = &cobra.Command{
 		if question.InvestigationID != "" {
 			fmt.Printf("  Investigation: %s\n", question.InvestigationID)
 		}
-		fmt.Printf("  Mission: %s\n", question.MissionID)
+		fmt.Printf("  Mission: %s\n", question.CommissionID)
 		fmt.Printf("  Status: %s\n", question.Status)
 		return nil
 	},
@@ -69,12 +69,12 @@ var questionListCmd = &cobra.Command{
 
 		// Get mission from context if not specified
 		if missionID == "" {
-			missionID = orcctx.GetContextMissionID()
+			missionID = orcctx.GetContextCommissionID()
 		}
 
 		ctx := context.Background()
 		questions, err := wire.QuestionService().ListQuestions(ctx, primary.QuestionFilters{
-			MissionID:       missionID,
+			CommissionID:    missionID,
 			InvestigationID: investigationID,
 			Status:          status,
 		})
@@ -132,7 +132,7 @@ var questionShowCmd = &cobra.Command{
 		if question.Answer != "" {
 			fmt.Printf("Answer: %s\n", question.Answer)
 		}
-		fmt.Printf("Mission: %s\n", question.MissionID)
+		fmt.Printf("Mission: %s\n", question.CommissionID)
 		if question.InvestigationID != "" {
 			fmt.Printf("Investigation: %s\n", question.InvestigationID)
 		}
@@ -261,12 +261,12 @@ var questionDeleteCmd = &cobra.Command{
 
 func init() {
 	// question create flags
-	questionCreateCmd.Flags().StringP("mission", "m", "", "Mission ID (defaults to context)")
+	questionCreateCmd.Flags().StringP("commission", "c", "", "Commission ID (defaults to context)")
 	questionCreateCmd.Flags().StringP("description", "d", "", "Question description")
 	questionCreateCmd.Flags().String("investigation", "", "Investigation ID to attach question to")
 
 	// question list flags
-	questionListCmd.Flags().StringP("mission", "m", "", "Filter by mission")
+	questionListCmd.Flags().StringP("commission", "c", "", "Filter by mission")
 	questionListCmd.Flags().String("investigation", "", "Filter by investigation")
 	questionListCmd.Flags().StringP("status", "s", "", "Filter by status (open, answered)")
 

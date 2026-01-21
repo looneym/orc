@@ -28,8 +28,8 @@ func (r *ShipmentRepository) Create(ctx context.Context, shipment *secondary.Shi
 	}
 
 	_, err := r.db.ExecContext(ctx,
-		"INSERT INTO shipments (id, mission_id, title, description, status) VALUES (?, ?, ?, ?, ?)",
-		shipment.ID, shipment.MissionID, shipment.Title, desc, "active",
+		"INSERT INTO shipments (id, commission_id, title, description, status) VALUES (?, ?, ?, ?, ?)",
+		shipment.ID, shipment.CommissionID, shipment.Title, desc, "active",
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create shipment: %w", err)
@@ -51,9 +51,9 @@ func (r *ShipmentRepository) GetByID(ctx context.Context, id string) (*secondary
 
 	record := &secondary.ShipmentRecord{}
 	err := r.db.QueryRowContext(ctx,
-		"SELECT id, mission_id, title, description, status, assigned_grove_id, pinned, created_at, updated_at, completed_at FROM shipments WHERE id = ?",
+		"SELECT id, commission_id, title, description, status, assigned_grove_id, pinned, created_at, updated_at, completed_at FROM shipments WHERE id = ?",
 		id,
-	).Scan(&record.ID, &record.MissionID, &record.Title, &desc, &record.Status, &assignedGroveID, &pinned, &createdAt, &updatedAt, &completedAt)
+	).Scan(&record.ID, &record.CommissionID, &record.Title, &desc, &record.Status, &assignedGroveID, &pinned, &createdAt, &updatedAt, &completedAt)
 
 	if err == sql.ErrNoRows {
 		return nil, fmt.Errorf("shipment %s not found", id)
@@ -76,12 +76,12 @@ func (r *ShipmentRepository) GetByID(ctx context.Context, id string) (*secondary
 
 // List retrieves shipments matching the given filters.
 func (r *ShipmentRepository) List(ctx context.Context, filters secondary.ShipmentFilters) ([]*secondary.ShipmentRecord, error) {
-	query := "SELECT id, mission_id, title, description, status, assigned_grove_id, pinned, created_at, updated_at, completed_at FROM shipments WHERE 1=1"
+	query := "SELECT id, commission_id, title, description, status, assigned_grove_id, pinned, created_at, updated_at, completed_at FROM shipments WHERE 1=1"
 	args := []any{}
 
-	if filters.MissionID != "" {
-		query += " AND mission_id = ?"
-		args = append(args, filters.MissionID)
+	if filters.CommissionID != "" {
+		query += " AND commission_id = ?"
+		args = append(args, filters.CommissionID)
 	}
 
 	if filters.Status != "" {
@@ -109,7 +109,7 @@ func (r *ShipmentRepository) List(ctx context.Context, filters secondary.Shipmen
 		)
 
 		record := &secondary.ShipmentRecord{}
-		err := rows.Scan(&record.ID, &record.MissionID, &record.Title, &desc, &record.Status, &assignedGroveID, &pinned, &createdAt, &updatedAt, &completedAt)
+		err := rows.Scan(&record.ID, &record.CommissionID, &record.Title, &desc, &record.Status, &assignedGroveID, &pinned, &createdAt, &updatedAt, &completedAt)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan shipment: %w", err)
 		}
@@ -226,7 +226,7 @@ func (r *ShipmentRepository) GetNextID(ctx context.Context) (string, error) {
 
 // GetByGrove retrieves shipments assigned to a grove.
 func (r *ShipmentRepository) GetByGrove(ctx context.Context, groveID string) ([]*secondary.ShipmentRecord, error) {
-	query := "SELECT id, mission_id, title, description, status, assigned_grove_id, pinned, created_at, updated_at, completed_at FROM shipments WHERE assigned_grove_id = ?"
+	query := "SELECT id, commission_id, title, description, status, assigned_grove_id, pinned, created_at, updated_at, completed_at FROM shipments WHERE assigned_grove_id = ?"
 	rows, err := r.db.QueryContext(ctx, query, groveID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get shipments by grove: %w", err)
@@ -245,7 +245,7 @@ func (r *ShipmentRepository) GetByGrove(ctx context.Context, groveID string) ([]
 		)
 
 		record := &secondary.ShipmentRecord{}
-		err := rows.Scan(&record.ID, &record.MissionID, &record.Title, &desc, &record.Status, &assignedGroveID, &pinned, &createdAt, &updatedAt, &completedAt)
+		err := rows.Scan(&record.ID, &record.CommissionID, &record.Title, &desc, &record.Status, &assignedGroveID, &pinned, &createdAt, &updatedAt, &completedAt)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan shipment: %w", err)
 		}
@@ -309,10 +309,10 @@ func (r *ShipmentRepository) UpdateStatus(ctx context.Context, id, status string
 	return nil
 }
 
-// MissionExists checks if a mission exists.
-func (r *ShipmentRepository) MissionExists(ctx context.Context, missionID string) (bool, error) {
+// CommissionExists checks if a mission exists.
+func (r *ShipmentRepository) CommissionExists(ctx context.Context, missionID string) (bool, error) {
 	var count int
-	err := r.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM missions WHERE id = ?", missionID).Scan(&count)
+	err := r.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM commissions WHERE id = ?", missionID).Scan(&count)
 	if err != nil {
 		return false, fmt.Errorf("failed to check mission existence: %w", err)
 	}

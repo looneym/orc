@@ -1,24 +1,24 @@
-// Package mission contains the pure business logic for mission operations.
+// Package commission contains the pure business logic for commission operations.
 // This is part of the Functional Core - no I/O, only pure functions.
-package mission
+package commission
 
 import "time"
 
-// MissionStatus represents the possible states of a mission.
-type MissionStatus string
+// CommissionStatus represents the possible states of a commission.
+type CommissionStatus string
 
 const (
-	StatusActive   MissionStatus = "active"
-	StatusPaused   MissionStatus = "paused"
-	StatusComplete MissionStatus = "complete"
-	StatusArchived MissionStatus = "archived"
+	StatusActive   CommissionStatus = "active"
+	StatusPaused   CommissionStatus = "paused"
+	StatusComplete CommissionStatus = "complete"
+	StatusArchived CommissionStatus = "archived"
 )
 
 // StatusTransitionResult contains the result of a status transition.
 // This is a value object that captures both the new status and any
 // side effects (like setting CompletedAt timestamp).
 type StatusTransitionResult struct {
-	NewStatus   MissionStatus
+	NewStatus   CommissionStatus
 	CompletedAt *time.Time // Set when transitioning to complete status
 }
 
@@ -26,7 +26,7 @@ type StatusTransitionResult struct {
 // This is a pure function that captures the business rule:
 // - When status becomes "complete", CompletedAt should be set to the current time.
 // The caller should pass the current time to enable testing.
-func ApplyStatusTransition(newStatus MissionStatus, now time.Time) StatusTransitionResult {
+func ApplyStatusTransition(newStatus CommissionStatus, now time.Time) StatusTransitionResult {
 	result := StatusTransitionResult{
 		NewStatus: newStatus,
 	}
@@ -38,8 +38,8 @@ func ApplyStatusTransition(newStatus MissionStatus, now time.Time) StatusTransit
 	return result
 }
 
-// InitialStatus returns the initial status for a new mission.
-// This is a pure function that defines the business rule for new missions.
-func InitialStatus() MissionStatus {
+// InitialStatus returns the initial status for a new commission.
+// This is a pure function that defines the business rule for new commissions.
+func InitialStatus() CommissionStatus {
 	return StatusActive
 }

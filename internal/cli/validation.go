@@ -31,7 +31,7 @@ Create the file with:
     "permissions": {
       "additionalDirectories": [
         "~/src/worktrees",
-        "~/src/missions"
+        "~/src/factories"
       ]
     }
   }
@@ -62,7 +62,7 @@ Required configuration:
     "permissions": {
       "additionalDirectories": [
         "~/src/worktrees",
-        "~/src/missions"
+        "~/src/factories"
       ]
     }
   }
@@ -81,13 +81,13 @@ Add to ~/.claude/settings.json:
   "permissions": {
     "additionalDirectories": [
       "~/src/worktrees",
-      "~/src/missions"
+      "~/src/factories"
     ]
   }`)
 	}
 
 	// Check for required directories
-	requiredDirs := []string{"~/src/worktrees", "~/src/missions"}
+	requiredDirs := []string{"~/src/worktrees", "~/src/factories"}
 	foundDirs := make(map[string]bool)
 
 	for _, dir := range additionalDirs {

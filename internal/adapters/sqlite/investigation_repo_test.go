@@ -21,7 +21,7 @@ func setupInvestigationTestDB(t *testing.T) *sql.DB {
 
 	// Create missions table
 	_, err = db.Exec(`
-		CREATE TABLE missions (
+		CREATE TABLE commissions (
 			id TEXT PRIMARY KEY,
 			title TEXT NOT NULL,
 			status TEXT NOT NULL DEFAULT 'active',
@@ -37,7 +37,7 @@ func setupInvestigationTestDB(t *testing.T) *sql.DB {
 	_, err = db.Exec(`
 		CREATE TABLE groves (
 			id TEXT PRIMARY KEY,
-			mission_id TEXT NOT NULL,
+			commission_id TEXT NOT NULL,
 			name TEXT NOT NULL,
 			status TEXT NOT NULL DEFAULT 'active',
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -52,7 +52,7 @@ func setupInvestigationTestDB(t *testing.T) *sql.DB {
 	_, err = db.Exec(`
 		CREATE TABLE investigations (
 			id TEXT PRIMARY KEY,
-			mission_id TEXT NOT NULL,
+			commission_id TEXT NOT NULL,
 			title TEXT NOT NULL,
 			description TEXT,
 			status TEXT NOT NULL DEFAULT 'active',
@@ -72,7 +72,7 @@ func setupInvestigationTestDB(t *testing.T) *sql.DB {
 		CREATE TABLE questions (
 			id TEXT PRIMARY KEY,
 			investigation_id TEXT,
-			mission_id TEXT NOT NULL,
+			commission_id TEXT NOT NULL,
 			title TEXT NOT NULL,
 			description TEXT,
 			status TEXT NOT NULL DEFAULT 'open',
@@ -91,8 +91,8 @@ func setupInvestigationTestDB(t *testing.T) *sql.DB {
 	}
 
 	// Insert test data
-	_, _ = db.Exec("INSERT INTO missions (id, title, status) VALUES ('MISSION-001', 'Test Mission', 'active')")
-	_, _ = db.Exec("INSERT INTO groves (id, mission_id, name, status) VALUES ('GROVE-001', 'MISSION-001', 'test-grove', 'active')")
+	_, _ = db.Exec("INSERT INTO commissions (id, title, status) VALUES ('MISSION-001', 'Test Mission', 'active')")
+	_, _ = db.Exec("INSERT INTO groves (id, commission_id, name, status) VALUES ('GROVE-001', 'MISSION-001', 'test-grove', 'active')")
 
 	t.Cleanup(func() {
 		db.Close()
@@ -111,10 +111,10 @@ func createTestInvestigation(t *testing.T, repo *sqlite.InvestigationRepository,
 	}
 
 	inv := &secondary.InvestigationRecord{
-		ID:          nextID,
-		MissionID:   missionID,
-		Title:       title,
-		Description: description,
+		ID:           nextID,
+		CommissionID: missionID,
+		Title:        title,
+		Description:  description,
 	}
 
 	err = repo.Create(ctx, inv)
@@ -131,10 +131,10 @@ func TestInvestigationRepository_Create(t *testing.T) {
 	ctx := context.Background()
 
 	inv := &secondary.InvestigationRecord{
-		ID:          "INV-001",
-		MissionID:   "MISSION-001",
-		Title:       "Test Investigation",
-		Description: "A test investigation description",
+		ID:           "INV-001",
+		CommissionID: "MISSION-001",
+		Title:        "Test Investigation",
+		Description:  "A test investigation description",
 	}
 
 	err := repo.Create(ctx, inv)
@@ -211,12 +211,12 @@ func TestInvestigationRepository_List_FilterByMission(t *testing.T) {
 	ctx := context.Background()
 
 	// Add another mission
-	_, _ = db.Exec("INSERT INTO missions (id, title, status) VALUES ('MISSION-002', 'Mission 2', 'active')")
+	_, _ = db.Exec("INSERT INTO commissions (id, title, status) VALUES ('MISSION-002', 'Mission 2', 'active')")
 
 	createTestInvestigation(t, repo, ctx, "MISSION-001", "Investigation 1", "")
 	createTestInvestigation(t, repo, ctx, "MISSION-002", "Investigation 2", "")
 
-	investigations, err := repo.List(ctx, secondary.InvestigationFilters{MissionID: "MISSION-001"})
+	investigations, err := repo.List(ctx, secondary.InvestigationFilters{CommissionID: "MISSION-001"})
 	if err != nil {
 		t.Fatalf("List failed: %v", err)
 	}
@@ -474,22 +474,22 @@ func TestInvestigationRepository_GetByGrove(t *testing.T) {
 	}
 }
 
-func TestInvestigationRepository_MissionExists(t *testing.T) {
+func TestInvestigationRepository_CommissionExists(t *testing.T) {
 	db := setupInvestigationTestDB(t)
 	repo := sqlite.NewInvestigationRepository(db)
 	ctx := context.Background()
 
-	exists, err := repo.MissionExists(ctx, "MISSION-001")
+	exists, err := repo.CommissionExists(ctx, "MISSION-001")
 	if err != nil {
-		t.Fatalf("MissionExists failed: %v", err)
+		t.Fatalf("CommissionExists failed: %v", err)
 	}
 	if !exists {
 		t.Error("expected mission to exist")
 	}
 
-	exists, err = repo.MissionExists(ctx, "MISSION-999")
+	exists, err = repo.CommissionExists(ctx, "MISSION-999")
 	if err != nil {
-		t.Fatalf("MissionExists failed: %v", err)
+		t.Fatalf("CommissionExists failed: %v", err)
 	}
 	if exists {
 		t.Error("expected mission to not exist")
@@ -504,9 +504,9 @@ func TestInvestigationRepository_GetQuestionsByInvestigation(t *testing.T) {
 	inv := createTestInvestigation(t, repo, ctx, "MISSION-001", "Investigation with Questions", "")
 
 	// Insert questions for the investigation
-	_, _ = db.Exec(`INSERT INTO questions (id, investigation_id, mission_id, title, status) VALUES ('Q-001', ?, 'MISSION-001', 'Question 1', 'open')`, inv.ID)
-	_, _ = db.Exec(`INSERT INTO questions (id, investigation_id, mission_id, title, status) VALUES ('Q-002', ?, 'MISSION-001', 'Question 2', 'open')`, inv.ID)
-	_, _ = db.Exec(`INSERT INTO questions (id, investigation_id, mission_id, title, status) VALUES ('Q-003', NULL, 'MISSION-001', 'Question 3 (no investigation)', 'open')`)
+	_, _ = db.Exec(`INSERT INTO questions (id, investigation_id, commission_id, title, status) VALUES ('Q-001', ?, 'MISSION-001', 'Question 1', 'open')`, inv.ID)
+	_, _ = db.Exec(`INSERT INTO questions (id, investigation_id, commission_id, title, status) VALUES ('Q-002', ?, 'MISSION-001', 'Question 2', 'open')`, inv.ID)
+	_, _ = db.Exec(`INSERT INTO questions (id, investigation_id, commission_id, title, status) VALUES ('Q-003', NULL, 'MISSION-001', 'Question 3 (no investigation)', 'open')`)
 
 	questions, err := repo.GetQuestionsByInvestigation(ctx, inv.ID)
 	if err != nil {

@@ -5,7 +5,7 @@ package grove
 import "fmt"
 
 // AgentType represents the type of agent in the grove domain.
-// Mirrored from mission to avoid import cycles.
+// Mirrored from commission to avoid import cycles.
 type AgentType string
 
 const (
@@ -31,15 +31,15 @@ func (r GuardResult) Error() error {
 
 // GuardContext provides context for agent-based guard evaluation.
 type GuardContext struct {
-	AgentType AgentType
-	AgentID   string
-	MissionID string
+	AgentType    AgentType
+	AgentID      string
+	CommissionID string
 }
 
 // CreateGroveContext provides context for grove creation guards.
 type CreateGroveContext struct {
 	GuardContext
-	MissionExists bool
+	CommissionExists bool
 }
 
 // OpenGroveContext provides context for grove open guards.
@@ -60,7 +60,7 @@ type DeleteGroveContext struct {
 // CanCreateGrove evaluates whether a grove can be created.
 // Rules:
 // - Only ORC can create groves (IMPs work within existing groves)
-// - Mission must exist
+// - Commission must exist
 func CanCreateGrove(ctx CreateGroveContext) GuardResult {
 	// Rule 1: Only ORC can create groves
 	if ctx.AgentType == AgentTypeIMP {
@@ -70,11 +70,11 @@ func CanCreateGrove(ctx CreateGroveContext) GuardResult {
 		}
 	}
 
-	// Rule 2: Mission must exist
-	if !ctx.MissionExists {
+	// Rule 2: Commission must exist
+	if !ctx.CommissionExists {
 		return GuardResult{
 			Allowed: false,
-			Reason:  fmt.Sprintf("cannot create grove: mission %s not found", ctx.MissionID),
+			Reason:  fmt.Sprintf("cannot create grove: commission %s not found", ctx.CommissionID),
 		}
 	}
 

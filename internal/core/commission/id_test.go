@@ -1,51 +1,51 @@
-package mission
+package commission
 
 import "testing"
 
-func TestGenerateMissionID(t *testing.T) {
+func TestGenerateCommissionID(t *testing.T) {
 	tests := []struct {
 		name       string
 		currentMax int
 		want       string
 	}{
 		{
-			name:       "first mission (max=0)",
+			name:       "first commission (max=0)",
 			currentMax: 0,
-			want:       "MISSION-001",
+			want:       "COMM-001",
 		},
 		{
-			name:       "second mission (max=1)",
+			name:       "second commission (max=1)",
 			currentMax: 1,
-			want:       "MISSION-002",
+			want:       "COMM-002",
 		},
 		{
-			name:       "tenth mission (max=9)",
+			name:       "tenth commission (max=9)",
 			currentMax: 9,
-			want:       "MISSION-010",
+			want:       "COMM-010",
 		},
 		{
-			name:       "hundredth mission (max=99)",
+			name:       "hundredth commission (max=99)",
 			currentMax: 99,
-			want:       "MISSION-100",
+			want:       "COMM-100",
 		},
 		{
 			name:       "three-digit boundary (max=999)",
 			currentMax: 999,
-			want:       "MISSION-1000",
+			want:       "COMM-1000",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := GenerateMissionID(tt.currentMax)
+			got := GenerateCommissionID(tt.currentMax)
 			if got != tt.want {
-				t.Errorf("GenerateMissionID(%d) = %q, want %q", tt.currentMax, got, tt.want)
+				t.Errorf("GenerateCommissionID(%d) = %q, want %q", tt.currentMax, got, tt.want)
 			}
 		})
 	}
 }
 
-func TestParseMissionNumber(t *testing.T) {
+func TestParseCommissionNumber(t *testing.T) {
 	tests := []struct {
 		name string
 		id   string
@@ -53,27 +53,27 @@ func TestParseMissionNumber(t *testing.T) {
 	}{
 		{
 			name: "valid single digit",
-			id:   "MISSION-001",
+			id:   "COMM-001",
 			want: 1,
 		},
 		{
 			name: "valid double digit",
-			id:   "MISSION-042",
+			id:   "COMM-042",
 			want: 42,
 		},
 		{
 			name: "valid triple digit",
-			id:   "MISSION-123",
+			id:   "COMM-123",
 			want: 123,
 		},
 		{
 			name: "valid four digit",
-			id:   "MISSION-1000",
+			id:   "COMM-1000",
 			want: 1000,
 		},
 		{
 			name: "invalid format - no dash",
-			id:   "MISSION001",
+			id:   "COMM001",
 			want: -1,
 		},
 		{
@@ -90,9 +90,9 @@ func TestParseMissionNumber(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := ParseMissionNumber(tt.id)
+			got := ParseCommissionNumber(tt.id)
 			if got != tt.want {
-				t.Errorf("ParseMissionNumber(%q) = %d, want %d", tt.id, got, tt.want)
+				t.Errorf("ParseCommissionNumber(%q) = %d, want %d", tt.id, got, tt.want)
 			}
 		})
 	}

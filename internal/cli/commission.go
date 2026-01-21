@@ -25,52 +25,52 @@ var (
 	colorDim    = color.New(color.Faint).SprintFunc()
 )
 
-var missionCmd = &cobra.Command{
-	Use:   "mission",
-	Short: "Manage missions (strategic work streams)",
-	Long:  "Create, list, and manage missions in the ORC ledger",
+var commissionCmd = &cobra.Command{
+	Use:   "commission",
+	Short: "Manage commissions (strategic work streams)",
+	Long:  "Create, list, and manage commissions in the ORC ledger",
 }
 
-var missionCreateCmd = &cobra.Command{
+var commissionCreateCmd = &cobra.Command{
 	Use:   "create [title]",
-	Short: "Create a new mission",
+	Short: "Create a new commission",
 	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
 		title := args[0]
 		description, _ := cmd.Flags().GetString("description")
 
-		return wire.MissionAdapter().Create(ctx, title, description)
+		return wire.CommissionAdapter().Create(ctx, title, description)
 	},
 }
 
-var missionListCmd = &cobra.Command{
+var commissionListCmd = &cobra.Command{
 	Use:   "list",
-	Short: "List missions",
+	Short: "List commissions",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
 		status, _ := cmd.Flags().GetString("status")
 
-		return wire.MissionAdapter().List(ctx, status)
+		return wire.CommissionAdapter().List(ctx, status)
 	},
 }
 
-var missionShowCmd = &cobra.Command{
-	Use:   "show [mission-id]",
-	Short: "Show mission details",
+var commissionShowCmd = &cobra.Command{
+	Use:   "show [commission-id]",
+	Short: "Show commission details",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
 		id := args[0]
 
-		// Show mission details via adapter
-		_, err := wire.MissionAdapter().Show(ctx, id)
+		// Show commission details via adapter
+		_, err := wire.CommissionAdapter().Show(ctx, id)
 		if err != nil {
 			return err
 		}
 
-		// List shipments under this mission via service
-		shipments, err := wire.ShipmentService().ListShipments(ctx, primary.ShipmentFilters{MissionID: id})
+		// List shipments under this commission via service
+		shipments, err := wire.ShipmentService().ListShipments(ctx, primary.ShipmentFilters{CommissionID: id})
 		if err == nil && len(shipments) > 0 {
 			fmt.Println("Shipments:")
 			for _, shipment := range shipments {
@@ -79,8 +79,8 @@ var missionShowCmd = &cobra.Command{
 			fmt.Println()
 		}
 
-		// List groves for this mission via service
-		groves, err := wire.GroveService().ListGroves(context.Background(), primary.GroveFilters{MissionID: id})
+		// List groves for this commission via service
+		groves, err := wire.GroveService().ListGroves(context.Background(), primary.GroveFilters{CommissionID: id})
 		if err == nil && len(groves) > 0 {
 			fmt.Println("Groves:")
 			for _, g := range groves {
@@ -93,56 +93,56 @@ var missionShowCmd = &cobra.Command{
 	},
 }
 
-var missionStartCmd = &cobra.Command{
-	Use:   "start [mission-id]",
-	Short: "Start a mission workspace with TMux session",
-	Long: `Create a mission workspace with .orc/config.json and TMux session.
+var commissionStartCmd = &cobra.Command{
+	Use:   "start [commission-id]",
+	Short: "Start a commission workspace with TMux session",
+	Long: `Create a commission workspace with .orc/config.json and TMux session.
 
 This command:
-1. Creates a workspace directory for the mission
-2. Writes .orc/config.json for mission context detection
+1. Creates a workspace directory for the commission
+2. Writes .orc/config.json for commission context detection
 3. Queries database for active groves
 4. Creates TMux session with ORC pane and grove panes
 5. Materializes git worktrees for groves if needed
 
 Examples:
-  orc mission start MISSION-001
-  orc mission start MISSION-001 --workspace ~/work/mission-001`,
+  orc commission start COMM-001
+  orc commission start COMM-001 --workspace ~/work/commission-001`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
 
-		// Check agent identity - only ORC can start missions
-		if err := wire.MissionOrchestrationService().CheckLaunchPermission(ctx); err != nil {
+		// Check agent identity - only ORC can start commissions
+		if err := wire.CommissionOrchestrationService().CheckLaunchPermission(ctx); err != nil {
 			return err
 		}
 
-		missionID := args[0]
+		commissionID := args[0]
 		workspacePath, _ := cmd.Flags().GetString("workspace")
 
 		// Check if we're in ORC source directory
 		if orccontext.IsOrcSourceDirectory() {
-			return fmt.Errorf("cannot start mission in ORC source directory - please run from another location")
+			return fmt.Errorf("cannot start commission in ORC source directory - please run from another location")
 		}
 
-		// Validate Claude workspace trust before creating mission workspace
+		// Validate Claude workspace trust before creating commission workspace
 		if err := validateClaudeWorkspaceTrust(); err != nil {
 			return fmt.Errorf("Claude workspace trust validation failed:\n\n%w\n\nRun 'orc doctor' for detailed diagnostics", err)
 		}
 
-		// Get mission from service
-		mission, err := wire.MissionService().GetMission(context.Background(), missionID)
+		// Get commission from service
+		commission, err := wire.CommissionService().GetCommission(context.Background(), commissionID)
 		if err != nil {
-			return fmt.Errorf("failed to get mission: %w", err)
+			return fmt.Errorf("failed to get commission: %w", err)
 		}
 
-		// Default workspace path: ~/src/missions/MISSION-ID
+		// Default workspace path: ~/src/commissions/COMM-ID
 		if workspacePath == "" {
 			home, err := os.UserHomeDir()
 			if err != nil {
 				return fmt.Errorf("failed to get home directory: %w", err)
 			}
-			workspacePath = filepath.Join(home, "src", "missions", missionID)
+			workspacePath = filepath.Join(home, "src", "commissions", commissionID)
 		}
 
 		// Create workspace directory
@@ -150,23 +150,23 @@ Examples:
 			return fmt.Errorf("failed to create workspace: %w", err)
 		}
 
-		// Write .orc/config.json for mission context
-		if err := orccontext.WriteMissionContext(workspacePath, missionID); err != nil {
-			return fmt.Errorf("failed to write mission config: %w", err)
+		// Write .orc/config.json for commission context
+		if err := orccontext.WriteCommissionContext(workspacePath, commissionID); err != nil {
+			return fmt.Errorf("failed to write commission config: %w", err)
 		}
 
-		fmt.Printf("✓ Created mission workspace at: %s\n", workspacePath)
-		fmt.Printf("  Mission: %s - %s\n", mission.ID, mission.Title)
+		fmt.Printf("✓ Created commission workspace at: %s\n", workspacePath)
+		fmt.Printf("  Commission: %s - %s\n", commission.ID, commission.Title)
 		fmt.Println()
 
-		// Get active groves for this mission via service
-		groves, err := wire.GroveService().ListGroves(context.Background(), primary.GroveFilters{MissionID: missionID})
+		// Get active groves for this commission via service
+		groves, err := wire.GroveService().ListGroves(context.Background(), primary.GroveFilters{CommissionID: commissionID})
 		if err != nil {
 			return fmt.Errorf("failed to get groves: %w", err)
 		}
 
 		// Create TMux session
-		sessionName := fmt.Sprintf("orc-%s", missionID)
+		sessionName := fmt.Sprintf("orc-%s", commissionID)
 		tmuxAdapter := wire.TMuxAdapter()
 
 		// Check if session already exists
@@ -213,15 +213,15 @@ Examples:
 		}
 
 		if len(groves) == 0 {
-			fmt.Println("  ℹ️  No groves found for this mission")
-			fmt.Printf("     Create groves with: orc grove create <name> --mission %s --repos <repo-names>\n", missionID)
+			fmt.Println("  ℹ️  No groves found for this commission")
+			fmt.Printf("     Create groves with: orc grove create <name> --commission %s --repos <repo-names>\n", commissionID)
 		}
 
 		// Select the ORC window (window 1) as default
 		tmuxAdapter.SelectWindow(ctx, sessionName, 1)
 
 		fmt.Println()
-		fmt.Printf("Mission workspace ready!\n")
+		fmt.Printf("Commission workspace ready!\n")
 		fmt.Println()
 		fmt.Println(tmuxAdapter.AttachInstructions(sessionName))
 
@@ -229,29 +229,29 @@ Examples:
 	},
 }
 
-var missionCompleteCmd = &cobra.Command{
-	Use:   "complete [mission-id]",
-	Short: "Mark a mission as complete",
+var commissionCompleteCmd = &cobra.Command{
+	Use:   "complete [commission-id]",
+	Short: "Mark a commission as complete",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
-		return wire.MissionAdapter().Complete(ctx, args[0])
+		return wire.CommissionAdapter().Complete(ctx, args[0])
 	},
 }
 
-var missionArchiveCmd = &cobra.Command{
-	Use:   "archive [mission-id]",
-	Short: "Archive a completed mission",
+var commissionArchiveCmd = &cobra.Command{
+	Use:   "archive [commission-id]",
+	Short: "Archive a completed commission",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
-		return wire.MissionAdapter().Archive(ctx, args[0])
+		return wire.CommissionAdapter().Archive(ctx, args[0])
 	},
 }
 
-var missionUpdateCmd = &cobra.Command{
-	Use:   "update [mission-id]",
-	Short: "Update mission title and/or description",
+var commissionUpdateCmd = &cobra.Command{
+	Use:   "update [commission-id]",
+	Short: "Update commission title and/or description",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
@@ -259,38 +259,38 @@ var missionUpdateCmd = &cobra.Command{
 		title, _ := cmd.Flags().GetString("title")
 		description, _ := cmd.Flags().GetString("description")
 
-		return wire.MissionAdapter().Update(ctx, id, title, description)
+		return wire.CommissionAdapter().Update(ctx, id, title, description)
 	},
 }
 
-var missionDeleteCmd = &cobra.Command{
-	Use:   "delete [mission-id]",
-	Short: "Delete a mission from the database",
-	Long: `Delete a mission and all associated data from the database.
+var commissionDeleteCmd = &cobra.Command{
+	Use:   "delete [commission-id]",
+	Short: "Delete a commission from the database",
+	Long: `Delete a commission and all associated data from the database.
 
 WARNING: This is a destructive operation. Associated shipments, tasks, and groves
-will lose their mission reference.
+will lose their commission reference.
 
 Examples:
-  orc mission delete MISSION-TEST-001
-  orc mission delete MISSION-001 --force`,
+  orc commission delete COMM-TEST-001
+  orc commission delete COMM-001 --force`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
 		id := args[0]
 		force, _ := cmd.Flags().GetBool("force")
 
-		return wire.MissionAdapter().Delete(ctx, id, force)
+		return wire.CommissionAdapter().Delete(ctx, id, force)
 	},
 }
 
-var missionLaunchCmd = &cobra.Command{
-	Use:   "launch [mission-id]",
-	Short: "Launch mission infrastructure (plan/apply)",
-	Long: `Launch or update mission infrastructure using plan/apply pattern.
+var commissionLaunchCmd = &cobra.Command{
+	Use:   "launch [commission-id]",
+	Short: "Launch commission infrastructure (plan/apply)",
+	Long: `Launch or update commission infrastructure using plan/apply pattern.
 
 This command:
-1. Reads desired state from database (missions, shipments, groves)
+1. Reads desired state from database (commissions, shipments, groves)
 2. Analyzes current filesystem state
 3. Generates a plan of changes needed
 4. Shows plan and asks for confirmation
@@ -299,48 +299,48 @@ This command:
 Idempotent: Can be run multiple times safely.
 
 Examples:
-  orc mission launch MISSION-002
-  orc mission launch MISSION-001 --workspace ~/custom/path`,
+  orc commission launch COMM-002
+  orc commission launch COMM-001 --workspace ~/custom/path`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
 
-		// Check agent identity - only ORC can launch missions
-		if err := wire.MissionOrchestrationService().CheckLaunchPermission(ctx); err != nil {
+		// Check agent identity - only ORC can launch commissions
+		if err := wire.CommissionOrchestrationService().CheckLaunchPermission(ctx); err != nil {
 			return err
 		}
 
-		missionID := args[0]
+		commissionID := args[0]
 		workspacePath, _ := cmd.Flags().GetString("workspace")
 		createTmux, _ := cmd.Flags().GetBool("tmux")
 
 		// Default workspace path
 		if workspacePath == "" {
 			var err error
-			workspacePath, err = config.DefaultWorkspacePath(missionID)
+			workspacePath, err = config.DefaultWorkspacePath(commissionID)
 			if err != nil {
 				return err
 			}
 		}
 
 		// Phase 1: Load state using orchestration service
-		fmt.Printf("🔍 Analyzing mission: %s\n\n", missionID)
-		orchSvc := wire.MissionOrchestrationService()
+		fmt.Printf("🔍 Analyzing commission: %s\n\n", commissionID)
+		orchSvc := wire.CommissionOrchestrationService()
 
-		state, err := orchSvc.LoadMissionState(ctx, missionID)
+		state, err := orchSvc.LoadCommissionState(ctx, commissionID)
 		if err != nil {
-			return fmt.Errorf("mission not found in database: %w\nCreate it first: orc mission create", err)
+			return fmt.Errorf("comcommission not found in database: %w\nCreate it first: orc commission create", err)
 		}
 
 		// Phase 2: Generate infrastructure plan
 		infraPlan := orchSvc.AnalyzeInfrastructure(state, workspacePath)
 
 		// Phase 3: Display plan
-		displayMissionState(state, workspacePath)
+		displayCommissionState(state, workspacePath)
 		displayInfrastructurePlan(infraPlan)
 
 		if createTmux {
-			sessionName := fmt.Sprintf("orc-%s", missionID)
+			sessionName := fmt.Sprintf("orc-%s", commissionID)
 			tmuxAdapter := wire.TMuxAdapter()
 			tmuxPlan := orchSvc.PlanTmuxSession(state, workspacePath, sessionName, tmuxAdapter.SessionExists(ctx, sessionName), &tmuxChecker{adapter: tmuxAdapter})
 			displayTmuxPlan(tmuxPlan)
@@ -358,11 +358,11 @@ Examples:
 		// Phase 5: Apply infrastructure
 		fmt.Print("\n🚀 Applying changes...\n\n")
 		result := orchSvc.ApplyInfrastructure(ctx, infraPlan)
-		displayInfrastructureResult(result, missionID)
+		displayInfrastructureResult(result, commissionID)
 
 		// Phase 6: Apply TMux if requested
 		if createTmux {
-			sessionName := fmt.Sprintf("orc-%s", missionID)
+			sessionName := fmt.Sprintf("orc-%s", commissionID)
 			grovesDir := filepath.Join(workspacePath, "groves")
 			applyTmuxSession(sessionName, state.Groves, grovesDir, workspacePath)
 		}
@@ -372,10 +372,10 @@ Examples:
 		fmt.Println("Next steps:")
 		fmt.Printf("  cd %s\n", workspacePath)
 		tmuxAdapterForCheck := wire.TMuxAdapter()
-		if createTmux && !tmuxAdapterForCheck.SessionExists(ctx, fmt.Sprintf("orc-%s", missionID)) {
-			fmt.Printf("  tmux attach -t orc-%s\n", missionID)
+		if createTmux && !tmuxAdapterForCheck.SessionExists(ctx, fmt.Sprintf("orc-%s", commissionID)) {
+			fmt.Printf("  tmux attach -t orc-%s\n", commissionID)
 		}
-		fmt.Printf("  orc summary --mission %s\n", missionID)
+		fmt.Printf("  orc summary --commission %s\n", commissionID)
 
 		return nil
 	},
@@ -398,13 +398,13 @@ func (t *tmuxChecker) GetPaneCommand(session, window string, pane int) string {
 	return t.adapter.GetPaneCommand(context.Background(), session, window, pane)
 }
 
-// displayMissionState shows the database state section of the plan
-func displayMissionState(state *primary.MissionState, workspacePath string) {
+// displayCommissionState shows the database state section of the plan
+func displayCommissionState(state *primary.CommissionState, workspacePath string) {
 	fmt.Print("📋 Plan:\n\n")
 	fmt.Println(color.New(color.Bold).Sprint("Database State:"))
-	fmt.Printf("  Mission: %s - %s\n", colorDim(state.Mission.ID), state.Mission.Title)
+	fmt.Printf("  Commission: %s - %s\n", colorDim(state.Commission.ID), state.Commission.Title)
 	fmt.Printf("    Workspace: %s\n", workspacePath)
-	fmt.Printf("    Created: %s\n", state.Mission.CreatedAt)
+	fmt.Printf("    Created: %s\n", state.Commission.CreatedAt)
 	fmt.Println()
 	fmt.Printf("  Groves in DB: %d\n", len(state.Groves))
 	for _, grove := range state.Groves {
@@ -423,9 +423,9 @@ func displayInfrastructurePlan(plan *primary.InfrastructurePlan) {
 	fmt.Println(color.New(color.Bold).Sprint("Infrastructure:"))
 
 	if plan.CreateWorkspace {
-		fmt.Printf("  %s mission workspace: %s\n", colorCreate("CREATE"), plan.WorkspacePath)
+		fmt.Printf("  %s commission workspace: %s\n", colorCreate("CREATE"), plan.WorkspacePath)
 	} else {
-		fmt.Printf("  %s mission workspace: %s\n", colorExists("EXISTS"), plan.WorkspacePath)
+		fmt.Printf("  %s commission workspace: %s\n", colorExists("EXISTS"), plan.WorkspacePath)
 	}
 
 	if plan.CreateGrovesDir {
@@ -483,11 +483,11 @@ func displayTmuxPlan(plan *primary.TmuxSessionPlan) {
 }
 
 // displayInfrastructureResult shows the results of applying infrastructure changes
-func displayInfrastructureResult(result *primary.InfrastructureApplyResult, missionID string) {
+func displayInfrastructureResult(result *primary.InfrastructureApplyResult, commissionID string) {
 	if result.WorkspaceCreated {
-		fmt.Println("✓ Mission workspace created")
+		fmt.Println("✓ Commission workspace created")
 	} else {
-		fmt.Println("✓ Mission workspace ready")
+		fmt.Println("✓ Commission workspace ready")
 	}
 
 	if result.GrovesDirCreated {
@@ -510,7 +510,7 @@ func displayInfrastructureResult(result *primary.InfrastructureApplyResult, miss
 
 	for _, grove := range result.GrovesNeedingWork {
 		fmt.Printf("  ℹ️  Grove %s worktree missing: %s\n", grove.GroveID, grove.DesiredPath)
-		fmt.Printf("      Materialize with: orc grove create %s --repos <repo> --mission %s\n", grove.GroveName, missionID)
+		fmt.Printf("      Materialize with: orc grove create %s --repos <repo> --commission %s\n", grove.GroveName, commissionID)
 	}
 
 	for _, err := range result.Errors {
@@ -518,10 +518,10 @@ func displayInfrastructureResult(result *primary.InfrastructureApplyResult, miss
 	}
 
 	fmt.Println()
-	fmt.Println("✅ Mission infrastructure ready")
+	fmt.Println("✅ Commission infrastructure ready")
 }
 
-// applyTmuxSession creates or updates the TMux session for a mission
+// applyTmuxSession creates or updates the TMux session for a commission
 func applyTmuxSession(sessionName string, groves []*primary.Grove, grovesDir, workspacePath string) {
 	ctx := context.Background()
 	tmuxAdapter := wire.TMuxAdapter()
@@ -615,50 +615,50 @@ func applyTmuxSession(sessionName string, groves []*primary.Grove, grovesDir, wo
 	}
 }
 
-var missionPinCmd = &cobra.Command{
-	Use:   "pin [mission-id]",
-	Short: "Pin mission to keep it visible",
+var commissionPinCmd = &cobra.Command{
+	Use:   "pin [commission-id]",
+	Short: "Pin commission to keep it visible",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
-		return wire.MissionAdapter().Pin(ctx, args[0])
+		return wire.CommissionAdapter().Pin(ctx, args[0])
 	},
 }
 
-var missionUnpinCmd = &cobra.Command{
-	Use:   "unpin [mission-id]",
-	Short: "Unpin mission",
+var commissionUnpinCmd = &cobra.Command{
+	Use:   "unpin [commission-id]",
+	Short: "Unpin commission",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
-		return wire.MissionAdapter().Unpin(ctx, args[0])
+		return wire.CommissionAdapter().Unpin(ctx, args[0])
 	},
 }
 
-// MissionCmd returns the mission command
-func MissionCmd() *cobra.Command {
+// CommissionCmd returns the commission command
+func CommissionCmd() *cobra.Command {
 	// Add flags
-	missionCreateCmd.Flags().StringP("description", "d", "", "Mission description")
-	missionListCmd.Flags().StringP("status", "s", "", "Filter by status (active, paused, complete, archived)")
-	missionStartCmd.Flags().StringP("workspace", "w", "", "Custom workspace path (default: ~/missions/MISSION-ID)")
-	missionLaunchCmd.Flags().StringP("workspace", "w", "", "Custom workspace path (default: ~/src/missions/MISSION-ID)")
-	missionLaunchCmd.Flags().Bool("tmux", false, "Create TMux session with window layout (no apps launched)")
-	missionUpdateCmd.Flags().StringP("title", "t", "", "New mission title")
-	missionUpdateCmd.Flags().StringP("description", "d", "", "New mission description")
-	missionDeleteCmd.Flags().BoolP("force", "f", false, "Force delete even with associated data")
+	commissionCreateCmd.Flags().StringP("description", "d", "", "Commission description")
+	commissionListCmd.Flags().StringP("status", "s", "", "Filter by status (active, paused, complete, archived)")
+	commissionStartCmd.Flags().StringP("workspace", "w", "", "Custom workspace path (default: ~/commissions/COMM-ID)")
+	commissionLaunchCmd.Flags().StringP("workspace", "w", "", "Custom workspace path (default: ~/src/commissions/COMM-ID)")
+	commissionLaunchCmd.Flags().Bool("tmux", false, "Create TMux session with window layout (no apps launched)")
+	commissionUpdateCmd.Flags().StringP("title", "t", "", "New commission title")
+	commissionUpdateCmd.Flags().StringP("description", "d", "", "New commission description")
+	commissionDeleteCmd.Flags().BoolP("force", "f", false, "Force delete even with associated data")
 
 	// Add subcommands
-	missionCmd.AddCommand(missionCreateCmd)
-	missionCmd.AddCommand(missionListCmd)
-	missionCmd.AddCommand(missionShowCmd)
-	missionCmd.AddCommand(missionStartCmd)
-	missionCmd.AddCommand(missionLaunchCmd)
-	missionCmd.AddCommand(missionCompleteCmd)
-	missionCmd.AddCommand(missionArchiveCmd)
-	missionCmd.AddCommand(missionUpdateCmd)
-	missionCmd.AddCommand(missionDeleteCmd)
-	missionCmd.AddCommand(missionPinCmd)
-	missionCmd.AddCommand(missionUnpinCmd)
+	commissionCmd.AddCommand(commissionCreateCmd)
+	commissionCmd.AddCommand(commissionListCmd)
+	commissionCmd.AddCommand(commissionShowCmd)
+	commissionCmd.AddCommand(commissionStartCmd)
+	commissionCmd.AddCommand(commissionLaunchCmd)
+	commissionCmd.AddCommand(commissionCompleteCmd)
+	commissionCmd.AddCommand(commissionArchiveCmd)
+	commissionCmd.AddCommand(commissionUpdateCmd)
+	commissionCmd.AddCommand(commissionDeleteCmd)
+	commissionCmd.AddCommand(commissionPinCmd)
+	commissionCmd.AddCommand(commissionUnpinCmd)
 
-	return missionCmd
+	return commissionCmd
 }

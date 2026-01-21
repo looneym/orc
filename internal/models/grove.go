@@ -11,14 +11,14 @@ import (
 // This is the domain type used within the models package.
 // For persistence, use the repository interfaces in ports/secondary.
 type Grove struct {
-	ID        string
-	MissionID string
-	Name      string
-	Path      string
-	Repos     sql.NullString
-	Status    string
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	ID              string
+	ComcommissionID string
+	Name            string
+	Path            string
+	Repos           sql.NullString
+	Status          string
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
 }
 
 // Grove status constants

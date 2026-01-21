@@ -1,4 +1,4 @@
-package mission
+package commission
 
 import (
 	"testing"
@@ -10,8 +10,8 @@ func TestApplyStatusTransition(t *testing.T) {
 
 	tests := []struct {
 		name            string
-		newStatus       MissionStatus
-		wantStatus      MissionStatus
+		newStatus       CommissionStatus
+		wantStatus      CommissionStatus
 		wantCompletedAt bool
 	}{
 		{

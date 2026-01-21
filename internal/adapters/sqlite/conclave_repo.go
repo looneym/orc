@@ -28,8 +28,8 @@ func (r *ConclaveRepository) Create(ctx context.Context, conclave *secondary.Con
 	}
 
 	_, err := r.db.ExecContext(ctx,
-		"INSERT INTO conclaves (id, mission_id, title, description, status) VALUES (?, ?, ?, ?, ?)",
-		conclave.ID, conclave.MissionID, conclave.Title, desc, "active",
+		"INSERT INTO conclaves (id, commission_id, title, description, status) VALUES (?, ?, ?, ?, ?)",
+		conclave.ID, conclave.CommissionID, conclave.Title, desc, "active",
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create conclave: %w", err)
@@ -51,9 +51,9 @@ func (r *ConclaveRepository) GetByID(ctx context.Context, id string) (*secondary
 
 	record := &secondary.ConclaveRecord{}
 	err := r.db.QueryRowContext(ctx,
-		"SELECT id, mission_id, title, description, status, assigned_grove_id, pinned, created_at, updated_at, completed_at FROM conclaves WHERE id = ?",
+		"SELECT id, commission_id, title, description, status, assigned_grove_id, pinned, created_at, updated_at, completed_at FROM conclaves WHERE id = ?",
 		id,
-	).Scan(&record.ID, &record.MissionID, &record.Title, &desc, &record.Status, &assignedGroveID, &pinned, &createdAt, &updatedAt, &completedAt)
+	).Scan(&record.ID, &record.CommissionID, &record.Title, &desc, &record.Status, &assignedGroveID, &pinned, &createdAt, &updatedAt, &completedAt)
 
 	if err == sql.ErrNoRows {
 		return nil, fmt.Errorf("conclave %s not found", id)
@@ -76,12 +76,12 @@ func (r *ConclaveRepository) GetByID(ctx context.Context, id string) (*secondary
 
 // List retrieves conclaves matching the given filters.
 func (r *ConclaveRepository) List(ctx context.Context, filters secondary.ConclaveFilters) ([]*secondary.ConclaveRecord, error) {
-	query := "SELECT id, mission_id, title, description, status, assigned_grove_id, pinned, created_at, updated_at, completed_at FROM conclaves WHERE 1=1"
+	query := "SELECT id, commission_id, title, description, status, assigned_grove_id, pinned, created_at, updated_at, completed_at FROM conclaves WHERE 1=1"
 	args := []any{}
 
-	if filters.MissionID != "" {
-		query += " AND mission_id = ?"
-		args = append(args, filters.MissionID)
+	if filters.CommissionID != "" {
+		query += " AND commission_id = ?"
+		args = append(args, filters.CommissionID)
 	}
 
 	if filters.Status != "" {
@@ -109,7 +109,7 @@ func (r *ConclaveRepository) List(ctx context.Context, filters secondary.Conclav
 		)
 
 		record := &secondary.ConclaveRecord{}
-		err := rows.Scan(&record.ID, &record.MissionID, &record.Title, &desc, &record.Status, &assignedGroveID, &pinned, &createdAt, &updatedAt, &completedAt)
+		err := rows.Scan(&record.ID, &record.CommissionID, &record.Title, &desc, &record.Status, &assignedGroveID, &pinned, &createdAt, &updatedAt, &completedAt)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan conclave: %w", err)
 		}
@@ -252,7 +252,7 @@ func (r *ConclaveRepository) UpdateStatus(ctx context.Context, id, status string
 
 // GetByGrove retrieves conclaves assigned to a grove.
 func (r *ConclaveRepository) GetByGrove(ctx context.Context, groveID string) ([]*secondary.ConclaveRecord, error) {
-	query := "SELECT id, mission_id, title, description, status, assigned_grove_id, pinned, created_at, updated_at, completed_at FROM conclaves WHERE assigned_grove_id = ?"
+	query := "SELECT id, commission_id, title, description, status, assigned_grove_id, pinned, created_at, updated_at, completed_at FROM conclaves WHERE assigned_grove_id = ?"
 	rows, err := r.db.QueryContext(ctx, query, groveID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get conclaves by grove: %w", err)
@@ -271,7 +271,7 @@ func (r *ConclaveRepository) GetByGrove(ctx context.Context, groveID string) ([]
 		)
 
 		record := &secondary.ConclaveRecord{}
-		err := rows.Scan(&record.ID, &record.MissionID, &record.Title, &desc, &record.Status, &assignedGroveID, &pinned, &createdAt, &updatedAt, &completedAt)
+		err := rows.Scan(&record.ID, &record.CommissionID, &record.Title, &desc, &record.Status, &assignedGroveID, &pinned, &createdAt, &updatedAt, &completedAt)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan conclave: %w", err)
 		}
@@ -291,10 +291,10 @@ func (r *ConclaveRepository) GetByGrove(ctx context.Context, groveID string) ([]
 	return conclaves, nil
 }
 
-// MissionExists checks if a mission exists.
-func (r *ConclaveRepository) MissionExists(ctx context.Context, missionID string) (bool, error) {
+// CommissionExists checks if a mission exists.
+func (r *ConclaveRepository) CommissionExists(ctx context.Context, missionID string) (bool, error) {
 	var count int
-	err := r.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM missions WHERE id = ?", missionID).Scan(&count)
+	err := r.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM commissions WHERE id = ?", missionID).Scan(&count)
 	if err != nil {
 		return false, fmt.Errorf("failed to check mission existence: %w", err)
 	}
@@ -303,7 +303,7 @@ func (r *ConclaveRepository) MissionExists(ctx context.Context, missionID string
 
 // GetTasksByConclave retrieves tasks belonging to a conclave.
 func (r *ConclaveRepository) GetTasksByConclave(ctx context.Context, conclaveID string) ([]*secondary.ConclaveTaskRecord, error) {
-	query := `SELECT id, shipment_id, mission_id, title, description, type, status, priority,
+	query := `SELECT id, shipment_id, commission_id, title, description, type, status, priority,
 		assigned_grove_id, pinned, created_at, updated_at, claimed_at, completed_at,
 		conclave_id, promoted_from_id, promoted_from_type
 		FROM tasks WHERE conclave_id = ? ORDER BY created_at ASC`
@@ -333,7 +333,7 @@ func (r *ConclaveRepository) GetTasksByConclave(ctx context.Context, conclaveID 
 		)
 
 		record := &secondary.ConclaveTaskRecord{}
-		err := rows.Scan(&record.ID, &shipmentID, &record.MissionID, &record.Title, &desc, &taskType, &record.Status, &priority,
+		err := rows.Scan(&record.ID, &shipmentID, &record.CommissionID, &record.Title, &desc, &taskType, &record.Status, &priority,
 			&assignedGroveID, &pinned, &createdAt, &updatedAt, &claimedAt, &completedAt,
 			&conclaveIDCol, &promotedFromID, &promotedFromType)
 		if err != nil {
@@ -366,7 +366,7 @@ func (r *ConclaveRepository) GetTasksByConclave(ctx context.Context, conclaveID 
 
 // GetQuestionsByConclave retrieves questions belonging to a conclave.
 func (r *ConclaveRepository) GetQuestionsByConclave(ctx context.Context, conclaveID string) ([]*secondary.ConclaveQuestionRecord, error) {
-	query := `SELECT id, investigation_id, mission_id, title, description, status, answer, pinned,
+	query := `SELECT id, investigation_id, commission_id, title, description, status, answer, pinned,
 		created_at, updated_at, answered_at, conclave_id, promoted_from_id, promoted_from_type
 		FROM questions WHERE conclave_id = ? ORDER BY created_at ASC`
 
@@ -392,7 +392,7 @@ func (r *ConclaveRepository) GetQuestionsByConclave(ctx context.Context, conclav
 		)
 
 		record := &secondary.ConclaveQuestionRecord{}
-		err := rows.Scan(&record.ID, &investigationID, &record.MissionID, &record.Title, &desc, &record.Status, &answer, &pinned,
+		err := rows.Scan(&record.ID, &investigationID, &record.CommissionID, &record.Title, &desc, &record.Status, &answer, &pinned,
 			&createdAt, &updatedAt, &answeredAt, &conclaveIDCol, &promotedFromID, &promotedFromType)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan question: %w", err)
@@ -419,7 +419,7 @@ func (r *ConclaveRepository) GetQuestionsByConclave(ctx context.Context, conclav
 
 // GetPlansByConclave retrieves plans belonging to a conclave.
 func (r *ConclaveRepository) GetPlansByConclave(ctx context.Context, conclaveID string) ([]*secondary.ConclavePlanRecord, error) {
-	query := `SELECT id, shipment_id, mission_id, title, description, status, content, pinned,
+	query := `SELECT id, shipment_id, commission_id, title, description, status, content, pinned,
 		created_at, updated_at, approved_at, conclave_id, promoted_from_id, promoted_from_type
 		FROM plans WHERE conclave_id = ? ORDER BY created_at ASC`
 
@@ -445,7 +445,7 @@ func (r *ConclaveRepository) GetPlansByConclave(ctx context.Context, conclaveID 
 		)
 
 		record := &secondary.ConclavePlanRecord{}
-		err := rows.Scan(&record.ID, &shipmentID, &record.MissionID, &record.Title, &desc, &record.Status, &content, &pinned,
+		err := rows.Scan(&record.ID, &shipmentID, &record.CommissionID, &record.Title, &desc, &record.Status, &content, &pinned,
 			&createdAt, &updatedAt, &approvedAt, &conclaveIDCol, &promotedFromID, &promotedFromType)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan plan: %w", err)

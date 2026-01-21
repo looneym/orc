@@ -1,12 +1,12 @@
 package primary
 
-// MissionState represents the loaded state of a mission and its groves.
-type MissionState struct {
-	Mission *Mission
-	Groves  []*Grove
+// CommissionState represents the loaded state of a commission and its groves.
+type CommissionState struct {
+	Commission *Commission
+	Groves     []*Grove
 }
 
-// InfrastructurePlan describes the changes needed to set up mission infrastructure.
+// InfrastructurePlan describes the changes needed to set up commission infrastructure.
 type InfrastructurePlan struct {
 	WorkspacePath string
 	GrovesDir     string

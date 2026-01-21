@@ -1,6 +1,6 @@
-// Package mission contains the pure business logic for mission operations.
+// Package commission contains the pure business logic for commission operations.
 // This file contains pure planner functions that generate effects.
-package mission
+package commission
 
 import (
 	"encoding/json"
@@ -22,16 +22,16 @@ type GrovePlanInput struct {
 // LaunchPlanInput contains the inputs needed to generate a launch plan.
 // All values are pre-fetched by the caller - no I/O in the planner.
 type LaunchPlanInput struct {
-	MissionID     string
-	MissionTitle  string
-	WorkspacePath string
-	CreateTMux    bool
-	Groves        []GrovePlanInput
+	CommissionID    string
+	CommissionTitle string
+	WorkspacePath   string
+	CreateTMux      bool
+	Groves          []GrovePlanInput
 }
 
-// LaunchPlan represents the planned effects for launching a mission.
+// LaunchPlan represents the planned effects for launching a commission.
 type LaunchPlan struct {
-	MissionID     string
+	CommissionID  string
 	WorkspacePath string
 	FilesystemOps []effects.FileEffect
 	DatabaseOps   []effects.PersistEffect
@@ -53,11 +53,11 @@ func (p LaunchPlan) Effects() []effects.Effect {
 	return result
 }
 
-// GenerateLaunchPlan creates a plan for launching mission infrastructure.
+// GenerateLaunchPlan creates a plan for launching commission infrastructure.
 // This is a pure function - all input data must be pre-fetched.
 func GenerateLaunchPlan(input LaunchPlanInput) LaunchPlan {
 	plan := LaunchPlan{
-		MissionID:     input.MissionID,
+		CommissionID:  input.CommissionID,
 		WorkspacePath: input.WorkspacePath,
 	}
 
@@ -89,7 +89,7 @@ func GenerateLaunchPlan(input LaunchPlanInput) LaunchPlan {
 		})
 
 		// Generate and write grove config
-		configContent := generateGroveConfig(grove.ID, input.MissionID, grove.Name, grove.Repos)
+		configContent := generateGroveConfig(grove.ID, input.CommissionID, grove.Name, grove.Repos)
 		plan.FilesystemOps = append(plan.FilesystemOps, effects.FileEffect{
 			Operation: "write",
 			Path:      filepath.Join(desiredPath, ".orc", "config.json"),
@@ -112,7 +112,7 @@ func GenerateLaunchPlan(input LaunchPlanInput) LaunchPlan {
 
 	// 4. TMux operations (optional)
 	if input.CreateTMux {
-		sessionName := "orc-" + input.MissionID
+		sessionName := "orc-" + input.CommissionID
 
 		plan.TMuxOps = append(plan.TMuxOps, effects.TMuxEffect{
 			Operation:   "new_session",
@@ -137,15 +137,15 @@ func GenerateLaunchPlan(input LaunchPlanInput) LaunchPlan {
 
 // StartPlanInput contains the inputs needed to generate a start plan.
 type StartPlanInput struct {
-	MissionID     string
+	CommissionID  string
 	WorkspacePath string
 	Groves        []GrovePlanInput
 }
 
-// StartPlan represents the planned effects for starting a mission.
+// StartPlan represents the planned effects for starting a commission.
 type StartPlan struct {
-	MissionID string
-	TMuxOps   []effects.TMuxEffect
+	CommissionID string
+	TMuxOps      []effects.TMuxEffect
 }
 
 // Effects returns all effects as a flat slice for execution.
@@ -157,14 +157,14 @@ func (p StartPlan) Effects() []effects.Effect {
 	return result
 }
 
-// GenerateStartPlan creates a plan for starting a mission's tmux session.
+// GenerateStartPlan creates a plan for starting a commission's tmux session.
 // This is a simpler version of launch that only handles tmux setup.
 func GenerateStartPlan(input StartPlanInput) StartPlan {
 	plan := StartPlan{
-		MissionID: input.MissionID,
+		CommissionID: input.CommissionID,
 	}
 
-	sessionName := "orc-" + input.MissionID
+	sessionName := "orc-" + input.CommissionID
 	grovesDir := filepath.Join(input.WorkspacePath, "groves")
 
 	// Create new session
@@ -197,24 +197,24 @@ type groveConfig struct {
 }
 
 type groveConfigInner struct {
-	GroveID   string   `json:"grove_id"`
-	MissionID string   `json:"mission_id"`
-	Name      string   `json:"name"`
-	Repos     []string `json:"repos"`
-	CreatedAt string   `json:"created_at"`
+	GroveID      string   `json:"grove_id"`
+	CommissionID string   `json:"commission_id"`
+	Name         string   `json:"name"`
+	Repos        []string `json:"repos"`
+	CreatedAt    string   `json:"created_at"`
 }
 
 // generateGroveConfig creates the JSON config content for a grove.
-func generateGroveConfig(groveID, missionID, name string, repos []string) []byte {
+func generateGroveConfig(groveID, commissionID, name string, repos []string) []byte {
 	config := groveConfig{
 		Version: "1.0",
 		Type:    "grove",
 		Grove: groveConfigInner{
-			GroveID:   groveID,
-			MissionID: missionID,
-			Name:      name,
-			Repos:     repos,
-			CreatedAt: time.Now().UTC().Format(time.RFC3339),
+			GroveID:      groveID,
+			CommissionID: commissionID,
+			Name:         name,
+			Repos:        repos,
+			CreatedAt:    time.Now().UTC().Format(time.RFC3339),
 		},
 	}
 

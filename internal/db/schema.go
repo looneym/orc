@@ -1,7 +1,7 @@
 package db
 
 const schemaSQL = `
--- Missions (Strategic work streams)
+-- Commissions (Strategic work streams)
 CREATE TABLE IF NOT EXISTS missions (
 	id TEXT PRIMARY KEY,
 	title TEXT NOT NULL,
@@ -71,7 +71,7 @@ CREATE TABLE IF NOT EXISTS tasks (
 	CHECK ((epic_id IS NOT NULL AND rabbit_hole_id IS NULL) OR (epic_id IS NULL AND rabbit_hole_id IS NOT NULL))
 );
 
--- Groves (Physical workspaces) - Mission-level worktrees
+-- Groves (Physical workspaces) - Commission-level worktrees
 CREATE TABLE IF NOT EXISTS groves (
 	id TEXT PRIMARY KEY,
 	mission_id TEXT NOT NULL,

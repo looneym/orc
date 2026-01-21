@@ -60,7 +60,7 @@ func (m *mockShipmentRepository) List(ctx context.Context, filters secondary.Shi
 	}
 	var result []*secondary.ShipmentRecord
 	for _, s := range m.shipments {
-		if filters.MissionID != "" && s.MissionID != filters.MissionID {
+		if filters.CommissionID != "" && s.CommissionID != filters.CommissionID {
 			continue
 		}
 		if filters.Status != "" && s.Status != filters.Status {
@@ -146,7 +146,7 @@ func (m *mockShipmentRepository) UpdateStatus(ctx context.Context, id, status st
 	return nil
 }
 
-func (m *mockShipmentRepository) MissionExists(ctx context.Context, missionID string) (bool, error) {
+func (m *mockShipmentRepository) CommissionExists(ctx context.Context, missionID string) (bool, error) {
 	if m.missionExistsErr != nil {
 		return false, m.missionExistsErr
 	}
@@ -221,7 +221,7 @@ func (m *mockTaskRepositoryForShipment) AssignGroveByShipment(ctx context.Contex
 	return m.assignErr
 }
 
-func (m *mockTaskRepositoryForShipment) MissionExists(ctx context.Context, missionID string) (bool, error) {
+func (m *mockTaskRepositoryForShipment) CommissionExists(ctx context.Context, missionID string) (bool, error) {
 	return true, nil
 }
 
@@ -269,9 +269,9 @@ func TestCreateShipment_Success(t *testing.T) {
 	ctx := context.Background()
 
 	resp, err := service.CreateShipment(ctx, primary.CreateShipmentRequest{
-		MissionID:   "MISSION-001",
-		Title:       "Test Shipment",
-		Description: "A test shipment",
+		CommissionID: "MISSION-001",
+		Title:        "Test Shipment",
+		Description:  "A test shipment",
 	})
 
 	if err != nil {
@@ -295,9 +295,9 @@ func TestCreateShipment_MissionNotFound(t *testing.T) {
 	shipmentRepo.missionExistsResult = false
 
 	_, err := service.CreateShipment(ctx, primary.CreateShipmentRequest{
-		MissionID:   "MISSION-NONEXISTENT",
-		Title:       "Test Shipment",
-		Description: "A test shipment",
+		CommissionID: "MISSION-NONEXISTENT",
+		Title:        "Test Shipment",
+		Description:  "A test shipment",
 	})
 
 	if err == nil {
@@ -312,9 +312,9 @@ func TestCreateShipment_MissionValidationError(t *testing.T) {
 	shipmentRepo.missionExistsErr = errors.New("database error")
 
 	_, err := service.CreateShipment(ctx, primary.CreateShipmentRequest{
-		MissionID:   "MISSION-001",
-		Title:       "Test Shipment",
-		Description: "A test shipment",
+		CommissionID: "MISSION-001",
+		Title:        "Test Shipment",
+		Description:  "A test shipment",
 	})
 
 	if err == nil {
@@ -331,10 +331,10 @@ func TestGetShipment_Found(t *testing.T) {
 	ctx := context.Background()
 
 	shipmentRepo.shipments["SHIPMENT-001"] = &secondary.ShipmentRecord{
-		ID:        "SHIPMENT-001",
-		MissionID: "MISSION-001",
-		Title:     "Test Shipment",
-		Status:    "active",
+		ID:           "SHIPMENT-001",
+		CommissionID: "MISSION-001",
+		Title:        "Test Shipment",
+		Status:       "active",
 	}
 
 	shipment, err := service.GetShipment(ctx, "SHIPMENT-001")
@@ -367,19 +367,19 @@ func TestListShipments_FilterByMission(t *testing.T) {
 	ctx := context.Background()
 
 	shipmentRepo.shipments["SHIPMENT-001"] = &secondary.ShipmentRecord{
-		ID:        "SHIPMENT-001",
-		MissionID: "MISSION-001",
-		Title:     "Shipment 1",
-		Status:    "active",
+		ID:           "SHIPMENT-001",
+		CommissionID: "MISSION-001",
+		Title:        "Shipment 1",
+		Status:       "active",
 	}
 	shipmentRepo.shipments["SHIPMENT-002"] = &secondary.ShipmentRecord{
-		ID:        "SHIPMENT-002",
-		MissionID: "MISSION-002",
-		Title:     "Shipment 2",
-		Status:    "active",
+		ID:           "SHIPMENT-002",
+		CommissionID: "MISSION-002",
+		Title:        "Shipment 2",
+		Status:       "active",
 	}
 
-	shipments, err := service.ListShipments(ctx, primary.ShipmentFilters{MissionID: "MISSION-001"})
+	shipments, err := service.ListShipments(ctx, primary.ShipmentFilters{CommissionID: "MISSION-001"})
 
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
@@ -394,16 +394,16 @@ func TestListShipments_FilterByStatus(t *testing.T) {
 	ctx := context.Background()
 
 	shipmentRepo.shipments["SHIPMENT-001"] = &secondary.ShipmentRecord{
-		ID:        "SHIPMENT-001",
-		MissionID: "MISSION-001",
-		Title:     "Active Shipment",
-		Status:    "active",
+		ID:           "SHIPMENT-001",
+		CommissionID: "MISSION-001",
+		Title:        "Active Shipment",
+		Status:       "active",
 	}
 	shipmentRepo.shipments["SHIPMENT-002"] = &secondary.ShipmentRecord{
-		ID:        "SHIPMENT-002",
-		MissionID: "MISSION-001",
-		Title:     "Paused Shipment",
-		Status:    "paused",
+		ID:           "SHIPMENT-002",
+		CommissionID: "MISSION-001",
+		Title:        "Paused Shipment",
+		Status:       "paused",
 	}
 
 	shipments, err := service.ListShipments(ctx, primary.ShipmentFilters{Status: "active"})
@@ -425,11 +425,11 @@ func TestCompleteShipment_UnpinnedAllowed(t *testing.T) {
 	ctx := context.Background()
 
 	shipmentRepo.shipments["SHIPMENT-001"] = &secondary.ShipmentRecord{
-		ID:        "SHIPMENT-001",
-		MissionID: "MISSION-001",
-		Title:     "Test Shipment",
-		Status:    "active",
-		Pinned:    false,
+		ID:           "SHIPMENT-001",
+		CommissionID: "MISSION-001",
+		Title:        "Test Shipment",
+		Status:       "active",
+		Pinned:       false,
 	}
 
 	err := service.CompleteShipment(ctx, "SHIPMENT-001")
@@ -447,11 +447,11 @@ func TestCompleteShipment_PinnedBlocked(t *testing.T) {
 	ctx := context.Background()
 
 	shipmentRepo.shipments["SHIPMENT-001"] = &secondary.ShipmentRecord{
-		ID:        "SHIPMENT-001",
-		MissionID: "MISSION-001",
-		Title:     "Pinned Shipment",
-		Status:    "active",
-		Pinned:    true,
+		ID:           "SHIPMENT-001",
+		CommissionID: "MISSION-001",
+		Title:        "Pinned Shipment",
+		Status:       "active",
+		Pinned:       true,
 	}
 
 	err := service.CompleteShipment(ctx, "SHIPMENT-001")
@@ -481,10 +481,10 @@ func TestPauseShipment_ActiveAllowed(t *testing.T) {
 	ctx := context.Background()
 
 	shipmentRepo.shipments["SHIPMENT-001"] = &secondary.ShipmentRecord{
-		ID:        "SHIPMENT-001",
-		MissionID: "MISSION-001",
-		Title:     "Active Shipment",
-		Status:    "active",
+		ID:           "SHIPMENT-001",
+		CommissionID: "MISSION-001",
+		Title:        "Active Shipment",
+		Status:       "active",
 	}
 
 	err := service.PauseShipment(ctx, "SHIPMENT-001")
@@ -502,10 +502,10 @@ func TestPauseShipment_NotActiveBlocked(t *testing.T) {
 	ctx := context.Background()
 
 	shipmentRepo.shipments["SHIPMENT-001"] = &secondary.ShipmentRecord{
-		ID:        "SHIPMENT-001",
-		MissionID: "MISSION-001",
-		Title:     "Paused Shipment",
-		Status:    "paused",
+		ID:           "SHIPMENT-001",
+		CommissionID: "MISSION-001",
+		Title:        "Paused Shipment",
+		Status:       "paused",
 	}
 
 	err := service.PauseShipment(ctx, "SHIPMENT-001")
@@ -520,10 +520,10 @@ func TestPauseShipment_CompleteBlocked(t *testing.T) {
 	ctx := context.Background()
 
 	shipmentRepo.shipments["SHIPMENT-001"] = &secondary.ShipmentRecord{
-		ID:        "SHIPMENT-001",
-		MissionID: "MISSION-001",
-		Title:     "Complete Shipment",
-		Status:    "complete",
+		ID:           "SHIPMENT-001",
+		CommissionID: "MISSION-001",
+		Title:        "Complete Shipment",
+		Status:       "complete",
 	}
 
 	err := service.PauseShipment(ctx, "SHIPMENT-001")
@@ -542,10 +542,10 @@ func TestResumeShipment_PausedAllowed(t *testing.T) {
 	ctx := context.Background()
 
 	shipmentRepo.shipments["SHIPMENT-001"] = &secondary.ShipmentRecord{
-		ID:        "SHIPMENT-001",
-		MissionID: "MISSION-001",
-		Title:     "Paused Shipment",
-		Status:    "paused",
+		ID:           "SHIPMENT-001",
+		CommissionID: "MISSION-001",
+		Title:        "Paused Shipment",
+		Status:       "paused",
 	}
 
 	err := service.ResumeShipment(ctx, "SHIPMENT-001")
@@ -563,10 +563,10 @@ func TestResumeShipment_NotPausedBlocked(t *testing.T) {
 	ctx := context.Background()
 
 	shipmentRepo.shipments["SHIPMENT-001"] = &secondary.ShipmentRecord{
-		ID:        "SHIPMENT-001",
-		MissionID: "MISSION-001",
-		Title:     "Active Shipment",
-		Status:    "active",
+		ID:           "SHIPMENT-001",
+		CommissionID: "MISSION-001",
+		Title:        "Active Shipment",
+		Status:       "active",
 	}
 
 	err := service.ResumeShipment(ctx, "SHIPMENT-001")
@@ -585,11 +585,11 @@ func TestPinShipment(t *testing.T) {
 	ctx := context.Background()
 
 	shipmentRepo.shipments["SHIPMENT-001"] = &secondary.ShipmentRecord{
-		ID:        "SHIPMENT-001",
-		MissionID: "MISSION-001",
-		Title:     "Test Shipment",
-		Status:    "active",
-		Pinned:    false,
+		ID:           "SHIPMENT-001",
+		CommissionID: "MISSION-001",
+		Title:        "Test Shipment",
+		Status:       "active",
+		Pinned:       false,
 	}
 
 	err := service.PinShipment(ctx, "SHIPMENT-001")
@@ -607,11 +607,11 @@ func TestUnpinShipment(t *testing.T) {
 	ctx := context.Background()
 
 	shipmentRepo.shipments["SHIPMENT-001"] = &secondary.ShipmentRecord{
-		ID:        "SHIPMENT-001",
-		MissionID: "MISSION-001",
-		Title:     "Pinned Shipment",
-		Status:    "active",
-		Pinned:    true,
+		ID:           "SHIPMENT-001",
+		CommissionID: "MISSION-001",
+		Title:        "Pinned Shipment",
+		Status:       "active",
+		Pinned:       true,
 	}
 
 	err := service.UnpinShipment(ctx, "SHIPMENT-001")
@@ -633,10 +633,10 @@ func TestAssignShipmentToGrove_Success(t *testing.T) {
 	ctx := context.Background()
 
 	shipmentRepo.shipments["SHIPMENT-001"] = &secondary.ShipmentRecord{
-		ID:        "SHIPMENT-001",
-		MissionID: "MISSION-001",
-		Title:     "Test Shipment",
-		Status:    "active",
+		ID:           "SHIPMENT-001",
+		CommissionID: "MISSION-001",
+		Title:        "Test Shipment",
+		Status:       "active",
 	}
 
 	err := service.AssignShipmentToGrove(ctx, "SHIPMENT-001", "GROVE-001")
@@ -665,14 +665,14 @@ func TestAssignShipmentToGrove_GroveAlreadyAssigned(t *testing.T) {
 	ctx := context.Background()
 
 	shipmentRepo.shipments["SHIPMENT-001"] = &secondary.ShipmentRecord{
-		ID:        "SHIPMENT-001",
-		MissionID: "MISSION-001",
-		Title:     "Shipment 1",
-		Status:    "active",
+		ID:           "SHIPMENT-001",
+		CommissionID: "MISSION-001",
+		Title:        "Shipment 1",
+		Status:       "active",
 	}
 	shipmentRepo.shipments["SHIPMENT-002"] = &secondary.ShipmentRecord{
 		ID:              "SHIPMENT-002",
-		MissionID:       "MISSION-001",
+		CommissionID:    "MISSION-001",
 		Title:           "Shipment 2",
 		Status:          "active",
 		AssignedGroveID: "GROVE-001",
@@ -696,16 +696,16 @@ func TestGetShipmentsByGrove_Success(t *testing.T) {
 
 	shipmentRepo.shipments["SHIPMENT-001"] = &secondary.ShipmentRecord{
 		ID:              "SHIPMENT-001",
-		MissionID:       "MISSION-001",
+		CommissionID:    "MISSION-001",
 		Title:           "Assigned Shipment",
 		Status:          "active",
 		AssignedGroveID: "GROVE-001",
 	}
 	shipmentRepo.shipments["SHIPMENT-002"] = &secondary.ShipmentRecord{
-		ID:        "SHIPMENT-002",
-		MissionID: "MISSION-001",
-		Title:     "Unassigned Shipment",
-		Status:    "active",
+		ID:           "SHIPMENT-002",
+		CommissionID: "MISSION-001",
+		Title:        "Unassigned Shipment",
+		Status:       "active",
 	}
 
 	shipments, err := service.GetShipmentsByGrove(ctx, "GROVE-001")
@@ -727,10 +727,10 @@ func TestGetShipmentTasks_Success(t *testing.T) {
 	ctx := context.Background()
 
 	shipmentRepo.shipments["SHIPMENT-001"] = &secondary.ShipmentRecord{
-		ID:        "SHIPMENT-001",
-		MissionID: "MISSION-001",
-		Title:     "Test Shipment",
-		Status:    "active",
+		ID:           "SHIPMENT-001",
+		CommissionID: "MISSION-001",
+		Title:        "Test Shipment",
+		Status:       "active",
 	}
 
 	tasks, err := service.GetShipmentTasks(ctx, "SHIPMENT-001")
@@ -753,11 +753,11 @@ func TestUpdateShipment_Title(t *testing.T) {
 	ctx := context.Background()
 
 	shipmentRepo.shipments["SHIPMENT-001"] = &secondary.ShipmentRecord{
-		ID:          "SHIPMENT-001",
-		MissionID:   "MISSION-001",
-		Title:       "Old Title",
-		Description: "Original description",
-		Status:      "active",
+		ID:           "SHIPMENT-001",
+		CommissionID: "MISSION-001",
+		Title:        "Old Title",
+		Description:  "Original description",
+		Status:       "active",
 	}
 
 	err := service.UpdateShipment(ctx, primary.UpdateShipmentRequest{
@@ -782,10 +782,10 @@ func TestDeleteShipment_Success(t *testing.T) {
 	ctx := context.Background()
 
 	shipmentRepo.shipments["SHIPMENT-001"] = &secondary.ShipmentRecord{
-		ID:        "SHIPMENT-001",
-		MissionID: "MISSION-001",
-		Title:     "Test Shipment",
-		Status:    "active",
+		ID:           "SHIPMENT-001",
+		CommissionID: "MISSION-001",
+		Title:        "Test Shipment",
+		Status:       "active",
 	}
 
 	err := service.DeleteShipment(ctx, "SHIPMENT-001")

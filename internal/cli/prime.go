@@ -31,7 +31,7 @@ appropriate context automatically.
 
 Output includes:
 - Current location (cwd)
-- Mission context (if any)
+- Commission context (if any)
 - Current focus (if any)
 - Core rules for ORC usage
 
@@ -65,7 +65,7 @@ func runPrime(cmd *cobra.Command, args []string) error {
 
 	// Detect contexts
 	groveCtx, _ := ctx.DetectGroveContext()
-	missionCtx, _ := ctx.DetectMissionContext()
+	commissionCtx, _ := ctx.DetectCommissionContext()
 
 	// Load config to check role
 	cfg, _ := config.LoadConfig(cwd)
@@ -78,9 +78,9 @@ func runPrime(cmd *cobra.Command, args []string) error {
 			if cfg.Grove != nil {
 				role = cfg.Grove.Role
 			}
-		case config.TypeMission:
-			if cfg.Mission != nil {
-				role = cfg.Mission.Role
+		case config.TypeCommission:
+			if cfg.Commission != nil {
+				role = cfg.Commission.Role
 			}
 		case config.TypeGlobal:
 			if cfg.State != nil {
@@ -91,7 +91,7 @@ func runPrime(cmd *cobra.Command, args []string) error {
 
 	// If no role configured, show fallback guidance
 	if role == "" {
-		output := buildFallbackOutput(cwd, groveCtx, missionCtx)
+		output := buildFallbackOutput(cwd, groveCtx, commissionCtx)
 		fmt.Println(truncateOutput(output, format, maxLines))
 		return nil
 	}
@@ -103,12 +103,12 @@ func runPrime(cmd *cobra.Command, args []string) error {
 		if groveCtx != nil {
 			fullOutput = buildIMPPrimeOutput(groveCtx, cwd)
 		} else {
-			fullOutput = buildFallbackOutput(cwd, groveCtx, missionCtx)
+			fullOutput = buildFallbackOutput(cwd, groveCtx, commissionCtx)
 		}
 	case config.RoleORC:
-		fullOutput = buildORCPrimeOutput(missionCtx, cwd, cfg)
+		fullOutput = buildORCPrimeOutput(commissionCtx, cwd, cfg)
 	default:
-		fullOutput = buildFallbackOutput(cwd, groveCtx, missionCtx)
+		fullOutput = buildFallbackOutput(cwd, groveCtx, commissionCtx)
 	}
 
 	fmt.Println(truncateOutput(fullOutput, format, maxLines))
@@ -129,7 +129,7 @@ func truncateOutput(output, format string, maxLines int) string {
 }
 
 // buildORCPrimeOutput creates ORC orchestrator context output
-func buildORCPrimeOutput(missionCtx *ctx.MissionContext, cwd string, cfg *config.Config) string {
+func buildORCPrimeOutput(commissionCtx *ctx.CommissionContext, cwd string, cfg *config.Config) string {
 	var output strings.Builder
 
 	output.WriteString("# ORC Context (Session Prime)\n\n")
@@ -154,29 +154,29 @@ func buildORCPrimeOutput(missionCtx *ctx.MissionContext, cwd string, cfg *config
 		}
 	}
 
-	// Mission context
-	if missionCtx != nil {
-		output.WriteString(fmt.Sprintf("**Mission**: %s\n", missionCtx.MissionID))
-		output.WriteString(fmt.Sprintf("**Workspace**: %s\n\n", missionCtx.WorkspacePath))
+	// Commission context
+	if commissionCtx != nil {
+		output.WriteString(fmt.Sprintf("**Commission**: %s\n", commissionCtx.CommissionID))
+		output.WriteString(fmt.Sprintf("**Workspace**: %s\n\n", commissionCtx.WorkspacePath))
 
-		// Get mission details
-		mission, err := wire.MissionService().GetMission(context.Background(), missionCtx.MissionID)
+		// Get commission details
+		commission, err := wire.CommissionService().GetCommission(context.Background(), commissionCtx.CommissionID)
 		if err == nil {
-			output.WriteString(fmt.Sprintf("## %s\n\n", mission.Title))
-			if mission.Description != "" {
-				descLines := strings.Split(mission.Description, "\n")
+			output.WriteString(fmt.Sprintf("## %s\n\n", commission.Title))
+			if commission.Description != "" {
+				descLines := strings.Split(commission.Description, "\n")
 				if len(descLines) > 3 {
 					output.WriteString(strings.Join(descLines[:3], "\n"))
 					output.WriteString("\n...\n\n")
 				} else {
-					output.WriteString(mission.Description)
+					output.WriteString(commission.Description)
 					output.WriteString("\n\n")
 				}
 			}
 		}
 	} else {
 		output.WriteString("**Context**: Master orchestrator (global)\n\n")
-		output.WriteString("Run `orc mission list` to see available missions.\n\n")
+		output.WriteString("Run `orc commission list` to see available commissions.\n\n")
 	}
 
 	// Core rules (shared)
@@ -203,7 +203,7 @@ func buildIMPPrimeOutput(groveCtx *ctx.GroveContext, cwd string) string {
 	output.WriteString("## Identity\n\n")
 	output.WriteString("**Role**: Implementation Agent (IMP)\n")
 	output.WriteString(fmt.Sprintf("**Grove**: %s (`%s`)\n", groveCtx.Name, groveCtx.GroveID))
-	output.WriteString(fmt.Sprintf("**Mission**: `%s`\n", groveCtx.MissionID))
+	output.WriteString(fmt.Sprintf("**Mission**: `%s`\n", groveCtx.CommissionID))
 	output.WriteString(fmt.Sprintf("**Location**: `%s`\n\n", cwd))
 
 	// Git context
@@ -348,7 +348,7 @@ func getCoreRules() string {
 }
 
 // buildFallbackOutput creates output when no role is configured
-func buildFallbackOutput(cwd string, groveCtx *ctx.GroveContext, missionCtx *ctx.MissionContext) string {
+func buildFallbackOutput(cwd string, groveCtx *ctx.GroveContext, commissionCtx *ctx.CommissionContext) string {
 	var output strings.Builder
 
 	output.WriteString("# ORC Context - Role Not Configured\n\n")
@@ -364,8 +364,8 @@ func buildFallbackOutput(cwd string, groveCtx *ctx.GroveContext, missionCtx *ctx
 		output.WriteString("```json\n")
 		output.WriteString("\"role\": \"IMP\"\n")
 		output.WriteString("```\n\n")
-	} else if missionCtx != nil {
-		output.WriteString(fmt.Sprintf("**Detected mission**: %s\n", missionCtx.MissionID))
+	} else if commissionCtx != nil {
+		output.WriteString(fmt.Sprintf("**Detected mission**: %s\n", commissionCtx.CommissionID))
 		output.WriteString("**Suggested role**: `ORC` (Orchestrator)\n\n")
 		output.WriteString("To configure, edit `.orc/config.json` and add:\n")
 		output.WriteString("```json\n")

@@ -25,7 +25,7 @@ func setupHandoffTestDB(t *testing.T) *sql.DB {
 			id TEXT PRIMARY KEY,
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 			handoff_note TEXT NOT NULL,
-			active_mission_id TEXT,
+			active_commission_id TEXT,
 			active_grove_id TEXT,
 			todos_snapshot TEXT
 		)
@@ -51,11 +51,11 @@ func createTestHandoff(t *testing.T, repo *sqlite.HandoffRepository, ctx context
 	}
 
 	handoff := &secondary.HandoffRecord{
-		ID:              nextID,
-		HandoffNote:     note,
-		ActiveMissionID: missionID,
-		ActiveGroveID:   groveID,
-		TodosSnapshot:   todos,
+		ID:                 nextID,
+		HandoffNote:        note,
+		ActiveCommissionID: missionID,
+		ActiveGroveID:      groveID,
+		TodosSnapshot:      todos,
 	}
 
 	err = repo.Create(ctx, handoff)
@@ -72,11 +72,11 @@ func TestHandoffRepository_Create(t *testing.T) {
 	ctx := context.Background()
 
 	handoff := &secondary.HandoffRecord{
-		ID:              "HO-001",
-		HandoffNote:     "Session complete. Next steps: review plan.",
-		ActiveMissionID: "MISSION-001",
-		ActiveGroveID:   "GROVE-001",
-		TodosSnapshot:   "[]",
+		ID:                 "HO-001",
+		HandoffNote:        "Session complete. Next steps: review plan.",
+		ActiveCommissionID: "MISSION-001",
+		ActiveGroveID:      "GROVE-001",
+		TodosSnapshot:      "[]",
 	}
 
 	err := repo.Create(ctx, handoff)
@@ -92,8 +92,8 @@ func TestHandoffRepository_Create(t *testing.T) {
 	if retrieved.HandoffNote != "Session complete. Next steps: review plan." {
 		t.Errorf("expected correct handoff note, got '%s'", retrieved.HandoffNote)
 	}
-	if retrieved.ActiveMissionID != "MISSION-001" {
-		t.Errorf("expected mission 'MISSION-001', got '%s'", retrieved.ActiveMissionID)
+	if retrieved.ActiveCommissionID != "MISSION-001" {
+		t.Errorf("expected mission 'MISSION-001', got '%s'", retrieved.ActiveCommissionID)
 	}
 	if retrieved.ActiveGroveID != "GROVE-001" {
 		t.Errorf("expected grove 'GROVE-001', got '%s'", retrieved.ActiveGroveID)
@@ -116,8 +116,8 @@ func TestHandoffRepository_Create_MinimalData(t *testing.T) {
 	}
 
 	retrieved, _ := repo.GetByID(ctx, "HO-001")
-	if retrieved.ActiveMissionID != "" {
-		t.Errorf("expected empty mission ID, got '%s'", retrieved.ActiveMissionID)
+	if retrieved.ActiveCommissionID != "" {
+		t.Errorf("expected empty mission ID, got '%s'", retrieved.ActiveCommissionID)
 	}
 	if retrieved.ActiveGroveID != "" {
 		t.Errorf("expected empty grove ID, got '%s'", retrieved.ActiveGroveID)
@@ -163,7 +163,7 @@ func TestHandoffRepository_GetLatest(t *testing.T) {
 	// Create handoffs with explicit timestamps to ensure ordering
 	_, _ = db.Exec(`INSERT INTO handoffs (id, handoff_note, created_at) VALUES ('HO-001', 'First handoff', '2024-01-01 10:00:00')`)
 	_, _ = db.Exec(`INSERT INTO handoffs (id, handoff_note, created_at) VALUES ('HO-002', 'Second handoff', '2024-01-01 11:00:00')`)
-	_, _ = db.Exec(`INSERT INTO handoffs (id, handoff_note, active_mission_id, created_at) VALUES ('HO-003', 'Latest handoff', 'MISSION-001', '2024-01-01 12:00:00')`)
+	_, _ = db.Exec(`INSERT INTO handoffs (id, handoff_note, active_commission_id, created_at) VALUES ('HO-003', 'Latest handoff', 'MISSION-001', '2024-01-01 12:00:00')`)
 
 	latest, err := repo.GetLatest(ctx)
 	if err != nil {

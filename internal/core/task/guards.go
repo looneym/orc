@@ -20,10 +20,10 @@ func (r GuardResult) Error() error {
 
 // CreateTaskContext provides context for task creation guards.
 type CreateTaskContext struct {
-	MissionID      string
-	MissionExists  bool
-	ShipmentID     string // optional, empty if not specified
-	ShipmentExists bool   // only checked if ShipmentID != ""
+	CommissionID     string
+	CommissionExists bool
+	ShipmentID       string // optional, empty if not specified
+	ShipmentExists   bool   // only checked if ShipmentID != ""
 }
 
 // CompleteTaskContext provides context for task completion guards.
@@ -47,14 +47,14 @@ type TagTaskContext struct {
 
 // CanCreateTask evaluates whether a task can be created.
 // Rules:
-// - Mission must exist
+// - Commission must exist
 // - Shipment must exist (if shipment_id provided)
 func CanCreateTask(ctx CreateTaskContext) GuardResult {
-	// Rule 1: Mission must exist
-	if !ctx.MissionExists {
+	// Rule 1: Commission must exist
+	if !ctx.CommissionExists {
 		return GuardResult{
 			Allowed: false,
-			Reason:  fmt.Sprintf("mission %s not found", ctx.MissionID),
+			Reason:  fmt.Sprintf("commission %s not found", ctx.CommissionID),
 		}
 	}
 

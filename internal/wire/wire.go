@@ -19,29 +19,29 @@ import (
 )
 
 var (
-	missionService              primary.MissionService
-	groveService                primary.GroveService
-	shipmentService             primary.ShipmentService
-	taskService                 primary.TaskService
-	noteService                 primary.NoteService
-	handoffService              primary.HandoffService
-	tomeService                 primary.TomeService
-	conclaveService             primary.ConclaveService
-	operationService            primary.OperationService
-	investigationService        primary.InvestigationService
-	questionService             primary.QuestionService
-	planService                 primary.PlanService
-	tagService                  primary.TagService
-	messageService              primary.MessageService
-	missionOrchestrationService *app.MissionOrchestrationService
-	tmuxService                 secondary.TMuxAdapter
-	once                        sync.Once
+	commissionService              primary.CommissionService
+	groveService                   primary.GroveService
+	shipmentService                primary.ShipmentService
+	taskService                    primary.TaskService
+	noteService                    primary.NoteService
+	handoffService                 primary.HandoffService
+	tomeService                    primary.TomeService
+	conclaveService                primary.ConclaveService
+	operationService               primary.OperationService
+	investigationService           primary.InvestigationService
+	questionService                primary.QuestionService
+	planService                    primary.PlanService
+	tagService                     primary.TagService
+	messageService                 primary.MessageService
+	commissionOrchestrationService *app.CommissionOrchestrationService
+	tmuxService                    secondary.TMuxAdapter
+	once                           sync.Once
 )
 
-// MissionService returns the singleton MissionService instance.
-func MissionService() primary.MissionService {
+// CommissionService returns the singleton CommissionService instance.
+func CommissionService() primary.CommissionService {
 	once.Do(initServices)
-	return missionService
+	return commissionService
 }
 
 // GroveService returns the singleton GroveService instance.
@@ -122,10 +122,10 @@ func MessageService() primary.MessageService {
 	return messageService
 }
 
-// MissionOrchestrationService returns the singleton MissionOrchestrationService instance.
-func MissionOrchestrationService() *app.MissionOrchestrationService {
+// CommissionOrchestrationService returns the singleton CommissionOrchestrationService instance.
+func CommissionOrchestrationService() *app.CommissionOrchestrationService {
 	once.Do(initServices)
-	return missionOrchestrationService
+	return commissionOrchestrationService
 }
 
 // TMuxAdapter returns the singleton TMuxAdapter instance.
@@ -144,18 +144,18 @@ func initServices() {
 	}
 
 	// Create repository adapters (secondary ports) - sqlite adapters with injected DB
-	missionRepo := sqlite.NewMissionRepository(database)
+	commissionRepo := sqlite.NewCommissionRepository(database)
 	groveRepo := sqlite.NewGroveRepository(database)
 	agentProvider := persistence.NewAgentIdentityProvider()
 	tmuxAdapter := tmuxadapter.NewAdapter()
 	tmuxService = tmuxAdapter // Store for getter
 
 	// Create effect executor with injected repositories and adapters
-	executor := app.NewEffectExecutor(groveRepo, missionRepo, tmuxAdapter)
+	executor := app.NewEffectExecutor(groveRepo, commissionRepo, tmuxAdapter)
 
 	// Create services (primary ports implementation)
-	missionService = app.NewMissionService(missionRepo, groveRepo, agentProvider, executor)
-	groveService = app.NewGroveService(groveRepo, missionRepo, agentProvider, executor)
+	commissionService = app.NewCommissionService(commissionRepo, groveRepo, agentProvider, executor)
+	groveService = app.NewGroveService(groveRepo, commissionRepo, agentProvider, executor)
 
 	// Create shipment and task services
 	shipmentRepo := sqlite.NewShipmentRepository(database)
@@ -192,20 +192,20 @@ func initServices() {
 	messageService = app.NewMessageService(messageRepo)
 
 	// Create orchestration services
-	missionOrchestrationService = app.NewMissionOrchestrationService(missionService, groveService, agentProvider)
+	commissionOrchestrationService = app.NewCommissionOrchestrationService(commissionService, groveService, agentProvider)
 }
 
-// MissionAdapter returns a new MissionAdapter writing to stdout.
+// CommissionAdapter returns a new CommissionAdapter writing to stdout.
 // Each call creates a new adapter (adapters are stateless translators).
-func MissionAdapter() *cliadapter.MissionAdapter {
-	return MissionAdapterWithOutput(os.Stdout)
+func CommissionAdapter() *cliadapter.CommissionAdapter {
+	return CommissionAdapterWithOutput(os.Stdout)
 }
 
-// MissionAdapterWithOutput returns a new MissionAdapter writing to the given output.
+// CommissionAdapterWithOutput returns a new CommissionAdapter writing to the given output.
 // This variant allows testing or alternate output destinations.
-func MissionAdapterWithOutput(out io.Writer) *cliadapter.MissionAdapter {
+func CommissionAdapterWithOutput(out io.Writer) *cliadapter.CommissionAdapter {
 	once.Do(initServices)
-	return cliadapter.NewMissionAdapter(missionService, out)
+	return cliadapter.NewCommissionAdapter(commissionService, out)
 }
 
 // GroveAdapter returns a new GroveAdapter writing to stdout.

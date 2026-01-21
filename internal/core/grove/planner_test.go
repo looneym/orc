@@ -9,11 +9,11 @@ import (
 
 func TestGenerateCreateGrovePlan_Basic(t *testing.T) {
 	input := CreateGrovePlanInput{
-		GroveID:   "GROVE-001",
-		GroveName: "auth-backend",
-		MissionID: "MISSION-001",
-		BasePath:  "/home/user/src/worktrees",
-		Repos:     []string{},
+		GroveID:      "GROVE-001",
+		GroveName:    "auth-backend",
+		CommissionID: "MISSION-001",
+		BasePath:     "/home/user/src/worktrees",
+		Repos:        []string{},
 	}
 
 	plan := GenerateCreateGrovePlan(input)
@@ -66,11 +66,11 @@ func TestGenerateCreateGrovePlan_Basic(t *testing.T) {
 
 func TestGenerateCreateGrovePlan_WithRepos(t *testing.T) {
 	input := CreateGrovePlanInput{
-		GroveID:   "GROVE-002",
-		GroveName: "frontend",
-		MissionID: "MISSION-002",
-		BasePath:  "/home/user/src/worktrees",
-		Repos:     []string{"main-app", "api-service"},
+		GroveID:      "GROVE-002",
+		GroveName:    "frontend",
+		CommissionID: "MISSION-002",
+		BasePath:     "/home/user/src/worktrees",
+		Repos:        []string{"main-app", "api-service"},
 	}
 
 	plan := GenerateCreateGrovePlan(input)
@@ -97,11 +97,11 @@ func TestGenerateCreateGrovePlan_WithRepos(t *testing.T) {
 
 func TestGenerateCreateGrovePlan_ConfigContent(t *testing.T) {
 	input := CreateGrovePlanInput{
-		GroveID:   "GROVE-001",
-		GroveName: "test-grove",
-		MissionID: "MISSION-001",
-		BasePath:  "/tmp",
-		Repos:     []string{"repo1"},
+		GroveID:      "GROVE-001",
+		GroveName:    "test-grove",
+		CommissionID: "MISSION-001",
+		BasePath:     "/tmp",
+		Repos:        []string{"repo1"},
 	}
 
 	plan := GenerateCreateGrovePlan(input)
@@ -195,11 +195,11 @@ func TestGenerateOpenGrovePlan(t *testing.T) {
 
 func TestCreateGrovePlan_Effects(t *testing.T) {
 	input := CreateGrovePlanInput{
-		GroveID:   "GROVE-001",
-		GroveName: "test",
-		MissionID: "MISSION-001",
-		BasePath:  "/tmp",
-		Repos:     []string{"repo1"},
+		GroveID:      "GROVE-001",
+		GroveName:    "test",
+		CommissionID: "MISSION-001",
+		BasePath:     "/tmp",
+		Repos:        []string{"repo1"},
 	}
 
 	plan := GenerateCreateGrovePlan(input)
@@ -272,11 +272,11 @@ func TestGenerateCreateGrovePlan_PathFormatting(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			input := CreateGrovePlanInput{
-				GroveID:   "GROVE-001",
-				GroveName: tt.groveName,
-				MissionID: tt.missionID,
-				BasePath:  tt.basePath,
-				Repos:     nil,
+				GroveID:      "GROVE-001",
+				GroveName:    tt.groveName,
+				CommissionID: tt.missionID,
+				BasePath:     tt.basePath,
+				Repos:        nil,
 			}
 			plan := GenerateCreateGrovePlan(input)
 			if plan.GrovePath != tt.expectedPath {

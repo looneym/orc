@@ -21,7 +21,7 @@ func setupQuestionTestDB(t *testing.T) *sql.DB {
 
 	// Create missions table
 	_, err = db.Exec(`
-		CREATE TABLE missions (
+		CREATE TABLE commissions (
 			id TEXT PRIMARY KEY,
 			title TEXT NOT NULL,
 			status TEXT NOT NULL DEFAULT 'active',
@@ -37,7 +37,7 @@ func setupQuestionTestDB(t *testing.T) *sql.DB {
 	_, err = db.Exec(`
 		CREATE TABLE investigations (
 			id TEXT PRIMARY KEY,
-			mission_id TEXT NOT NULL,
+			commission_id TEXT NOT NULL,
 			title TEXT NOT NULL,
 			status TEXT NOT NULL DEFAULT 'active',
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -53,7 +53,7 @@ func setupQuestionTestDB(t *testing.T) *sql.DB {
 		CREATE TABLE questions (
 			id TEXT PRIMARY KEY,
 			investigation_id TEXT,
-			mission_id TEXT NOT NULL,
+			commission_id TEXT NOT NULL,
 			title TEXT NOT NULL,
 			description TEXT,
 			status TEXT NOT NULL DEFAULT 'open',
@@ -72,8 +72,8 @@ func setupQuestionTestDB(t *testing.T) *sql.DB {
 	}
 
 	// Insert test data
-	_, _ = db.Exec("INSERT INTO missions (id, title, status) VALUES ('MISSION-001', 'Test Mission', 'active')")
-	_, _ = db.Exec("INSERT INTO investigations (id, mission_id, title, status) VALUES ('INV-001', 'MISSION-001', 'Test Investigation', 'active')")
+	_, _ = db.Exec("INSERT INTO commissions (id, title, status) VALUES ('MISSION-001', 'Test Mission', 'active')")
+	_, _ = db.Exec("INSERT INTO investigations (id, commission_id, title, status) VALUES ('INV-001', 'MISSION-001', 'Test Investigation', 'active')")
 
 	t.Cleanup(func() {
 		db.Close()
@@ -93,7 +93,7 @@ func createTestQuestion(t *testing.T, repo *sqlite.QuestionRepository, ctx conte
 
 	question := &secondary.QuestionRecord{
 		ID:              nextID,
-		MissionID:       missionID,
+		CommissionID:    missionID,
 		InvestigationID: investigationID,
 		Title:           title,
 	}
@@ -113,7 +113,7 @@ func TestQuestionRepository_Create(t *testing.T) {
 
 	question := &secondary.QuestionRecord{
 		ID:              "Q-001",
-		MissionID:       "MISSION-001",
+		CommissionID:    "MISSION-001",
 		InvestigationID: "INV-001",
 		Title:           "Test Question",
 		Description:     "A test question description",
@@ -146,9 +146,9 @@ func TestQuestionRepository_Create_WithoutInvestigation(t *testing.T) {
 	ctx := context.Background()
 
 	question := &secondary.QuestionRecord{
-		ID:        "Q-001",
-		MissionID: "MISSION-001",
-		Title:     "Standalone Question",
+		ID:           "Q-001",
+		CommissionID: "MISSION-001",
+		Title:        "Standalone Question",
 	}
 
 	err := repo.Create(ctx, question)
@@ -177,8 +177,8 @@ func TestQuestionRepository_GetByID(t *testing.T) {
 	if retrieved.Title != "Test Question" {
 		t.Errorf("expected title 'Test Question', got '%s'", retrieved.Title)
 	}
-	if retrieved.MissionID != "MISSION-001" {
-		t.Errorf("expected mission 'MISSION-001', got '%s'", retrieved.MissionID)
+	if retrieved.CommissionID != "MISSION-001" {
+		t.Errorf("expected mission 'MISSION-001', got '%s'", retrieved.CommissionID)
 	}
 }
 
@@ -218,7 +218,7 @@ func TestQuestionRepository_List_FilterByInvestigation(t *testing.T) {
 	ctx := context.Background()
 
 	// Add another investigation
-	_, _ = db.Exec("INSERT INTO investigations (id, mission_id, title) VALUES ('INV-002', 'MISSION-001', 'Inv 2')")
+	_, _ = db.Exec("INSERT INTO investigations (id, commission_id, title) VALUES ('INV-002', 'MISSION-001', 'Inv 2')")
 
 	createTestQuestion(t, repo, ctx, "MISSION-001", "INV-001", "Question 1")
 	createTestQuestion(t, repo, ctx, "MISSION-001", "INV-001", "Question 2")
@@ -240,12 +240,12 @@ func TestQuestionRepository_List_FilterByMission(t *testing.T) {
 	ctx := context.Background()
 
 	// Add another mission
-	_, _ = db.Exec("INSERT INTO missions (id, title, status) VALUES ('MISSION-002', 'Mission 2', 'active')")
+	_, _ = db.Exec("INSERT INTO commissions (id, title, status) VALUES ('MISSION-002', 'Mission 2', 'active')")
 
 	createTestQuestion(t, repo, ctx, "MISSION-001", "", "Question 1")
 	createTestQuestion(t, repo, ctx, "MISSION-002", "", "Question 2")
 
-	questions, err := repo.List(ctx, secondary.QuestionFilters{MissionID: "MISSION-001"})
+	questions, err := repo.List(ctx, secondary.QuestionFilters{CommissionID: "MISSION-001"})
 	if err != nil {
 		t.Fatalf("List failed: %v", err)
 	}
@@ -440,22 +440,22 @@ func TestQuestionRepository_Answer_NotFound(t *testing.T) {
 	}
 }
 
-func TestQuestionRepository_MissionExists(t *testing.T) {
+func TestQuestionRepository_CommissionExists(t *testing.T) {
 	db := setupQuestionTestDB(t)
 	repo := sqlite.NewQuestionRepository(db)
 	ctx := context.Background()
 
-	exists, err := repo.MissionExists(ctx, "MISSION-001")
+	exists, err := repo.CommissionExists(ctx, "MISSION-001")
 	if err != nil {
-		t.Fatalf("MissionExists failed: %v", err)
+		t.Fatalf("CommissionExists failed: %v", err)
 	}
 	if !exists {
 		t.Error("expected mission to exist")
 	}
 
-	exists, err = repo.MissionExists(ctx, "MISSION-999")
+	exists, err = repo.CommissionExists(ctx, "MISSION-999")
 	if err != nil {
-		t.Fatalf("MissionExists failed: %v", err)
+		t.Fatalf("CommissionExists failed: %v", err)
 	}
 	if exists {
 		t.Error("expected mission to not exist")

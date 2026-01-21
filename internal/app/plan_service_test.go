@@ -68,7 +68,7 @@ func (m *mockPlanRepository) List(ctx context.Context, filters secondary.PlanFil
 	}
 	var result []*secondary.PlanRecord
 	for _, p := range m.plans {
-		if filters.MissionID != "" && p.MissionID != filters.MissionID {
+		if filters.CommissionID != "" && p.CommissionID != filters.CommissionID {
 			continue
 		}
 		if filters.ShipmentID != "" && p.ShipmentID != filters.ShipmentID {
@@ -163,7 +163,7 @@ func (m *mockPlanRepository) HasActivePlanForShipment(ctx context.Context, shipm
 	return exists || m.hasActivePlanResult, nil
 }
 
-func (m *mockPlanRepository) MissionExists(ctx context.Context, missionID string) (bool, error) {
+func (m *mockPlanRepository) CommissionExists(ctx context.Context, missionID string) (bool, error) {
 	if m.missionExistsErr != nil {
 		return false, m.missionExistsErr
 	}
@@ -196,10 +196,10 @@ func TestCreatePlan_Success(t *testing.T) {
 	ctx := context.Background()
 
 	resp, err := service.CreatePlan(ctx, primary.CreatePlanRequest{
-		MissionID:   "MISSION-001",
-		Title:       "Test Plan",
-		Description: "A test plan",
-		Content:     "## Plan Content\n\n- Step 1\n- Step 2",
+		CommissionID: "MISSION-001",
+		Title:        "Test Plan",
+		Description:  "A test plan",
+		Content:      "## Plan Content\n\n- Step 1\n- Step 2",
 	})
 
 	if err != nil {
@@ -221,10 +221,10 @@ func TestCreatePlan_WithShipment(t *testing.T) {
 	ctx := context.Background()
 
 	resp, err := service.CreatePlan(ctx, primary.CreatePlanRequest{
-		MissionID:   "MISSION-001",
-		ShipmentID:  "SHIPMENT-001",
-		Title:       "Shipment Plan",
-		Description: "A plan for a shipment",
+		CommissionID: "MISSION-001",
+		ShipmentID:   "SHIPMENT-001",
+		Title:        "Shipment Plan",
+		Description:  "A plan for a shipment",
 	})
 
 	if err != nil {
@@ -242,9 +242,9 @@ func TestCreatePlan_MissionNotFound(t *testing.T) {
 	planRepo.missionExistsResult = false
 
 	_, err := service.CreatePlan(ctx, primary.CreatePlanRequest{
-		MissionID:   "MISSION-NONEXISTENT",
-		Title:       "Test Plan",
-		Description: "A test plan",
+		CommissionID: "MISSION-NONEXISTENT",
+		Title:        "Test Plan",
+		Description:  "A test plan",
 	})
 
 	if err == nil {
@@ -259,10 +259,10 @@ func TestCreatePlan_ShipmentNotFound(t *testing.T) {
 	planRepo.shipmentExistsResult = false
 
 	_, err := service.CreatePlan(ctx, primary.CreatePlanRequest{
-		MissionID:   "MISSION-001",
-		ShipmentID:  "SHIPMENT-NONEXISTENT",
-		Title:       "Test Plan",
-		Description: "A test plan",
+		CommissionID: "MISSION-001",
+		ShipmentID:   "SHIPMENT-NONEXISTENT",
+		Title:        "Test Plan",
+		Description:  "A test plan",
 	})
 
 	if err == nil {
@@ -276,19 +276,19 @@ func TestCreatePlan_ShipmentAlreadyHasActivePlan(t *testing.T) {
 
 	// Create existing active plan
 	planRepo.plans["PLAN-001"] = &secondary.PlanRecord{
-		ID:         "PLAN-001",
-		MissionID:  "MISSION-001",
-		ShipmentID: "SHIPMENT-001",
-		Title:      "Existing Plan",
-		Status:     "draft",
+		ID:           "PLAN-001",
+		CommissionID: "MISSION-001",
+		ShipmentID:   "SHIPMENT-001",
+		Title:        "Existing Plan",
+		Status:       "draft",
 	}
 	planRepo.activePlanForShipment["SHIPMENT-001"] = "PLAN-001"
 
 	_, err := service.CreatePlan(ctx, primary.CreatePlanRequest{
-		MissionID:   "MISSION-001",
-		ShipmentID:  "SHIPMENT-001",
-		Title:       "New Plan",
-		Description: "Should fail",
+		CommissionID: "MISSION-001",
+		ShipmentID:   "SHIPMENT-001",
+		Title:        "New Plan",
+		Description:  "Should fail",
 	})
 
 	if err == nil {
@@ -305,10 +305,10 @@ func TestGetPlan_Found(t *testing.T) {
 	ctx := context.Background()
 
 	planRepo.plans["PLAN-001"] = &secondary.PlanRecord{
-		ID:        "PLAN-001",
-		MissionID: "MISSION-001",
-		Title:     "Test Plan",
-		Status:    "draft",
+		ID:           "PLAN-001",
+		CommissionID: "MISSION-001",
+		Title:        "Test Plan",
+		Status:       "draft",
 	}
 
 	plan, err := service.GetPlan(ctx, "PLAN-001")
@@ -341,19 +341,19 @@ func TestListPlans_FilterByMission(t *testing.T) {
 	ctx := context.Background()
 
 	planRepo.plans["PLAN-001"] = &secondary.PlanRecord{
-		ID:        "PLAN-001",
-		MissionID: "MISSION-001",
-		Title:     "Plan 1",
-		Status:    "draft",
+		ID:           "PLAN-001",
+		CommissionID: "MISSION-001",
+		Title:        "Plan 1",
+		Status:       "draft",
 	}
 	planRepo.plans["PLAN-002"] = &secondary.PlanRecord{
-		ID:        "PLAN-002",
-		MissionID: "MISSION-002",
-		Title:     "Plan 2",
-		Status:    "draft",
+		ID:           "PLAN-002",
+		CommissionID: "MISSION-002",
+		Title:        "Plan 2",
+		Status:       "draft",
 	}
 
-	plans, err := service.ListPlans(ctx, primary.PlanFilters{MissionID: "MISSION-001"})
+	plans, err := service.ListPlans(ctx, primary.PlanFilters{CommissionID: "MISSION-001"})
 
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
@@ -368,17 +368,17 @@ func TestListPlans_FilterByShipment(t *testing.T) {
 	ctx := context.Background()
 
 	planRepo.plans["PLAN-001"] = &secondary.PlanRecord{
-		ID:         "PLAN-001",
-		MissionID:  "MISSION-001",
-		ShipmentID: "SHIPMENT-001",
-		Title:      "Shipment Plan",
-		Status:     "draft",
+		ID:           "PLAN-001",
+		CommissionID: "MISSION-001",
+		ShipmentID:   "SHIPMENT-001",
+		Title:        "Shipment Plan",
+		Status:       "draft",
 	}
 	planRepo.plans["PLAN-002"] = &secondary.PlanRecord{
-		ID:        "PLAN-002",
-		MissionID: "MISSION-001",
-		Title:     "Mission Plan",
-		Status:    "draft",
+		ID:           "PLAN-002",
+		CommissionID: "MISSION-001",
+		Title:        "Mission Plan",
+		Status:       "draft",
 	}
 
 	plans, err := service.ListPlans(ctx, primary.PlanFilters{ShipmentID: "SHIPMENT-001"})
@@ -396,16 +396,16 @@ func TestListPlans_FilterByStatus(t *testing.T) {
 	ctx := context.Background()
 
 	planRepo.plans["PLAN-001"] = &secondary.PlanRecord{
-		ID:        "PLAN-001",
-		MissionID: "MISSION-001",
-		Title:     "Draft Plan",
-		Status:    "draft",
+		ID:           "PLAN-001",
+		CommissionID: "MISSION-001",
+		Title:        "Draft Plan",
+		Status:       "draft",
 	}
 	planRepo.plans["PLAN-002"] = &secondary.PlanRecord{
-		ID:        "PLAN-002",
-		MissionID: "MISSION-001",
-		Title:     "Approved Plan",
-		Status:    "approved",
+		ID:           "PLAN-002",
+		CommissionID: "MISSION-001",
+		Title:        "Approved Plan",
+		Status:       "approved",
 	}
 
 	plans, err := service.ListPlans(ctx, primary.PlanFilters{Status: "draft"})
@@ -427,10 +427,10 @@ func TestApprovePlan_Success(t *testing.T) {
 	ctx := context.Background()
 
 	planRepo.plans["PLAN-001"] = &secondary.PlanRecord{
-		ID:        "PLAN-001",
-		MissionID: "MISSION-001",
-		Title:     "Test Plan",
-		Status:    "draft",
+		ID:           "PLAN-001",
+		CommissionID: "MISSION-001",
+		Title:        "Test Plan",
+		Status:       "draft",
 	}
 
 	err := service.ApprovePlan(ctx, "PLAN-001")
@@ -452,11 +452,11 @@ func TestPinPlan(t *testing.T) {
 	ctx := context.Background()
 
 	planRepo.plans["PLAN-001"] = &secondary.PlanRecord{
-		ID:        "PLAN-001",
-		MissionID: "MISSION-001",
-		Title:     "Test Plan",
-		Status:    "draft",
-		Pinned:    false,
+		ID:           "PLAN-001",
+		CommissionID: "MISSION-001",
+		Title:        "Test Plan",
+		Status:       "draft",
+		Pinned:       false,
 	}
 
 	err := service.PinPlan(ctx, "PLAN-001")
@@ -474,11 +474,11 @@ func TestUnpinPlan(t *testing.T) {
 	ctx := context.Background()
 
 	planRepo.plans["PLAN-001"] = &secondary.PlanRecord{
-		ID:        "PLAN-001",
-		MissionID: "MISSION-001",
-		Title:     "Pinned Plan",
-		Status:    "draft",
-		Pinned:    true,
+		ID:           "PLAN-001",
+		CommissionID: "MISSION-001",
+		Title:        "Pinned Plan",
+		Status:       "draft",
+		Pinned:       true,
 	}
 
 	err := service.UnpinPlan(ctx, "PLAN-001")
@@ -500,11 +500,11 @@ func TestUpdatePlan_Title(t *testing.T) {
 	ctx := context.Background()
 
 	planRepo.plans["PLAN-001"] = &secondary.PlanRecord{
-		ID:          "PLAN-001",
-		MissionID:   "MISSION-001",
-		Title:       "Old Title",
-		Description: "Original description",
-		Status:      "draft",
+		ID:           "PLAN-001",
+		CommissionID: "MISSION-001",
+		Title:        "Old Title",
+		Description:  "Original description",
+		Status:       "draft",
 	}
 
 	err := service.UpdatePlan(ctx, primary.UpdatePlanRequest{
@@ -525,11 +525,11 @@ func TestUpdatePlan_Content(t *testing.T) {
 	ctx := context.Background()
 
 	planRepo.plans["PLAN-001"] = &secondary.PlanRecord{
-		ID:        "PLAN-001",
-		MissionID: "MISSION-001",
-		Title:     "Test Plan",
-		Content:   "Original content",
-		Status:    "draft",
+		ID:           "PLAN-001",
+		CommissionID: "MISSION-001",
+		Title:        "Test Plan",
+		Content:      "Original content",
+		Status:       "draft",
 	}
 
 	err := service.UpdatePlan(ctx, primary.UpdatePlanRequest{
@@ -554,10 +554,10 @@ func TestDeletePlan_Success(t *testing.T) {
 	ctx := context.Background()
 
 	planRepo.plans["PLAN-001"] = &secondary.PlanRecord{
-		ID:        "PLAN-001",
-		MissionID: "MISSION-001",
-		Title:     "Test Plan",
-		Status:    "draft",
+		ID:           "PLAN-001",
+		CommissionID: "MISSION-001",
+		Title:        "Test Plan",
+		Status:       "draft",
 	}
 
 	err := service.DeletePlan(ctx, "PLAN-001")
@@ -579,11 +579,11 @@ func TestGetShipmentActivePlan_Found(t *testing.T) {
 	ctx := context.Background()
 
 	planRepo.plans["PLAN-001"] = &secondary.PlanRecord{
-		ID:         "PLAN-001",
-		MissionID:  "MISSION-001",
-		ShipmentID: "SHIPMENT-001",
-		Title:      "Active Plan",
-		Status:     "draft",
+		ID:           "PLAN-001",
+		CommissionID: "MISSION-001",
+		ShipmentID:   "SHIPMENT-001",
+		Title:        "Active Plan",
+		Status:       "draft",
 	}
 	planRepo.activePlanForShipment["SHIPMENT-001"] = "PLAN-001"
 

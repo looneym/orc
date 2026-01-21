@@ -23,10 +23,10 @@ type HandoffService interface {
 
 // CreateHandoffRequest contains parameters for creating a handoff.
 type CreateHandoffRequest struct {
-	HandoffNote     string
-	ActiveMissionID string
-	ActiveGroveID   string
-	TodosSnapshot   string // JSON snapshot of todos state
+	HandoffNote        string
+	ActiveCommissionID string
+	ActiveGroveID      string
+	TodosSnapshot      string // JSON snapshot of todos state
 }
 
 // CreateHandoffResponse contains the result of creating a handoff.
@@ -37,10 +37,10 @@ type CreateHandoffResponse struct {
 
 // Handoff represents a handoff entity at the port boundary.
 type Handoff struct {
-	ID              string
-	CreatedAt       string
-	HandoffNote     string
-	ActiveMissionID string
-	ActiveGroveID   string
-	TodosSnapshot   string
+	ID                 string
+	CreatedAt          string
+	HandoffNote        string
+	ActiveCommissionID string
+	ActiveGroveID      string
+	TodosSnapshot      string
 }

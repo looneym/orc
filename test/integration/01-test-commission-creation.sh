@@ -43,7 +43,7 @@ test_create_mission() {
     fi
 
     log_info "Created mission: $TEST_MISSION_ID"
-    TEST_MISSION_DIR="$HOME/src/missions/$TEST_MISSION_ID"
+    TEST_MISSION_DIR="$HOME/src/factories/$TEST_MISSION_ID"
 
     assert_command_succeeds "orc mission list | grep -q \"$TEST_MISSION_ID\"" \
         "Mission appears in mission list"

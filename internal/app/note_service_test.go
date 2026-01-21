@@ -56,7 +56,7 @@ func (m *mockNoteRepository) List(ctx context.Context, filters secondary.NoteFil
 	}
 	var result []*secondary.NoteRecord
 	for _, n := range m.notes {
-		if filters.MissionID != "" && n.MissionID != filters.MissionID {
+		if filters.CommissionID != "" && n.CommissionID != filters.CommissionID {
 			continue
 		}
 		if filters.Type != "" && n.Type != filters.Type {
@@ -133,7 +133,7 @@ func (m *mockNoteRepository) GetByContainer(ctx context.Context, containerType, 
 	return result, nil
 }
 
-func (m *mockNoteRepository) MissionExists(ctx context.Context, missionID string) (bool, error) {
+func (m *mockNoteRepository) CommissionExists(ctx context.Context, missionID string) (bool, error) {
 	if m.missionExistsErr != nil {
 		return false, m.missionExistsErr
 	}
@@ -167,9 +167,9 @@ func TestCreateNote_Success(t *testing.T) {
 	ctx := context.Background()
 
 	resp, err := service.CreateNote(ctx, primary.CreateNoteRequest{
-		MissionID: "MISSION-001",
-		Title:     "Test Note",
-		Content:   "Note content",
+		CommissionID: "MISSION-001",
+		Title:        "Test Note",
+		Content:      "Note content",
 	})
 
 	if err != nil {
@@ -188,7 +188,7 @@ func TestCreateNote_WithShipmentContainer(t *testing.T) {
 	ctx := context.Background()
 
 	resp, err := service.CreateNote(ctx, primary.CreateNoteRequest{
-		MissionID:     "MISSION-001",
+		CommissionID:  "MISSION-001",
 		Title:         "Shipment Note",
 		Content:       "Note for shipment",
 		ContainerType: "shipment",
@@ -208,7 +208,7 @@ func TestCreateNote_WithInvestigationContainer(t *testing.T) {
 	ctx := context.Background()
 
 	resp, err := service.CreateNote(ctx, primary.CreateNoteRequest{
-		MissionID:     "MISSION-001",
+		CommissionID:  "MISSION-001",
 		Title:         "Investigation Note",
 		Content:       "Note for investigation",
 		ContainerType: "investigation",
@@ -228,7 +228,7 @@ func TestCreateNote_WithConclaveContainer(t *testing.T) {
 	ctx := context.Background()
 
 	resp, err := service.CreateNote(ctx, primary.CreateNoteRequest{
-		MissionID:     "MISSION-001",
+		CommissionID:  "MISSION-001",
 		Title:         "Conclave Note",
 		Content:       "Note for conclave",
 		ContainerType: "conclave",
@@ -248,7 +248,7 @@ func TestCreateNote_WithTomeContainer(t *testing.T) {
 	ctx := context.Background()
 
 	resp, err := service.CreateNote(ctx, primary.CreateNoteRequest{
-		MissionID:     "MISSION-001",
+		CommissionID:  "MISSION-001",
 		Title:         "Tome Note",
 		Content:       "Note for tome",
 		ContainerType: "tome",
@@ -270,9 +270,9 @@ func TestCreateNote_MissionNotFound(t *testing.T) {
 	noteRepo.missionExistsResult = false
 
 	_, err := service.CreateNote(ctx, primary.CreateNoteRequest{
-		MissionID: "MISSION-NONEXISTENT",
-		Title:     "Test Note",
-		Content:   "Note content",
+		CommissionID: "MISSION-NONEXISTENT",
+		Title:        "Test Note",
+		Content:      "Note content",
 	})
 
 	if err == nil {
@@ -289,10 +289,10 @@ func TestGetNote_Found(t *testing.T) {
 	ctx := context.Background()
 
 	noteRepo.notes["NOTE-001"] = &secondary.NoteRecord{
-		ID:        "NOTE-001",
-		MissionID: "MISSION-001",
-		Title:     "Test Note",
-		Content:   "Note content",
+		ID:           "NOTE-001",
+		CommissionID: "MISSION-001",
+		Title:        "Test Note",
+		Content:      "Note content",
 	}
 
 	note, err := service.GetNote(ctx, "NOTE-001")
@@ -325,17 +325,17 @@ func TestListNotes_FilterByMission(t *testing.T) {
 	ctx := context.Background()
 
 	noteRepo.notes["NOTE-001"] = &secondary.NoteRecord{
-		ID:        "NOTE-001",
-		MissionID: "MISSION-001",
-		Title:     "Note 1",
+		ID:           "NOTE-001",
+		CommissionID: "MISSION-001",
+		Title:        "Note 1",
 	}
 	noteRepo.notes["NOTE-002"] = &secondary.NoteRecord{
-		ID:        "NOTE-002",
-		MissionID: "MISSION-002",
-		Title:     "Note 2",
+		ID:           "NOTE-002",
+		CommissionID: "MISSION-002",
+		Title:        "Note 2",
 	}
 
-	notes, err := service.ListNotes(ctx, primary.NoteFilters{MissionID: "MISSION-001"})
+	notes, err := service.ListNotes(ctx, primary.NoteFilters{CommissionID: "MISSION-001"})
 
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
@@ -350,16 +350,16 @@ func TestListNotes_FilterByType(t *testing.T) {
 	ctx := context.Background()
 
 	noteRepo.notes["NOTE-001"] = &secondary.NoteRecord{
-		ID:        "NOTE-001",
-		MissionID: "MISSION-001",
-		Title:     "Design Note",
-		Type:      "design",
+		ID:           "NOTE-001",
+		CommissionID: "MISSION-001",
+		Title:        "Design Note",
+		Type:         "design",
 	}
 	noteRepo.notes["NOTE-002"] = &secondary.NoteRecord{
-		ID:        "NOTE-002",
-		MissionID: "MISSION-001",
-		Title:     "Code Note",
-		Type:      "code",
+		ID:           "NOTE-002",
+		CommissionID: "MISSION-001",
+		Title:        "Code Note",
+		Type:         "code",
 	}
 
 	notes, err := service.ListNotes(ctx, primary.NoteFilters{Type: "design"})
@@ -381,10 +381,10 @@ func TestUpdateNote_Title(t *testing.T) {
 	ctx := context.Background()
 
 	noteRepo.notes["NOTE-001"] = &secondary.NoteRecord{
-		ID:        "NOTE-001",
-		MissionID: "MISSION-001",
-		Title:     "Old Title",
-		Content:   "Original content",
+		ID:           "NOTE-001",
+		CommissionID: "MISSION-001",
+		Title:        "Old Title",
+		Content:      "Original content",
 	}
 
 	err := service.UpdateNote(ctx, primary.UpdateNoteRequest{
@@ -405,10 +405,10 @@ func TestUpdateNote_Content(t *testing.T) {
 	ctx := context.Background()
 
 	noteRepo.notes["NOTE-001"] = &secondary.NoteRecord{
-		ID:        "NOTE-001",
-		MissionID: "MISSION-001",
-		Title:     "Test Note",
-		Content:   "Original content",
+		ID:           "NOTE-001",
+		CommissionID: "MISSION-001",
+		Title:        "Test Note",
+		Content:      "Original content",
 	}
 
 	err := service.UpdateNote(ctx, primary.UpdateNoteRequest{
@@ -433,9 +433,9 @@ func TestDeleteNote_Success(t *testing.T) {
 	ctx := context.Background()
 
 	noteRepo.notes["NOTE-001"] = &secondary.NoteRecord{
-		ID:        "NOTE-001",
-		MissionID: "MISSION-001",
-		Title:     "Test Note",
+		ID:           "NOTE-001",
+		CommissionID: "MISSION-001",
+		Title:        "Test Note",
 	}
 
 	err := service.DeleteNote(ctx, "NOTE-001")
@@ -457,10 +457,10 @@ func TestPinNote(t *testing.T) {
 	ctx := context.Background()
 
 	noteRepo.notes["NOTE-001"] = &secondary.NoteRecord{
-		ID:        "NOTE-001",
-		MissionID: "MISSION-001",
-		Title:     "Test Note",
-		Pinned:    false,
+		ID:           "NOTE-001",
+		CommissionID: "MISSION-001",
+		Title:        "Test Note",
+		Pinned:       false,
 	}
 
 	err := service.PinNote(ctx, "NOTE-001")
@@ -478,10 +478,10 @@ func TestUnpinNote(t *testing.T) {
 	ctx := context.Background()
 
 	noteRepo.notes["NOTE-001"] = &secondary.NoteRecord{
-		ID:        "NOTE-001",
-		MissionID: "MISSION-001",
-		Title:     "Pinned Note",
-		Pinned:    true,
+		ID:           "NOTE-001",
+		CommissionID: "MISSION-001",
+		Title:        "Pinned Note",
+		Pinned:       true,
 	}
 
 	err := service.UnpinNote(ctx, "NOTE-001")
@@ -503,15 +503,15 @@ func TestGetNotesByContainer_Shipment(t *testing.T) {
 	ctx := context.Background()
 
 	noteRepo.notes["NOTE-001"] = &secondary.NoteRecord{
-		ID:         "NOTE-001",
-		MissionID:  "MISSION-001",
-		Title:      "Shipment Note",
-		ShipmentID: "SHIPMENT-001",
+		ID:           "NOTE-001",
+		CommissionID: "MISSION-001",
+		Title:        "Shipment Note",
+		ShipmentID:   "SHIPMENT-001",
 	}
 	noteRepo.notes["NOTE-002"] = &secondary.NoteRecord{
-		ID:        "NOTE-002",
-		MissionID: "MISSION-001",
-		Title:     "Other Note",
+		ID:           "NOTE-002",
+		CommissionID: "MISSION-001",
+		Title:        "Other Note",
 	}
 
 	notes, err := service.GetNotesByContainer(ctx, "shipment", "SHIPMENT-001")
@@ -530,7 +530,7 @@ func TestGetNotesByContainer_Investigation(t *testing.T) {
 
 	noteRepo.notes["NOTE-001"] = &secondary.NoteRecord{
 		ID:              "NOTE-001",
-		MissionID:       "MISSION-001",
+		CommissionID:    "MISSION-001",
 		Title:           "Investigation Note",
 		InvestigationID: "INV-001",
 	}
@@ -550,10 +550,10 @@ func TestGetNotesByContainer_Conclave(t *testing.T) {
 	ctx := context.Background()
 
 	noteRepo.notes["NOTE-001"] = &secondary.NoteRecord{
-		ID:         "NOTE-001",
-		MissionID:  "MISSION-001",
-		Title:      "Conclave Note",
-		ConclaveID: "CON-001",
+		ID:           "NOTE-001",
+		CommissionID: "MISSION-001",
+		Title:        "Conclave Note",
+		ConclaveID:   "CON-001",
 	}
 
 	notes, err := service.GetNotesByContainer(ctx, "conclave", "CON-001")
@@ -571,10 +571,10 @@ func TestGetNotesByContainer_Tome(t *testing.T) {
 	ctx := context.Background()
 
 	noteRepo.notes["NOTE-001"] = &secondary.NoteRecord{
-		ID:        "NOTE-001",
-		MissionID: "MISSION-001",
-		Title:     "Tome Note",
-		TomeID:    "TOME-001",
+		ID:           "NOTE-001",
+		CommissionID: "MISSION-001",
+		Title:        "Tome Note",
+		TomeID:       "TOME-001",
 	}
 
 	notes, err := service.GetNotesByContainer(ctx, "tome", "TOME-001")

@@ -46,9 +46,9 @@ type TomeService interface {
 
 // CreateTomeRequest contains parameters for creating a tome.
 type CreateTomeRequest struct {
-	MissionID   string
-	Title       string
-	Description string
+	CommissionID string
+	Title        string
+	Description  string
 }
 
 // CreateTomeResponse contains the result of creating a tome.
@@ -67,7 +67,7 @@ type UpdateTomeRequest struct {
 // Tome represents a tome entity at the port boundary.
 type Tome struct {
 	ID              string
-	MissionID       string
+	CommissionID    string
 	Title           string
 	Description     string
 	Status          string
@@ -80,6 +80,6 @@ type Tome struct {
 
 // TomeFilters contains filter options for listing tomes.
 type TomeFilters struct {
-	MissionID string
-	Status    string
+	CommissionID string
+	Status       string
 }

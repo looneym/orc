@@ -19,10 +19,10 @@ const (
 
 // AgentIdentity represents a parsed agent ID
 type AgentIdentity struct {
-	Type      AgentType
-	ID        string // "ORC" for orchestrator, Grove ID for IMP
-	FullID    string // Complete ID like "ORC" or "IMP-GROVE-001"
-	MissionID string // Mission ID (empty for ORC outside mission, populated for IMP)
+	Type         AgentType
+	ID           string // "ORC" for orchestrator, Grove ID for IMP
+	FullID       string // Complete ID like "ORC" or "IMP-GROVE-001"
+	CommissionID string // Commission ID (empty for ORC outside commission, populated for IMP)
 }
 
 // GetCurrentAgentID detects the current agent identity based on working directory context
@@ -38,26 +38,26 @@ func GetCurrentAgentID() (*AgentIdentity, error) {
 	if err == nil && cfg.Type == config.TypeGrove {
 		// We're in a grove - this is an IMP
 		return &AgentIdentity{
-			Type:      AgentTypeIMP,
-			ID:        cfg.Grove.GroveID,
-			FullID:    fmt.Sprintf("IMP-%s", cfg.Grove.GroveID),
-			MissionID: cfg.Grove.MissionID,
+			Type:         AgentTypeIMP,
+			ID:           cfg.Grove.GroveID,
+			FullID:       fmt.Sprintf("IMP-%s", cfg.Grove.GroveID),
+			CommissionID: cfg.Grove.CommissionID,
 		}, nil
 	}
 
 	// Not in a grove - we're ORC (orchestrator)
-	// ORC can work anywhere: mission workspaces, ORC repo, anywhere
-	missionCtx, _ := context.DetectMissionContext()
-	missionID := ""
-	if missionCtx != nil {
-		missionID = missionCtx.MissionID
+	// ORC can work anywhere: commission workspaces, ORC repo, anywhere
+	comcommissionCtx, _ := context.DetectCommissionContext()
+	commissionID := ""
+	if comcommissionCtx != nil {
+		commissionID = comcommissionCtx.CommissionID
 	}
 
 	return &AgentIdentity{
-		Type:      AgentTypeORC,
-		ID:        "ORC",
-		FullID:    "ORC",
-		MissionID: missionID, // Populated if in mission context, empty otherwise
+		Type:         AgentTypeORC,
+		ID:           "ORC",
+		FullID:       "ORC",
+		CommissionID: commissionID, // Populated if in commission context, empty otherwise
 	}, nil
 }
 
@@ -66,10 +66,10 @@ func ParseAgentID(agentID string) (*AgentIdentity, error) {
 	// Special case: ORC has no parts
 	if agentID == "ORC" {
 		return &AgentIdentity{
-			Type:      AgentTypeORC,
-			ID:        "ORC",
-			FullID:    "ORC",
-			MissionID: "", // ORC can work across missions
+			Type:         AgentTypeORC,
+			ID:           "ORC",
+			FullID:       "ORC",
+			CommissionID: "", // ORC can work across commissions
 		}, nil
 	}
 
@@ -108,11 +108,11 @@ func ResolveTMuxTarget(agentID string, groveName string) (string, error) {
 		return "ORC:1.1", nil
 	}
 
-	// For IMP, need grove name and mission ID
-	if identity.MissionID == "" || groveName == "" {
-		return "", fmt.Errorf("IMP target requires mission ID and grove name")
+	// For IMP, need grove name and commission ID
+	if identity.CommissionID == "" || groveName == "" {
+		return "", fmt.Errorf("IMP target requires commission ID and grove name")
 	}
 
 	// Window named by grove, pane 2 is Claude
-	return fmt.Sprintf("orc-%s:%s.2", identity.MissionID, groveName), nil
+	return fmt.Sprintf("orc-%s:%s.2", identity.CommissionID, groveName), nil
 }

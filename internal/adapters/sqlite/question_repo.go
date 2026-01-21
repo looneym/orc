@@ -33,8 +33,8 @@ func (r *QuestionRepository) Create(ctx context.Context, question *secondary.Que
 	}
 
 	_, err := r.db.ExecContext(ctx,
-		"INSERT INTO questions (id, investigation_id, mission_id, title, description, status) VALUES (?, ?, ?, ?, ?, ?)",
-		question.ID, investigationID, question.MissionID, question.Title, desc, "open",
+		"INSERT INTO questions (id, investigation_id, commission_id, title, description, status) VALUES (?, ?, ?, ?, ?, ?)",
+		question.ID, investigationID, question.CommissionID, question.Title, desc, "open",
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create question: %w", err)
@@ -60,11 +60,11 @@ func (r *QuestionRepository) GetByID(ctx context.Context, id string) (*secondary
 
 	record := &secondary.QuestionRecord{}
 	err := r.db.QueryRowContext(ctx,
-		`SELECT id, investigation_id, mission_id, title, description, status, answer, pinned,
+		`SELECT id, investigation_id, commission_id, title, description, status, answer, pinned,
 			created_at, updated_at, answered_at, conclave_id, promoted_from_id, promoted_from_type
 		FROM questions WHERE id = ?`,
 		id,
-	).Scan(&record.ID, &investigationID, &record.MissionID, &record.Title, &desc, &record.Status, &answer, &pinned,
+	).Scan(&record.ID, &investigationID, &record.CommissionID, &record.Title, &desc, &record.Status, &answer, &pinned,
 		&createdAt, &updatedAt, &answeredAt, &conclaveID, &promotedFromID, &promotedFromType)
 
 	if err == sql.ErrNoRows {
@@ -92,7 +92,7 @@ func (r *QuestionRepository) GetByID(ctx context.Context, id string) (*secondary
 
 // List retrieves questions matching the given filters.
 func (r *QuestionRepository) List(ctx context.Context, filters secondary.QuestionFilters) ([]*secondary.QuestionRecord, error) {
-	query := `SELECT id, investigation_id, mission_id, title, description, status, answer, pinned,
+	query := `SELECT id, investigation_id, commission_id, title, description, status, answer, pinned,
 		created_at, updated_at, answered_at, conclave_id, promoted_from_id, promoted_from_type
 		FROM questions WHERE 1=1`
 	args := []any{}
@@ -102,9 +102,9 @@ func (r *QuestionRepository) List(ctx context.Context, filters secondary.Questio
 		args = append(args, filters.InvestigationID)
 	}
 
-	if filters.MissionID != "" {
-		query += " AND mission_id = ?"
-		args = append(args, filters.MissionID)
+	if filters.CommissionID != "" {
+		query += " AND commission_id = ?"
+		args = append(args, filters.CommissionID)
 	}
 
 	if filters.Status != "" {
@@ -136,7 +136,7 @@ func (r *QuestionRepository) List(ctx context.Context, filters secondary.Questio
 		)
 
 		record := &secondary.QuestionRecord{}
-		err := rows.Scan(&record.ID, &investigationID, &record.MissionID, &record.Title, &desc, &record.Status, &answer, &pinned,
+		err := rows.Scan(&record.ID, &investigationID, &record.CommissionID, &record.Title, &desc, &record.Status, &answer, &pinned,
 			&createdAt, &updatedAt, &answeredAt, &conclaveID, &promotedFromID, &promotedFromType)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan question: %w", err)
@@ -274,10 +274,10 @@ func (r *QuestionRepository) Answer(ctx context.Context, id, answer string) erro
 	return nil
 }
 
-// MissionExists checks if a mission exists.
-func (r *QuestionRepository) MissionExists(ctx context.Context, missionID string) (bool, error) {
+// CommissionExists checks if a mission exists.
+func (r *QuestionRepository) CommissionExists(ctx context.Context, missionID string) (bool, error) {
 	var count int
-	err := r.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM missions WHERE id = ?", missionID).Scan(&count)
+	err := r.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM commissions WHERE id = ?", missionID).Scan(&count)
 	if err != nil {
 		return false, fmt.Errorf("failed to check mission existence: %w", err)
 	}

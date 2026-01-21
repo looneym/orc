@@ -157,7 +157,7 @@ cleanup() {
     log_section "Cleanup"
     if [[ -n "$TEST_MISSION_ID" ]]; then
         # Clean up test data
-        rm -rf "$HOME/src/missions/$TEST_MISSION_ID"
+        rm -rf "$HOME/src/factories/$TEST_MISSION_ID"
     fi
 }
 
@@ -252,7 +252,7 @@ tmux kill-session -t test-orc-session
 ### Stale test missions/groves
 ```bash
 # Manual cleanup
-rm -rf ~/src/missions/MISSION-*
+rm -rf ~/src/factories/MISSION-*
 rm -rf ~/src/worktrees/test-canary-*
 cd ~/src/orc-canary && git worktree prune
 ```

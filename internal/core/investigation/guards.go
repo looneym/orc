@@ -20,8 +20,8 @@ func (r GuardResult) Error() error {
 
 // CreateInvestigationContext provides context for investigation creation guards.
 type CreateInvestigationContext struct {
-	MissionID     string
-	MissionExists bool
+	CommissionID     string
+	CommissionExists bool
 }
 
 // CompleteInvestigationContext provides context for investigation completion guards.
@@ -38,12 +38,12 @@ type StatusTransitionContext struct {
 
 // CanCreateInvestigation evaluates whether an investigation can be created.
 // Rules:
-// - Mission must exist
+// - Commission must exist
 func CanCreateInvestigation(ctx CreateInvestigationContext) GuardResult {
-	if !ctx.MissionExists {
+	if !ctx.CommissionExists {
 		return GuardResult{
 			Allowed: false,
-			Reason:  fmt.Sprintf("mission %s not found", ctx.MissionID),
+			Reason:  fmt.Sprintf("commission %s not found", ctx.CommissionID),
 		}
 	}
 

@@ -13,14 +13,14 @@ import (
 // Test Helper
 // ============================================================================
 
-func newTestGroveService(agentType secondary.AgentType) (*GroveServiceImpl, *mockMissionRepository, *mockGroveRepository, *mockEffectExecutor) {
-	missionRepo := newMockMissionRepository()
+func newTestGroveService(agentType secondary.AgentType) (*GroveServiceImpl, *mockCommissionRepository, *mockGroveRepository, *mockEffectExecutor) {
+	commissionRepo := newMockCommissionRepository()
 	groveRepo := newMockGroveRepository()
 	agentProvider := newMockAgentProvider(agentType)
 	executor := newMockEffectExecutor()
 
-	service := NewGroveService(groveRepo, missionRepo, agentProvider, executor)
-	return service, missionRepo, groveRepo, executor
+	service := NewGroveService(groveRepo, commissionRepo, agentProvider, executor)
+	return service, commissionRepo, groveRepo, executor
 }
 
 // ============================================================================
@@ -28,21 +28,21 @@ func newTestGroveService(agentType secondary.AgentType) (*GroveServiceImpl, *moc
 // ============================================================================
 
 func TestCreateGrove_ORCCanCreate(t *testing.T) {
-	service, missionRepo, _, executor := newTestGroveService(secondary.AgentTypeORC)
+	service, commissionRepo, _, executor := newTestGroveService(secondary.AgentTypeORC)
 	ctx := context.Background()
 
 	// Setup: mission exists
-	missionRepo.missions["MISSION-001"] = &secondary.MissionRecord{
+	commissionRepo.commissions["MISSION-001"] = &secondary.CommissionRecord{
 		ID:     "MISSION-001",
 		Title:  "Test Mission",
 		Status: "active",
 	}
 
 	resp, err := service.CreateGrove(ctx, primary.CreateGroveRequest{
-		Name:      "auth-backend",
-		MissionID: "MISSION-001",
-		Repos:     []string{},
-		BasePath:  "/tmp/worktrees",
+		Name:         "auth-backend",
+		CommissionID: "MISSION-001",
+		Repos:        []string{},
+		BasePath:     "/tmp/worktrees",
 	})
 
 	if err != nil {
@@ -60,18 +60,18 @@ func TestCreateGrove_ORCCanCreate(t *testing.T) {
 }
 
 func TestCreateGrove_IMPCannotCreate(t *testing.T) {
-	service, missionRepo, _, _ := newTestGroveService(secondary.AgentTypeIMP)
+	service, commissionRepo, _, _ := newTestGroveService(secondary.AgentTypeIMP)
 	ctx := context.Background()
 
-	missionRepo.missions["MISSION-001"] = &secondary.MissionRecord{
+	commissionRepo.commissions["MISSION-001"] = &secondary.CommissionRecord{
 		ID:     "MISSION-001",
 		Title:  "Test Mission",
 		Status: "active",
 	}
 
 	_, err := service.CreateGrove(ctx, primary.CreateGroveRequest{
-		Name:      "test-grove",
-		MissionID: "MISSION-001",
+		Name:         "test-grove",
+		CommissionID: "MISSION-001",
 	})
 
 	if err == nil {
@@ -86,8 +86,8 @@ func TestCreateGrove_MissionMustExist(t *testing.T) {
 	// No mission setup - mission doesn't exist
 
 	_, err := service.CreateGrove(ctx, primary.CreateGroveRequest{
-		Name:      "test-grove",
-		MissionID: "MISSION-NONEXISTENT",
+		Name:         "test-grove",
+		CommissionID: "MISSION-NONEXISTENT",
 	})
 
 	if err == nil {
@@ -96,19 +96,19 @@ func TestCreateGrove_MissionMustExist(t *testing.T) {
 }
 
 func TestCreateGrove_GeneratesEffects(t *testing.T) {
-	service, missionRepo, _, executor := newTestGroveService(secondary.AgentTypeORC)
+	service, commissionRepo, _, executor := newTestGroveService(secondary.AgentTypeORC)
 	ctx := context.Background()
 
-	missionRepo.missions["MISSION-001"] = &secondary.MissionRecord{
+	commissionRepo.commissions["MISSION-001"] = &secondary.CommissionRecord{
 		ID:     "MISSION-001",
 		Title:  "Test Mission",
 		Status: "active",
 	}
 
 	_, err := service.CreateGrove(ctx, primary.CreateGroveRequest{
-		Name:      "backend",
-		MissionID: "MISSION-001",
-		BasePath:  "/tmp/worktrees",
+		Name:         "backend",
+		CommissionID: "MISSION-001",
+		BasePath:     "/tmp/worktrees",
 	})
 
 	if err != nil {
@@ -137,7 +137,7 @@ func TestGetGrove_Found(t *testing.T) {
 	ctx := context.Background()
 
 	groveRepo.groves["MISSION-001"] = []*secondary.GroveRecord{
-		{ID: "GROVE-001", Name: "backend", MissionID: "MISSION-001", WorktreePath: "/tmp/grove"},
+		{ID: "GROVE-001", Name: "backend", CommissionID: "MISSION-001", WorktreePath: "/tmp/grove"},
 	}
 
 	grove, err := service.GetGrove(ctx, "GROVE-001")
@@ -170,14 +170,14 @@ func TestListGroves_FilterByMission(t *testing.T) {
 	ctx := context.Background()
 
 	groveRepo.groves["MISSION-001"] = []*secondary.GroveRecord{
-		{ID: "GROVE-001", Name: "backend", MissionID: "MISSION-001"},
-		{ID: "GROVE-002", Name: "frontend", MissionID: "MISSION-001"},
+		{ID: "GROVE-001", Name: "backend", CommissionID: "MISSION-001"},
+		{ID: "GROVE-002", Name: "frontend", CommissionID: "MISSION-001"},
 	}
 	groveRepo.groves["MISSION-002"] = []*secondary.GroveRecord{
-		{ID: "GROVE-003", Name: "other", MissionID: "MISSION-002"},
+		{ID: "GROVE-003", Name: "other", CommissionID: "MISSION-002"},
 	}
 
-	groves, err := service.ListGroves(ctx, primary.GroveFilters{MissionID: "MISSION-001"})
+	groves, err := service.ListGroves(ctx, primary.GroveFilters{CommissionID: "MISSION-001"})
 
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
@@ -191,7 +191,7 @@ func TestListGroves_Empty(t *testing.T) {
 	service, _, _, _ := newTestGroveService(secondary.AgentTypeORC)
 	ctx := context.Background()
 
-	groves, err := service.ListGroves(ctx, primary.GroveFilters{MissionID: "MISSION-EMPTY"})
+	groves, err := service.ListGroves(ctx, primary.GroveFilters{CommissionID: "MISSION-EMPTY"})
 
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
@@ -210,7 +210,7 @@ func TestRenameGrove_Success(t *testing.T) {
 	ctx := context.Background()
 
 	groveRepo.groves["MISSION-001"] = []*secondary.GroveRecord{
-		{ID: "GROVE-001", Name: "old-name", MissionID: "MISSION-001"},
+		{ID: "GROVE-001", Name: "old-name", CommissionID: "MISSION-001"},
 	}
 
 	err := service.RenameGrove(ctx, primary.RenameGroveRequest{
@@ -246,7 +246,7 @@ func TestDeleteGrove_NoActiveTasks(t *testing.T) {
 	ctx := context.Background()
 
 	groveRepo.groves["MISSION-001"] = []*secondary.GroveRecord{
-		{ID: "GROVE-001", Name: "backend", MissionID: "MISSION-001"},
+		{ID: "GROVE-001", Name: "backend", CommissionID: "MISSION-001"},
 	}
 
 	err := service.DeleteGrove(ctx, primary.DeleteGroveRequest{
@@ -264,7 +264,7 @@ func TestDeleteGrove_WithForce(t *testing.T) {
 	ctx := context.Background()
 
 	groveRepo.groves["MISSION-001"] = []*secondary.GroveRecord{
-		{ID: "GROVE-001", Name: "backend", MissionID: "MISSION-001"},
+		{ID: "GROVE-001", Name: "backend", CommissionID: "MISSION-001"},
 	}
 
 	err := service.DeleteGrove(ctx, primary.DeleteGroveRequest{

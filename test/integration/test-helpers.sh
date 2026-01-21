@@ -170,7 +170,7 @@ cleanup_test_mission() {
 
     # TODO: Add proper mission cleanup when implemented
     # For now, just clean up workspace directory
-    local mission_dir="$HOME/src/missions/$mission_id"
+    local mission_dir="$HOME/src/factories/$mission_id"
     if [[ -d "$mission_dir" ]]; then
         rm -rf "$mission_dir"
         log_success "Removed mission directory: $mission_dir"

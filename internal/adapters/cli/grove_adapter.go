@@ -24,11 +24,11 @@ func NewGroveAdapter(service primary.GroveService, out io.Writer) *GroveAdapter 
 	}
 }
 
-// List lists groves with optional mission filter.
-// When missionID is empty, all groves are returned.
-func (a *GroveAdapter) List(ctx context.Context, missionID string) ([]*primary.Grove, error) {
+// List lists groves with optional commission filter.
+// When commissionID is empty, all groves are returned.
+func (a *GroveAdapter) List(ctx context.Context, commissionID string) ([]*primary.Grove, error) {
 	groves, err := a.service.ListGroves(ctx, primary.GroveFilters{
-		MissionID: missionID,
+		CommissionID: commissionID,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to list groves: %w", err)
@@ -38,19 +38,19 @@ func (a *GroveAdapter) List(ctx context.Context, missionID string) ([]*primary.G
 		fmt.Fprintln(a.out, "No groves found.")
 		fmt.Fprintln(a.out)
 		fmt.Fprintln(a.out, "Create your first grove:")
-		fmt.Fprintln(a.out, "  orc grove create my-grove --repos main-app --mission MISSION-001")
+		fmt.Fprintln(a.out, "  orc grove create my-grove --repos main-app --commission COMM-001")
 		return groves, nil
 	}
 
 	w := tabwriter.NewWriter(a.out, 0, 0, 3, ' ', 0)
-	fmt.Fprintln(w, "ID\tNAME\tMISSION\tSTATUS\tPATH")
-	fmt.Fprintln(w, "--\t----\t-------\t------\t----")
+	fmt.Fprintln(w, "ID\tNAME\tCOMMISSION\tSTATUS\tPATH")
+	fmt.Fprintln(w, "--\t----\t----------\t------\t----")
 
 	for _, grove := range groves {
 		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n",
 			grove.ID,
 			grove.Name,
-			grove.MissionID,
+			grove.CommissionID,
 			grove.Status,
 			grove.Path,
 		)
@@ -68,9 +68,9 @@ func (a *GroveAdapter) Show(ctx context.Context, groveID string) (*primary.Grove
 	}
 
 	fmt.Fprintf(a.out, "\nGrove: %s\n", grove.ID)
-	fmt.Fprintf(a.out, "Name:    %s\n", grove.Name)
-	fmt.Fprintf(a.out, "Mission: %s\n", grove.MissionID)
-	fmt.Fprintf(a.out, "Path:    %s\n", grove.Path)
+	fmt.Fprintf(a.out, "Name:       %s\n", grove.Name)
+	fmt.Fprintf(a.out, "Commission: %s\n", grove.CommissionID)
+	fmt.Fprintf(a.out, "Path:       %s\n", grove.Path)
 	fmt.Fprintf(a.out, "Status:  %s\n", grove.Status)
 	fmt.Fprintf(a.out, "Created: %s\n", grove.CreatedAt)
 	fmt.Fprintln(a.out)

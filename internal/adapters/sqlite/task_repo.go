@@ -42,7 +42,7 @@ func scanTask(scanner interface {
 
 	record := &secondary.TaskRecord{}
 	err := scanner.Scan(
-		&record.ID, &shipmentID, &record.MissionID, &record.Title, &desc,
+		&record.ID, &shipmentID, &record.CommissionID, &record.Title, &desc,
 		&taskType, &record.Status, &priority, &assignedGroveID,
 		&pinned, &createdAt, &updatedAt, &claimedAt, &completedAt,
 		&conclaveID, &promotedFromID, &promotedFromType,
@@ -73,7 +73,7 @@ func scanTask(scanner interface {
 	return record, nil
 }
 
-const taskSelectCols = "id, shipment_id, mission_id, title, description, type, status, priority, assigned_grove_id, pinned, created_at, updated_at, claimed_at, completed_at, conclave_id, promoted_from_id, promoted_from_type"
+const taskSelectCols = "id, shipment_id, commission_id, title, description, type, status, priority, assigned_grove_id, pinned, created_at, updated_at, claimed_at, completed_at, conclave_id, promoted_from_id, promoted_from_type"
 
 // Create persists a new task.
 func (r *TaskRepository) Create(ctx context.Context, task *secondary.TaskRecord) error {
@@ -90,8 +90,8 @@ func (r *TaskRepository) Create(ctx context.Context, task *secondary.TaskRecord)
 	}
 
 	_, err := r.db.ExecContext(ctx,
-		"INSERT INTO tasks (id, shipment_id, mission_id, title, description, type, status) VALUES (?, ?, ?, ?, ?, ?, ?)",
-		task.ID, shipmentID, task.MissionID, task.Title, desc, taskType, "ready",
+		"INSERT INTO tasks (id, shipment_id, commission_id, title, description, type, status) VALUES (?, ?, ?, ?, ?, ?, ?)",
+		task.ID, shipmentID, task.CommissionID, task.Title, desc, taskType, "ready",
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create task: %w", err)
@@ -133,9 +133,9 @@ func (r *TaskRepository) List(ctx context.Context, filters secondary.TaskFilters
 		args = append(args, filters.Status)
 	}
 
-	if filters.MissionID != "" {
-		query += " AND mission_id = ?"
-		args = append(args, filters.MissionID)
+	if filters.CommissionID != "" {
+		query += " AND commission_id = ?"
+		args = append(args, filters.CommissionID)
 	}
 
 	query += " ORDER BY created_at ASC"
@@ -359,10 +359,10 @@ func (r *TaskRepository) AssignGroveByShipment(ctx context.Context, shipmentID, 
 	return nil
 }
 
-// MissionExists checks if a mission exists.
-func (r *TaskRepository) MissionExists(ctx context.Context, missionID string) (bool, error) {
+// CommissionExists checks if a mission exists.
+func (r *TaskRepository) CommissionExists(ctx context.Context, missionID string) (bool, error) {
 	var count int
-	err := r.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM missions WHERE id = ?", missionID).Scan(&count)
+	err := r.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM commissions WHERE id = ?", missionID).Scan(&count)
 	if err != nil {
 		return false, fmt.Errorf("failed to check mission existence: %w", err)
 	}
@@ -432,7 +432,7 @@ func (r *TaskRepository) RemoveTag(ctx context.Context, taskID string) error {
 // ListByTag retrieves tasks with a specific tag.
 func (r *TaskRepository) ListByTag(ctx context.Context, tagID string) ([]*secondary.TaskRecord, error) {
 	query := `
-		SELECT t.id, t.shipment_id, t.mission_id, t.title, t.description,
+		SELECT t.id, t.shipment_id, t.commission_id, t.title, t.description,
 		       t.type, t.status, t.priority, t.assigned_grove_id,
 		       t.pinned, t.created_at, t.updated_at, t.claimed_at, t.completed_at,
 		       t.conclave_id, t.promoted_from_id, t.promoted_from_type

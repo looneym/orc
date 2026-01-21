@@ -32,19 +32,19 @@ var planCreateCmd = &cobra.Command{
 
 		// Get mission from context or require explicit flag
 		if missionID == "" {
-			missionID = orcctx.GetContextMissionID()
+			missionID = orcctx.GetContextCommissionID()
 			if missionID == "" {
-				return fmt.Errorf("no mission context detected\nHint: Use --mission flag or run from a grove/mission directory")
+				return fmt.Errorf("no mission context detected\nHint: Use --commission flag or run from a grove/mission directory")
 			}
 		}
 
 		ctx := context.Background()
 		resp, err := wire.PlanService().CreatePlan(ctx, primary.CreatePlanRequest{
-			MissionID:   missionID,
-			ShipmentID:  shipmentID,
-			Title:       title,
-			Description: description,
-			Content:     content,
+			CommissionID: missionID,
+			ShipmentID:   shipmentID,
+			Title:        title,
+			Description:  description,
+			Content:      content,
 		})
 		if err != nil {
 			return fmt.Errorf("failed to create plan: %w", err)
@@ -55,7 +55,7 @@ var planCreateCmd = &cobra.Command{
 		if plan.ShipmentID != "" {
 			fmt.Printf("  Shipment: %s\n", plan.ShipmentID)
 		}
-		fmt.Printf("  Mission: %s\n", plan.MissionID)
+		fmt.Printf("  Mission: %s\n", plan.CommissionID)
 		fmt.Printf("  Status: %s\n", plan.Status)
 		fmt.Println()
 		fmt.Println("Next steps:")
@@ -75,14 +75,14 @@ var planListCmd = &cobra.Command{
 
 		// Get mission from context if not specified
 		if missionID == "" {
-			missionID = orcctx.GetContextMissionID()
+			missionID = orcctx.GetContextCommissionID()
 		}
 
 		ctx := context.Background()
 		plans, err := wire.PlanService().ListPlans(ctx, primary.PlanFilters{
-			MissionID:  missionID,
-			ShipmentID: shipmentID,
-			Status:     status,
+			CommissionID: missionID,
+			ShipmentID:   shipmentID,
+			Status:       status,
 		})
 		if err != nil {
 			return fmt.Errorf("failed to list plans: %w", err)
@@ -138,7 +138,7 @@ var planShowCmd = &cobra.Command{
 		if plan.Content != "" {
 			fmt.Printf("\nContent:\n%s\n", plan.Content)
 		}
-		fmt.Printf("\nMission: %s\n", plan.MissionID)
+		fmt.Printf("\nMission: %s\n", plan.CommissionID)
 		if plan.ShipmentID != "" {
 			fmt.Printf("Shipment: %s\n", plan.ShipmentID)
 		}
@@ -264,13 +264,13 @@ var planDeleteCmd = &cobra.Command{
 
 func init() {
 	// plan create flags
-	planCreateCmd.Flags().StringP("mission", "m", "", "Mission ID (defaults to context)")
+	planCreateCmd.Flags().StringP("commission", "c", "", "Commission ID (defaults to context)")
 	planCreateCmd.Flags().StringP("description", "d", "", "Plan description")
 	planCreateCmd.Flags().StringP("content", "c", "", "Plan content")
 	planCreateCmd.Flags().String("shipment", "", "Shipment ID to attach plan to")
 
 	// plan list flags
-	planListCmd.Flags().StringP("mission", "m", "", "Filter by mission")
+	planListCmd.Flags().StringP("commission", "c", "", "Filter by mission")
 	planListCmd.Flags().String("shipment", "", "Filter by shipment")
 	planListCmd.Flags().StringP("status", "s", "", "Filter by status (draft, approved)")
 

@@ -31,23 +31,23 @@ var shipmentCreateCmd = &cobra.Command{
 
 		// Get mission from context or require explicit flag
 		if missionID == "" {
-			missionID = orccontext.GetContextMissionID()
+			missionID = orccontext.GetContextCommissionID()
 			if missionID == "" {
-				return fmt.Errorf("no mission context detected\nHint: Use --mission flag or run from a grove/mission directory")
+				return fmt.Errorf("no mission context detected\nHint: Use --commission flag or run from a grove/mission directory")
 			}
 		}
 
 		resp, err := wire.ShipmentService().CreateShipment(ctx, primary.CreateShipmentRequest{
-			MissionID:   missionID,
-			Title:       title,
-			Description: description,
+			CommissionID: missionID,
+			Title:        title,
+			Description:  description,
 		})
 		if err != nil {
 			return fmt.Errorf("failed to create shipment: %w", err)
 		}
 
 		fmt.Printf("Created shipment %s: %s\n", resp.Shipment.ID, resp.Shipment.Title)
-		fmt.Printf("  Under mission: %s\n", resp.Shipment.MissionID)
+		fmt.Printf("  Under mission: %s\n", resp.Shipment.CommissionID)
 		fmt.Println()
 		fmt.Println("Next steps:")
 		fmt.Printf("   orc task create \"Task title\" --shipment %s\n", resp.Shipment.ID)
@@ -65,12 +65,12 @@ var shipmentListCmd = &cobra.Command{
 
 		// Get mission from context if not specified
 		if missionID == "" {
-			missionID = orccontext.GetContextMissionID()
+			missionID = orccontext.GetContextCommissionID()
 		}
 
 		shipments, err := wire.ShipmentService().ListShipments(ctx, primary.ShipmentFilters{
-			MissionID: missionID,
-			Status:    status,
+			CommissionID: missionID,
+			Status:       status,
 		})
 		if err != nil {
 			return fmt.Errorf("failed to list shipments: %w", err)
@@ -89,7 +89,7 @@ var shipmentListCmd = &cobra.Command{
 			if s.Pinned {
 				pinnedMark = " [pinned]"
 			}
-			fmt.Fprintf(w, "%s\t%s%s\t%s\t%s\n", s.ID, s.Title, pinnedMark, s.Status, s.MissionID)
+			fmt.Fprintf(w, "%s\t%s%s\t%s\t%s\n", s.ID, s.Title, pinnedMark, s.Status, s.CommissionID)
 		}
 		w.Flush()
 		return nil
@@ -115,7 +115,7 @@ var shipmentShowCmd = &cobra.Command{
 			fmt.Printf("Description: %s\n", shipment.Description)
 		}
 		fmt.Printf("Status: %s\n", shipment.Status)
-		fmt.Printf("Mission: %s\n", shipment.MissionID)
+		fmt.Printf("Mission: %s\n", shipment.CommissionID)
 		if shipment.AssignedGroveID != "" {
 			fmt.Printf("Assigned Grove: %s\n", shipment.AssignedGroveID)
 		}
@@ -284,11 +284,11 @@ var shipmentAssignCmd = &cobra.Command{
 
 func init() {
 	// shipment create flags
-	shipmentCreateCmd.Flags().StringP("mission", "m", "", "Mission ID (defaults to context)")
+	shipmentCreateCmd.Flags().StringP("commission", "c", "", "Commission ID (defaults to context)")
 	shipmentCreateCmd.Flags().StringP("description", "d", "", "Shipment description")
 
 	// shipment list flags
-	shipmentListCmd.Flags().StringP("mission", "m", "", "Filter by mission")
+	shipmentListCmd.Flags().StringP("commission", "c", "", "Filter by mission")
 	shipmentListCmd.Flags().StringP("status", "s", "", "Filter by status")
 
 	// shipment update flags

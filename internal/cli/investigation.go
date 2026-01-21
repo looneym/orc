@@ -31,17 +31,17 @@ var investigationCreateCmd = &cobra.Command{
 
 		// Get mission from context or require explicit flag
 		if missionID == "" {
-			missionID = orcctx.GetContextMissionID()
+			missionID = orcctx.GetContextCommissionID()
 			if missionID == "" {
-				return fmt.Errorf("no mission context detected\nHint: Use --mission flag or run from a grove/mission directory")
+				return fmt.Errorf("no mission context detected\nHint: Use --commission flag or run from a grove/mission directory")
 			}
 		}
 
 		ctx := context.Background()
 		resp, err := wire.InvestigationService().CreateInvestigation(ctx, primary.CreateInvestigationRequest{
-			MissionID:   missionID,
-			Title:       title,
-			Description: description,
+			CommissionID: missionID,
+			Title:        title,
+			Description:  description,
 		})
 		if err != nil {
 			return fmt.Errorf("failed to create investigation: %w", err)
@@ -49,7 +49,7 @@ var investigationCreateCmd = &cobra.Command{
 
 		investigation := resp.Investigation
 		fmt.Printf("✓ Created investigation %s: %s\n", investigation.ID, investigation.Title)
-		fmt.Printf("  Mission: %s\n", investigation.MissionID)
+		fmt.Printf("  Mission: %s\n", investigation.CommissionID)
 		fmt.Printf("  Status: %s\n", investigation.Status)
 		fmt.Println()
 		fmt.Println("Next steps:")
@@ -67,13 +67,13 @@ var investigationListCmd = &cobra.Command{
 
 		// Get mission from context if not specified
 		if missionID == "" {
-			missionID = orcctx.GetContextMissionID()
+			missionID = orcctx.GetContextCommissionID()
 		}
 
 		ctx := context.Background()
 		investigations, err := wire.InvestigationService().ListInvestigations(ctx, primary.InvestigationFilters{
-			MissionID: missionID,
-			Status:    status,
+			CommissionID: missionID,
+			Status:       status,
 		})
 		if err != nil {
 			return fmt.Errorf("failed to list investigations: %w", err)
@@ -96,7 +96,7 @@ var investigationListCmd = &cobra.Command{
 			if inv.Status == "complete" {
 				statusIcon = "✅"
 			}
-			fmt.Fprintf(w, "%s\t%s%s\t%s %s\t%s\n", inv.ID, inv.Title, pinnedMark, statusIcon, inv.Status, inv.MissionID)
+			fmt.Fprintf(w, "%s\t%s%s\t%s %s\t%s\n", inv.ID, inv.Title, pinnedMark, statusIcon, inv.Status, inv.CommissionID)
 		}
 		w.Flush()
 		return nil
@@ -122,7 +122,7 @@ var investigationShowCmd = &cobra.Command{
 			fmt.Printf("Description: %s\n", investigation.Description)
 		}
 		fmt.Printf("Status: %s\n", investigation.Status)
-		fmt.Printf("Mission: %s\n", investigation.MissionID)
+		fmt.Printf("Mission: %s\n", investigation.CommissionID)
 		if investigation.AssignedGroveID != "" {
 			fmt.Printf("Assigned Grove: %s\n", investigation.AssignedGroveID)
 		}
@@ -312,11 +312,11 @@ var investigationAssignCmd = &cobra.Command{
 
 func init() {
 	// investigation create flags
-	investigationCreateCmd.Flags().StringP("mission", "m", "", "Mission ID (defaults to context)")
+	investigationCreateCmd.Flags().StringP("commission", "c", "", "Commission ID (defaults to context)")
 	investigationCreateCmd.Flags().StringP("description", "d", "", "Investigation description")
 
 	// investigation list flags
-	investigationListCmd.Flags().StringP("mission", "m", "", "Filter by mission")
+	investigationListCmd.Flags().StringP("commission", "c", "", "Filter by mission")
 	investigationListCmd.Flags().StringP("status", "s", "", "Filter by status (active, complete)")
 
 	// investigation update flags

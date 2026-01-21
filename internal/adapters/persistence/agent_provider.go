@@ -23,10 +23,10 @@ func (p *AgentIdentityProviderAdapter) GetCurrentIdentity(ctx context.Context) (
 	}
 
 	return &secondary.AgentIdentity{
-		Type:      secondary.AgentType(identity.Type),
-		ID:        identity.ID,
-		FullID:    identity.FullID,
-		MissionID: identity.MissionID,
+		Type:         secondary.AgentType(identity.Type),
+		ID:           identity.ID,
+		FullID:       identity.FullID,
+		CommissionID: identity.CommissionID,
 	}, nil
 }
 

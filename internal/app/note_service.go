@@ -23,12 +23,12 @@ func NewNoteService(noteRepo secondary.NoteRepository) *NoteServiceImpl {
 // CreateNote creates a new note.
 func (s *NoteServiceImpl) CreateNote(ctx context.Context, req primary.CreateNoteRequest) (*primary.CreateNoteResponse, error) {
 	// Validate mission exists
-	exists, err := s.noteRepo.MissionExists(ctx, req.MissionID)
+	exists, err := s.noteRepo.CommissionExists(ctx, req.CommissionID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to validate mission: %w", err)
+		return nil, fmt.Errorf("failed to validate commission: %w", err)
 	}
 	if !exists {
-		return nil, fmt.Errorf("mission %s not found", req.MissionID)
+		return nil, fmt.Errorf("commission %s not found", req.CommissionID)
 	}
 
 	// Get next ID
@@ -39,11 +39,11 @@ func (s *NoteServiceImpl) CreateNote(ctx context.Context, req primary.CreateNote
 
 	// Build record with container assignment
 	record := &secondary.NoteRecord{
-		ID:        nextID,
-		MissionID: req.MissionID,
-		Title:     req.Title,
-		Content:   req.Content,
-		Type:      req.Type,
+		ID:           nextID,
+		CommissionID: req.CommissionID,
+		Title:        req.Title,
+		Content:      req.Content,
+		Type:         req.Type,
 	}
 
 	// Set appropriate container FK based on container type
@@ -88,8 +88,8 @@ func (s *NoteServiceImpl) GetNote(ctx context.Context, noteID string) (*primary.
 // ListNotes lists notes with optional filters.
 func (s *NoteServiceImpl) ListNotes(ctx context.Context, filters primary.NoteFilters) ([]*primary.Note, error) {
 	records, err := s.noteRepo.List(ctx, secondary.NoteFilters{
-		Type:      filters.Type,
-		MissionID: filters.MissionID,
+		Type:         filters.Type,
+		CommissionID: filters.CommissionID,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to list notes: %w", err)
@@ -176,7 +176,7 @@ func (s *NoteServiceImpl) ReopenNote(ctx context.Context, noteID string) error {
 func (s *NoteServiceImpl) recordToNote(r *secondary.NoteRecord) *primary.Note {
 	return &primary.Note{
 		ID:               r.ID,
-		MissionID:        r.MissionID,
+		CommissionID:     r.CommissionID,
 		Title:            r.Title,
 		Content:          r.Content,
 		Type:             r.Type,

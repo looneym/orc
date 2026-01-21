@@ -28,12 +28,12 @@ func NewTaskService(
 // CreateTask creates a new task.
 func (s *TaskServiceImpl) CreateTask(ctx context.Context, req primary.CreateTaskRequest) (*primary.CreateTaskResponse, error) {
 	// Validate mission exists
-	exists, err := s.taskRepo.MissionExists(ctx, req.MissionID)
+	exists, err := s.taskRepo.CommissionExists(ctx, req.CommissionID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to validate mission: %w", err)
+		return nil, fmt.Errorf("failed to validate commission: %w", err)
 	}
 	if !exists {
-		return nil, fmt.Errorf("mission %s not found", req.MissionID)
+		return nil, fmt.Errorf("commission %s not found", req.CommissionID)
 	}
 
 	// Validate shipment exists if provided
@@ -55,13 +55,13 @@ func (s *TaskServiceImpl) CreateTask(ctx context.Context, req primary.CreateTask
 
 	// Create record
 	record := &secondary.TaskRecord{
-		ID:          nextID,
-		ShipmentID:  req.ShipmentID,
-		MissionID:   req.MissionID,
-		Title:       req.Title,
-		Description: req.Description,
-		Type:        req.Type,
-		Status:      "ready",
+		ID:           nextID,
+		ShipmentID:   req.ShipmentID,
+		CommissionID: req.CommissionID,
+		Title:        req.Title,
+		Description:  req.Description,
+		Type:         req.Type,
+		Status:       "ready",
 	}
 
 	if err := s.taskRepo.Create(ctx, record); err != nil {
@@ -107,9 +107,9 @@ func (s *TaskServiceImpl) GetTask(ctx context.Context, taskID string) (*primary.
 // ListTasks lists tasks with optional filters.
 func (s *TaskServiceImpl) ListTasks(ctx context.Context, filters primary.TaskFilters) ([]*primary.Task, error) {
 	records, err := s.taskRepo.List(ctx, secondary.TaskFilters{
-		ShipmentID: filters.ShipmentID,
-		Status:     filters.Status,
-		MissionID:  filters.MissionID,
+		ShipmentID:   filters.ShipmentID,
+		Status:       filters.Status,
+		CommissionID: filters.CommissionID,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to list tasks: %w", err)

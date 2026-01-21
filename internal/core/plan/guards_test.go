@@ -12,17 +12,17 @@ func TestCanCreatePlan(t *testing.T) {
 		{
 			name: "can create plan when mission exists and no shipment",
 			ctx: CreatePlanContext{
-				MissionID:     "MISSION-001",
-				MissionExists: true,
-				ShipmentID:    "",
+				CommissionID:     "MISSION-001",
+				CommissionExists: true,
+				ShipmentID:       "",
 			},
 			wantAllowed: true,
 		},
 		{
 			name: "can create plan when mission exists with shipment and no active plan",
 			ctx: CreatePlanContext{
-				MissionID:             "MISSION-001",
-				MissionExists:         true,
+				CommissionID:          "MISSION-001",
+				CommissionExists:      true,
 				ShipmentID:            "SHIP-001",
 				ShipmentExists:        true,
 				ShipmentHasActivePlan: false,
@@ -32,19 +32,19 @@ func TestCanCreatePlan(t *testing.T) {
 		{
 			name: "cannot create plan when mission not found",
 			ctx: CreatePlanContext{
-				MissionID:     "MISSION-999",
-				MissionExists: false,
+				CommissionID:     "MISSION-999",
+				CommissionExists: false,
 			},
 			wantAllowed: false,
-			wantReason:  "mission MISSION-999 not found",
+			wantReason:  "commission MISSION-999 not found",
 		},
 		{
 			name: "cannot create plan when shipment not found",
 			ctx: CreatePlanContext{
-				MissionID:      "MISSION-001",
-				MissionExists:  true,
-				ShipmentID:     "SHIP-999",
-				ShipmentExists: false,
+				CommissionID:     "MISSION-001",
+				CommissionExists: true,
+				ShipmentID:       "SHIP-999",
+				ShipmentExists:   false,
 			},
 			wantAllowed: false,
 			wantReason:  "shipment SHIP-999 not found",
@@ -52,8 +52,8 @@ func TestCanCreatePlan(t *testing.T) {
 		{
 			name: "cannot create plan when shipment already has active plan",
 			ctx: CreatePlanContext{
-				MissionID:             "MISSION-001",
-				MissionExists:         true,
+				CommissionID:          "MISSION-001",
+				CommissionExists:      true,
 				ShipmentID:            "SHIP-001",
 				ShipmentExists:        true,
 				ShipmentHasActivePlan: true,

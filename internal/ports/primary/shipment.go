@@ -46,9 +46,9 @@ type ShipmentService interface {
 
 // CreateShipmentRequest contains parameters for creating a shipment.
 type CreateShipmentRequest struct {
-	MissionID   string
-	Title       string
-	Description string
+	CommissionID string
+	Title        string
+	Description  string
 }
 
 // CreateShipmentResponse contains the result of creating a shipment.
@@ -67,7 +67,7 @@ type UpdateShipmentRequest struct {
 // Shipment represents a shipment entity at the port boundary.
 type Shipment struct {
 	ID              string
-	MissionID       string
+	CommissionID    string
 	Title           string
 	Description     string
 	Status          string
@@ -80,6 +80,6 @@ type Shipment struct {
 
 // ShipmentFilters contains filter options for listing shipments.
 type ShipmentFilters struct {
-	MissionID string
-	Status    string
+	CommissionID string
+	Status       string
 }

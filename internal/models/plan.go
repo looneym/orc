@@ -10,7 +10,7 @@ import (
 type Plan struct {
 	ID               string
 	ShipmentID       sql.NullString
-	MissionID        string
+	ComcommissionID  string
 	Title            string
 	Description      sql.NullString
 	Status           string

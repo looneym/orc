@@ -119,6 +119,11 @@ var migrations = []Migration{
 		Name:    "add_status_to_notes",
 		Up:      migrationV21,
 	},
+	{
+		Version: 22,
+		Name:    "rename_missions_to_commissions",
+		Up:      migrationV22,
+	},
 }
 
 // RunMigrations executes all pending migrations
@@ -2037,6 +2042,569 @@ func migrationV21(db *sql.DB) error {
 	`)
 	if err != nil {
 		return fmt.Errorf("failed to recreate notes indexes: %w", err)
+	}
+
+	return nil
+}
+
+// migrationV22 renames missions to commissions and updates ID format
+func migrationV22(db *sql.DB) error {
+	// Step 1: Create commissions table
+	_, err := db.Exec(`
+		CREATE TABLE commissions (
+			id TEXT PRIMARY KEY,
+			title TEXT NOT NULL,
+			description TEXT,
+			status TEXT NOT NULL CHECK(status IN ('initial', 'active', 'paused', 'complete', 'archived', 'deleted')) DEFAULT 'initial',
+			pinned INTEGER DEFAULT 0,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			started_at DATETIME,
+			completed_at DATETIME
+		)
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to create commissions table: %w", err)
+	}
+
+	// Step 2: Copy data from missions with ID transformation
+	_, err = db.Exec(`
+		INSERT INTO commissions (id, title, description, status, pinned, created_at, started_at, completed_at)
+		SELECT
+			REPLACE(id, 'MISSION-', 'COMM-'),
+			title,
+			description,
+			status,
+			pinned,
+			created_at,
+			started_at,
+			completed_at
+		FROM missions
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to copy missions to commissions: %w", err)
+	}
+
+	// Step 3: Update all foreign key columns in dependent tables
+	// Update groves
+	_, err = db.Exec(`
+		CREATE TABLE groves_new (
+			id TEXT PRIMARY KEY,
+			commission_id TEXT NOT NULL,
+			name TEXT NOT NULL,
+			path TEXT NOT NULL UNIQUE,
+			repos TEXT,
+			status TEXT NOT NULL CHECK(status IN ('active', 'archived')) DEFAULT 'active',
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			FOREIGN KEY (commission_id) REFERENCES commissions(id)
+		)
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to create groves_new: %w", err)
+	}
+
+	_, err = db.Exec(`
+		INSERT INTO groves_new (id, commission_id, name, path, repos, status, created_at, updated_at)
+		SELECT id, REPLACE(mission_id, 'MISSION-', 'COMM-'), name, path, repos, status, created_at, updated_at FROM groves
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to copy groves: %w", err)
+	}
+
+	_, err = db.Exec(`DROP TABLE groves`)
+	if err != nil {
+		return fmt.Errorf("failed to drop groves: %w", err)
+	}
+
+	_, err = db.Exec(`ALTER TABLE groves_new RENAME TO groves`)
+	if err != nil {
+		return fmt.Errorf("failed to rename groves_new: %w", err)
+	}
+
+	// Update shipments
+	_, err = db.Exec(`
+		CREATE TABLE shipments_new (
+			id TEXT PRIMARY KEY,
+			commission_id TEXT NOT NULL,
+			title TEXT NOT NULL,
+			description TEXT,
+			status TEXT NOT NULL CHECK(status IN ('ready', 'in_progress', 'paused', 'complete')) DEFAULT 'ready',
+			assigned_grove_id TEXT,
+			pinned INTEGER DEFAULT 0,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			completed_at DATETIME,
+			FOREIGN KEY (commission_id) REFERENCES commissions(id),
+			FOREIGN KEY (assigned_grove_id) REFERENCES groves(id)
+		)
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to create shipments_new: %w", err)
+	}
+
+	_, err = db.Exec(`
+		INSERT INTO shipments_new (id, commission_id, title, description, status, assigned_grove_id, pinned, created_at, updated_at, completed_at)
+		SELECT id, REPLACE(mission_id, 'MISSION-', 'COMM-'), title, description, status, assigned_grove_id, pinned, created_at, updated_at, completed_at FROM shipments
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to copy shipments: %w", err)
+	}
+
+	_, err = db.Exec(`DROP TABLE shipments`)
+	if err != nil {
+		return fmt.Errorf("failed to drop shipments: %w", err)
+	}
+
+	_, err = db.Exec(`ALTER TABLE shipments_new RENAME TO shipments`)
+	if err != nil {
+		return fmt.Errorf("failed to rename shipments_new: %w", err)
+	}
+
+	// Update tasks
+	_, err = db.Exec(`
+		CREATE TABLE tasks_new (
+			id TEXT PRIMARY KEY,
+			shipment_id TEXT,
+			commission_id TEXT NOT NULL,
+			title TEXT NOT NULL,
+			description TEXT,
+			type TEXT CHECK(type IN ('research', 'implementation', 'fix', 'documentation', 'maintenance')),
+			status TEXT NOT NULL CHECK(status IN ('ready', 'in_progress', 'paused', 'complete')) DEFAULT 'ready',
+			priority TEXT CHECK(priority IN ('low', 'medium', 'high')),
+			assigned_grove_id TEXT,
+			pinned INTEGER DEFAULT 0,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			claimed_at DATETIME,
+			completed_at DATETIME,
+			conclave_id TEXT,
+			promoted_from_id TEXT,
+			promoted_from_type TEXT,
+			FOREIGN KEY (shipment_id) REFERENCES shipments(id) ON DELETE CASCADE,
+			FOREIGN KEY (commission_id) REFERENCES commissions(id),
+			FOREIGN KEY (assigned_grove_id) REFERENCES groves(id),
+			FOREIGN KEY (conclave_id) REFERENCES conclaves(id) ON DELETE SET NULL
+		)
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to create tasks_new: %w", err)
+	}
+
+	_, err = db.Exec(`
+		INSERT INTO tasks_new (id, shipment_id, commission_id, title, description, type, status, priority, assigned_grove_id, pinned, created_at, updated_at, claimed_at, completed_at, conclave_id, promoted_from_id, promoted_from_type)
+		SELECT id, shipment_id, REPLACE(mission_id, 'MISSION-', 'COMM-'), title, description, type, status, priority, assigned_grove_id, pinned, created_at, updated_at, claimed_at, completed_at, conclave_id, promoted_from_id, promoted_from_type FROM tasks
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to copy tasks: %w", err)
+	}
+
+	_, err = db.Exec(`DROP TABLE tasks`)
+	if err != nil {
+		return fmt.Errorf("failed to drop tasks: %w", err)
+	}
+
+	_, err = db.Exec(`ALTER TABLE tasks_new RENAME TO tasks`)
+	if err != nil {
+		return fmt.Errorf("failed to rename tasks_new: %w", err)
+	}
+
+	// Update handoffs
+	_, err = db.Exec(`
+		CREATE TABLE handoffs_new (
+			id TEXT PRIMARY KEY,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			handoff_note TEXT NOT NULL,
+			active_commission_id TEXT,
+			active_grove_id TEXT,
+			todos_snapshot TEXT,
+			FOREIGN KEY (active_commission_id) REFERENCES commissions(id),
+			FOREIGN KEY (active_grove_id) REFERENCES groves(id)
+		)
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to create handoffs_new: %w", err)
+	}
+
+	_, err = db.Exec(`
+		INSERT INTO handoffs_new (id, created_at, handoff_note, active_commission_id, active_grove_id, todos_snapshot)
+		SELECT id, created_at, handoff_note, REPLACE(active_mission_id, 'MISSION-', 'COMM-'), active_grove_id, todos_snapshot FROM handoffs
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to copy handoffs: %w", err)
+	}
+
+	_, err = db.Exec(`DROP TABLE handoffs`)
+	if err != nil {
+		return fmt.Errorf("failed to drop handoffs: %w", err)
+	}
+
+	_, err = db.Exec(`ALTER TABLE handoffs_new RENAME TO handoffs`)
+	if err != nil {
+		return fmt.Errorf("failed to rename handoffs_new: %w", err)
+	}
+
+	// Update messages
+	_, err = db.Exec(`
+		CREATE TABLE messages_new (
+			id TEXT PRIMARY KEY,
+			sender TEXT NOT NULL,
+			recipient TEXT NOT NULL,
+			subject TEXT NOT NULL,
+			body TEXT NOT NULL,
+			timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+			read INTEGER DEFAULT 0,
+			commission_id TEXT NOT NULL,
+			FOREIGN KEY (commission_id) REFERENCES commissions(id)
+		)
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to create messages_new: %w", err)
+	}
+
+	_, err = db.Exec(`
+		INSERT INTO messages_new (id, sender, recipient, subject, body, timestamp, read, commission_id)
+		SELECT id, sender, recipient, subject, body, timestamp, read, REPLACE(mission_id, 'MISSION-', 'COMM-') FROM messages
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to copy messages: %w", err)
+	}
+
+	_, err = db.Exec(`DROP TABLE messages`)
+	if err != nil {
+		return fmt.Errorf("failed to drop messages: %w", err)
+	}
+
+	_, err = db.Exec(`ALTER TABLE messages_new RENAME TO messages`)
+	if err != nil {
+		return fmt.Errorf("failed to rename messages_new: %w", err)
+	}
+
+	// Update notes
+	_, err = db.Exec(`
+		CREATE TABLE notes_new (
+			id TEXT PRIMARY KEY,
+			commission_id TEXT NOT NULL,
+			title TEXT NOT NULL,
+			content TEXT,
+			type TEXT CHECK(type IN ('learning', 'concern', 'finding', 'frq', 'bug', 'investigation_report')),
+			status TEXT NOT NULL CHECK(status IN ('open', 'closed')) DEFAULT 'open',
+			shipment_id TEXT,
+			investigation_id TEXT,
+			conclave_id TEXT,
+			tome_id TEXT,
+			pinned INTEGER DEFAULT 0,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			closed_at DATETIME,
+			promoted_from_id TEXT,
+			promoted_from_type TEXT,
+			FOREIGN KEY (commission_id) REFERENCES commissions(id),
+			FOREIGN KEY (shipment_id) REFERENCES shipments(id) ON DELETE SET NULL,
+			FOREIGN KEY (investigation_id) REFERENCES investigations(id) ON DELETE SET NULL,
+			FOREIGN KEY (conclave_id) REFERENCES conclaves(id) ON DELETE SET NULL,
+			FOREIGN KEY (tome_id) REFERENCES tomes(id) ON DELETE SET NULL
+		)
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to create notes_new: %w", err)
+	}
+
+	_, err = db.Exec(`
+		INSERT INTO notes_new (id, commission_id, title, content, type, status, shipment_id, investigation_id, conclave_id, tome_id, pinned, created_at, updated_at, closed_at, promoted_from_id, promoted_from_type)
+		SELECT id, REPLACE(mission_id, 'MISSION-', 'COMM-'), title, content, type, status, shipment_id, investigation_id, conclave_id, tome_id, pinned, created_at, updated_at, closed_at, promoted_from_id, promoted_from_type FROM notes
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to copy notes: %w", err)
+	}
+
+	_, err = db.Exec(`DROP TABLE notes`)
+	if err != nil {
+		return fmt.Errorf("failed to drop notes: %w", err)
+	}
+
+	_, err = db.Exec(`ALTER TABLE notes_new RENAME TO notes`)
+	if err != nil {
+		return fmt.Errorf("failed to rename notes_new: %w", err)
+	}
+
+	// Update conclaves
+	_, err = db.Exec(`
+		CREATE TABLE conclaves_new (
+			id TEXT PRIMARY KEY,
+			commission_id TEXT NOT NULL,
+			title TEXT NOT NULL,
+			description TEXT,
+			status TEXT NOT NULL CHECK(status IN ('active', 'paused', 'complete')) DEFAULT 'active',
+			assigned_grove_id TEXT,
+			pinned INTEGER DEFAULT 0,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			completed_at DATETIME,
+			FOREIGN KEY (commission_id) REFERENCES commissions(id),
+			FOREIGN KEY (assigned_grove_id) REFERENCES groves(id)
+		)
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to create conclaves_new: %w", err)
+	}
+
+	_, err = db.Exec(`
+		INSERT INTO conclaves_new (id, commission_id, title, description, status, assigned_grove_id, pinned, created_at, updated_at, completed_at)
+		SELECT id, REPLACE(mission_id, 'MISSION-', 'COMM-'), title, description, status, assigned_grove_id, pinned, created_at, updated_at, completed_at FROM conclaves
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to copy conclaves: %w", err)
+	}
+
+	_, err = db.Exec(`DROP TABLE conclaves`)
+	if err != nil {
+		return fmt.Errorf("failed to drop conclaves: %w", err)
+	}
+
+	_, err = db.Exec(`ALTER TABLE conclaves_new RENAME TO conclaves`)
+	if err != nil {
+		return fmt.Errorf("failed to rename conclaves_new: %w", err)
+	}
+
+	// Update tomes
+	_, err = db.Exec(`
+		CREATE TABLE tomes_new (
+			id TEXT PRIMARY KEY,
+			commission_id TEXT NOT NULL,
+			title TEXT NOT NULL,
+			description TEXT,
+			status TEXT NOT NULL CHECK(status IN ('active', 'paused', 'complete')) DEFAULT 'active',
+			assigned_grove_id TEXT,
+			pinned INTEGER DEFAULT 0,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			completed_at DATETIME,
+			FOREIGN KEY (commission_id) REFERENCES commissions(id),
+			FOREIGN KEY (assigned_grove_id) REFERENCES groves(id)
+		)
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to create tomes_new: %w", err)
+	}
+
+	_, err = db.Exec(`
+		INSERT INTO tomes_new (id, commission_id, title, description, status, assigned_grove_id, pinned, created_at, updated_at, completed_at)
+		SELECT id, REPLACE(mission_id, 'MISSION-', 'COMM-'), title, description, status, assigned_grove_id, pinned, created_at, updated_at, completed_at FROM tomes
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to copy tomes: %w", err)
+	}
+
+	_, err = db.Exec(`DROP TABLE tomes`)
+	if err != nil {
+		return fmt.Errorf("failed to drop tomes: %w", err)
+	}
+
+	_, err = db.Exec(`ALTER TABLE tomes_new RENAME TO tomes`)
+	if err != nil {
+		return fmt.Errorf("failed to rename tomes_new: %w", err)
+	}
+
+	// Update investigations
+	_, err = db.Exec(`
+		CREATE TABLE investigations_new (
+			id TEXT PRIMARY KEY,
+			commission_id TEXT NOT NULL,
+			title TEXT NOT NULL,
+			description TEXT,
+			status TEXT NOT NULL CHECK(status IN ('active', 'paused', 'complete')) DEFAULT 'active',
+			assigned_grove_id TEXT,
+			pinned INTEGER DEFAULT 0,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			completed_at DATETIME,
+			FOREIGN KEY (commission_id) REFERENCES commissions(id),
+			FOREIGN KEY (assigned_grove_id) REFERENCES groves(id)
+		)
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to create investigations_new: %w", err)
+	}
+
+	_, err = db.Exec(`
+		INSERT INTO investigations_new (id, commission_id, title, description, status, assigned_grove_id, pinned, created_at, updated_at, completed_at)
+		SELECT id, REPLACE(mission_id, 'MISSION-', 'COMM-'), title, description, status, assigned_grove_id, pinned, created_at, updated_at, completed_at FROM investigations
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to copy investigations: %w", err)
+	}
+
+	_, err = db.Exec(`DROP TABLE investigations`)
+	if err != nil {
+		return fmt.Errorf("failed to drop investigations: %w", err)
+	}
+
+	_, err = db.Exec(`ALTER TABLE investigations_new RENAME TO investigations`)
+	if err != nil {
+		return fmt.Errorf("failed to rename investigations_new: %w", err)
+	}
+
+	// Update questions
+	_, err = db.Exec(`
+		CREATE TABLE questions_new (
+			id TEXT PRIMARY KEY,
+			investigation_id TEXT,
+			commission_id TEXT NOT NULL,
+			title TEXT NOT NULL,
+			description TEXT,
+			status TEXT NOT NULL CHECK(status IN ('open', 'answered')) DEFAULT 'open',
+			answer TEXT,
+			pinned INTEGER DEFAULT 0,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			answered_at DATETIME,
+			conclave_id TEXT,
+			promoted_from_id TEXT,
+			promoted_from_type TEXT,
+			FOREIGN KEY (investigation_id) REFERENCES investigations(id) ON DELETE SET NULL,
+			FOREIGN KEY (commission_id) REFERENCES commissions(id),
+			FOREIGN KEY (conclave_id) REFERENCES conclaves(id) ON DELETE SET NULL
+		)
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to create questions_new: %w", err)
+	}
+
+	_, err = db.Exec(`
+		INSERT INTO questions_new (id, investigation_id, commission_id, title, description, status, answer, pinned, created_at, updated_at, answered_at, conclave_id, promoted_from_id, promoted_from_type)
+		SELECT id, investigation_id, REPLACE(mission_id, 'MISSION-', 'COMM-'), title, description, status, answer, pinned, created_at, updated_at, answered_at, conclave_id, promoted_from_id, promoted_from_type FROM questions
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to copy questions: %w", err)
+	}
+
+	_, err = db.Exec(`DROP TABLE questions`)
+	if err != nil {
+		return fmt.Errorf("failed to drop questions: %w", err)
+	}
+
+	_, err = db.Exec(`ALTER TABLE questions_new RENAME TO questions`)
+	if err != nil {
+		return fmt.Errorf("failed to rename questions_new: %w", err)
+	}
+
+	// Update plans
+	_, err = db.Exec(`
+		CREATE TABLE plans_new (
+			id TEXT PRIMARY KEY,
+			shipment_id TEXT,
+			commission_id TEXT NOT NULL,
+			title TEXT NOT NULL,
+			description TEXT,
+			status TEXT NOT NULL CHECK(status IN ('draft', 'approved')) DEFAULT 'draft',
+			content TEXT,
+			pinned INTEGER DEFAULT 0,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			approved_at DATETIME,
+			conclave_id TEXT,
+			promoted_from_id TEXT,
+			promoted_from_type TEXT,
+			FOREIGN KEY (shipment_id) REFERENCES shipments(id) ON DELETE SET NULL,
+			FOREIGN KEY (commission_id) REFERENCES commissions(id),
+			FOREIGN KEY (conclave_id) REFERENCES conclaves(id) ON DELETE SET NULL
+		)
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to create plans_new: %w", err)
+	}
+
+	_, err = db.Exec(`
+		INSERT INTO plans_new (id, shipment_id, commission_id, title, description, status, content, pinned, created_at, updated_at, approved_at, conclave_id, promoted_from_id, promoted_from_type)
+		SELECT id, shipment_id, REPLACE(mission_id, 'MISSION-', 'COMM-'), title, description, status, content, pinned, created_at, updated_at, approved_at, conclave_id, promoted_from_id, promoted_from_type FROM plans
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to copy plans: %w", err)
+	}
+
+	_, err = db.Exec(`DROP TABLE plans`)
+	if err != nil {
+		return fmt.Errorf("failed to drop plans: %w", err)
+	}
+
+	_, err = db.Exec(`ALTER TABLE plans_new RENAME TO plans`)
+	if err != nil {
+		return fmt.Errorf("failed to rename plans_new: %w", err)
+	}
+
+	// Update operations
+	_, err = db.Exec(`
+		CREATE TABLE operations_new (
+			id TEXT PRIMARY KEY,
+			commission_id TEXT NOT NULL,
+			title TEXT NOT NULL,
+			description TEXT,
+			status TEXT NOT NULL CHECK(status IN ('active', 'complete')) DEFAULT 'active',
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			completed_at DATETIME,
+			FOREIGN KEY (commission_id) REFERENCES commissions(id)
+		)
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to create operations_new: %w", err)
+	}
+
+	_, err = db.Exec(`
+		INSERT INTO operations_new (id, commission_id, title, description, status, created_at, updated_at, completed_at)
+		SELECT id, REPLACE(mission_id, 'MISSION-', 'COMM-'), title, description, status, created_at, updated_at, completed_at FROM operations
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to copy operations: %w", err)
+	}
+
+	_, err = db.Exec(`DROP TABLE operations`)
+	if err != nil {
+		return fmt.Errorf("failed to drop operations: %w", err)
+	}
+
+	_, err = db.Exec(`ALTER TABLE operations_new RENAME TO operations`)
+	if err != nil {
+		return fmt.Errorf("failed to rename operations_new: %w", err)
+	}
+
+	// Drop old missions table
+	_, err = db.Exec(`DROP TABLE missions`)
+	if err != nil {
+		return fmt.Errorf("failed to drop missions: %w", err)
+	}
+
+	// Recreate indexes with new column names
+	_, err = db.Exec(`
+		CREATE INDEX idx_groves_commission ON groves(commission_id);
+		CREATE INDEX idx_shipments_commission ON shipments(commission_id);
+		CREATE INDEX idx_tasks_commission ON tasks(commission_id);
+		CREATE INDEX idx_tasks_shipment ON tasks(shipment_id);
+		CREATE INDEX idx_tasks_status ON tasks(status);
+		CREATE INDEX idx_tasks_grove ON tasks(assigned_grove_id);
+		CREATE INDEX idx_tasks_conclave ON tasks(conclave_id);
+		CREATE INDEX idx_notes_commission ON notes(commission_id);
+		CREATE INDEX idx_notes_type ON notes(type);
+		CREATE INDEX idx_notes_status ON notes(status);
+		CREATE INDEX idx_conclaves_commission ON conclaves(commission_id);
+		CREATE INDEX idx_tomes_commission ON tomes(commission_id);
+		CREATE INDEX idx_investigations_commission ON investigations(commission_id);
+		CREATE INDEX idx_questions_commission ON questions(commission_id);
+		CREATE INDEX idx_plans_commission ON plans(commission_id);
+		CREATE INDEX idx_operations_commission ON operations(commission_id);
+		CREATE INDEX idx_messages_commission ON messages(commission_id);
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to recreate indexes: %w", err)
+	}
+
+	// Insert default COMM-000 commission if not already present
+	_, err = db.Exec(`
+		INSERT OR IGNORE INTO commissions (id, title, description, status, pinned)
+		VALUES ('COMM-000', 'Keep the Factory Running', 'Default commission for maintenance and operational tasks', 'active', 1)
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to insert default commission: %w", err)
 	}
 
 	return nil

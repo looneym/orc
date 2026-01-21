@@ -32,18 +32,18 @@ var taskCreateCmd = &cobra.Command{
 
 		// Get mission from context or require explicit flag
 		if missionID == "" {
-			missionID = orccontext.GetContextMissionID()
+			missionID = orccontext.GetContextCommissionID()
 			if missionID == "" {
-				return fmt.Errorf("no mission context detected\nHint: Use --mission flag or run from a grove/mission directory")
+				return fmt.Errorf("no mission context detected\nHint: Use --commission flag or run from a grove/mission directory")
 			}
 		}
 
 		resp, err := wire.TaskService().CreateTask(ctx, primary.CreateTaskRequest{
-			ShipmentID:  shipmentID,
-			MissionID:   missionID,
-			Title:       title,
-			Description: description,
-			Type:        taskType,
+			ShipmentID:   shipmentID,
+			CommissionID: missionID,
+			Title:        title,
+			Description:  description,
+			Type:         taskType,
 		})
 		if err != nil {
 			return fmt.Errorf("failed to create task: %w", err)
@@ -54,7 +54,7 @@ var taskCreateCmd = &cobra.Command{
 		if task.ShipmentID != "" {
 			fmt.Printf("  Under shipment: %s\n", task.ShipmentID)
 		}
-		fmt.Printf("  Mission: %s\n", task.MissionID)
+		fmt.Printf("  Mission: %s\n", task.CommissionID)
 		return nil
 	},
 }
@@ -155,7 +155,7 @@ var taskShowCmd = &cobra.Command{
 		if task.Type != "" {
 			fmt.Printf("Type: %s\n", task.Type)
 		}
-		fmt.Printf("Mission: %s\n", task.MissionID)
+		fmt.Printf("Mission: %s\n", task.CommissionID)
 		if task.ShipmentID != "" {
 			fmt.Printf("Shipment: %s\n", task.ShipmentID)
 		}
@@ -453,7 +453,7 @@ var taskUntagCmd = &cobra.Command{
 func init() {
 	// task create flags
 	taskCreateCmd.Flags().String("shipment", "", "Shipment ID")
-	taskCreateCmd.Flags().StringP("mission", "m", "", "Mission ID (defaults to context)")
+	taskCreateCmd.Flags().StringP("commission", "c", "", "Commission ID (defaults to context)")
 	taskCreateCmd.Flags().StringP("description", "d", "", "Task description")
 	taskCreateCmd.Flags().String("type", "", "Task type (research, implementation, fix, documentation, maintenance)")
 

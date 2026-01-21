@@ -51,36 +51,36 @@ Examples:
 
 			var totalCleaned int
 
-			// 1. Clean up test missions
-			fmt.Println("📦 Cleaning up test missions...")
+			// 1. Clean up test commissions
+			fmt.Println("📦 Cleaning up test commissions...")
 			ctx := context.Background()
-			missions, err := wire.MissionService().ListMissions(ctx, primary.MissionFilters{})
+			commissions, err := wire.CommissionService().ListCommissions(ctx, primary.CommissionFilters{})
 			if err != nil {
-				return fmt.Errorf("failed to list missions: %w", err)
+				return fmt.Errorf("failed to list commissions: %w", err)
 			}
 
-			var missionsCleaned int
-			for _, mission := range missions {
-				if strings.HasPrefix(mission.ID, "MISSION-TEST-") {
+			var commissionsCleaned int
+			for _, commission := range commissions {
+				if strings.HasPrefix(commission.ID, "COMM-TEST-") {
 					if dryRun {
-						fmt.Printf("  [DRY RUN] Would delete: %s (%s)\n", mission.ID, mission.Title)
+						fmt.Printf("  [DRY RUN] Would delete: %s (%s)\n", commission.ID, commission.Title)
 					} else {
-						if err := wire.MissionService().DeleteMission(ctx, primary.DeleteMissionRequest{MissionID: mission.ID, Force: true}); err != nil {
-							fmt.Printf("  ⚠️  Failed to delete %s: %v\n", mission.ID, err)
+						if err := wire.CommissionService().DeleteCommission(ctx, primary.DeleteCommissionRequest{CommissionID: commission.ID, Force: true}); err != nil {
+							fmt.Printf("  ⚠️  Failed to delete %s: %v\n", commission.ID, err)
 						} else {
-							fmt.Printf("  ✓ Deleted: %s\n", mission.ID)
-							missionsCleaned++
+							fmt.Printf("  ✓ Deleted: %s\n", commission.ID)
+							commissionsCleaned++
 						}
 					}
 				}
 			}
 
-			if missionsCleaned == 0 && !dryRun {
-				fmt.Println("  ℹ️  No test missions found")
+			if commissionsCleaned == 0 && !dryRun {
+				fmt.Println("  ℹ️  No test commissions found")
 			} else if dryRun {
-				fmt.Printf("  Found %d test missions\n", missionsCleaned)
+				fmt.Printf("  Found %d test commissions\n", commissionsCleaned)
 			}
-			totalCleaned += missionsCleaned
+			totalCleaned += commissionsCleaned
 			fmt.Println()
 
 			// 2. Clean up test groves
@@ -92,8 +92,8 @@ Examples:
 
 			var grovesCleaned int
 			for _, grove := range groves {
-				// Match groves associated with test missions
-				if strings.HasPrefix(grove.MissionID, "MISSION-TEST-") {
+				// Match groves associated with test commissions
+				if strings.HasPrefix(grove.CommissionID, "COMM-TEST-") {
 					if dryRun {
 						fmt.Printf("  [DRY RUN] Would delete: %s (%s) at %s\n", grove.ID, grove.Name, grove.Path)
 					} else {

@@ -37,7 +37,7 @@ type NoteService interface {
 
 // CreateNoteRequest contains parameters for creating a note.
 type CreateNoteRequest struct {
-	MissionID     string
+	CommissionID  string
 	Title         string
 	Content       string
 	Type          string // learning, concern, finding, frq, bug, investigation_report
@@ -61,7 +61,7 @@ type UpdateNoteRequest struct {
 // Note represents a note entity at the port boundary.
 type Note struct {
 	ID               string
-	MissionID        string
+	CommissionID     string
 	Title            string
 	Content          string
 	Type             string
@@ -80,8 +80,8 @@ type Note struct {
 
 // NoteFilters contains filter options for listing notes.
 type NoteFilters struct {
-	Type      string
-	MissionID string
+	Type         string
+	CommissionID string
 }
 
 // Note type constants

@@ -25,12 +25,12 @@ func NewQuestionService(
 // CreateQuestion creates a new question.
 func (s *QuestionServiceImpl) CreateQuestion(ctx context.Context, req primary.CreateQuestionRequest) (*primary.CreateQuestionResponse, error) {
 	// Validate mission exists
-	exists, err := s.questionRepo.MissionExists(ctx, req.MissionID)
+	exists, err := s.questionRepo.CommissionExists(ctx, req.CommissionID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to validate mission: %w", err)
+		return nil, fmt.Errorf("failed to validate commission: %w", err)
 	}
 	if !exists {
-		return nil, fmt.Errorf("mission %s not found", req.MissionID)
+		return nil, fmt.Errorf("commission %s not found", req.CommissionID)
 	}
 
 	// Validate investigation exists if provided
@@ -53,7 +53,7 @@ func (s *QuestionServiceImpl) CreateQuestion(ctx context.Context, req primary.Cr
 	// Create record
 	record := &secondary.QuestionRecord{
 		ID:              nextID,
-		MissionID:       req.MissionID,
+		CommissionID:    req.CommissionID,
 		InvestigationID: req.InvestigationID,
 		Title:           req.Title,
 		Description:     req.Description,
@@ -89,7 +89,7 @@ func (s *QuestionServiceImpl) GetQuestion(ctx context.Context, questionID string
 func (s *QuestionServiceImpl) ListQuestions(ctx context.Context, filters primary.QuestionFilters) ([]*primary.Question, error) {
 	records, err := s.questionRepo.List(ctx, secondary.QuestionFilters{
 		InvestigationID: filters.InvestigationID,
-		MissionID:       filters.MissionID,
+		CommissionID:    filters.CommissionID,
 		Status:          filters.Status,
 	})
 	if err != nil {
@@ -139,7 +139,7 @@ func (s *QuestionServiceImpl) recordToQuestion(r *secondary.QuestionRecord) *pri
 	return &primary.Question{
 		ID:               r.ID,
 		InvestigationID:  r.InvestigationID,
-		MissionID:        r.MissionID,
+		CommissionID:     r.CommissionID,
 		Title:            r.Title,
 		Description:      r.Description,
 		Status:           r.Status,
