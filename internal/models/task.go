@@ -11,23 +11,23 @@ import (
 // This is the domain type used within the models package.
 // For persistence, use the repository interfaces in ports/secondary.
 type Task struct {
-	ID               string
-	ShipmentID       sql.NullString
-	ComcommissionID  string
-	Title            string
-	Description      sql.NullString
-	Type             sql.NullString
-	Status           string
-	Priority         sql.NullString
-	AssignedGroveID  sql.NullString
-	Pinned           bool
-	CreatedAt        time.Time
-	UpdatedAt        time.Time
-	ClaimedAt        sql.NullTime
-	CompletedAt      sql.NullTime
-	ConclaveID       sql.NullString
-	PromotedFromID   sql.NullString
-	PromotedFromType sql.NullString
+	ID                  string
+	ShipmentID          sql.NullString
+	ComcommissionID     string
+	Title               string
+	Description         sql.NullString
+	Type                sql.NullString
+	Status              string
+	Priority            sql.NullString
+	AssignedWorkbenchID sql.NullString
+	Pinned              bool
+	CreatedAt           time.Time
+	UpdatedAt           time.Time
+	ClaimedAt           sql.NullTime
+	CompletedAt         sql.NullTime
+	ConclaveID          sql.NullString
+	PromotedFromID      sql.NullString
+	PromotedFromType    sql.NullString
 }
 
 // Task status constants

@@ -33,7 +33,7 @@ var shipmentCreateCmd = &cobra.Command{
 		if missionID == "" {
 			missionID = orccontext.GetContextCommissionID()
 			if missionID == "" {
-				return fmt.Errorf("no mission context detected\nHint: Use --commission flag or run from a grove/mission directory")
+				return fmt.Errorf("no mission context detected\nHint: Use --commission flag or run from a workbench directory")
 			}
 		}
 
@@ -117,7 +117,7 @@ var shipmentShowCmd = &cobra.Command{
 		fmt.Printf("Status: %s\n", shipment.Status)
 		fmt.Printf("Mission: %s\n", shipment.CommissionID)
 		if shipment.AssignedWorkbenchID != "" {
-			fmt.Printf("Assigned Grove: %s\n", shipment.AssignedWorkbenchID)
+			fmt.Printf("Assigned Workbench: %s\n", shipment.AssignedWorkbenchID)
 		}
 		if shipment.Pinned {
 			fmt.Printf("Pinned: yes\n")
@@ -264,8 +264,8 @@ var shipmentUnpinCmd = &cobra.Command{
 }
 
 var shipmentAssignCmd = &cobra.Command{
-	Use:   "assign [shipment-id] [grove-id]",
-	Short: "Assign shipment to a grove",
+	Use:   "assign [shipment-id] [workbench-id]",
+	Short: "Assign shipment to a workbench",
 	Args:  cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
@@ -277,7 +277,7 @@ var shipmentAssignCmd = &cobra.Command{
 			return fmt.Errorf("failed to assign shipment: %w", err)
 		}
 
-		fmt.Printf("Shipment %s assigned to grove %s\n", shipmentID, workbenchID)
+		fmt.Printf("Shipment %s assigned to workbench %s\n", shipmentID, workbenchID)
 		return nil
 	},
 }

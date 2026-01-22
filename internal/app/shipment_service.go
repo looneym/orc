@@ -240,6 +240,7 @@ func recordToTask(r *secondary.TaskRecord) *primary.Task {
 	return &primary.Task{
 		ID:                  r.ID,
 		ShipmentID:          r.ShipmentID,
+		InvestigationID:     r.InvestigationID,
 		CommissionID:        r.CommissionID,
 		Title:               r.Title,
 		Description:         r.Description,

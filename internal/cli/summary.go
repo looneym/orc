@@ -48,10 +48,10 @@ func colorizeTag(tagName string) string {
 	return c.Sprintf("[%s]", tagName)
 }
 
-// colorizeGrove wraps grove info with color (cyan for visibility)
-func colorizeGrove(groveName, workbenchID string) string {
+// colorizeWorkbench wraps workbench info with color (cyan for visibility)
+func colorizeWorkbench(workbenchName, workbenchID string) string {
 	c := color.New(color.FgCyan)
-	return c.Sprintf("[Grove: %s (%s)]", groveName, workbenchID)
+	return c.Sprintf("[Workbench: %s (%s)]", workbenchName, workbenchID)
 }
 
 // getIDColor returns a deterministic color for an ID type (TASK, SHIP, MISSION)
@@ -126,8 +126,6 @@ func getEntityType(id string) string {
 	switch parts[0] {
 	case "TASK":
 		return "task"
-	case "Q":
-		return "question"
 	case "PLAN":
 		return "plan"
 	case "NOTE":
@@ -263,7 +261,7 @@ func displayShipmentChildren(shipmentID, prefix string, filters *filterConfig) i
 	return len(visible)
 }
 
-// displayConclaveChildren shows tasks/questions/plans/notes under a conclave with tag filtering
+// displayConclaveChildren shows tasks/plans/notes under a conclave with tag filtering
 // Returns count of visible items
 func displayConclaveChildren(conclaveID, prefix string, filters *filterConfig) int {
 	ctx := context.Background()
@@ -276,17 +274,6 @@ func displayConclaveChildren(conclaveID, prefix string, filters *filterConfig) i
 			Title:  t.Title,
 			Status: t.Status,
 			Pinned: t.Pinned,
-		})
-	}
-	// Get questions via ConclaveService
-	serviceQuestions, _ := wire.ConclaveService().GetConclaveQuestions(ctx, conclaveID)
-	var questions []*models.Question
-	for _, q := range serviceQuestions {
-		questions = append(questions, &models.Question{
-			ID:     q.ID,
-			Title:  q.Title,
-			Status: q.Status,
-			Pinned: q.Pinned,
 		})
 	}
 	// Get plans via ConclaveService
@@ -333,17 +320,6 @@ func displayConclaveChildren(conclaveID, prefix string, filters *filterConfig) i
 		show, tagName := shouldShowLeaf(t.ID, filters)
 		if show {
 			visible = append(visible, childItem{t.ID, t.Title, t.Status, t.Pinned, tagName})
-		} else {
-			hiddenCount++
-		}
-	}
-	for _, q := range questions {
-		if q.Status == "answered" || filters.statusMap[q.Status] {
-			continue
-		}
-		show, tagName := shouldShowLeaf(q.ID, filters)
-		if show {
-			visible = append(visible, childItem{q.ID, q.Title, q.Status, q.Pinned, tagName})
 		} else {
 			hiddenCount++
 		}
@@ -398,20 +374,9 @@ func displayConclaveChildren(conclaveID, prefix string, filters *filterConfig) i
 	return len(visible)
 }
 
-// displayInvestigationChildren shows questions and notes under an investigation with tag filtering
+// displayInvestigationChildren shows notes under an investigation with tag filtering
 // Returns count of visible items
 func displayInvestigationChildren(investigationID, prefix string, filters *filterConfig) int {
-	invQuestions, _ := wire.InvestigationService().GetInvestigationQuestions(context.Background(), investigationID)
-	// Convert to models.Question for the rest of the function
-	var questions []*models.Question
-	for _, q := range invQuestions {
-		questions = append(questions, &models.Question{
-			ID:     q.ID,
-			Title:  q.Title,
-			Status: q.Status,
-			Pinned: q.Pinned,
-		})
-	}
 	serviceNotes, _ := wire.NoteService().GetNotesByContainer(context.Background(), "investigation", investigationID)
 	// Convert to models.Note for the rest of the function (filter out closed notes)
 	var notes []*models.Note
@@ -437,17 +402,6 @@ func displayInvestigationChildren(investigationID, prefix string, filters *filte
 	var visible []childItem
 	hiddenCount := 0
 
-	for _, q := range questions {
-		if q.Status == "answered" || filters.statusMap[q.Status] {
-			continue
-		}
-		show, tagName := shouldShowLeaf(q.ID, filters)
-		if show {
-			visible = append(visible, childItem{q.ID, q.Title, q.Status, q.Pinned, tagName})
-		} else {
-			hiddenCount++
-		}
-	}
 	for _, n := range notes {
 		show, tagName := shouldShowLeaf(n.ID, filters)
 		if show {
@@ -817,7 +771,7 @@ Examples:
 						if container.workbenchID != "" {
 							workbench, err := wire.WorkbenchService().GetWorkbench(context.Background(), container.workbenchID)
 							if err == nil {
-								workbenchInfo = " " + colorizeGrove(workbench.Name, workbench.ID)
+								workbenchInfo = " " + colorizeWorkbench(workbench.Name, workbench.ID)
 							}
 						}
 
@@ -935,7 +889,6 @@ func containerHasMatchingLeaves(c containerInfo, filters *filterConfig) bool {
 		}
 	case "conclave":
 		tasks, _ := wire.ConclaveService().GetConclaveTasks(context.Background(), c.id)
-		questions, _ := wire.ConclaveService().GetConclaveQuestions(context.Background(), c.id)
 		plans, _ := wire.ConclaveService().GetConclavePlans(context.Background(), c.id)
 		serviceNotes, _ := wire.NoteService().GetNotesByContainer(context.Background(), "conclave", c.id)
 		var notes []*models.Note
@@ -950,15 +903,6 @@ func containerHasMatchingLeaves(c containerInfo, filters *filterConfig) bool {
 				continue
 			}
 			show, _ := shouldShowLeaf(t.ID, filters)
-			if show {
-				return true
-			}
-		}
-		for _, q := range questions {
-			if q.Status == "answered" || filters.statusMap[q.Status] {
-				continue
-			}
-			show, _ := shouldShowLeaf(q.ID, filters)
 			if show {
 				return true
 			}
@@ -979,11 +923,6 @@ func containerHasMatchingLeaves(c containerInfo, filters *filterConfig) bool {
 			}
 		}
 	case "investigation":
-		invQuestions, _ := wire.InvestigationService().GetInvestigationQuestions(context.Background(), c.id)
-		var questions []*models.Question
-		for _, q := range invQuestions {
-			questions = append(questions, &models.Question{ID: q.ID, Title: q.Title, Status: q.Status, Pinned: q.Pinned})
-		}
 		serviceNotes, _ := wire.NoteService().GetNotesByContainer(context.Background(), "investigation", c.id)
 		var notes []*models.Note
 		for _, n := range serviceNotes {
@@ -991,15 +930,6 @@ func containerHasMatchingLeaves(c containerInfo, filters *filterConfig) bool {
 				continue
 			}
 			notes = append(notes, &models.Note{ID: n.ID, Title: n.Title, Pinned: n.Pinned})
-		}
-		for _, q := range questions {
-			if q.Status == "answered" || filters.statusMap[q.Status] {
-				continue
-			}
-			show, _ := shouldShowLeaf(q.ID, filters)
-			if show {
-				return true
-			}
 		}
 		for _, n := range notes {
 			show, _ := shouldShowLeaf(n.ID, filters)

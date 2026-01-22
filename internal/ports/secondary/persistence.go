@@ -172,6 +172,9 @@ type TaskRepository interface {
 	// GetByShipment retrieves tasks for a shipment.
 	GetByShipment(ctx context.Context, shipmentID string) ([]*TaskRecord, error)
 
+	// GetByInvestigation retrieves tasks for an investigation.
+	GetByInvestigation(ctx context.Context, investigationID string) ([]*TaskRecord, error)
+
 	// UpdateStatus updates the status with optional timestamps.
 	UpdateStatus(ctx context.Context, id, status string, setClaimed, setCompleted bool) error
 
@@ -208,6 +211,7 @@ type TaskRecord struct {
 	ID                  string
 	ShipmentID          string // Empty string means null
 	CommissionID        string
+	InvestigationID     string // Empty string means null
 	Title               string
 	Description         string // Empty string means null
 	Type                string // Empty string means null
@@ -223,9 +227,10 @@ type TaskRecord struct {
 
 // TaskFilters contains filter options for querying tasks.
 type TaskFilters struct {
-	ShipmentID   string
-	Status       string
-	CommissionID string
+	ShipmentID      string
+	InvestigationID string
+	Status          string
+	CommissionID    string
 }
 
 // TagRecord represents a tag as stored in persistence.
@@ -449,9 +454,6 @@ type ConclaveRepository interface {
 	// GetTasksByConclave retrieves tasks belonging to a conclave.
 	GetTasksByConclave(ctx context.Context, conclaveID string) ([]*ConclaveTaskRecord, error)
 
-	// GetQuestionsByConclave retrieves questions belonging to a conclave.
-	GetQuestionsByConclave(ctx context.Context, conclaveID string) ([]*ConclaveQuestionRecord, error)
-
 	// GetPlansByConclave retrieves plans belonging to a conclave.
 	GetPlansByConclave(ctx context.Context, conclaveID string) ([]*ConclavePlanRecord, error)
 }
@@ -496,23 +498,6 @@ type ConclaveTaskRecord struct {
 	ConclaveID          string
 	PromotedFromID      string
 	PromotedFromType    string
-}
-
-// ConclaveQuestionRecord represents a question as returned from conclave cross-entity query.
-type ConclaveQuestionRecord struct {
-	ID              string
-	CommissionID    string
-	ShipmentID      string
-	InvestigationID string
-	ConclaveID      string
-	Title           string
-	Content         string
-	Answer          string
-	Status          string
-	Pinned          bool
-	CreatedAt       string
-	UpdatedAt       string
-	AnsweredAt      string
 }
 
 // ConclavePlanRecord represents a plan as returned from conclave cross-entity query.
@@ -608,17 +593,18 @@ type InvestigationRepository interface {
 	// AssignWorkbench assigns an investigation to a grove.
 	AssignWorkbench(ctx context.Context, investigationID, workbenchID string) error
 
+	// GetByConclave retrieves investigations for a conclave.
+	GetByConclave(ctx context.Context, conclaveID string) ([]*InvestigationRecord, error)
+
 	// CommissionExists checks if a commission exists (for validation).
 	CommissionExists(ctx context.Context, commissionID string) (bool, error)
-
-	// GetQuestionsByInvestigation retrieves questions for an investigation.
-	GetQuestionsByInvestigation(ctx context.Context, investigationID string) ([]*InvestigationQuestionRecord, error)
 }
 
 // InvestigationRecord represents an investigation as stored in persistence.
 type InvestigationRecord struct {
 	ID                  string
 	CommissionID        string
+	ConclaveID          string // Empty string means null
 	Title               string
 	Description         string // Empty string means null
 	Status              string
@@ -632,86 +618,8 @@ type InvestigationRecord struct {
 // InvestigationFilters contains filter options for querying investigations.
 type InvestigationFilters struct {
 	CommissionID string
+	ConclaveID   string
 	Status       string
-}
-
-// InvestigationQuestionRecord represents a question as returned from investigation cross-entity query.
-type InvestigationQuestionRecord struct {
-	ID               string
-	InvestigationID  string
-	CommissionID     string
-	Title            string
-	Description      string
-	Status           string
-	Answer           string
-	Pinned           bool
-	CreatedAt        string
-	UpdatedAt        string
-	AnsweredAt       string
-	ConclaveID       string
-	PromotedFromID   string
-	PromotedFromType string
-}
-
-// QuestionRepository defines the secondary port for question persistence.
-type QuestionRepository interface {
-	// Create persists a new question.
-	Create(ctx context.Context, question *QuestionRecord) error
-
-	// GetByID retrieves a question by its ID.
-	GetByID(ctx context.Context, id string) (*QuestionRecord, error)
-
-	// List retrieves questions matching the given filters.
-	List(ctx context.Context, filters QuestionFilters) ([]*QuestionRecord, error)
-
-	// Update updates an existing question.
-	Update(ctx context.Context, question *QuestionRecord) error
-
-	// Delete removes a question from persistence.
-	Delete(ctx context.Context, id string) error
-
-	// Pin pins a question.
-	Pin(ctx context.Context, id string) error
-
-	// Unpin unpins a question.
-	Unpin(ctx context.Context, id string) error
-
-	// GetNextID returns the next available question ID.
-	GetNextID(ctx context.Context) (string, error)
-
-	// Answer sets the answer for a question and marks it as answered.
-	Answer(ctx context.Context, id, answer string) error
-
-	// CommissionExists checks if a commission exists (for validation).
-	CommissionExists(ctx context.Context, commissionID string) (bool, error)
-
-	// InvestigationExists checks if an investigation exists (for validation).
-	InvestigationExists(ctx context.Context, investigationID string) (bool, error)
-}
-
-// QuestionRecord represents a question as stored in persistence.
-type QuestionRecord struct {
-	ID               string
-	InvestigationID  string // Empty string means null
-	CommissionID     string
-	Title            string
-	Description      string // Empty string means null
-	Status           string
-	Answer           string // Empty string means null
-	Pinned           bool
-	CreatedAt        string
-	UpdatedAt        string
-	AnsweredAt       string // Empty string means null
-	ConclaveID       string // Empty string means null
-	PromotedFromID   string // Empty string means null
-	PromotedFromType string // Empty string means null
-}
-
-// QuestionFilters contains filter options for querying questions.
-type QuestionFilters struct {
-	InvestigationID string
-	CommissionID    string
-	Status          string
 }
 
 // PlanRepository defines the secondary port for plan persistence.

@@ -235,12 +235,12 @@ func checkDirectories(quiet bool) error {
 
 	if !quiet {
 		if worktreesExists {
-			// Count groves
+			// Count workbenches
 			entries, _ := os.ReadDir(worktreesPath)
-			groveCount := len(entries)
-			fmt.Printf("   ✓ ~/src/worktrees exists (%d groves)\n", groveCount)
+			workbenchCount := len(entries)
+			fmt.Printf("   ✓ ~/src/worktrees exists (%d workbenches)\n", workbenchCount)
 		} else {
-			fmt.Println("   ⚠️  ~/src/worktrees does not exist (will be created on first grove)")
+			fmt.Println("   ⚠️  ~/src/worktrees does not exist (will be created on first workbench)")
 		}
 
 		if missionsExists {

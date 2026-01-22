@@ -38,7 +38,7 @@ CREATE TABLE IF NOT EXISTS tags (
 CREATE TABLE IF NOT EXISTS entity_tags (
 	id TEXT PRIMARY KEY,
 	entity_id TEXT NOT NULL,
-	entity_type TEXT NOT NULL CHECK(entity_type IN ('task', 'question', 'plan', 'note', 'shipment', 'investigation', 'conclave', 'tome')),
+	entity_type TEXT NOT NULL CHECK(entity_type IN ('task', 'plan', 'note', 'shipment', 'investigation', 'conclave', 'tome')),
 	tag_id TEXT NOT NULL,
 	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE,
@@ -139,7 +139,7 @@ CREATE TABLE IF NOT EXISTS shipments (
 CREATE TABLE IF NOT EXISTS investigations (
 	id TEXT PRIMARY KEY,
 	commission_id TEXT NOT NULL,
-	shipment_id TEXT,
+	conclave_id TEXT,
 	title TEXT NOT NULL,
 	description TEXT,
 	status TEXT NOT NULL CHECK(status IN ('active', 'in_progress', 'resolved', 'complete')) DEFAULT 'active',
@@ -149,7 +149,7 @@ CREATE TABLE IF NOT EXISTS investigations (
 	updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 	completed_at DATETIME,
 	FOREIGN KEY (commission_id) REFERENCES commissions(id),
-	FOREIGN KEY (shipment_id) REFERENCES shipments(id),
+	FOREIGN KEY (conclave_id) REFERENCES conclaves(id) ON DELETE SET NULL,
 	FOREIGN KEY (assigned_workbench_id) REFERENCES workbenches(id)
 );
 
@@ -174,6 +174,7 @@ CREATE TABLE IF NOT EXISTS tasks (
 	id TEXT PRIMARY KEY,
 	shipment_id TEXT,
 	commission_id TEXT NOT NULL,
+	investigation_id TEXT,
 	title TEXT NOT NULL,
 	description TEXT,
 	type TEXT CHECK(type IN ('research', 'implementation', 'fix', 'documentation', 'maintenance')),
@@ -188,6 +189,7 @@ CREATE TABLE IF NOT EXISTS tasks (
 	completed_at DATETIME,
 	FOREIGN KEY (shipment_id) REFERENCES shipments(id) ON DELETE CASCADE,
 	FOREIGN KEY (commission_id) REFERENCES commissions(id),
+	FOREIGN KEY (investigation_id) REFERENCES investigations(id) ON DELETE SET NULL,
 	FOREIGN KEY (assigned_workbench_id) REFERENCES workbenches(id)
 );
 
@@ -210,7 +212,7 @@ CREATE TABLE IF NOT EXISTS handoffs (
 	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 	handoff_note TEXT NOT NULL,
 	active_commission_id TEXT,
-	active_grove_id TEXT,
+	active_workbench_id TEXT,
 	todos_snapshot TEXT,
 	FOREIGN KEY (active_commission_id) REFERENCES commissions(id)
 );
@@ -300,29 +302,6 @@ CREATE TABLE IF NOT EXISTS notes (
 	FOREIGN KEY (tome_id) REFERENCES tomes(id) ON DELETE SET NULL
 );
 
--- Questions (Open questions)
-CREATE TABLE IF NOT EXISTS questions (
-	id TEXT PRIMARY KEY,
-	commission_id TEXT NOT NULL,
-	shipment_id TEXT,
-	investigation_id TEXT,
-	conclave_id TEXT,
-	title TEXT NOT NULL,
-	description TEXT,
-	answer TEXT,
-	status TEXT NOT NULL CHECK(status IN ('open', 'answered', 'closed')) DEFAULT 'open',
-	pinned INTEGER DEFAULT 0,
-	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-	updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-	answered_at DATETIME,
-	promoted_from_id TEXT,
-	promoted_from_type TEXT,
-	FOREIGN KEY (commission_id) REFERENCES commissions(id),
-	FOREIGN KEY (shipment_id) REFERENCES shipments(id) ON DELETE SET NULL,
-	FOREIGN KEY (investigation_id) REFERENCES investigations(id) ON DELETE SET NULL,
-	FOREIGN KEY (conclave_id) REFERENCES conclaves(id) ON DELETE SET NULL
-);
-
 -- Create indexes for common queries
 CREATE INDEX IF NOT EXISTS idx_tags_name ON tags(name);
 CREATE INDEX IF NOT EXISTS idx_entity_tags_entity ON entity_tags(entity_id, entity_type);
@@ -347,11 +326,13 @@ CREATE INDEX IF NOT EXISTS idx_shipments_status ON shipments(status);
 CREATE INDEX IF NOT EXISTS idx_shipments_workbench ON shipments(assigned_workbench_id);
 CREATE INDEX IF NOT EXISTS idx_investigations_commission ON investigations(commission_id);
 CREATE INDEX IF NOT EXISTS idx_investigations_status ON investigations(status);
+CREATE INDEX IF NOT EXISTS idx_investigations_conclave ON investigations(conclave_id);
 CREATE INDEX IF NOT EXISTS idx_tomes_commission ON tomes(commission_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_shipment ON tasks(shipment_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_commission ON tasks(commission_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
 CREATE INDEX IF NOT EXISTS idx_tasks_workbench ON tasks(assigned_workbench_id);
+CREATE INDEX IF NOT EXISTS idx_tasks_investigation ON tasks(investigation_id);
 CREATE INDEX IF NOT EXISTS idx_operations_commission ON operations(commission_id);
 CREATE INDEX IF NOT EXISTS idx_handoffs_created ON handoffs(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_prs_shipment ON prs(shipment_id);
@@ -364,8 +345,6 @@ CREATE INDEX IF NOT EXISTS idx_conclaves_commission ON conclaves(commission_id);
 CREATE INDEX IF NOT EXISTS idx_conclaves_status ON conclaves(status);
 CREATE INDEX IF NOT EXISTS idx_notes_commission ON notes(commission_id);
 CREATE INDEX IF NOT EXISTS idx_notes_shipment ON notes(shipment_id);
-CREATE INDEX IF NOT EXISTS idx_questions_commission ON questions(commission_id);
-CREATE INDEX IF NOT EXISTS idx_questions_status ON questions(status);
 `
 
 // InitSchema creates the database schema

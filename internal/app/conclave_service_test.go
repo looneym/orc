@@ -133,10 +133,6 @@ func (m *mockConclaveRepository) GetTasksByConclave(ctx context.Context, conclav
 	return []*secondary.ConclaveTaskRecord{}, nil
 }
 
-func (m *mockConclaveRepository) GetQuestionsByConclave(ctx context.Context, conclaveID string) ([]*secondary.ConclaveQuestionRecord, error) {
-	return []*secondary.ConclaveQuestionRecord{}, nil
-}
-
 func (m *mockConclaveRepository) GetPlansByConclave(ctx context.Context, conclaveID string) ([]*secondary.ConclavePlanRecord, error) {
 	return []*secondary.ConclavePlanRecord{}, nil
 }
@@ -600,25 +596,6 @@ func TestGetConclaveTasks_Success(t *testing.T) {
 	// Empty list is valid
 	if tasks == nil {
 		t.Error("expected non-nil tasks slice")
-	}
-}
-
-// ============================================================================
-// GetConclaveQuestions Tests
-// ============================================================================
-
-func TestGetConclaveQuestions_Success(t *testing.T) {
-	service, _ := newTestConclaveService()
-	ctx := context.Background()
-
-	questions, err := service.GetConclaveQuestions(ctx, "CON-001")
-
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-	// Empty list is valid
-	if questions == nil {
-		t.Error("expected non-nil questions slice")
 	}
 }
 

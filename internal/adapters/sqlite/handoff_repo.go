@@ -36,7 +36,7 @@ func (r *HandoffRepository) Create(ctx context.Context, handoff *secondary.Hando
 	}
 
 	_, err := r.db.ExecContext(ctx,
-		`INSERT INTO handoffs (id, handoff_note, active_commission_id, active_grove_id, todos_snapshot)
+		`INSERT INTO handoffs (id, handoff_note, active_commission_id, active_workbench_id, todos_snapshot)
 		 VALUES (?, ?, ?, ?, ?)`,
 		handoff.ID, handoff.HandoffNote, missionID, workbenchID, todos,
 	)
@@ -58,7 +58,7 @@ func (r *HandoffRepository) GetByID(ctx context.Context, id string) (*secondary.
 
 	record := &secondary.HandoffRecord{}
 	err := r.db.QueryRowContext(ctx,
-		`SELECT id, created_at, handoff_note, active_commission_id, active_grove_id, todos_snapshot
+		`SELECT id, created_at, handoff_note, active_commission_id, active_workbench_id, todos_snapshot
 		 FROM handoffs WHERE id = ?`,
 		id,
 	).Scan(&record.ID, &createdAt, &record.HandoffNote, &missionID, &workbenchID, &todos)
@@ -89,7 +89,7 @@ func (r *HandoffRepository) GetLatest(ctx context.Context) (*secondary.HandoffRe
 
 	record := &secondary.HandoffRecord{}
 	err := r.db.QueryRowContext(ctx,
-		`SELECT id, created_at, handoff_note, active_commission_id, active_grove_id, todos_snapshot
+		`SELECT id, created_at, handoff_note, active_commission_id, active_workbench_id, todos_snapshot
 		 FROM handoffs ORDER BY created_at DESC LIMIT 1`,
 	).Scan(&record.ID, &createdAt, &record.HandoffNote, &missionID, &workbenchID, &todos)
 
@@ -119,16 +119,16 @@ func (r *HandoffRepository) GetLatestForWorkbench(ctx context.Context, workbench
 
 	record := &secondary.HandoffRecord{}
 	err := r.db.QueryRowContext(ctx,
-		`SELECT id, created_at, handoff_note, active_commission_id, active_grove_id, todos_snapshot
-		 FROM handoffs WHERE active_grove_id = ? ORDER BY created_at DESC LIMIT 1`,
+		`SELECT id, created_at, handoff_note, active_commission_id, active_workbench_id, todos_snapshot
+		 FROM handoffs WHERE active_workbench_id = ? ORDER BY created_at DESC LIMIT 1`,
 		workbenchID,
 	).Scan(&record.ID, &createdAt, &record.HandoffNote, &missionID, &grove, &todos)
 
 	if err == sql.ErrNoRows {
-		return nil, fmt.Errorf("no handoffs found for grove %s", workbenchID)
+		return nil, fmt.Errorf("no handoffs found for workbench %s", workbenchID)
 	}
 	if err != nil {
-		return nil, fmt.Errorf("failed to get latest handoff for grove: %w", err)
+		return nil, fmt.Errorf("failed to get latest handoff for workbench: %w", err)
 	}
 
 	record.CreatedAt = createdAt.Format(time.RFC3339)
@@ -141,7 +141,7 @@ func (r *HandoffRepository) GetLatestForWorkbench(ctx context.Context, workbench
 
 // List retrieves handoffs with optional limit.
 func (r *HandoffRepository) List(ctx context.Context, limit int) ([]*secondary.HandoffRecord, error) {
-	query := `SELECT id, created_at, handoff_note, active_commission_id, active_grove_id, todos_snapshot
+	query := `SELECT id, created_at, handoff_note, active_commission_id, active_workbench_id, todos_snapshot
 	          FROM handoffs ORDER BY created_at DESC`
 
 	if limit > 0 {

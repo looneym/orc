@@ -191,20 +191,6 @@ func (s *ConclaveServiceImpl) GetConclaveTasks(ctx context.Context, conclaveID s
 	return tasks, nil
 }
 
-// GetConclaveQuestions retrieves all questions in a conclave.
-func (s *ConclaveServiceImpl) GetConclaveQuestions(ctx context.Context, conclaveID string) ([]*primary.ConclaveQuestion, error) {
-	records, err := s.conclaveRepo.GetQuestionsByConclave(ctx, conclaveID)
-	if err != nil {
-		return nil, err
-	}
-
-	questions := make([]*primary.ConclaveQuestion, len(records))
-	for i, r := range records {
-		questions[i] = s.questionRecordToConclaveQuestion(r)
-	}
-	return questions, nil
-}
-
 // GetConclavePlans retrieves all plans in a conclave.
 func (s *ConclaveServiceImpl) GetConclavePlans(ctx context.Context, conclaveID string) ([]*primary.ConclavePlan, error) {
 	records, err := s.conclaveRepo.GetPlansByConclave(ctx, conclaveID)
@@ -253,24 +239,6 @@ func (s *ConclaveServiceImpl) taskRecordToConclaveTask(r *secondary.ConclaveTask
 		UpdatedAt:           r.UpdatedAt,
 		ClaimedAt:           r.ClaimedAt,
 		CompletedAt:         r.CompletedAt,
-	}
-}
-
-func (s *ConclaveServiceImpl) questionRecordToConclaveQuestion(r *secondary.ConclaveQuestionRecord) *primary.ConclaveQuestion {
-	return &primary.ConclaveQuestion{
-		ID:              r.ID,
-		CommissionID:    r.CommissionID,
-		ShipmentID:      r.ShipmentID,
-		InvestigationID: r.InvestigationID,
-		ConclaveID:      r.ConclaveID,
-		Title:           r.Title,
-		Content:         r.Content,
-		Answer:          r.Answer,
-		Status:          r.Status,
-		Pinned:          r.Pinned,
-		CreatedAt:       r.CreatedAt,
-		UpdatedAt:       r.UpdatedAt,
-		AnsweredAt:      r.AnsweredAt,
 	}
 }
 

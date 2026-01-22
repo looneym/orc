@@ -69,7 +69,7 @@ func TestHandoffRepository_Create(t *testing.T) {
 		ID:                 "HO-001",
 		HandoffNote:        "Session complete. Next steps: review plan.",
 		ActiveCommissionID: "MISSION-001",
-		ActiveWorkbenchID:  "GROVE-001",
+		ActiveWorkbenchID:  "WB-001",
 		TodosSnapshot:      "[]",
 	}
 
@@ -89,8 +89,8 @@ func TestHandoffRepository_Create(t *testing.T) {
 	if retrieved.ActiveCommissionID != "MISSION-001" {
 		t.Errorf("expected mission 'MISSION-001', got '%s'", retrieved.ActiveCommissionID)
 	}
-	if retrieved.ActiveWorkbenchID != "GROVE-001" {
-		t.Errorf("expected grove 'GROVE-001', got '%s'", retrieved.ActiveWorkbenchID)
+	if retrieved.ActiveWorkbenchID != "WB-001" {
+		t.Errorf("expected workbench 'WB-001', got '%s'", retrieved.ActiveWorkbenchID)
 	}
 }
 
@@ -114,7 +114,7 @@ func TestHandoffRepository_Create_MinimalData(t *testing.T) {
 		t.Errorf("expected empty mission ID, got '%s'", retrieved.ActiveCommissionID)
 	}
 	if retrieved.ActiveWorkbenchID != "" {
-		t.Errorf("expected empty grove ID, got '%s'", retrieved.ActiveWorkbenchID)
+		t.Errorf("expected empty workbench ID, got '%s'", retrieved.ActiveWorkbenchID)
 	}
 }
 
@@ -123,7 +123,7 @@ func TestHandoffRepository_GetByID(t *testing.T) {
 	repo := sqlite.NewHandoffRepository(db)
 	ctx := context.Background()
 
-	handoff := createTestHandoff(t, repo, ctx, "Test note", "MISSION-001", "GROVE-001", "[]")
+	handoff := createTestHandoff(t, repo, ctx, "Test note", "MISSION-001", "WB-001", "[]")
 
 	retrieved, err := repo.GetByID(ctx, handoff.ID)
 	if err != nil {
@@ -188,12 +188,12 @@ func TestHandoffRepository_GetLatestForWorkbench(t *testing.T) {
 	repo := sqlite.NewHandoffRepository(db)
 	ctx := context.Background()
 
-	// Create handoffs for different groves with explicit timestamps
-	_, _ = db.Exec(`INSERT INTO handoffs (id, handoff_note, active_grove_id, created_at) VALUES ('HO-001', 'Grove 1 first', 'GROVE-001', '2024-01-01 10:00:00')`)
-	_, _ = db.Exec(`INSERT INTO handoffs (id, handoff_note, active_grove_id, created_at) VALUES ('HO-002', 'Grove 1 latest', 'GROVE-001', '2024-01-01 11:00:00')`)
-	_, _ = db.Exec(`INSERT INTO handoffs (id, handoff_note, active_grove_id, created_at) VALUES ('HO-003', 'Grove 2', 'GROVE-002', '2024-01-01 12:00:00')`)
+	// Create handoffs for different workbenches with explicit timestamps
+	_, _ = db.Exec(`INSERT INTO handoffs (id, handoff_note, active_workbench_id, created_at) VALUES ('HO-001', 'Workbench 1 first', 'WB-001', '2024-01-01 10:00:00')`)
+	_, _ = db.Exec(`INSERT INTO handoffs (id, handoff_note, active_workbench_id, created_at) VALUES ('HO-002', 'Workbench 1 latest', 'WB-001', '2024-01-01 11:00:00')`)
+	_, _ = db.Exec(`INSERT INTO handoffs (id, handoff_note, active_workbench_id, created_at) VALUES ('HO-003', 'Workbench 2', 'WB-002', '2024-01-01 12:00:00')`)
 
-	latest, err := repo.GetLatestForWorkbench(ctx, "GROVE-001")
+	latest, err := repo.GetLatestForWorkbench(ctx, "WB-001")
 	if err != nil {
 		t.Fatalf("GetLatestForWorkbench failed: %v", err)
 	}
@@ -201,8 +201,8 @@ func TestHandoffRepository_GetLatestForWorkbench(t *testing.T) {
 	if latest.ID != "HO-002" {
 		t.Errorf("expected handoff ID 'HO-002', got '%s'", latest.ID)
 	}
-	if latest.HandoffNote != "Grove 1 latest" {
-		t.Errorf("expected note 'Grove 1 latest', got '%s'", latest.HandoffNote)
+	if latest.HandoffNote != "Workbench 1 latest" {
+		t.Errorf("expected note 'Workbench 1 latest', got '%s'", latest.HandoffNote)
 	}
 }
 
@@ -211,11 +211,11 @@ func TestHandoffRepository_GetLatestForWorkbench_NotFound(t *testing.T) {
 	repo := sqlite.NewHandoffRepository(db)
 	ctx := context.Background()
 
-	createTestHandoff(t, repo, ctx, "Different grove", "", "GROVE-002", "")
+	createTestHandoff(t, repo, ctx, "Different workbench", "", "WB-002", "")
 
-	_, err := repo.GetLatestForWorkbench(ctx, "GROVE-001")
+	_, err := repo.GetLatestForWorkbench(ctx, "WB-001")
 	if err == nil {
-		t.Error("expected error for grove with no handoffs")
+		t.Error("expected error for workbench with no handoffs")
 	}
 }
 

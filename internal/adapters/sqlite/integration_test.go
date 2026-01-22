@@ -139,20 +139,14 @@ func TestIntegration_ConclaveWithTasksQuestionsPlans(t *testing.T) {
 		t.Fatalf("Create conclave failed: %v", err)
 	}
 
-	// Tasks and plans link via shipment, questions link via conclave_id
+	// Tasks and plans link via shipment
 	_, _ = db.Exec(`INSERT INTO tasks (id, shipment_id, commission_id, title, status) VALUES ('TASK-001', 'SHIP-001', 'MISSION-001', 'Review Task', 'ready')`)
-	_, _ = db.Exec(`INSERT INTO questions (id, commission_id, title, status, conclave_id) VALUES ('Q-001', 'MISSION-001', 'Review Question', 'open', 'CON-001')`)
 	_, _ = db.Exec(`INSERT INTO plans (id, shipment_id, commission_id, title, status) VALUES ('PLAN-001', 'SHIP-001', 'MISSION-001', 'Review Plan', 'draft')`)
 
-	// Verify all entities linked to conclave
+	// Verify entities linked to conclave
 	tasks, _ := conclaveRepo.GetTasksByConclave(ctx, "CON-001")
 	if len(tasks) != 1 {
 		t.Errorf("expected 1 task in conclave, got %d", len(tasks))
-	}
-
-	questions, _ := conclaveRepo.GetQuestionsByConclave(ctx, "CON-001")
-	if len(questions) != 1 {
-		t.Errorf("expected 1 question in conclave, got %d", len(questions))
 	}
 
 	plans, _ := conclaveRepo.GetPlansByConclave(ctx, "CON-001")

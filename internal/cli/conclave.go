@@ -32,7 +32,7 @@ var conclaveCreateCmd = &cobra.Command{
 		if missionID == "" {
 			missionID = orcctx.GetContextCommissionID()
 			if missionID == "" {
-				return fmt.Errorf("no mission context detected\nHint: Use --commission flag or run from a grove/mission directory")
+				return fmt.Errorf("no mission context detected\nHint: Use --commission flag or run from a workbench directory")
 			}
 		}
 
@@ -144,23 +144,6 @@ var conclaveShowCmd = &cobra.Command{
 			for _, task := range tasks {
 				statusIcon := getStatusIcon(task.Status)
 				fmt.Printf("  %s %s: %s [%s]\n", statusIcon, task.ID, task.Title, task.Status)
-			}
-		}
-
-		// Show questions in this conclave
-		questions, err := wire.ConclaveService().GetConclaveQuestions(ctx, conclaveID)
-		if err != nil {
-			return fmt.Errorf("failed to get questions: %w", err)
-		}
-
-		if len(questions) > 0 {
-			fmt.Printf("\nQuestions (%d):\n", len(questions))
-			for _, q := range questions {
-				statusIcon := "❓"
-				if q.Status == "answered" {
-					statusIcon = "✅"
-				}
-				fmt.Printf("  %s %s: %s [%s]\n", statusIcon, q.ID, q.Title, q.Status)
 			}
 		}
 

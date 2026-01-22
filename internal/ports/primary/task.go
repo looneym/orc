@@ -13,7 +13,7 @@ type TaskService interface {
 	// ListTasks lists tasks with optional filters.
 	ListTasks(ctx context.Context, filters TaskFilters) ([]*Task, error)
 
-	// ClaimTask claims a task for a grove (sets to in_progress).
+	// ClaimTask claims a task for a workbench (sets to in_progress).
 	ClaimTask(ctx context.Context, req ClaimTaskRequest) error
 
 	// CompleteTask marks a task as complete.
@@ -34,7 +34,7 @@ type TaskService interface {
 	// UnpinTask unpins a task.
 	UnpinTask(ctx context.Context, taskID string) error
 
-	// GetTasksByGrove retrieves tasks assigned to a grove.
+	// GetTasksByGrove retrieves tasks assigned to a workbench.
 	GetTasksByGrove(ctx context.Context, workbenchID string) ([]*Task, error)
 
 	// DeleteTask deletes a task.
@@ -49,17 +49,18 @@ type TaskService interface {
 	// ListTasksByTag retrieves tasks with a specific tag.
 	ListTasksByTag(ctx context.Context, tagName string) ([]*Task, error)
 
-	// DiscoverTasks finds ready tasks in the current grove context.
+	// DiscoverTasks finds ready tasks in the current workbench context.
 	DiscoverTasks(ctx context.Context, workbenchID string) ([]*Task, error)
 }
 
 // CreateTaskRequest contains parameters for creating a task.
 type CreateTaskRequest struct {
-	ShipmentID   string // Optional
-	CommissionID string
-	Title        string
-	Description  string
-	Type         string // Optional: research, implementation, fix, documentation, maintenance
+	ShipmentID      string // Optional
+	InvestigationID string // Optional
+	CommissionID    string
+	Title           string
+	Description     string
+	Type            string // Optional: research, implementation, fix, documentation, maintenance
 }
 
 // CreateTaskResponse contains the result of creating a task.
@@ -85,6 +86,7 @@ type UpdateTaskRequest struct {
 type Task struct {
 	ID                  string
 	ShipmentID          string
+	InvestigationID     string
 	CommissionID        string
 	Title               string
 	Description         string
@@ -108,8 +110,9 @@ type TaskTag struct {
 
 // TaskFilters contains filter options for listing tasks.
 type TaskFilters struct {
-	ShipmentID   string
-	Status       string
-	CommissionID string
-	TagName      string
+	ShipmentID      string
+	InvestigationID string
+	Status          string
+	CommissionID    string
+	TagName         string
 }

@@ -40,9 +40,6 @@ type ConclaveService interface {
 	// GetConclaveTasks retrieves all tasks in a conclave.
 	GetConclaveTasks(ctx context.Context, conclaveID string) ([]*ConclaveTask, error)
 
-	// GetConclaveQuestions retrieves all questions in a conclave.
-	GetConclaveQuestions(ctx context.Context, conclaveID string) ([]*ConclaveQuestion, error)
-
 	// GetConclavePlans retrieves all plans in a conclave.
 	GetConclavePlans(ctx context.Context, conclaveID string) ([]*ConclavePlan, error)
 }
@@ -106,23 +103,6 @@ type ConclaveTask struct {
 	UpdatedAt           string
 	ClaimedAt           string
 	CompletedAt         string
-}
-
-// ConclaveQuestion represents a question associated with a conclave.
-type ConclaveQuestion struct {
-	ID              string
-	CommissionID    string
-	ShipmentID      string
-	InvestigationID string
-	ConclaveID      string
-	Title           string
-	Content         string
-	Answer          string
-	Status          string
-	Pinned          bool
-	CreatedAt       string
-	UpdatedAt       string
-	AnsweredAt      string
 }
 
 // ConclavePlan represents a plan associated with a conclave.

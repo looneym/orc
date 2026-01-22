@@ -20,7 +20,7 @@ func MailCmd() *cobra.Command {
 		Long: `Send and receive messages between ORC and IMP agents.
 
 Messages are async and persistent in the ORC database.
-Agent identity is auto-detected from context (ORC repo or grove).`,
+Agent identity is auto-detected from context (ORC repo or workbench).`,
 	}
 
 	cmd.AddCommand(mailSendCmd())
@@ -40,7 +40,7 @@ func mailSendCmd() *cobra.Command {
 		Long: `Send a message to ORC or an IMP agent.
 
 Examples:
-  orc mail send "Please review PR #42" --to IMP-GROVE-001 --subject "Code Review"
+  orc mail send "Please review PR #42" --to IMP-WB-001 --subject "Code Review"
   orc mail send "Task complete" --to ORC --subject "Update"`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -111,7 +111,7 @@ Examples:
 		},
 	}
 
-	cmd.Flags().StringVar(&to, "to", "", "Recipient agent ID (e.g., IMP-GROVE-001)")
+	cmd.Flags().StringVar(&to, "to", "", "Recipient agent ID (e.g., IMP-WB-001)")
 	cmd.Flags().StringVar(&subject, "subject", "", "Message subject")
 	cmd.MarkFlagRequired("to")
 
@@ -230,7 +230,7 @@ func mailConversationCmd() *cobra.Command {
 		Long: `Display all messages between you and another agent.
 
 Example:
-  orc mail conversation IMP-GROVE-001`,
+  orc mail conversation IMP-WB-001`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := context.Background()

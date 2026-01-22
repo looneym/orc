@@ -8,16 +8,16 @@ import (
 // Conclave represents an ideation session container.
 // All database operations are handled by ConclaveRepository in the adapters layer.
 type Conclave struct {
-	ID              string
-	ComcommissionID string
-	Title           string
-	Description     sql.NullString
-	Status          string
-	AssignedGroveID sql.NullString
-	Pinned          bool
-	CreatedAt       time.Time
-	UpdatedAt       time.Time
-	CompletedAt     sql.NullTime
+	ID                  string
+	ComcommissionID     string
+	Title               string
+	Description         sql.NullString
+	Status              string
+	AssignedWorkbenchID sql.NullString
+	Pinned              bool
+	CreatedAt           time.Time
+	UpdatedAt           time.Time
+	CompletedAt         sql.NullTime
 }
 
 // Conclave status constants

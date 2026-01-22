@@ -8,16 +8,16 @@ import (
 // Investigation represents a research container in the ORC ledger.
 // Status can be: active, paused, complete
 type Investigation struct {
-	ID              string
-	ComcommissionID string
-	Title           string
-	Description     sql.NullString
-	Status          string
-	AssignedGroveID sql.NullString
-	Pinned          bool
-	CreatedAt       time.Time
-	UpdatedAt       time.Time
-	CompletedAt     sql.NullTime
+	ID                  string
+	ComcommissionID     string
+	Title               string
+	Description         sql.NullString
+	Status              string
+	AssignedWorkbenchID sql.NullString
+	Pinned              bool
+	CreatedAt           time.Time
+	UpdatedAt           time.Time
+	CompletedAt         sql.NullTime
 }
 
 // Investigation status constants

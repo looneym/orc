@@ -38,7 +38,7 @@ var noteCreateCmd = &cobra.Command{
 		if missionID == "" {
 			missionID = orccontext.GetContextCommissionID()
 			if missionID == "" {
-				return fmt.Errorf("no mission context detected\nHint: Use --commission flag or run from a grove/mission directory")
+				return fmt.Errorf("no mission context detected\nHint: Use --commission flag or run from a workbench directory")
 			}
 		}
 

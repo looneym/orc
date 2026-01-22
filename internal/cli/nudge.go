@@ -22,7 +22,7 @@ The agent must be running in a tmux session for this to work.
 
 Examples:
   orc nudge ORC "Check your mail - urgent task"
-  orc nudge IMP-GROVE-001 "Tests are failing, need fix ASAP"`,
+  orc nudge IMP-WB-001 "Tests are failing, need fix ASAP"`,
 		Args: cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			agentID := args[0]

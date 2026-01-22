@@ -146,8 +146,8 @@ func (m *mockInvestigationRepository) CommissionExists(ctx context.Context, miss
 	return m.missionExistsResult, nil
 }
 
-func (m *mockInvestigationRepository) GetQuestionsByInvestigation(ctx context.Context, investigationID string) ([]*secondary.InvestigationQuestionRecord, error) {
-	return []*secondary.InvestigationQuestionRecord{}, nil
+func (m *mockInvestigationRepository) GetByConclave(ctx context.Context, conclaveID string) ([]*secondary.InvestigationRecord, error) {
+	return []*secondary.InvestigationRecord{}, nil
 }
 
 // ============================================================================
@@ -615,24 +615,5 @@ func TestGetInvestigationsByGrove_Success(t *testing.T) {
 	}
 	if len(investigations) != 1 {
 		t.Errorf("expected 1 investigation, got %d", len(investigations))
-	}
-}
-
-// ============================================================================
-// GetInvestigationQuestions Tests
-// ============================================================================
-
-func TestGetInvestigationQuestions_Success(t *testing.T) {
-	service, _ := newTestInvestigationService()
-	ctx := context.Background()
-
-	questions, err := service.GetInvestigationQuestions(ctx, "INV-001")
-
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-	// Empty list is valid
-	if questions == nil {
-		t.Error("expected non-nil questions slice")
 	}
 }

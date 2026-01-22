@@ -34,19 +34,17 @@ type InvestigationService interface {
 	// DeleteInvestigation deletes an investigation.
 	DeleteInvestigation(ctx context.Context, investigationID string) error
 
-	// AssignInvestigationToGrove assigns an investigation to a grove.
+	// AssignInvestigationToGrove assigns an investigation to a workbench.
 	AssignInvestigationToGrove(ctx context.Context, investigationID, workbenchID string) error
 
-	// GetInvestigationsByGrove retrieves investigations assigned to a grove.
+	// GetInvestigationsByGrove retrieves investigations assigned to a workbench.
 	GetInvestigationsByGrove(ctx context.Context, workbenchID string) ([]*Investigation, error)
-
-	// GetInvestigationQuestions retrieves all questions in an investigation.
-	GetInvestigationQuestions(ctx context.Context, investigationID string) ([]*InvestigationQuestion, error)
 }
 
 // CreateInvestigationRequest contains parameters for creating an investigation.
 type CreateInvestigationRequest struct {
 	CommissionID string
+	ConclaveID   string
 	Title        string
 	Description  string
 }
@@ -68,6 +66,7 @@ type UpdateInvestigationRequest struct {
 type Investigation struct {
 	ID                  string
 	CommissionID        string
+	ConclaveID          string
 	Title               string
 	Description         string
 	Status              string
@@ -81,23 +80,6 @@ type Investigation struct {
 // InvestigationFilters contains filter options for listing investigations.
 type InvestigationFilters struct {
 	CommissionID string
+	ConclaveID   string
 	Status       string
-}
-
-// InvestigationQuestion represents a question associated with an investigation.
-type InvestigationQuestion struct {
-	ID               string
-	InvestigationID  string
-	CommissionID     string
-	Title            string
-	Description      string
-	Status           string
-	Answer           string
-	Pinned           bool
-	CreatedAt        string
-	UpdatedAt        string
-	AnsweredAt       string
-	ConclaveID       string
-	PromotedFromID   string
-	PromotedFromType string
 }

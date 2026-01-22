@@ -39,7 +39,6 @@ It coordinates IMPs (Implementation Agents) working in isolated workbenches (wor
 
 	// Entity commands (semantic model)
 	rootCmd.AddCommand(cli.NoteCmd())
-	rootCmd.AddCommand(cli.QuestionCmd())
 	rootCmd.AddCommand(cli.PlanCmd())
 	rootCmd.AddCommand(cli.TomeCmd())
 	rootCmd.AddCommand(cli.InvestigationCmd())

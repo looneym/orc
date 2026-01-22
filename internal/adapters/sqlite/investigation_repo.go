@@ -22,14 +22,17 @@ func NewInvestigationRepository(db *sql.DB) *InvestigationRepository {
 
 // Create persists a new investigation.
 func (r *InvestigationRepository) Create(ctx context.Context, investigation *secondary.InvestigationRecord) error {
-	var desc sql.NullString
+	var desc, conclaveID sql.NullString
 	if investigation.Description != "" {
 		desc = sql.NullString{String: investigation.Description, Valid: true}
 	}
+	if investigation.ConclaveID != "" {
+		conclaveID = sql.NullString{String: investigation.ConclaveID, Valid: true}
+	}
 
 	_, err := r.db.ExecContext(ctx,
-		"INSERT INTO investigations (id, commission_id, title, description, status) VALUES (?, ?, ?, ?, ?)",
-		investigation.ID, investigation.CommissionID, investigation.Title, desc, "active",
+		"INSERT INTO investigations (id, commission_id, conclave_id, title, description, status) VALUES (?, ?, ?, ?, ?, ?)",
+		investigation.ID, investigation.CommissionID, conclaveID, investigation.Title, desc, "active",
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create investigation: %w", err)
@@ -41,6 +44,7 @@ func (r *InvestigationRepository) Create(ctx context.Context, investigation *sec
 // GetByID retrieves an investigation by its ID.
 func (r *InvestigationRepository) GetByID(ctx context.Context, id string) (*secondary.InvestigationRecord, error) {
 	var (
+		conclaveID          sql.NullString
 		desc                sql.NullString
 		assignedWorkbenchID sql.NullString
 		pinned              bool
@@ -51,9 +55,9 @@ func (r *InvestigationRepository) GetByID(ctx context.Context, id string) (*seco
 
 	record := &secondary.InvestigationRecord{}
 	err := r.db.QueryRowContext(ctx,
-		"SELECT id, commission_id, title, description, status, assigned_workbench_id, pinned, created_at, updated_at, completed_at FROM investigations WHERE id = ?",
+		"SELECT id, commission_id, conclave_id, title, description, status, assigned_workbench_id, pinned, created_at, updated_at, completed_at FROM investigations WHERE id = ?",
 		id,
-	).Scan(&record.ID, &record.CommissionID, &record.Title, &desc, &record.Status, &assignedWorkbenchID, &pinned, &createdAt, &updatedAt, &completedAt)
+	).Scan(&record.ID, &record.CommissionID, &conclaveID, &record.Title, &desc, &record.Status, &assignedWorkbenchID, &pinned, &createdAt, &updatedAt, &completedAt)
 
 	if err == sql.ErrNoRows {
 		return nil, fmt.Errorf("investigation %s not found", id)
@@ -62,6 +66,7 @@ func (r *InvestigationRepository) GetByID(ctx context.Context, id string) (*seco
 		return nil, fmt.Errorf("failed to get investigation: %w", err)
 	}
 
+	record.ConclaveID = conclaveID.String
 	record.Description = desc.String
 	record.AssignedWorkbenchID = assignedWorkbenchID.String
 	record.Pinned = pinned
@@ -76,12 +81,17 @@ func (r *InvestigationRepository) GetByID(ctx context.Context, id string) (*seco
 
 // List retrieves investigations matching the given filters.
 func (r *InvestigationRepository) List(ctx context.Context, filters secondary.InvestigationFilters) ([]*secondary.InvestigationRecord, error) {
-	query := "SELECT id, commission_id, title, description, status, assigned_workbench_id, pinned, created_at, updated_at, completed_at FROM investigations WHERE 1=1"
+	query := "SELECT id, commission_id, conclave_id, title, description, status, assigned_workbench_id, pinned, created_at, updated_at, completed_at FROM investigations WHERE 1=1"
 	args := []any{}
 
 	if filters.CommissionID != "" {
 		query += " AND commission_id = ?"
 		args = append(args, filters.CommissionID)
+	}
+
+	if filters.ConclaveID != "" {
+		query += " AND conclave_id = ?"
+		args = append(args, filters.ConclaveID)
 	}
 
 	if filters.Status != "" {
@@ -100,6 +110,7 @@ func (r *InvestigationRepository) List(ctx context.Context, filters secondary.In
 	var investigations []*secondary.InvestigationRecord
 	for rows.Next() {
 		var (
+			conclaveID          sql.NullString
 			desc                sql.NullString
 			assignedWorkbenchID sql.NullString
 			pinned              bool
@@ -109,11 +120,12 @@ func (r *InvestigationRepository) List(ctx context.Context, filters secondary.In
 		)
 
 		record := &secondary.InvestigationRecord{}
-		err := rows.Scan(&record.ID, &record.CommissionID, &record.Title, &desc, &record.Status, &assignedWorkbenchID, &pinned, &createdAt, &updatedAt, &completedAt)
+		err := rows.Scan(&record.ID, &record.CommissionID, &conclaveID, &record.Title, &desc, &record.Status, &assignedWorkbenchID, &pinned, &createdAt, &updatedAt, &completedAt)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan investigation: %w", err)
 		}
 
+		record.ConclaveID = conclaveID.String
 		record.Description = desc.String
 		record.AssignedWorkbenchID = assignedWorkbenchID.String
 		record.Pinned = pinned
@@ -252,7 +264,7 @@ func (r *InvestigationRepository) UpdateStatus(ctx context.Context, id, status s
 
 // GetByWorkbench retrieves investigations assigned to a grove.
 func (r *InvestigationRepository) GetByWorkbench(ctx context.Context, workbenchID string) ([]*secondary.InvestigationRecord, error) {
-	query := "SELECT id, commission_id, title, description, status, assigned_workbench_id, pinned, created_at, updated_at, completed_at FROM investigations WHERE assigned_workbench_id = ?"
+	query := "SELECT id, commission_id, conclave_id, title, description, status, assigned_workbench_id, pinned, created_at, updated_at, completed_at FROM investigations WHERE assigned_workbench_id = ?"
 	rows, err := r.db.QueryContext(ctx, query, workbenchID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get investigations by grove: %w", err)
@@ -262,6 +274,7 @@ func (r *InvestigationRepository) GetByWorkbench(ctx context.Context, workbenchI
 	var investigations []*secondary.InvestigationRecord
 	for rows.Next() {
 		var (
+			conclaveID          sql.NullString
 			desc                sql.NullString
 			assignedWorkbenchID sql.NullString
 			pinned              bool
@@ -271,11 +284,55 @@ func (r *InvestigationRepository) GetByWorkbench(ctx context.Context, workbenchI
 		)
 
 		record := &secondary.InvestigationRecord{}
-		err := rows.Scan(&record.ID, &record.CommissionID, &record.Title, &desc, &record.Status, &assignedWorkbenchID, &pinned, &createdAt, &updatedAt, &completedAt)
+		err := rows.Scan(&record.ID, &record.CommissionID, &conclaveID, &record.Title, &desc, &record.Status, &assignedWorkbenchID, &pinned, &createdAt, &updatedAt, &completedAt)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan investigation: %w", err)
 		}
 
+		record.ConclaveID = conclaveID.String
+		record.Description = desc.String
+		record.AssignedWorkbenchID = assignedWorkbenchID.String
+		record.Pinned = pinned
+		record.CreatedAt = createdAt.Format(time.RFC3339)
+		record.UpdatedAt = updatedAt.Format(time.RFC3339)
+		if completedAt.Valid {
+			record.CompletedAt = completedAt.Time.Format(time.RFC3339)
+		}
+
+		investigations = append(investigations, record)
+	}
+
+	return investigations, nil
+}
+
+// GetByConclave retrieves investigations for a conclave.
+func (r *InvestigationRepository) GetByConclave(ctx context.Context, conclaveID string) ([]*secondary.InvestigationRecord, error) {
+	query := "SELECT id, commission_id, conclave_id, title, description, status, assigned_workbench_id, pinned, created_at, updated_at, completed_at FROM investigations WHERE conclave_id = ? ORDER BY created_at ASC"
+	rows, err := r.db.QueryContext(ctx, query, conclaveID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get investigations by conclave: %w", err)
+	}
+	defer rows.Close()
+
+	var investigations []*secondary.InvestigationRecord
+	for rows.Next() {
+		var (
+			conclaveIDCol       sql.NullString
+			desc                sql.NullString
+			assignedWorkbenchID sql.NullString
+			pinned              bool
+			createdAt           time.Time
+			updatedAt           time.Time
+			completedAt         sql.NullTime
+		)
+
+		record := &secondary.InvestigationRecord{}
+		err := rows.Scan(&record.ID, &record.CommissionID, &conclaveIDCol, &record.Title, &desc, &record.Status, &assignedWorkbenchID, &pinned, &createdAt, &updatedAt, &completedAt)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan investigation: %w", err)
+		}
+
+		record.ConclaveID = conclaveIDCol.String
 		record.Description = desc.String
 		record.AssignedWorkbenchID = assignedWorkbenchID.String
 		record.Pinned = pinned
@@ -317,59 +374,6 @@ func (r *InvestigationRepository) CommissionExists(ctx context.Context, missionI
 		return false, fmt.Errorf("failed to check mission existence: %w", err)
 	}
 	return count > 0, nil
-}
-
-// GetQuestionsByInvestigation retrieves questions for an investigation.
-func (r *InvestigationRepository) GetQuestionsByInvestigation(ctx context.Context, investigationID string) ([]*secondary.InvestigationQuestionRecord, error) {
-	query := `SELECT id, investigation_id, commission_id, title, description, status, answer, pinned,
-		created_at, updated_at, answered_at, conclave_id, promoted_from_id, promoted_from_type
-		FROM questions WHERE investigation_id = ? ORDER BY created_at ASC`
-
-	rows, err := r.db.QueryContext(ctx, query, investigationID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get questions by investigation: %w", err)
-	}
-	defer rows.Close()
-
-	var questions []*secondary.InvestigationQuestionRecord
-	for rows.Next() {
-		var (
-			investigationIDCol sql.NullString
-			desc               sql.NullString
-			answer             sql.NullString
-			pinned             bool
-			createdAt          time.Time
-			updatedAt          time.Time
-			answeredAt         sql.NullTime
-			conclaveID         sql.NullString
-			promotedFromID     sql.NullString
-			promotedFromType   sql.NullString
-		)
-
-		record := &secondary.InvestigationQuestionRecord{}
-		err := rows.Scan(&record.ID, &investigationIDCol, &record.CommissionID, &record.Title, &desc, &record.Status, &answer, &pinned,
-			&createdAt, &updatedAt, &answeredAt, &conclaveID, &promotedFromID, &promotedFromType)
-		if err != nil {
-			return nil, fmt.Errorf("failed to scan question: %w", err)
-		}
-
-		record.InvestigationID = investigationIDCol.String
-		record.Description = desc.String
-		record.Answer = answer.String
-		record.Pinned = pinned
-		record.CreatedAt = createdAt.Format(time.RFC3339)
-		record.UpdatedAt = updatedAt.Format(time.RFC3339)
-		if answeredAt.Valid {
-			record.AnsweredAt = answeredAt.Time.Format(time.RFC3339)
-		}
-		record.ConclaveID = conclaveID.String
-		record.PromotedFromID = promotedFromID.String
-		record.PromotedFromType = promotedFromType.String
-
-		questions = append(questions, record)
-	}
-
-	return questions, nil
 }
 
 // Ensure InvestigationRepository implements the interface

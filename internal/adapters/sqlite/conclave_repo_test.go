@@ -417,33 +417,6 @@ func TestConclaveRepository_GetTasksByConclave(t *testing.T) {
 	}
 }
 
-func TestConclaveRepository_GetQuestionsByConclave(t *testing.T) {
-	db := setupConclaveTestDB(t)
-	repo := sqlite.NewConclaveRepository(db)
-	ctx := context.Background()
-
-	conclave := createTestConclave(t, repo, ctx, "MISSION-001", "Conclave with Questions", "")
-
-	// Insert questions for the conclave
-	_, _ = db.Exec(`INSERT INTO questions (id, commission_id, title, status, conclave_id) VALUES ('Q-001', 'MISSION-001', 'Question 1', 'open', ?)`, conclave.ID)
-	_, _ = db.Exec(`INSERT INTO questions (id, commission_id, title, status, conclave_id) VALUES ('Q-002', 'MISSION-001', 'Question 2', 'open', ?)`, conclave.ID)
-	_, _ = db.Exec(`INSERT INTO questions (id, commission_id, title, status, conclave_id) VALUES ('Q-003', 'MISSION-001', 'Question 3 (no conclave)', 'open', NULL)`)
-
-	questions, err := repo.GetQuestionsByConclave(ctx, conclave.ID)
-	if err != nil {
-		t.Fatalf("GetQuestionsByConclave failed: %v", err)
-	}
-
-	if len(questions) != 2 {
-		t.Errorf("expected 2 questions for conclave, got %d", len(questions))
-	}
-
-	// Verify question data
-	if questions[0].Title != "Question 1" {
-		t.Errorf("expected title 'Question 1', got '%s'", questions[0].Title)
-	}
-}
-
 func TestConclaveRepository_GetPlansByConclave(t *testing.T) {
 	db := setupConclaveTestDB(t)
 	repo := sqlite.NewConclaveRepository(db)

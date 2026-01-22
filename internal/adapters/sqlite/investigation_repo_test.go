@@ -432,30 +432,3 @@ func TestInvestigationRepository_CommissionExists(t *testing.T) {
 		t.Error("expected mission to not exist")
 	}
 }
-
-func TestInvestigationRepository_GetQuestionsByInvestigation(t *testing.T) {
-	db := setupInvestigationTestDB(t)
-	repo := sqlite.NewInvestigationRepository(db)
-	ctx := context.Background()
-
-	inv := createTestInvestigation(t, repo, ctx, "MISSION-001", "Investigation with Questions", "")
-
-	// Insert questions for the investigation
-	_, _ = db.Exec(`INSERT INTO questions (id, investigation_id, commission_id, title, status) VALUES ('Q-001', ?, 'MISSION-001', 'Question 1', 'open')`, inv.ID)
-	_, _ = db.Exec(`INSERT INTO questions (id, investigation_id, commission_id, title, status) VALUES ('Q-002', ?, 'MISSION-001', 'Question 2', 'open')`, inv.ID)
-	_, _ = db.Exec(`INSERT INTO questions (id, investigation_id, commission_id, title, status) VALUES ('Q-003', NULL, 'MISSION-001', 'Question 3 (no investigation)', 'open')`)
-
-	questions, err := repo.GetQuestionsByInvestigation(ctx, inv.ID)
-	if err != nil {
-		t.Fatalf("GetQuestionsByInvestigation failed: %v", err)
-	}
-
-	if len(questions) != 2 {
-		t.Errorf("expected 2 questions for investigation, got %d", len(questions))
-	}
-
-	// Verify question data
-	if questions[0].Title != "Question 1" {
-		t.Errorf("expected title 'Question 1', got '%s'", questions[0].Title)
-	}
-}

@@ -27,19 +27,21 @@ var investigationCreateCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		title := args[0]
 		missionID, _ := cmd.Flags().GetString("commission")
+		conclaveID, _ := cmd.Flags().GetString("conclave")
 		description, _ := cmd.Flags().GetString("description")
 
 		// Get mission from context or require explicit flag
 		if missionID == "" {
 			missionID = orcctx.GetContextCommissionID()
 			if missionID == "" {
-				return fmt.Errorf("no mission context detected\nHint: Use --commission flag or run from a grove/mission directory")
+				return fmt.Errorf("no mission context detected\nHint: Use --commission flag or run from a workbench directory")
 			}
 		}
 
 		ctx := context.Background()
 		resp, err := wire.InvestigationService().CreateInvestigation(ctx, primary.CreateInvestigationRequest{
 			CommissionID: missionID,
+			ConclaveID:   conclaveID,
 			Title:        title,
 			Description:  description,
 		})
@@ -53,7 +55,7 @@ var investigationCreateCmd = &cobra.Command{
 		fmt.Printf("  Status: %s\n", investigation.Status)
 		fmt.Println()
 		fmt.Println("Next steps:")
-		fmt.Printf("   orc question create \"Question title\" --investigation %s\n", investigation.ID)
+		fmt.Printf("   orc note create \"Note title\" --investigation %s\n", investigation.ID)
 		return nil
 	},
 }
@@ -63,6 +65,7 @@ var investigationListCmd = &cobra.Command{
 	Short: "List investigations",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		missionID, _ := cmd.Flags().GetString("commission")
+		conclaveID, _ := cmd.Flags().GetString("conclave")
 		status, _ := cmd.Flags().GetString("status")
 
 		// Get mission from context if not specified
@@ -73,6 +76,7 @@ var investigationListCmd = &cobra.Command{
 		ctx := context.Background()
 		investigations, err := wire.InvestigationService().ListInvestigations(ctx, primary.InvestigationFilters{
 			CommissionID: missionID,
+			ConclaveID:   conclaveID,
 			Status:       status,
 		})
 		if err != nil {
@@ -123,8 +127,11 @@ var investigationShowCmd = &cobra.Command{
 		}
 		fmt.Printf("Status: %s\n", investigation.Status)
 		fmt.Printf("Mission: %s\n", investigation.CommissionID)
+		if investigation.ConclaveID != "" {
+			fmt.Printf("Conclave: %s\n", investigation.ConclaveID)
+		}
 		if investigation.AssignedWorkbenchID != "" {
-			fmt.Printf("Assigned Grove: %s\n", investigation.AssignedWorkbenchID)
+			fmt.Printf("Assigned Workbench: %s\n", investigation.AssignedWorkbenchID)
 		}
 		if investigation.Pinned {
 			fmt.Printf("Pinned: yes\n")
@@ -132,23 +139,6 @@ var investigationShowCmd = &cobra.Command{
 		fmt.Printf("Created: %s\n", investigation.CreatedAt)
 		if investigation.CompletedAt != "" {
 			fmt.Printf("Completed: %s\n", investigation.CompletedAt)
-		}
-
-		// Show questions in this investigation
-		questions, err := wire.InvestigationService().GetInvestigationQuestions(ctx, investigationID)
-		if err != nil {
-			return fmt.Errorf("failed to get questions: %w", err)
-		}
-
-		if len(questions) > 0 {
-			fmt.Printf("\nQuestions (%d):\n", len(questions))
-			for _, q := range questions {
-				statusIcon := "❓"
-				if q.Status == "answered" {
-					statusIcon = "✅"
-				}
-				fmt.Printf("  %s %s: %s [%s]\n", statusIcon, q.ID, q.Title, q.Status)
-			}
 		}
 
 		return nil
@@ -292,8 +282,8 @@ var investigationDeleteCmd = &cobra.Command{
 }
 
 var investigationAssignCmd = &cobra.Command{
-	Use:   "assign [investigation-id] [grove-id]",
-	Short: "Assign investigation to a grove",
+	Use:   "assign [investigation-id] [workbench-id]",
+	Short: "Assign investigation to a workbench",
 	Args:  cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		investigationID := args[0]
@@ -305,7 +295,7 @@ var investigationAssignCmd = &cobra.Command{
 			return fmt.Errorf("failed to assign investigation: %w", err)
 		}
 
-		fmt.Printf("✓ Investigation %s assigned to grove %s\n", investigationID, workbenchID)
+		fmt.Printf("✓ Investigation %s assigned to workbench %s\n", investigationID, workbenchID)
 		return nil
 	},
 }
@@ -313,10 +303,12 @@ var investigationAssignCmd = &cobra.Command{
 func init() {
 	// investigation create flags
 	investigationCreateCmd.Flags().StringP("commission", "c", "", "Commission ID (defaults to context)")
+	investigationCreateCmd.Flags().String("conclave", "", "Conclave ID (optional)")
 	investigationCreateCmd.Flags().StringP("description", "d", "", "Investigation description")
 
 	// investigation list flags
 	investigationListCmd.Flags().StringP("commission", "c", "", "Filter by mission")
+	investigationListCmd.Flags().String("conclave", "", "Filter by conclave")
 	investigationListCmd.Flags().StringP("status", "s", "", "Filter by status (active, complete)")
 
 	// investigation update flags

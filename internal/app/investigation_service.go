@@ -43,6 +43,7 @@ func (s *InvestigationServiceImpl) CreateInvestigation(ctx context.Context, req 
 	record := &secondary.InvestigationRecord{
 		ID:           nextID,
 		CommissionID: req.CommissionID,
+		ConclaveID:   req.ConclaveID,
 		Title:        req.Title,
 		Description:  req.Description,
 		Status:       "active",
@@ -77,6 +78,7 @@ func (s *InvestigationServiceImpl) GetInvestigation(ctx context.Context, investi
 func (s *InvestigationServiceImpl) ListInvestigations(ctx context.Context, filters primary.InvestigationFilters) ([]*primary.Investigation, error) {
 	records, err := s.investigationRepo.List(ctx, secondary.InvestigationFilters{
 		CommissionID: filters.CommissionID,
+		ConclaveID:   filters.ConclaveID,
 		Status:       filters.Status,
 	})
 	if err != nil {
@@ -179,26 +181,13 @@ func (s *InvestigationServiceImpl) GetInvestigationsByGrove(ctx context.Context,
 	return investigations, nil
 }
 
-// GetInvestigationQuestions retrieves all questions in an investigation.
-func (s *InvestigationServiceImpl) GetInvestigationQuestions(ctx context.Context, investigationID string) ([]*primary.InvestigationQuestion, error) {
-	records, err := s.investigationRepo.GetQuestionsByInvestigation(ctx, investigationID)
-	if err != nil {
-		return nil, err
-	}
-
-	questions := make([]*primary.InvestigationQuestion, len(records))
-	for i, r := range records {
-		questions[i] = s.questionRecordToInvestigationQuestion(r)
-	}
-	return questions, nil
-}
-
 // Helper methods
 
 func (s *InvestigationServiceImpl) recordToInvestigation(r *secondary.InvestigationRecord) *primary.Investigation {
 	return &primary.Investigation{
 		ID:                  r.ID,
 		CommissionID:        r.CommissionID,
+		ConclaveID:          r.ConclaveID,
 		Title:               r.Title,
 		Description:         r.Description,
 		Status:              r.Status,
@@ -207,25 +196,6 @@ func (s *InvestigationServiceImpl) recordToInvestigation(r *secondary.Investigat
 		CreatedAt:           r.CreatedAt,
 		UpdatedAt:           r.UpdatedAt,
 		CompletedAt:         r.CompletedAt,
-	}
-}
-
-func (s *InvestigationServiceImpl) questionRecordToInvestigationQuestion(r *secondary.InvestigationQuestionRecord) *primary.InvestigationQuestion {
-	return &primary.InvestigationQuestion{
-		ID:               r.ID,
-		InvestigationID:  r.InvestigationID,
-		CommissionID:     r.CommissionID,
-		Title:            r.Title,
-		Description:      r.Description,
-		Status:           r.Status,
-		Answer:           r.Answer,
-		Pinned:           r.Pinned,
-		CreatedAt:        r.CreatedAt,
-		UpdatedAt:        r.UpdatedAt,
-		AnsweredAt:       r.AnsweredAt,
-		ConclaveID:       r.ConclaveID,
-		PromotedFromID:   r.PromotedFromID,
-		PromotedFromType: r.PromotedFromType,
 	}
 }
 

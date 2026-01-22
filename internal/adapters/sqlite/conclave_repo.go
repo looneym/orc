@@ -327,57 +327,6 @@ func (r *ConclaveRepository) GetTasksByConclave(ctx context.Context, conclaveID 
 	return tasks, nil
 }
 
-// GetQuestionsByConclave retrieves questions belonging to a conclave.
-func (r *ConclaveRepository) GetQuestionsByConclave(ctx context.Context, conclaveID string) ([]*secondary.ConclaveQuestionRecord, error) {
-	query := `SELECT id, commission_id, shipment_id, investigation_id, conclave_id, title, description, answer, status, pinned,
-		created_at, updated_at, answered_at
-		FROM questions WHERE conclave_id = ? ORDER BY created_at ASC`
-
-	rows, err := r.db.QueryContext(ctx, query, conclaveID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get questions by conclave: %w", err)
-	}
-	defer rows.Close()
-
-	var questions []*secondary.ConclaveQuestionRecord
-	for rows.Next() {
-		var (
-			shipmentID      sql.NullString
-			investigationID sql.NullString
-			conclaveIDCol   sql.NullString
-			content         sql.NullString
-			answer          sql.NullString
-			pinned          bool
-			createdAt       time.Time
-			updatedAt       time.Time
-			answeredAt      sql.NullTime
-		)
-
-		record := &secondary.ConclaveQuestionRecord{}
-		err := rows.Scan(&record.ID, &record.CommissionID, &shipmentID, &investigationID, &conclaveIDCol, &record.Title, &content, &answer, &record.Status, &pinned,
-			&createdAt, &updatedAt, &answeredAt)
-		if err != nil {
-			return nil, fmt.Errorf("failed to scan question: %w", err)
-		}
-
-		record.ShipmentID = shipmentID.String
-		record.InvestigationID = investigationID.String
-		record.ConclaveID = conclaveIDCol.String
-		record.Content = content.String
-		record.Answer = answer.String
-		record.Pinned = pinned
-		record.CreatedAt = createdAt.Format(time.RFC3339)
-		record.UpdatedAt = updatedAt.Format(time.RFC3339)
-		if answeredAt.Valid {
-			record.AnsweredAt = answeredAt.Time.Format(time.RFC3339)
-		}
-
-		questions = append(questions, record)
-	}
-
-	return questions, nil
-}
-
 // GetPlansByConclave retrieves plans belonging to a conclave.
 func (r *ConclaveRepository) GetPlansByConclave(ctx context.Context, conclaveID string) ([]*secondary.ConclavePlanRecord, error) {
 	query := `SELECT id, commission_id, shipment_id, title, description, content, status, pinned,

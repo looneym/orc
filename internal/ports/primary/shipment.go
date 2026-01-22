@@ -31,10 +31,10 @@ type ShipmentService interface {
 	// UnpinShipment unpins a shipment.
 	UnpinShipment(ctx context.Context, shipmentID string) error
 
-	// AssignShipmentToGrove assigns a shipment to a grove.
+	// AssignShipmentToGrove assigns a shipment to a workbench.
 	AssignShipmentToGrove(ctx context.Context, shipmentID, workbenchID string) error
 
-	// GetShipmentsByGrove retrieves shipments assigned to a grove.
+	// GetShipmentsByGrove retrieves shipments assigned to a workbench.
 	GetShipmentsByGrove(ctx context.Context, workbenchID string) ([]*Shipment, error)
 
 	// GetShipmentTasks retrieves all tasks for a shipment.

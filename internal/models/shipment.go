@@ -11,16 +11,16 @@ import (
 // This is the domain type used within the models package.
 // For persistence, use the repository interfaces in ports/secondary.
 type Shipment struct {
-	ID              string
-	ComcommissionID string
-	Title           string
-	Description     sql.NullString
-	Status          string
-	AssignedGroveID sql.NullString
-	Pinned          bool
-	CreatedAt       time.Time
-	UpdatedAt       time.Time
-	CompletedAt     sql.NullTime
+	ID                  string
+	ComcommissionID     string
+	Title               string
+	Description         sql.NullString
+	Status              string
+	AssignedWorkbenchID sql.NullString
+	Pinned              bool
+	CreatedAt           time.Time
+	UpdatedAt           time.Time
+	CompletedAt         sql.NullTime
 }
 
 // Shipment status constants

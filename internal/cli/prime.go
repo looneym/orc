@@ -265,24 +265,6 @@ func buildIMPPrimeOutput(groveCtx *ctx.GroveContext, cwd string) string {
 			output.WriteString(inv.Description)
 			output.WriteString("\n\n")
 		}
-
-		// Show open questions
-		questions, err := wire.InvestigationService().GetInvestigationQuestions(context.Background(), inv.ID)
-		if err == nil {
-			var openQuestions []*primary.InvestigationQuestion
-			for _, q := range questions {
-				if q.Status == "open" {
-					openQuestions = append(openQuestions, q)
-				}
-			}
-			if len(openQuestions) > 0 {
-				output.WriteString("**Open Questions**:\n")
-				for _, q := range openQuestions {
-					output.WriteString(fmt.Sprintf("- %s - %s\n", q.ID, q.Title))
-				}
-				output.WriteString("\n")
-			}
-		}
 	}
 
 	if !hasAssignments {
@@ -296,9 +278,8 @@ func buildIMPPrimeOutput(groveCtx *ctx.GroveContext, cwd string) string {
 	output.WriteString("- `orc summary` - View mission tree with all containers\n")
 	output.WriteString("- `orc focus ID` - Set focus to a container (SHIP-*, CON-*, INV-*, TOME-*)\n")
 	output.WriteString("- `orc task list --shipment SHIP-ID` - List tasks for a shipment\n")
-	output.WriteString("- `orc question list --investigation INV-ID` - List questions for an investigation\n")
-	output.WriteString("- `orc task complete TASK-ID` - Mark task as completed\n")
-	output.WriteString("- `orc question answer Q-ID` - Record answer to a question\n\n")
+	output.WriteString("- `orc note list --investigation INV-ID` - List notes for an investigation\n")
+	output.WriteString("- `orc task complete TASK-ID` - Mark task as completed\n\n")
 
 	// Section 4: Core Rules (shared across all session types)
 	output.WriteString(getCoreRules())

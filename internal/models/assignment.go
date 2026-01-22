@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-// ShipmentAssignment represents a shipment (with tasks) assigned to a grove
+// ShipmentAssignment represents a shipment (with tasks) assigned to a workbench
 type ShipmentAssignment struct {
 	ShipmentID          string       `json:"shipment_id"`
 	ShipmentTitle       string       `json:"shipment_title"`
@@ -39,9 +39,9 @@ type ProgressInfo struct {
 	ReadyTasks      int `json:"ready_tasks"`
 }
 
-// ReadShipmentAssignment reads a shipment assignment from a grove's .orc directory
-func ReadShipmentAssignment(groveDir string) (*ShipmentAssignment, error) {
-	path := filepath.Join(groveDir, ".orc", "assigned-work.json")
+// ReadShipmentAssignment reads a shipment assignment from a workbench's .orc directory
+func ReadShipmentAssignment(workbenchDir string) (*ShipmentAssignment, error) {
+	path := filepath.Join(workbenchDir, ".orc", "assigned-work.json")
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read assignment file: %w", err)
@@ -56,15 +56,15 @@ func ReadShipmentAssignment(groveDir string) (*ShipmentAssignment, error) {
 }
 
 // UpdateShipmentAssignmentStatus updates the status of a shipment assignment file
-func UpdateShipmentAssignmentStatus(groveDir, status string) error {
-	assignment, err := ReadShipmentAssignment(groveDir)
+func UpdateShipmentAssignmentStatus(workbenchDir, status string) error {
+	assignment, err := ReadShipmentAssignment(workbenchDir)
 	if err != nil {
 		return err
 	}
 
 	assignment.Status = status
 
-	path := filepath.Join(groveDir, ".orc", "assigned-work.json")
+	path := filepath.Join(workbenchDir, ".orc", "assigned-work.json")
 	data, err := json.MarshalIndent(assignment, "", "  ")
 	if err != nil {
 		return fmt.Errorf("failed to marshal shipment assignment: %w", err)
@@ -78,7 +78,7 @@ func UpdateShipmentAssignmentStatus(groveDir, status string) error {
 }
 
 // WriteShipmentAssignment writes a shipment with tasks to assignment file
-func WriteShipmentAssignment(groveDir string, shipment *Shipment, tasks []*Task, assignedBy string) error {
+func WriteShipmentAssignment(workbenchDir string, shipment *Shipment, tasks []*Task, assignedBy string) error {
 	// Build task info
 	var taskInfos []TaskInfo
 	completedTasks := 0
@@ -136,7 +136,7 @@ func WriteShipmentAssignment(groveDir string, shipment *Shipment, tasks []*Task,
 		},
 	}
 
-	orcDir := filepath.Join(groveDir, ".orc")
+	orcDir := filepath.Join(workbenchDir, ".orc")
 	if err := os.MkdirAll(orcDir, 0755); err != nil {
 		return fmt.Errorf("failed to create .orc directory: %w", err)
 	}

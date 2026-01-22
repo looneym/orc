@@ -10,6 +10,6 @@ type Handoff struct {
 	CreatedAt             time.Time
 	HandoffNote           string
 	ActiveComcommissionID sql.NullString
-	ActiveGroveID         sql.NullString
+	ActiveWorkbenchID     sql.NullString
 	TodosSnapshot         sql.NullString
 }

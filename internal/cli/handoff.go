@@ -109,7 +109,7 @@ Examples:
 			fmt.Printf("  Mission: %s\n", handoff.ActiveCommissionID)
 		}
 		if handoff.ActiveWorkbenchID != "" {
-			fmt.Printf("  Grove: %s\n", handoff.ActiveWorkbenchID)
+			fmt.Printf("  Workbench: %s\n", handoff.ActiveWorkbenchID)
 		}
 
 		// Update global state config
@@ -142,7 +142,7 @@ var handoffShowCmd = &cobra.Command{
 			fmt.Printf("Mission: %s\n", handoff.ActiveCommissionID)
 		}
 		if handoff.ActiveWorkbenchID != "" {
-			fmt.Printf("Grove: %s\n", handoff.ActiveWorkbenchID)
+			fmt.Printf("Workbench: %s\n", handoff.ActiveWorkbenchID)
 		}
 
 		fmt.Printf("\n--- HANDOFF NOTE ---\n\n%s\n\n", handoff.HandoffNote)
@@ -172,22 +172,22 @@ var handoffListCmd = &cobra.Command{
 			return nil
 		}
 
-		fmt.Printf("\n%-10s %-20s %-15s %-15s\n", "ID", "CREATED", "MISSION", "GROVE")
+		fmt.Printf("\n%-10s %-20s %-15s %-15s\n", "ID", "CREATED", "MISSION", "WORKBENCH")
 		fmt.Println("────────────────────────────────────────────────────────────────")
 		for _, h := range handoffs {
 			mission := "-"
 			if h.ActiveCommissionID != "" {
 				mission = h.ActiveCommissionID
 			}
-			grove := "-"
+			workbench := "-"
 			if h.ActiveWorkbenchID != "" {
-				grove = h.ActiveWorkbenchID
+				workbench = h.ActiveWorkbenchID
 			}
 			fmt.Printf("%-10s %-20s %-15s %-15s\n",
 				h.ID,
 				h.CreatedAt,
 				mission,
-				grove,
+				workbench,
 			)
 		}
 		fmt.Println()
@@ -225,7 +225,7 @@ func HandoffCmd() *cobra.Command {
 	handoffCreateCmd.Flags().StringP("file", "f", "", "Read handoff note from file")
 	handoffCreateCmd.Flags().Bool("stdin", false, "Read handoff note from stdin")
 	handoffCreateCmd.Flags().StringP("commission", "c", "", "Active mission ID")
-	handoffCreateCmd.Flags().String("grove", "", "Active grove ID (for IMP handoffs)")
+	handoffCreateCmd.Flags().String("grove", "", "Active workbench ID (for IMP handoffs)")
 	handoffCreateCmd.Flags().StringP("todos", "t", "", "Path to todos JSON file")
 
 	handoffListCmd.Flags().IntP("limit", "l", 10, "Maximum number of handoffs to show")
