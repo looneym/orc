@@ -662,12 +662,19 @@ type PlanRepository interface {
 
 	// ShipmentExists checks if a shipment exists (for validation).
 	ShipmentExists(ctx context.Context, shipmentID string) (bool, error)
+
+	// CycleExists checks if a cycle exists (for validation).
+	CycleExists(ctx context.Context, cycleID string) (bool, error)
+
+	// GetByCycle retrieves plans for a cycle.
+	GetByCycle(ctx context.Context, cycleID string) ([]*PlanRecord, error)
 }
 
 // PlanRecord represents a plan as stored in persistence.
 type PlanRecord struct {
 	ID               string
 	ShipmentID       string // Empty string means null
+	CycleID          string // Empty string means null
 	CommissionID     string
 	Title            string
 	Description      string // Empty string means null
@@ -685,6 +692,7 @@ type PlanRecord struct {
 // PlanFilters contains filter options for querying plans.
 type PlanFilters struct {
 	ShipmentID   string
+	CycleID      string
 	CommissionID string
 	Status       string
 }
@@ -1090,6 +1098,69 @@ type CycleRecord struct {
 
 // CycleFilters contains filter options for querying cycles.
 type CycleFilters struct {
+	ShipmentID string
+	Status     string
+}
+
+// CycleWorkOrderRepository defines the secondary port for cycle work order persistence.
+type CycleWorkOrderRepository interface {
+	// Create persists a new cycle work order.
+	Create(ctx context.Context, cwo *CycleWorkOrderRecord) error
+
+	// GetByID retrieves a cycle work order by its ID.
+	GetByID(ctx context.Context, id string) (*CycleWorkOrderRecord, error)
+
+	// GetByCycle retrieves a cycle work order by its cycle ID.
+	GetByCycle(ctx context.Context, cycleID string) (*CycleWorkOrderRecord, error)
+
+	// List retrieves cycle work orders matching the given filters.
+	List(ctx context.Context, filters CycleWorkOrderFilters) ([]*CycleWorkOrderRecord, error)
+
+	// Update updates an existing cycle work order.
+	Update(ctx context.Context, cwo *CycleWorkOrderRecord) error
+
+	// Delete removes a cycle work order from persistence.
+	Delete(ctx context.Context, id string) error
+
+	// GetNextID returns the next available cycle work order ID.
+	GetNextID(ctx context.Context) (string, error)
+
+	// UpdateStatus updates the status of a cycle work order.
+	UpdateStatus(ctx context.Context, id, status string) error
+
+	// Validation helpers (for guards to query)
+
+	// CycleExists checks if a cycle exists.
+	CycleExists(ctx context.Context, cycleID string) (bool, error)
+
+	// ShipmentExists checks if a shipment exists.
+	ShipmentExists(ctx context.Context, shipmentID string) (bool, error)
+
+	// CycleHasCWO checks if a cycle already has a CWO (for 1:1 constraint).
+	CycleHasCWO(ctx context.Context, cycleID string) (bool, error)
+
+	// GetCycleStatus retrieves the status of a cycle.
+	GetCycleStatus(ctx context.Context, cycleID string) (string, error)
+
+	// GetCycleShipmentID retrieves the shipment ID for a cycle.
+	GetCycleShipmentID(ctx context.Context, cycleID string) (string, error)
+}
+
+// CycleWorkOrderRecord represents a cycle work order as stored in persistence.
+type CycleWorkOrderRecord struct {
+	ID                 string
+	CycleID            string
+	ShipmentID         string
+	Outcome            string
+	AcceptanceCriteria string // JSON array, empty string means null
+	Status             string
+	CreatedAt          string
+	UpdatedAt          string
+}
+
+// CycleWorkOrderFilters contains filter options for querying cycle work orders.
+type CycleWorkOrderFilters struct {
+	CycleID    string
 	ShipmentID string
 	Status     string
 }

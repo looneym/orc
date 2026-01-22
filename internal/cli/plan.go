@@ -29,6 +29,7 @@ var planCreateCmd = &cobra.Command{
 		description, _ := cmd.Flags().GetString("description")
 		content, _ := cmd.Flags().GetString("content")
 		shipmentID, _ := cmd.Flags().GetString("shipment")
+		cycleID, _ := cmd.Flags().GetString("cycle-id")
 
 		// Get mission from context or require explicit flag
 		if missionID == "" {
@@ -42,6 +43,7 @@ var planCreateCmd = &cobra.Command{
 		resp, err := wire.PlanService().CreatePlan(ctx, primary.CreatePlanRequest{
 			CommissionID: missionID,
 			ShipmentID:   shipmentID,
+			CycleID:      cycleID,
 			Title:        title,
 			Description:  description,
 			Content:      content,
@@ -71,6 +73,7 @@ var planListCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		missionID, _ := cmd.Flags().GetString("commission")
 		shipmentID, _ := cmd.Flags().GetString("shipment")
+		cycleID, _ := cmd.Flags().GetString("cycle-id")
 		status, _ := cmd.Flags().GetString("status")
 
 		// Get mission from context if not specified
@@ -82,6 +85,7 @@ var planListCmd = &cobra.Command{
 		plans, err := wire.PlanService().ListPlans(ctx, primary.PlanFilters{
 			CommissionID: missionID,
 			ShipmentID:   shipmentID,
+			CycleID:      cycleID,
 			Status:       status,
 		})
 		if err != nil {
@@ -141,6 +145,9 @@ var planShowCmd = &cobra.Command{
 		fmt.Printf("\nMission: %s\n", plan.CommissionID)
 		if plan.ShipmentID != "" {
 			fmt.Printf("Shipment: %s\n", plan.ShipmentID)
+		}
+		if plan.CycleID != "" {
+			fmt.Printf("Cycle: %s\n", plan.CycleID)
 		}
 		if plan.ConclaveID != "" {
 			fmt.Printf("Conclave: %s\n", plan.ConclaveID)
@@ -268,10 +275,12 @@ func init() {
 	planCreateCmd.Flags().StringP("description", "d", "", "Plan description")
 	planCreateCmd.Flags().String("content", "", "Plan content")
 	planCreateCmd.Flags().String("shipment", "", "Shipment ID to attach plan to")
+	planCreateCmd.Flags().String("cycle-id", "", "Cycle ID to attach plan to")
 
 	// plan list flags
 	planListCmd.Flags().StringP("commission", "c", "", "Filter by mission")
 	planListCmd.Flags().String("shipment", "", "Filter by shipment")
+	planListCmd.Flags().String("cycle-id", "", "Filter by cycle")
 	planListCmd.Flags().StringP("status", "s", "", "Filter by status (draft, approved)")
 
 	// plan update flags

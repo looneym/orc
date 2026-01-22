@@ -44,9 +44,10 @@ It coordinates IMPs (Implementation Agents) working in isolated workbenches (wor
 	rootCmd.AddCommand(cli.InvestigationCmd())
 	rootCmd.AddCommand(cli.ConclaveCmd())
 
-	// Spec-Kit execution tracking (Work Orders and Cycles)
+	// Spec-Kit execution tracking (Work Orders, Cycles, and Cycle Work Orders)
 	rootCmd.AddCommand(cli.WorkOrderCmd())
 	rootCmd.AddCommand(cli.CycleCmd())
+	rootCmd.AddCommand(cli.CycleWorkOrderCmd())
 
 	// Repository and PR commands
 	rootCmd.AddCommand(cli.RepoCmd())

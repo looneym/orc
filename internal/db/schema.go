@@ -244,6 +244,7 @@ CREATE TABLE IF NOT EXISTS plans (
 	id TEXT PRIMARY KEY,
 	commission_id TEXT NOT NULL,
 	shipment_id TEXT,
+	cycle_id TEXT,
 	title TEXT NOT NULL,
 	description TEXT,
 	content TEXT,
@@ -257,6 +258,7 @@ CREATE TABLE IF NOT EXISTS plans (
 	promoted_from_type TEXT,
 	FOREIGN KEY (commission_id) REFERENCES commissions(id),
 	FOREIGN KEY (shipment_id) REFERENCES shipments(id) ON DELETE SET NULL,
+	FOREIGN KEY (cycle_id) REFERENCES cycles(id) ON DELETE SET NULL,
 	FOREIGN KEY (conclave_id) REFERENCES conclaves(id) ON DELETE SET NULL
 );
 
@@ -341,6 +343,7 @@ CREATE INDEX IF NOT EXISTS idx_prs_commission ON prs(commission_id);
 CREATE INDEX IF NOT EXISTS idx_prs_status ON prs(status);
 CREATE INDEX IF NOT EXISTS idx_plans_commission ON plans(commission_id);
 CREATE INDEX IF NOT EXISTS idx_plans_status ON plans(status);
+CREATE INDEX IF NOT EXISTS idx_plans_cycle ON plans(cycle_id);
 CREATE INDEX IF NOT EXISTS idx_conclaves_commission ON conclaves(commission_id);
 CREATE INDEX IF NOT EXISTS idx_conclaves_status ON conclaves(status);
 CREATE INDEX IF NOT EXISTS idx_notes_commission ON notes(commission_id);
@@ -377,6 +380,24 @@ CREATE INDEX IF NOT EXISTS idx_work_orders_status ON work_orders(status);
 CREATE INDEX IF NOT EXISTS idx_cycles_shipment ON cycles(shipment_id);
 CREATE INDEX IF NOT EXISTS idx_cycles_status ON cycles(status);
 CREATE INDEX IF NOT EXISTS idx_cycles_sequence ON cycles(shipment_id, sequence_number);
+
+-- Cycle Work Orders (1:1 with Cycle)
+CREATE TABLE IF NOT EXISTS cycle_work_orders (
+	id TEXT PRIMARY KEY,
+	cycle_id TEXT NOT NULL UNIQUE,
+	shipment_id TEXT NOT NULL,
+	outcome TEXT NOT NULL,
+	acceptance_criteria TEXT,  -- JSON array of criteria
+	status TEXT NOT NULL CHECK(status IN ('draft', 'active', 'complete')) DEFAULT 'draft',
+	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+	updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+	FOREIGN KEY (cycle_id) REFERENCES cycles(id) ON DELETE CASCADE,
+	FOREIGN KEY (shipment_id) REFERENCES shipments(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_cycle_work_orders_cycle ON cycle_work_orders(cycle_id);
+CREATE INDEX IF NOT EXISTS idx_cycle_work_orders_shipment ON cycle_work_orders(shipment_id);
+CREATE INDEX IF NOT EXISTS idx_cycle_work_orders_status ON cycle_work_orders(status);
 `
 
 // InitSchema creates the database schema
@@ -422,7 +443,7 @@ func InitSchema() error {
 				return err
 			}
 			// Insert all migration versions as applied
-			for i := 1; i <= 34; i++ {
+			for i := 1; i <= 35; i++ {
 				_, err = db.Exec("INSERT INTO schema_version (version) VALUES (?)", i)
 				if err != nil {
 					return err

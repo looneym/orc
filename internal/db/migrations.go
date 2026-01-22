@@ -184,6 +184,11 @@ var migrations = []Migration{
 		Name:    "add_work_orders_and_cycles_tables",
 		Up:      migrationV34,
 	},
+	{
+		Version: 35,
+		Name:    "add_cycle_work_orders_table_and_plans_cycle_id",
+		Up:      migrationV35,
+	},
 }
 
 // RunMigrations executes all pending migrations
@@ -3731,6 +3736,55 @@ func migrationV34(db *sql.DB) error {
 	`)
 	if err != nil {
 		return fmt.Errorf("failed to create indexes: %w", err)
+	}
+
+	return nil
+}
+
+// migrationV35 adds cycle_work_orders table and cycle_id FK to plans table
+func migrationV35(db *sql.DB) error {
+	// Create cycle_work_orders table (1:1 with Cycle)
+	_, err := db.Exec(`
+		CREATE TABLE IF NOT EXISTS cycle_work_orders (
+			id TEXT PRIMARY KEY,
+			cycle_id TEXT NOT NULL UNIQUE,
+			shipment_id TEXT NOT NULL,
+			outcome TEXT NOT NULL,
+			acceptance_criteria TEXT,
+			status TEXT NOT NULL CHECK(status IN ('draft', 'active', 'complete')) DEFAULT 'draft',
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			FOREIGN KEY (cycle_id) REFERENCES cycles(id) ON DELETE CASCADE,
+			FOREIGN KEY (shipment_id) REFERENCES shipments(id) ON DELETE CASCADE
+		)
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to create cycle_work_orders table: %w", err)
+	}
+
+	// Create indexes for cycle_work_orders
+	_, err = db.Exec(`
+		CREATE INDEX IF NOT EXISTS idx_cycle_work_orders_cycle ON cycle_work_orders(cycle_id);
+		CREATE INDEX IF NOT EXISTS idx_cycle_work_orders_shipment ON cycle_work_orders(shipment_id);
+		CREATE INDEX IF NOT EXISTS idx_cycle_work_orders_status ON cycle_work_orders(status)
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to create cycle_work_orders indexes: %w", err)
+	}
+
+	// Add cycle_id column to plans table
+	_, err = db.Exec(`ALTER TABLE plans ADD COLUMN cycle_id TEXT REFERENCES cycles(id) ON DELETE SET NULL`)
+	if err != nil {
+		// Column might already exist, ignore error
+		if err.Error() != "duplicate column name: cycle_id" {
+			return fmt.Errorf("failed to add cycle_id to plans: %w", err)
+		}
+	}
+
+	// Create index for plans.cycle_id
+	_, err = db.Exec(`CREATE INDEX IF NOT EXISTS idx_plans_cycle ON plans(cycle_id)`)
+	if err != nil {
+		return fmt.Errorf("failed to create plans cycle_id index: %w", err)
 	}
 
 	return nil

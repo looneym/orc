@@ -1,0 +1,291 @@
+# Cycle Work Order Workflow Finite State Machine
+# Single source of truth for CWO lifecycle in ORC
+#
+# Generated: 2026-01-22
+# Context: SHIP-204 Cycle 2 - CWO Entity + PLAN Linkage
+
+name: cycle-work-order-workflow
+version: "1.0"
+description: |
+  Defines the complete lifecycle of a Cycle Work Order (CWO) entity in ORC.
+  CWOs are 1:1 slices of shipment Work Orders for specific cycles.
+  They define what each cycle will deliver.
+
+# =============================================================================
+# STATES
+# =============================================================================
+states:
+  initial:
+    description: No CWO exists yet (pre-creation)
+    terminal: false
+
+  draft:
+    description: CWO is being defined, can be edited
+    terminal: false
+    invariants:
+      - status == "draft"
+      - created_at is set
+      - cycle_id is set and references existing cycle
+      - shipment_id is set and references existing shipment
+      - outcome is not empty
+
+  active:
+    description: CWO is locked for execution, no edits allowed
+    terminal: false
+    invariants:
+      - status == "active"
+      - cycle exists
+
+  complete:
+    description: CWO has been delivered, cycle work finished
+    terminal: true  # Soft terminal - delete still possible
+    invariants:
+      - status == "complete"
+      - parent cycle must be complete
+
+  deleted:
+    description: CWO removed from database (true terminal state)
+    terminal: true
+
+# =============================================================================
+# EVENTS
+# =============================================================================
+events:
+  create:
+    description: Create a new CWO for a cycle
+    payload:
+      cycle_id: { type: string, required: true }
+      outcome: { type: string, required: true }
+      acceptance_criteria: { type: string, required: false }
+
+  update:
+    description: Update CWO outcome or acceptance criteria
+    payload:
+      outcome: { type: string, required: false }
+      acceptance_criteria: { type: string, required: false }
+
+  activate:
+    description: Lock CWO for execution
+    payload: {}
+
+  complete:
+    description: Mark CWO as delivered
+    payload: {}
+
+  delete:
+    description: Hard-delete CWO from database
+    payload: {}
+
+# =============================================================================
+# TRANSITIONS
+# =============================================================================
+transitions:
+  # --- Creation ---
+  - name: create_cwo
+    from: initial
+    to: draft
+    event: create
+    guards:
+      - cycle_exists          # Cycle must exist
+      - cycle_has_no_cwo      # 1:1 constraint - cycle can only have one CWO
+      - outcome_not_empty     # Outcome is required
+    effects:
+      - { type: WriteDB, operation: INSERT, table: cycle_work_orders }
+    test_cases:
+      - "Create CWO with existing cycle"
+      - "Create CWO for non-existent cycle (error)"
+      - "Create CWO for cycle that already has CWO (error)"
+      - "Create CWO with empty outcome (error)"
+
+  # --- Updating (no state change) ---
+  - name: update_cwo
+    from: draft
+    to: draft
+    event: update
+    guards: []
+    effects:
+      - { type: WriteDB, operation: UPDATE, table: cycle_work_orders, fields: [outcome, acceptance_criteria, updated_at] }
+    test_cases:
+      - "Update CWO outcome"
+      - "Update CWO acceptance criteria"
+      - "Cannot update active CWO (error)"
+
+  # --- Activating ---
+  - name: activate_cwo
+    from: draft
+    to: active
+    event: activate
+    guards:
+      - is_draft           # Must be in draft status
+      - outcome_not_empty  # Outcome must be set
+      - cycle_exists       # Cycle must still exist
+    effects:
+      - { type: WriteDB, operation: UPDATE, table: cycle_work_orders, fields: [status, updated_at] }
+    test_cases:
+      - "Activate draft CWO"
+      - "Activate active CWO (error)"
+      - "Activate complete CWO (error)"
+      - "Activate CWO with empty outcome (error)"
+
+  # --- Completing ---
+  - name: complete_cwo
+    from: active
+    to: complete
+    event: complete
+    guards:
+      - is_active           # Must be in active status
+      - cycle_is_complete   # Parent cycle must be complete
+    effects:
+      - { type: WriteDB, operation: UPDATE, table: cycle_work_orders, fields: [status, updated_at] }
+    test_cases:
+      - "Complete CWO when cycle is complete"
+      - "Complete CWO when cycle is not complete (error)"
+      - "Complete draft CWO (error)"
+
+  # --- Deletion ---
+  - name: delete_draft_cwo
+    from: draft
+    to: deleted
+    event: delete
+    guards: []
+    effects:
+      - { type: WriteDB, operation: DELETE, table: cycle_work_orders }
+    test_cases:
+      - "Delete draft CWO"
+
+  - name: delete_active_cwo
+    from: active
+    to: deleted
+    event: delete
+    guards: []
+    effects:
+      - { type: WriteDB, operation: DELETE, table: cycle_work_orders }
+    test_cases:
+      - "Delete active CWO"
+
+  - name: delete_complete_cwo
+    from: complete
+    to: deleted
+    event: delete
+    guards: []
+    effects:
+      - { type: WriteDB, operation: DELETE, table: cycle_work_orders }
+    test_cases:
+      - "Delete complete CWO"
+
+# =============================================================================
+# GUARDS
+# =============================================================================
+guards:
+  cycle_exists:
+    description: |
+      Check that the target cycle exists.
+      CWOs must belong to an existing cycle.
+    implementation: |
+      exists, err := repo.CycleExists(ctx, cycle_id)
+      return err == nil && exists
+    error_message: "cycle {cycle_id} not found"
+
+  cycle_has_no_cwo:
+    description: |
+      Check that the cycle does not already have a CWO.
+      Enforces 1:1 relationship between Cycle and CWO.
+    implementation: |
+      hasCWO, err := repo.CycleHasCWO(ctx, cycle_id)
+      return err == nil && !hasCWO
+    error_message: "cycle {cycle_id} already has a CWO"
+
+  outcome_not_empty:
+    description: |
+      Check that outcome is not empty.
+      CWOs must define what will be delivered.
+    implementation: |
+      return len(strings.TrimSpace(outcome)) > 0
+    error_message: "outcome cannot be empty"
+
+  is_draft:
+    description: |
+      Check that CWO status is "draft".
+      Required for activate transition.
+    implementation: |
+      cwo, _ := repo.GetByID(ctx, cwo_id)
+      return cwo.Status == "draft"
+    error_message: "can only activate draft CWOs (current status: {status})"
+
+  is_active:
+    description: |
+      Check that CWO status is "active".
+      Required for complete transition.
+    implementation: |
+      cwo, _ := repo.GetByID(ctx, cwo_id)
+      return cwo.Status == "active"
+    error_message: "can only complete active CWOs (current status: {status})"
+
+  cycle_is_complete:
+    description: |
+      Check that the parent cycle is complete.
+      CWO can only be completed when cycle work is done.
+    implementation: |
+      status, err := repo.GetCycleStatus(ctx, cycle_id)
+      return err == nil && status == "complete"
+    error_message: "cannot complete CWO: parent cycle is not complete (status: {cycle_status})"
+
+# =============================================================================
+# EFFECTS
+# =============================================================================
+effects:
+  WriteDB:
+    description: Database write operation
+    parameters:
+      operation: { type: enum, values: [INSERT, UPDATE, DELETE] }
+      table: { type: string }
+      fields: { type: array, items: string, optional: true }
+
+# =============================================================================
+# INVARIANTS
+# =============================================================================
+invariants:
+  - name: id_format
+    description: CWO IDs follow CWO-XXX format
+    check: id matches /^CWO-\d{3}$/
+
+  - name: id_unique
+    description: CWO IDs are unique
+    check: COUNT(SELECT id FROM cycle_work_orders WHERE id = {id}) == 1
+
+  - name: status_valid
+    description: Status is one of valid values
+    check: status IN ('draft', 'active', 'complete')
+
+  - name: cycle_reference
+    description: CWO must reference existing cycle
+    check: EXISTS(SELECT 1 FROM cycles WHERE id = cycle_id)
+
+  - name: shipment_reference
+    description: CWO must reference existing shipment
+    check: EXISTS(SELECT 1 FROM shipments WHERE id = shipment_id)
+
+  - name: cycle_unique
+    description: Each cycle can have at most one CWO (1:1)
+    check: COUNT(SELECT id FROM cycle_work_orders WHERE cycle_id = {cycle_id}) <= 1
+
+  - name: outcome_not_empty
+    description: CWO outcome must not be empty
+    check: LENGTH(outcome) > 0
+
+# =============================================================================
+# NOTES
+# =============================================================================
+notes:
+  - |
+    CWO is a "specification" entity - it defines what a cycle will deliver.
+    Unlike the parent Work Order (shipment-level), CWOs are cycle-specific slices.
+  - |
+    The 1:1 relationship with Cycle is enforced via UNIQUE constraint on cycle_id.
+    This prevents multiple CWOs being created for the same cycle.
+  - |
+    CWO can only be completed when its parent Cycle is complete.
+    This ensures the execution tracking hierarchy is maintained.
+  - |
+    Plans can optionally be linked to CWOs via the cycle_id FK.
+    This allows tracking which plans were used for which cycles.

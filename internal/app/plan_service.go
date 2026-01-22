@@ -53,6 +53,17 @@ func (s *PlanServiceImpl) CreatePlan(ctx context.Context, req primary.CreatePlan
 		}
 	}
 
+	// Validate cycle exists if provided
+	if req.CycleID != "" {
+		cycleExists, err := s.planRepo.CycleExists(ctx, req.CycleID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to validate cycle: %w", err)
+		}
+		if !cycleExists {
+			return nil, fmt.Errorf("cycle %s not found", req.CycleID)
+		}
+	}
+
 	// Get next ID
 	nextID, err := s.planRepo.GetNextID(ctx)
 	if err != nil {
@@ -64,6 +75,7 @@ func (s *PlanServiceImpl) CreatePlan(ctx context.Context, req primary.CreatePlan
 		ID:           nextID,
 		CommissionID: req.CommissionID,
 		ShipmentID:   req.ShipmentID,
+		CycleID:      req.CycleID,
 		Title:        req.Title,
 		Description:  req.Description,
 		Content:      req.Content,
@@ -99,6 +111,7 @@ func (s *PlanServiceImpl) GetPlan(ctx context.Context, planID string) (*primary.
 func (s *PlanServiceImpl) ListPlans(ctx context.Context, filters primary.PlanFilters) ([]*primary.Plan, error) {
 	records, err := s.planRepo.List(ctx, secondary.PlanFilters{
 		ShipmentID:   filters.ShipmentID,
+		CycleID:      filters.CycleID,
 		CommissionID: filters.CommissionID,
 		Status:       filters.Status,
 	})
@@ -162,6 +175,7 @@ func (s *PlanServiceImpl) recordToPlan(r *secondary.PlanRecord) *primary.Plan {
 	return &primary.Plan{
 		ID:               r.ID,
 		ShipmentID:       r.ShipmentID,
+		CycleID:          r.CycleID,
 		CommissionID:     r.CommissionID,
 		Title:            r.Title,
 		Description:      r.Description,
