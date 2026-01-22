@@ -4,130 +4,90 @@ Implementation planning ceremony - designs **how** to build what the CWO specifi
 
 ## Overview
 
-This command guides you through the structured planning ceremony that ensures:
-- Plans are aligned with AGENTS.md architecture rules
-- Plans are scoped to the active Cycle Work Order (CWO)
-- Plans are captured in the ORC ledger for tracking
-- El Presidente explicitly approves before implementation begins
+This skill guides you through planning and ensures plans are captured in the ORC ledger before implementation begins.
 
-**Boundary:** This skill is about **planning implementation**, not scoping work. The CWO (created by `/orc-cycle`) defines *what* to build. This skill plans *how* to build it.
+**Boundary:** This skill plans *how* to build. The CWO (from `/orc-cycle`) defines *what* to build.
 
 **Workflow position:**
 ```
-/orc-cycle → CWO created → El Presidente approves → /orc-plan → implement → CREC → /orc-cycle
+/orc-cycle → CWO approved → /orc-plan → implement → /orc-deliver
 ```
 
-**Prerequisite:** A CWO must exist and be approved before running this skill. If no CWO exists, run `/orc-cycle` first.
+**Prerequisite:** CWO must exist and be approved. If not, run `/orc-cycle` first.
 
 ---
 
-## PHASE 1: Context Gathering (MANDATORY)
+## PHASE 1: Context Gathering
 
-You MUST complete all steps before entering plan mode.
+Complete all steps before entering plan mode.
 
-### Step 1.1: Get Focused Shipment
+### Step 1.1: Get Current State
 
 ```bash
 ./orc status
 ```
 
-Note the focused **Shipment ID** (e.g., SHIP-207) and **Commission ID** (e.g., COMM-001).
+Note the **Shipment ID** and **Commission ID**.
 
-### Step 1.2: Read AGENTS.md (NON-NEGOTIABLE)
+### Step 1.2: Read AGENTS.md
 
 ```bash
 cat AGENTS.md
 ```
 
-**You MUST read and internalize AGENTS.md before proceeding.** This contains:
-- Architecture rules (hexagonal/ports & adapters)
-- Layer boundaries (core → ports → app → adapters → cli)
-- Testing requirements (FSM-first, table-driven tests)
-- Verification discipline (must run tests and lint)
-- Checklists for common operations
+**You MUST read AGENTS.md before proceeding.** Your plan must follow its architecture rules.
 
-**Your plan MUST follow these rules. No exceptions.**
-
-### Step 1.3: Get Work Order
-
-```bash
-./orc work_order list --shipment-id SHIP-XXX
-./orc work_order show WO-XXX
-```
-
-The Work Order defines the **overall outcome** and **acceptance criteria** for the shipment. Your plan contributes to this larger goal.
-
-### Step 1.4: Get Active Cycle Work Order
+### Step 1.3: Get the CWO
 
 ```bash
 ./orc cwo list --shipment-id SHIP-XXX
 ./orc cwo show CWO-XXX
 ```
 
-**Check:** The CWO must exist and be approved (Cycle status: `approved`). If no CWO exists or it's still in draft, stop and run `/orc-cycle` first to create/approve one.
+Note the **CWO ID** and **Cycle ID**. The CWO defines this cycle's scope - your plan must achieve its outcome and meet its acceptance criteria.
 
-The CWO defines **this cycle's specific scope**. Your plan must:
-- Achieve the CWO outcome
-- Meet all CWO acceptance criteria
-- Stay within the CWO scope (don't gold-plate)
-
-### Step 1.5: Note the Cycle ID
-
-The CWO belongs to a Cycle (e.g., CYC-003). Note this ID - you'll need it when capturing the plan to the ledger.
+**Guard:** Cycle status must be `approved`. If not, run `/orc-cycle` first.
 
 ---
 
-## PHASE 2: Planning
+## PHASE 2: Design the Plan
 
 ### Step 2.1: Enter Plan Mode
 
 Use the `EnterPlanMode` tool now.
 
-### Step 2.2: Handle Stale Plan Files
+### Step 2.2: Design Your Plan
 
-**IMPORTANT:** If Claude Code loads a plan file from a previous session, DISCARD its contents entirely. Start fresh based on the CWO you just read.
+Include in your plan:
 
-### Step 2.3: Design Your Implementation Plan
+1. **Goal** - The CWO outcome (copy from CWO)
+2. **Acceptance Criteria Mapping** - How each criterion will be met
+3. **Files to Modify** - Specific files and what changes
+4. **Implementation Steps** - Concrete steps with AGENTS.md checklist references
+5. **Verification** - `make test`, `make lint`, manual checks
 
-Your plan must include:
+### Step 2.3: Exit Plan Mode
 
-1. **Goal Statement** - What the CWO outcome is (copy from CWO)
-
-2. **Approach** - High-level strategy for achieving the goal
-
-3. **Implementation Steps** - Concrete steps, referencing:
-   - Specific files to create/modify
-   - Which AGENTS.md checklist applies (e.g., "Add CLI Command", "Add Field to Entity")
-   - Architecture layer each change belongs to
-
-4. **Verification Steps** - How to confirm the work is complete:
-   - [ ] `make test` passes
-   - [ ] `make lint` passes
-   - [ ] Manual verification steps (if applicable)
-
-5. **Acceptance Criteria Mapping** - Show how each CWO criterion will be met
-
-### Step 2.4: Exit Plan Mode
-
-When your plan is ready, use `ExitPlanMode` to present it for El Presidente's approval.
+When ready, use `ExitPlanMode` to present for El Presidente's approval.
 
 ---
 
-## PHASE 3: After Approval (CRITICAL)
+## PHASE 3: Persist to Ledger
 
-When El Presidente approves your plan, you MUST immediately capture it to the ORC ledger before beginning any implementation.
+**TRIGGER:** When you see the "Exited Plan Mode" system message, execute this phase IMMEDIATELY.
 
-### Step 3.1: Capture Plan to Ledger
+The message will include: `The plan file is located at /Users/.../.claude/plans/PLAN_FILE.md`
+
+### Step 3.1: Create Plan in Ledger
+
+Using the plan file path from the message and IDs from Phase 1:
 
 ```bash
-./orc plan create "Your Plan Title" \
+./orc plan create "PLAN_TITLE" \
   --cycle-id CYC-XXX \
-  --commission COMM-XXX \
   --shipment SHIP-XXX \
-  --content "$(cat ~/.claude/plans/<plan-file>.md)"
+  --content "$(cat PLAN_FILE_PATH)"
 ```
-
-Use the Cycle ID, Commission ID, and Shipment ID from Phase 1.
 
 ### Step 3.2: Approve the Plan
 
@@ -135,55 +95,65 @@ Use the Cycle ID, Commission ID, and Shipment ID from Phase 1.
 ./orc plan approve PLAN-XXX
 ```
 
-Use the PLAN ID returned from the create command.
+This transitions the Cycle to `implementing` status.
 
-### Step 3.3: Confirm Success
+### Step 3.3: Confirm
 
 ```bash
 ./orc plan show PLAN-XXX
+./orc cycle show CYC-XXX
 ```
 
-Verify the plan is captured with status `approved`.
+**Gates (must pass before implementation):**
+- [ ] Plan status: `approved`
+- [ ] Cycle status: `implementing`
+
+Report to El Presidente: "Plan PLAN-XXX approved. Cycle CYC-XXX is now implementing. Ready to begin?"
 
 ---
 
-## PHASE 4: Begin Implementation
+## PHASE 4: Implementation
 
-Only after the plan is captured and approved in the ORC ledger may you begin implementation.
+Only after Phase 3 gates pass may you begin implementation.
 
 Follow your plan. Follow AGENTS.md. Run verification at the end.
 
-**After implementation is complete:**
-Run `/orc-deliver` to close out the cycle.
+**When complete:** Run `/orc-deliver` to close the cycle.
 
 ---
 
 ## Quick Reference
 
 ```
-PREREQUISITE: CWO exists and approved (from /orc-cycle)
-    │
-    ▼
 /orc-plan
     │
     ▼
-PHASE 1: Context (orc status, AGENTS.md, WO, CWO)
+PHASE 1: ./orc status, cat AGENTS.md, ./orc cwo show
     │
     ▼
 PHASE 2: EnterPlanMode → Design → ExitPlanMode
     │
     ▼
-El Presidente Approves
+[El Presidente approves in Claude Code]
     │
     ▼
-PHASE 3: orc plan create → orc plan approve
+[System message: "Exited Plan Mode... plan file at X"]
     │
     ▼
-PHASE 4: Implementation
+PHASE 3: ./orc plan create → ./orc plan approve → Cycle: implementing
     │
     ▼
-CREC created → El Presidente verifies
-    │
-    ▼
-HANDOFF: /orc-cycle (reflects CREC, plucks next cycle)
+PHASE 4: Implementation → /orc-deliver
 ```
+
+---
+
+## Edge Cases
+
+| Situation | Handling |
+|-----------|----------|
+| Cycle not `approved` | Stop. Run `/orc-cycle` first. |
+| No CWO exists | Stop. Run `/orc-cycle` first. |
+| Plan create fails | Check cycle-id, shipment flags. Retry. |
+| Cycle not `implementing` after approve | Check `./orc plan show` - plan may not be linked to cycle. |
+| Stale plan file loaded | Discard old content, start fresh from current CWO. |
