@@ -9,96 +9,31 @@ import (
 
 	"github.com/example/orc/internal/adapters/sqlite"
 	corecommission "github.com/example/orc/internal/core/commission"
+	"github.com/example/orc/internal/db"
 	"github.com/example/orc/internal/ports/secondary"
 )
 
+// setupTestDB creates an in-memory database with the authoritative schema.
+// Uses db.GetSchemaSQL() to prevent test schemas from drifting.
 func setupTestDB(t *testing.T) *sql.DB {
 	t.Helper()
 
-	db, err := sql.Open("sqlite3", ":memory:")
+	testDB, err := sql.Open("sqlite3", ":memory:")
 	if err != nil {
 		t.Fatalf("failed to open test db: %v", err)
 	}
 
-	// Create commissions table
-	_, err = db.Exec(`
-		CREATE TABLE commissions (
-			id TEXT PRIMARY KEY,
-			title TEXT NOT NULL,
-			description TEXT,
-			status TEXT NOT NULL DEFAULT 'active',
-			pinned INTEGER NOT NULL DEFAULT 0,
-			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-			completed_at DATETIME
-		)
-	`)
+	// Use the authoritative schema from schema.go
+	_, err = testDB.Exec(db.GetSchemaSQL())
 	if err != nil {
-		t.Fatalf("failed to create commissions table: %v", err)
-	}
-
-	// Create shipments table for CountShipments test
-	_, err = db.Exec(`
-		CREATE TABLE shipments (
-			id TEXT PRIMARY KEY,
-			commission_id TEXT NOT NULL,
-			title TEXT NOT NULL,
-			status TEXT NOT NULL DEFAULT 'active'
-		)
-	`)
-	if err != nil {
-		t.Fatalf("failed to create shipments table: %v", err)
-	}
-
-	// Create repos table
-	_, err = db.Exec(`
-		CREATE TABLE repos (
-			id TEXT PRIMARY KEY,
-			name TEXT NOT NULL UNIQUE,
-			url TEXT,
-			local_path TEXT,
-			default_branch TEXT DEFAULT 'main',
-			status TEXT NOT NULL CHECK(status IN ('active', 'archived')) DEFAULT 'active',
-			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-		)
-	`)
-	if err != nil {
-		t.Fatalf("failed to create repos table: %v", err)
-	}
-
-	// Create prs table
-	_, err = db.Exec(`
-		CREATE TABLE prs (
-			id TEXT PRIMARY KEY,
-			shipment_id TEXT NOT NULL UNIQUE,
-			repo_id TEXT NOT NULL,
-			commission_id TEXT NOT NULL,
-			number INTEGER,
-			title TEXT NOT NULL,
-			description TEXT,
-			branch TEXT NOT NULL,
-			target_branch TEXT,
-			url TEXT,
-			status TEXT NOT NULL CHECK(status IN ('draft', 'open', 'approved', 'merged', 'closed')) DEFAULT 'open',
-			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-			merged_at DATETIME,
-			closed_at DATETIME,
-			FOREIGN KEY (shipment_id) REFERENCES shipments(id) ON DELETE CASCADE,
-			FOREIGN KEY (repo_id) REFERENCES repos(id),
-			FOREIGN KEY (commission_id) REFERENCES commissions(id)
-		)
-	`)
-	if err != nil {
-		t.Fatalf("failed to create prs table: %v", err)
+		t.Fatalf("failed to create schema: %v", err)
 	}
 
 	t.Cleanup(func() {
-		db.Close()
+		testDB.Close()
 	})
 
-	return db
+	return testDB
 }
 
 // createTestCommission is a helper that simulates service-layer behavior:

@@ -8,78 +8,35 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 
 	"github.com/example/orc/internal/adapters/sqlite"
+	"github.com/example/orc/internal/db"
 	"github.com/example/orc/internal/ports/secondary"
 )
 
+// setupQuestionTestDB creates an in-memory database with the authoritative schema.
+// Uses db.GetSchemaSQL() to prevent test schemas from drifting.
 func setupQuestionTestDB(t *testing.T) *sql.DB {
 	t.Helper()
 
-	db, err := sql.Open("sqlite3", ":memory:")
+	testDB, err := sql.Open("sqlite3", ":memory:")
 	if err != nil {
 		t.Fatalf("failed to open test db: %v", err)
 	}
 
-	// Create missions table
-	_, err = db.Exec(`
-		CREATE TABLE commissions (
-			id TEXT PRIMARY KEY,
-			title TEXT NOT NULL,
-			status TEXT NOT NULL DEFAULT 'active',
-			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-		)
-	`)
+	// Use the authoritative schema from schema.go
+	_, err = testDB.Exec(db.GetSchemaSQL())
 	if err != nil {
-		t.Fatalf("failed to create missions table: %v", err)
-	}
-
-	// Create investigations table
-	_, err = db.Exec(`
-		CREATE TABLE investigations (
-			id TEXT PRIMARY KEY,
-			commission_id TEXT NOT NULL,
-			title TEXT NOT NULL,
-			status TEXT NOT NULL DEFAULT 'active',
-			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-		)
-	`)
-	if err != nil {
-		t.Fatalf("failed to create investigations table: %v", err)
-	}
-
-	// Create questions table
-	_, err = db.Exec(`
-		CREATE TABLE questions (
-			id TEXT PRIMARY KEY,
-			investigation_id TEXT,
-			commission_id TEXT NOT NULL,
-			title TEXT NOT NULL,
-			description TEXT,
-			status TEXT NOT NULL DEFAULT 'open',
-			answer TEXT,
-			pinned INTEGER NOT NULL DEFAULT 0,
-			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-			answered_at DATETIME,
-			conclave_id TEXT,
-			promoted_from_id TEXT,
-			promoted_from_type TEXT
-		)
-	`)
-	if err != nil {
-		t.Fatalf("failed to create questions table: %v", err)
+		t.Fatalf("failed to create schema: %v", err)
 	}
 
 	// Insert test data
-	_, _ = db.Exec("INSERT INTO commissions (id, title, status) VALUES ('MISSION-001', 'Test Mission', 'active')")
-	_, _ = db.Exec("INSERT INTO investigations (id, commission_id, title, status) VALUES ('INV-001', 'MISSION-001', 'Test Investigation', 'active')")
+	_, _ = testDB.Exec("INSERT INTO commissions (id, title, status) VALUES ('MISSION-001', 'Test Mission', 'active')")
+	_, _ = testDB.Exec("INSERT INTO investigations (id, commission_id, title, status) VALUES ('INV-001', 'MISSION-001', 'Test Investigation', 'open')")
 
 	t.Cleanup(func() {
-		db.Close()
+		testDB.Close()
 	})
 
-	return db
+	return testDB
 }
 
 // createTestQuestion is a helper that creates a question with a generated ID.

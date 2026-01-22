@@ -8,50 +8,31 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 
 	"github.com/example/orc/internal/adapters/sqlite"
+	"github.com/example/orc/internal/db"
 	"github.com/example/orc/internal/ports/secondary"
 )
 
+// setupTagTestDB creates an in-memory database with the authoritative schema.
+// Uses db.GetSchemaSQL() to prevent test schemas from drifting.
 func setupTagTestDB(t *testing.T) *sql.DB {
 	t.Helper()
 
-	db, err := sql.Open("sqlite3", ":memory:")
+	testDB, err := sql.Open("sqlite3", ":memory:")
 	if err != nil {
 		t.Fatalf("failed to open test db: %v", err)
 	}
 
-	// Create tags table
-	_, err = db.Exec(`
-		CREATE TABLE tags (
-			id TEXT PRIMARY KEY,
-			name TEXT NOT NULL UNIQUE,
-			description TEXT,
-			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-		)
-	`)
+	// Use the authoritative schema from schema.go
+	_, err = testDB.Exec(db.GetSchemaSQL())
 	if err != nil {
-		t.Fatalf("failed to create tags table: %v", err)
-	}
-
-	// Create entity_tags table
-	_, err = db.Exec(`
-		CREATE TABLE entity_tags (
-			id TEXT PRIMARY KEY,
-			entity_id TEXT NOT NULL,
-			entity_type TEXT NOT NULL,
-			tag_id TEXT NOT NULL,
-			created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-		)
-	`)
-	if err != nil {
-		t.Fatalf("failed to create entity_tags table: %v", err)
+		t.Fatalf("failed to create schema: %v", err)
 	}
 
 	t.Cleanup(func() {
-		db.Close()
+		testDB.Close()
 	})
 
-	return db
+	return testDB
 }
 
 // createTestTag is a helper that creates a tag with a generated ID.

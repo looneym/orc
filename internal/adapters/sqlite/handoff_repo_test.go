@@ -8,37 +8,31 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 
 	"github.com/example/orc/internal/adapters/sqlite"
+	"github.com/example/orc/internal/db"
 	"github.com/example/orc/internal/ports/secondary"
 )
 
+// setupHandoffTestDB creates an in-memory database with the authoritative schema.
+// Uses db.GetSchemaSQL() to prevent test schemas from drifting.
 func setupHandoffTestDB(t *testing.T) *sql.DB {
 	t.Helper()
 
-	db, err := sql.Open("sqlite3", ":memory:")
+	testDB, err := sql.Open("sqlite3", ":memory:")
 	if err != nil {
 		t.Fatalf("failed to open test db: %v", err)
 	}
 
-	// Create handoffs table
-	_, err = db.Exec(`
-		CREATE TABLE handoffs (
-			id TEXT PRIMARY KEY,
-			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-			handoff_note TEXT NOT NULL,
-			active_commission_id TEXT,
-			active_grove_id TEXT,
-			todos_snapshot TEXT
-		)
-	`)
+	// Use the authoritative schema from schema.go
+	_, err = testDB.Exec(db.GetSchemaSQL())
 	if err != nil {
-		t.Fatalf("failed to create handoffs table: %v", err)
+		t.Fatalf("failed to create schema: %v", err)
 	}
 
 	t.Cleanup(func() {
-		db.Close()
+		testDB.Close()
 	})
 
-	return db
+	return testDB
 }
 
 // createTestHandoff is a helper that creates a handoff with a generated ID.

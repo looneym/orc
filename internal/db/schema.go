@@ -1,11 +1,14 @@
 package db
 
-// schemaSQL is the complete modern schema for fresh ORC installs.
+// SchemaSQL is the complete modern schema for fresh ORC installs.
 // This schema reflects the current state after all migrations.
 // IMPORTANT: Keep this in sync with migrations. Use Atlas to verify:
 //
 //	atlas schema diff --from "sqlite:///$HOME/.orc/orc.db" --to "sqlite:///tmp/fresh.db" --dev-url "sqlite://dev?mode=memory"
-const schemaSQL = `
+//
+// This constant is exported so tests can use the authoritative schema
+// instead of maintaining duplicate schemas that can drift.
+const SchemaSQL = `
 -- Tags (generic tagging system)
 CREATE TABLE IF NOT EXISTS tags (
 	id TEXT PRIMARY KEY,
@@ -105,7 +108,7 @@ CREATE TABLE IF NOT EXISTS shipments (
 	commission_id TEXT NOT NULL,
 	title TEXT NOT NULL,
 	description TEXT,
-	status TEXT NOT NULL CHECK(status IN ('active', 'paused', 'complete')) DEFAULT 'active',
+	status TEXT NOT NULL CHECK(status IN ('active', 'in_progress', 'paused', 'complete')) DEFAULT 'active',
 	assigned_workbench_id TEXT,
 	pinned INTEGER DEFAULT 0,
 	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -122,13 +125,15 @@ CREATE TABLE IF NOT EXISTS investigations (
 	shipment_id TEXT,
 	title TEXT NOT NULL,
 	description TEXT,
-	status TEXT NOT NULL CHECK(status IN ('open', 'in_progress', 'resolved', 'closed')) DEFAULT 'open',
+	status TEXT NOT NULL CHECK(status IN ('active', 'in_progress', 'resolved', 'complete')) DEFAULT 'active',
+	assigned_workbench_id TEXT,
 	pinned INTEGER DEFAULT 0,
 	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 	updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-	resolved_at DATETIME,
+	completed_at DATETIME,
 	FOREIGN KEY (commission_id) REFERENCES commissions(id),
-	FOREIGN KEY (shipment_id) REFERENCES shipments(id)
+	FOREIGN KEY (shipment_id) REFERENCES shipments(id),
+	FOREIGN KEY (assigned_workbench_id) REFERENCES workbenches(id)
 );
 
 -- Tomes (Knowledge containers)
@@ -167,17 +172,28 @@ CREATE TABLE IF NOT EXISTS tasks (
 	FOREIGN KEY (assigned_workbench_id) REFERENCES workbenches(id)
 );
 
+-- Operations (Legacy work units - migrated from missions era)
+CREATE TABLE IF NOT EXISTS operations (
+	id TEXT PRIMARY KEY,
+	commission_id TEXT NOT NULL,
+	title TEXT NOT NULL,
+	description TEXT,
+	status TEXT NOT NULL CHECK(status IN ('ready', 'in_progress', 'complete')) DEFAULT 'ready',
+	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+	updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+	completed_at DATETIME,
+	FOREIGN KEY (commission_id) REFERENCES commissions(id)
+);
+
 -- Handoffs (Claude-to-Claude context transfer)
 CREATE TABLE IF NOT EXISTS handoffs (
 	id TEXT PRIMARY KEY,
 	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 	handoff_note TEXT NOT NULL,
 	active_commission_id TEXT,
-	active_work_orders TEXT,
-	active_workbench_id TEXT,
+	active_grove_id TEXT,
 	todos_snapshot TEXT,
-	FOREIGN KEY (active_commission_id) REFERENCES commissions(id),
-	FOREIGN KEY (active_workbench_id) REFERENCES workbenches(id)
+	FOREIGN KEY (active_commission_id) REFERENCES commissions(id)
 );
 
 -- PRs (Pull requests)
@@ -215,10 +231,12 @@ CREATE TABLE IF NOT EXISTS plans (
 	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 	updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 	approved_at DATETIME,
+	conclave_id TEXT,
 	promoted_from_id TEXT,
 	promoted_from_type TEXT,
 	FOREIGN KEY (commission_id) REFERENCES commissions(id),
-	FOREIGN KEY (shipment_id) REFERENCES shipments(id) ON DELETE SET NULL
+	FOREIGN KEY (shipment_id) REFERENCES shipments(id) ON DELETE SET NULL,
+	FOREIGN KEY (conclave_id) REFERENCES conclaves(id) ON DELETE SET NULL
 );
 
 -- Conclaves (Decision containers)
@@ -248,7 +266,7 @@ CREATE TABLE IF NOT EXISTS notes (
 	tome_id TEXT,
 	title TEXT NOT NULL,
 	content TEXT,
-	type TEXT CHECK(type IN ('learning', 'concern', 'finding', 'frq', 'bug', 'investigation_report')),
+	type TEXT,
 	status TEXT NOT NULL CHECK(status IN ('open', 'resolved', 'closed')) DEFAULT 'open',
 	pinned INTEGER DEFAULT 0,
 	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -315,6 +333,7 @@ CREATE INDEX IF NOT EXISTS idx_tasks_shipment ON tasks(shipment_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_commission ON tasks(commission_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
 CREATE INDEX IF NOT EXISTS idx_tasks_workbench ON tasks(assigned_workbench_id);
+CREATE INDEX IF NOT EXISTS idx_operations_commission ON operations(commission_id);
 CREATE INDEX IF NOT EXISTS idx_handoffs_created ON handoffs(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_prs_shipment ON prs(shipment_id);
 CREATE INDEX IF NOT EXISTS idx_prs_repo ON prs(repo_id);
@@ -358,7 +377,7 @@ func InitSchema() error {
 		} else {
 			// Completely fresh install - create modern schema directly
 			// Also create schema_version at max version to prevent migrations from running
-			_, err = db.Exec(schemaSQL)
+			_, err = db.Exec(SchemaSQL)
 			if err != nil {
 				return err
 			}
@@ -385,4 +404,10 @@ func InitSchema() error {
 
 	// schema_version table exists - run any pending migrations
 	return RunMigrations()
+}
+
+// GetSchemaSQL returns the authoritative schema SQL for use by tests.
+// Tests should use this instead of hardcoding their own schema to prevent drift.
+func GetSchemaSQL() string {
+	return SchemaSQL
 }

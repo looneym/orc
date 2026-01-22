@@ -8,125 +8,35 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 
 	"github.com/example/orc/internal/adapters/sqlite"
+	"github.com/example/orc/internal/db"
 	"github.com/example/orc/internal/ports/secondary"
 )
 
+// setupTaskTestDB creates an in-memory database with the authoritative schema.
+// Uses db.GetSchemaSQL() to prevent test schemas from drifting.
 func setupTaskTestDB(t *testing.T) *sql.DB {
 	t.Helper()
 
-	db, err := sql.Open("sqlite3", ":memory:")
+	testDB, err := sql.Open("sqlite3", ":memory:")
 	if err != nil {
 		t.Fatalf("failed to open test db: %v", err)
 	}
 
-	// Create missions table
-	_, err = db.Exec(`
-		CREATE TABLE commissions (
-			id TEXT PRIMARY KEY,
-			title TEXT NOT NULL,
-			status TEXT NOT NULL DEFAULT 'active',
-			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-		)
-	`)
+	// Use the authoritative schema from schema.go
+	_, err = testDB.Exec(db.GetSchemaSQL())
 	if err != nil {
-		t.Fatalf("failed to create missions table: %v", err)
-	}
-
-	// Create shipments table
-	_, err = db.Exec(`
-		CREATE TABLE shipments (
-			id TEXT PRIMARY KEY,
-			commission_id TEXT NOT NULL,
-			title TEXT NOT NULL,
-			status TEXT NOT NULL DEFAULT 'active',
-			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-		)
-	`)
-	if err != nil {
-		t.Fatalf("failed to create shipments table: %v", err)
-	}
-
-	// Create groves table
-	_, err = db.Exec(`
-		CREATE TABLE groves (
-			id TEXT PRIMARY KEY,
-			commission_id TEXT NOT NULL,
-			name TEXT NOT NULL,
-			status TEXT NOT NULL DEFAULT 'active',
-			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-		)
-	`)
-	if err != nil {
-		t.Fatalf("failed to create groves table: %v", err)
-	}
-
-	// Create tasks table
-	_, err = db.Exec(`
-		CREATE TABLE tasks (
-			id TEXT PRIMARY KEY,
-			shipment_id TEXT,
-			commission_id TEXT NOT NULL,
-			title TEXT NOT NULL,
-			description TEXT,
-			type TEXT,
-			status TEXT NOT NULL DEFAULT 'ready',
-			priority TEXT,
-			assigned_workbench_id TEXT,
-			pinned INTEGER NOT NULL DEFAULT 0,
-			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-			claimed_at DATETIME,
-			completed_at DATETIME,
-			conclave_id TEXT,
-			promoted_from_id TEXT,
-			promoted_from_type TEXT
-		)
-	`)
-	if err != nil {
-		t.Fatalf("failed to create tasks table: %v", err)
-	}
-
-	// Create tags table
-	_, err = db.Exec(`
-		CREATE TABLE tags (
-			id TEXT PRIMARY KEY,
-			name TEXT NOT NULL UNIQUE,
-			description TEXT,
-			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-		)
-	`)
-	if err != nil {
-		t.Fatalf("failed to create tags table: %v", err)
-	}
-
-	// Create entity_tags table
-	_, err = db.Exec(`
-		CREATE TABLE entity_tags (
-			id TEXT PRIMARY KEY,
-			entity_id TEXT NOT NULL,
-			entity_type TEXT NOT NULL,
-			tag_id TEXT NOT NULL,
-			created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-		)
-	`)
-	if err != nil {
-		t.Fatalf("failed to create entity_tags table: %v", err)
+		t.Fatalf("failed to create schema: %v", err)
 	}
 
 	// Insert test data
-	_, _ = db.Exec("INSERT INTO commissions (id, title, status) VALUES ('MISSION-001', 'Test Mission', 'active')")
-	_, _ = db.Exec("INSERT INTO shipments (id, commission_id, title, status) VALUES ('SHIP-001', 'MISSION-001', 'Test Shipment', 'active')")
-	_, _ = db.Exec("INSERT INTO groves (id, commission_id, name, status) VALUES ('GROVE-001', 'MISSION-001', 'test-grove', 'active')")
+	_, _ = testDB.Exec("INSERT INTO commissions (id, title, status) VALUES ('MISSION-001', 'Test Mission', 'active')")
+	_, _ = testDB.Exec("INSERT INTO shipments (id, commission_id, title, status) VALUES ('SHIP-001', 'MISSION-001', 'Test Shipment', 'active')")
 
 	t.Cleanup(func() {
-		db.Close()
+		testDB.Close()
 	})
 
-	return db
+	return testDB
 }
 
 // createTestTask is a helper that creates a task with a generated ID.
