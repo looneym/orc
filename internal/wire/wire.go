@@ -36,6 +36,8 @@ var (
 	factoryService                 primary.FactoryService
 	workshopService                primary.WorkshopService
 	workbenchService               primary.WorkbenchService
+	workOrderService               primary.WorkOrderService
+	cycleService                   primary.CycleService
 	commissionOrchestrationService *app.CommissionOrchestrationService
 	tmuxService                    secondary.TMuxAdapter
 	once                           sync.Once
@@ -143,6 +145,18 @@ func WorkbenchService() primary.WorkbenchService {
 	return workbenchService
 }
 
+// WorkOrderService returns the singleton WorkOrderService instance.
+func WorkOrderService() primary.WorkOrderService {
+	once.Do(initServices)
+	return workOrderService
+}
+
+// CycleService returns the singleton CycleService instance.
+func CycleService() primary.CycleService {
+	once.Do(initServices)
+	return cycleService
+}
+
 // CommissionOrchestrationService returns the singleton CommissionOrchestrationService instance.
 func CommissionOrchestrationService() *app.CommissionOrchestrationService {
 	once.Do(initServices)
@@ -221,6 +235,12 @@ func initServices() {
 	factoryService = app.NewFactoryService(factoryRepo)
 	workshopService = app.NewWorkshopService(workshopRepo)
 	workbenchService = app.NewWorkbenchService(workbenchRepo, workshopRepo, agentProvider, executor)
+
+	// Create work order and cycle services
+	workOrderRepo := sqlite.NewWorkOrderRepository(database)
+	cycleRepo := sqlite.NewCycleRepository(database)
+	workOrderService = app.NewWorkOrderService(workOrderRepo)
+	cycleService = app.NewCycleService(cycleRepo)
 
 	// Create orchestration services
 	commissionOrchestrationService = app.NewCommissionOrchestrationService(commissionService, agentProvider)

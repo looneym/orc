@@ -345,6 +345,38 @@ CREATE INDEX IF NOT EXISTS idx_conclaves_commission ON conclaves(commission_id);
 CREATE INDEX IF NOT EXISTS idx_conclaves_status ON conclaves(status);
 CREATE INDEX IF NOT EXISTS idx_notes_commission ON notes(commission_id);
 CREATE INDEX IF NOT EXISTS idx_notes_shipment ON notes(shipment_id);
+
+-- Work Orders (1:1 with Shipment)
+CREATE TABLE IF NOT EXISTS work_orders (
+	id TEXT PRIMARY KEY,
+	shipment_id TEXT NOT NULL UNIQUE,
+	outcome TEXT NOT NULL,
+	acceptance_criteria TEXT,  -- JSON array of criteria
+	status TEXT NOT NULL CHECK(status IN ('draft', 'active', 'complete')) DEFAULT 'draft',
+	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+	updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+	FOREIGN KEY (shipment_id) REFERENCES shipments(id) ON DELETE CASCADE
+);
+
+-- Cycles (n:1 with Shipment, ordered)
+CREATE TABLE IF NOT EXISTS cycles (
+	id TEXT PRIMARY KEY,
+	shipment_id TEXT NOT NULL,
+	sequence_number INTEGER NOT NULL,
+	status TEXT NOT NULL CHECK(status IN ('queued', 'active', 'complete')) DEFAULT 'queued',
+	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+	updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+	started_at DATETIME,
+	completed_at DATETIME,
+	FOREIGN KEY (shipment_id) REFERENCES shipments(id) ON DELETE CASCADE,
+	UNIQUE(shipment_id, sequence_number)
+);
+
+CREATE INDEX IF NOT EXISTS idx_work_orders_shipment ON work_orders(shipment_id);
+CREATE INDEX IF NOT EXISTS idx_work_orders_status ON work_orders(status);
+CREATE INDEX IF NOT EXISTS idx_cycles_shipment ON cycles(shipment_id);
+CREATE INDEX IF NOT EXISTS idx_cycles_status ON cycles(status);
+CREATE INDEX IF NOT EXISTS idx_cycles_sequence ON cycles(shipment_id, sequence_number);
 `
 
 // InitSchema creates the database schema
@@ -390,7 +422,7 @@ func InitSchema() error {
 				return err
 			}
 			// Insert all migration versions as applied
-			for i := 1; i <= 33; i++ {
+			for i := 1; i <= 34; i++ {
 				_, err = db.Exec("INSERT INTO schema_version (version) VALUES (?)", i)
 				if err != nil {
 					return err

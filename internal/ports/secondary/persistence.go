@@ -989,3 +989,107 @@ type WorkbenchRecord struct {
 	CreatedAt    string
 	UpdatedAt    string
 }
+
+// WorkOrderRepository defines the secondary port for workOrder persistence.
+type WorkOrderRepository interface {
+	// Create persists a new workOrder.
+	Create(ctx context.Context, workOrder *WorkOrderRecord) error
+
+	// GetByID retrieves a workOrder by its ID.
+	GetByID(ctx context.Context, id string) (*WorkOrderRecord, error)
+
+	// List retrieves work_orders matching the given filters.
+	List(ctx context.Context, filters WorkOrderFilters) ([]*WorkOrderRecord, error)
+
+	// Update updates an existing workOrder.
+	Update(ctx context.Context, workOrder *WorkOrderRecord) error
+
+	// Delete removes a workOrder from persistence.
+	Delete(ctx context.Context, id string) error
+
+	// GetNextID returns the next available workOrder ID.
+	GetNextID(ctx context.Context) (string, error)
+
+	// ShipmentExists checks if a shipment exists.
+	ShipmentExists(ctx context.Context, shipmentID string) (bool, error)
+
+	// ShipmentHasWorkOrder checks if a shipment already has a workOrder (for 1:1 relationships).
+	ShipmentHasWorkOrder(ctx context.Context, shipmentID string) (bool, error)
+
+	// GetByShipment retrieves a work order by its shipment ID.
+	GetByShipment(ctx context.Context, shipmentID string) (*WorkOrderRecord, error)
+
+	// UpdateStatus updates the status of a work order.
+	UpdateStatus(ctx context.Context, id, status string) error
+}
+
+// WorkOrderRecord represents a workOrder as stored in persistence.
+type WorkOrderRecord struct {
+	ID                 string
+	ShipmentID         string
+	Outcome            string
+	AcceptanceCriteria string // JSON array, empty string means null
+	Status             string
+	CreatedAt          string
+	UpdatedAt          string
+}
+
+// WorkOrderFilters contains filter options for querying work_orders.
+type WorkOrderFilters struct {
+	ShipmentID string
+	Status     string
+}
+
+// CycleRepository defines the secondary port for cycle persistence.
+type CycleRepository interface {
+	// Create persists a new cycle.
+	Create(ctx context.Context, cycle *CycleRecord) error
+
+	// GetByID retrieves a cycle by its ID.
+	GetByID(ctx context.Context, id string) (*CycleRecord, error)
+
+	// List retrieves cycles matching the given filters.
+	List(ctx context.Context, filters CycleFilters) ([]*CycleRecord, error)
+
+	// Update updates an existing cycle.
+	Update(ctx context.Context, cycle *CycleRecord) error
+
+	// Delete removes a cycle from persistence.
+	Delete(ctx context.Context, id string) error
+
+	// GetNextID returns the next available cycle ID.
+	GetNextID(ctx context.Context) (string, error)
+
+	// ShipmentExists checks if a shipment exists.
+	ShipmentExists(ctx context.Context, shipmentID string) (bool, error)
+
+	// GetNextSequenceNumber returns the next sequence number for a shipment.
+	GetNextSequenceNumber(ctx context.Context, shipmentID string) (int64, error)
+
+	// GetActiveCycle returns the active cycle for a shipment (if any).
+	GetActiveCycle(ctx context.Context, shipmentID string) (*CycleRecord, error)
+
+	// GetByShipmentAndSequence returns a specific cycle by shipment and sequence number.
+	GetByShipmentAndSequence(ctx context.Context, shipmentID string, seq int64) (*CycleRecord, error)
+
+	// UpdateStatus updates cycle status and optional timestamps.
+	UpdateStatus(ctx context.Context, id, status string, setStarted, setCompleted bool) error
+}
+
+// CycleRecord represents a cycle as stored in persistence.
+type CycleRecord struct {
+	ID             string
+	ShipmentID     string
+	SequenceNumber int64
+	Status         string
+	CreatedAt      string
+	UpdatedAt      string
+	StartedAt      string // Empty string means null
+	CompletedAt    string // Empty string means null
+}
+
+// CycleFilters contains filter options for querying cycles.
+type CycleFilters struct {
+	ShipmentID string
+	Status     string
+}

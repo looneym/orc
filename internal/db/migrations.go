@@ -179,6 +179,11 @@ var migrations = []Migration{
 		Name:    "simplify_conclave_statuses",
 		Up:      migrationV33,
 	},
+	{
+		Version: 34,
+		Name:    "add_work_orders_and_cycles_tables",
+		Up:      migrationV34,
+	},
 }
 
 // RunMigrations executes all pending migrations
@@ -3673,6 +3678,59 @@ func migrationV33(db *sql.DB) error {
 	`)
 	if err != nil {
 		return fmt.Errorf("failed to recreate conclaves table: %w", err)
+	}
+
+	return nil
+}
+
+// migrationV34 adds work_orders and cycles tables for Spec-Kit execution tracking
+func migrationV34(db *sql.DB) error {
+	// Create work_orders table (1:1 with Shipment)
+	_, err := db.Exec(`
+		CREATE TABLE IF NOT EXISTS work_orders (
+			id TEXT PRIMARY KEY,
+			shipment_id TEXT NOT NULL UNIQUE,
+			outcome TEXT NOT NULL,
+			acceptance_criteria TEXT,
+			status TEXT NOT NULL CHECK(status IN ('draft', 'active', 'complete')) DEFAULT 'draft',
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			FOREIGN KEY (shipment_id) REFERENCES shipments(id) ON DELETE CASCADE
+		)
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to create work_orders table: %w", err)
+	}
+
+	// Create cycles table (n:1 with Shipment)
+	_, err = db.Exec(`
+		CREATE TABLE IF NOT EXISTS cycles (
+			id TEXT PRIMARY KEY,
+			shipment_id TEXT NOT NULL,
+			sequence_number INTEGER NOT NULL,
+			status TEXT NOT NULL CHECK(status IN ('queued', 'active', 'complete')) DEFAULT 'queued',
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			started_at DATETIME,
+			completed_at DATETIME,
+			FOREIGN KEY (shipment_id) REFERENCES shipments(id) ON DELETE CASCADE,
+			UNIQUE(shipment_id, sequence_number)
+		)
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to create cycles table: %w", err)
+	}
+
+	// Create indexes
+	_, err = db.Exec(`
+		CREATE INDEX IF NOT EXISTS idx_work_orders_shipment ON work_orders(shipment_id);
+		CREATE INDEX IF NOT EXISTS idx_work_orders_status ON work_orders(status);
+		CREATE INDEX IF NOT EXISTS idx_cycles_shipment ON cycles(shipment_id);
+		CREATE INDEX IF NOT EXISTS idx_cycles_status ON cycles(status);
+		CREATE INDEX IF NOT EXISTS idx_cycles_sequence ON cycles(shipment_id, sequence_number)
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to create indexes: %w", err)
 	}
 
 	return nil

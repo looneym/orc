@@ -149,13 +149,13 @@ func TestPluralize(t *testing.T) {
 
 func TestParseParent(t *testing.T) {
 	tests := []struct {
-		name        string
-		input       string
-		wantEntity  string
-		wantFK      string
-		wantTable   string
-		wantCard    string
-		wantErr     bool
+		name       string
+		input      string
+		wantEntity string
+		wantFK     string
+		wantTable  string
+		wantCard   string
+		wantErr    bool
 	}{
 		{"empty", "", "", "", "", "", false},
 		{"1:1 relationship", "shipment:1:1", "Shipment", "shipment_id", "shipments", "1:1", false},

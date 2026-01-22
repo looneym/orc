@@ -46,8 +46,8 @@ func TemplateFuncs() template.FuncMap {
 
 // replaceAll is a template-friendly version of strings.ReplaceAll.
 // Usage: {{.ParentFK | replace "_" "-"}}
-func replaceAll(old, new, s string) string {
-	return strings.ReplaceAll(s, old, new)
+func replaceAll(old, replacement, s string) string {
+	return strings.ReplaceAll(s, old, replacement)
 }
 
 // formatStatusList formats status values for SQL CHECK constraint.
