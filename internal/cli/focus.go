@@ -49,18 +49,10 @@ func runFocus(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to get working directory: %w", err)
 	}
 
-	// Try to load config from cwd first, then fall back to home dir
-	cfg, configDir, err := loadConfigWithDir(cwd)
+	// Load config from cwd only
+	cfg, err := config.LoadConfig(cwd)
 	if err != nil {
-		// Try home directory for global config
-		homeDir, homeErr := os.UserHomeDir()
-		if homeErr != nil {
-			return fmt.Errorf("no config found and cannot access home directory")
-		}
-		cfg, configDir, err = loadConfigWithDir(homeDir)
-		if err != nil {
-			return fmt.Errorf("no ORC config found in current directory or home directory")
-		}
+		return fmt.Errorf("no ORC config found in current directory")
 	}
 
 	if showOnly {
@@ -69,7 +61,7 @@ func runFocus(cmd *cobra.Command, args []string) error {
 
 	if len(args) == 0 {
 		// Clear focus
-		return clearFocus(cfg, configDir)
+		return clearFocus(cfg, cwd)
 	}
 
 	// Set focus
@@ -79,16 +71,7 @@ func runFocus(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	return setFocus(cfg, configDir, containerID, containerType, title)
-}
-
-// loadConfigWithDir loads config and returns both config and the directory it was loaded from
-func loadConfigWithDir(dir string) (*config.Config, string, error) {
-	cfg, err := config.LoadConfig(dir)
-	if err != nil {
-		return nil, "", err
-	}
-	return cfg, dir, nil
+	return setFocus(cfg, cwd, containerID, containerType, title)
 }
 
 // validateAndGetInfo validates the container ID exists and returns its type and title
@@ -130,64 +113,27 @@ func validateAndGetInfo(id string) (containerType string, title string, err erro
 
 // showCurrentFocus displays the current focus
 func showCurrentFocus(cfg *config.Config) error {
-	focusID := getCurrentFocus(cfg)
-
-	if focusID == "" {
+	if cfg.CurrentFocus == "" {
 		fmt.Println("No focus set")
 		fmt.Println("\nSet focus with: orc focus <container-id>")
 		return nil
 	}
 
-	containerType, title, err := validateAndGetInfo(focusID)
+	containerType, title, err := validateAndGetInfo(cfg.CurrentFocus)
 	if err != nil {
-		// Focus is set but container no longer exists - graceful degradation, not an error
-		fmt.Printf("Focus: %s (container not found - may have been deleted)\n", focusID)
+		// Focus is set but container no longer exists - graceful degradation
+		fmt.Printf("Focus: %s (container not found - may have been deleted)\n", cfg.CurrentFocus)
 		return nil //nolint:nilerr // intentional: show info even if container deleted
 	}
 
-	fmt.Printf("Focus: %s\n", focusID)
+	fmt.Printf("Focus: %s\n", cfg.CurrentFocus)
 	fmt.Printf("  %s: %s\n", containerType, title)
 	return nil
 }
 
-// getCurrentFocus gets the current focus from config based on config type
-func getCurrentFocus(cfg *config.Config) string {
-	if cfg == nil {
-		return ""
-	}
-	switch cfg.Type {
-	case config.TypeCommission:
-		if cfg.Commission != nil {
-			return cfg.Commission.CurrentFocus
-		}
-	case config.TypeGrove:
-		if cfg.Grove != nil {
-			return cfg.Grove.CurrentFocus
-		}
-	case config.TypeGlobal:
-		if cfg.State != nil {
-			return cfg.State.CurrentFocus
-		}
-	}
-	return ""
-}
-
 // setFocus sets the focus in the config
 func setFocus(cfg *config.Config, configDir, containerID, containerType, title string) error {
-	switch cfg.Type {
-	case config.TypeCommission:
-		if cfg.Commission != nil {
-			cfg.Commission.CurrentFocus = containerID
-		}
-	case config.TypeGrove:
-		if cfg.Grove != nil {
-			cfg.Grove.CurrentFocus = containerID
-		}
-	case config.TypeGlobal:
-		if cfg.State != nil {
-			cfg.State.CurrentFocus = containerID
-		}
-	}
+	cfg.CurrentFocus = containerID
 
 	if err := config.SaveConfig(configDir, cfg); err != nil {
 		return fmt.Errorf("failed to save config: %w", err)
@@ -201,20 +147,7 @@ func setFocus(cfg *config.Config, configDir, containerID, containerType, title s
 
 // clearFocus clears the current focus
 func clearFocus(cfg *config.Config, configDir string) error {
-	switch cfg.Type {
-	case config.TypeCommission:
-		if cfg.Commission != nil {
-			cfg.Commission.CurrentFocus = ""
-		}
-	case config.TypeGrove:
-		if cfg.Grove != nil {
-			cfg.Grove.CurrentFocus = ""
-		}
-	case config.TypeGlobal:
-		if cfg.State != nil {
-			cfg.State.CurrentFocus = ""
-		}
-	}
+	cfg.CurrentFocus = ""
 
 	if err := config.SaveConfig(configDir, cfg); err != nil {
 		return fmt.Errorf("failed to save config: %w", err)
@@ -226,7 +159,10 @@ func clearFocus(cfg *config.Config, configDir string) error {
 
 // GetCurrentFocus is exported for use by other commands (e.g., prime)
 func GetCurrentFocus(cfg *config.Config) string {
-	return getCurrentFocus(cfg)
+	if cfg == nil {
+		return ""
+	}
+	return cfg.CurrentFocus
 }
 
 // GetFocusInfo returns the type and title for a focus ID, or empty strings if invalid

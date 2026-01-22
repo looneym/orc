@@ -72,8 +72,8 @@ Examples:
 			// Messages must be scoped to a mission for database storage
 			missionID := identity.CommissionID
 
-			if identity.Type == agent.AgentTypeORC {
-				// ORC sending: use recipient's mission ID (must be IMP)
+			if identity.Type == agent.AgentTypeGoblin {
+				// Goblin sending: use recipient's mission ID (must be IMP)
 				if recipientIdentity.Type == agent.AgentTypeIMP {
 					// Use recipient's commission ID
 					if recipientIdentity.CommissionID != "" {
@@ -82,9 +82,9 @@ Examples:
 						return fmt.Errorf("cannot determine mission ID for IMP agent")
 					}
 				} else {
-					return fmt.Errorf("ORC can only send to IMP agents")
+					return fmt.Errorf("Goblin can only send to IMP agents")
 				}
-			} else if recipientIdentity.Type == agent.AgentTypeORC {
+			} else if recipientIdentity.Type == agent.AgentTypeGoblin {
 				// Sending TO ORC: use sender's mission ID (IMPs reporting to ORC)
 				missionID = identity.CommissionID
 			}

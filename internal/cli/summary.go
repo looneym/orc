@@ -597,12 +597,12 @@ Examples:
 			// Determine mission filter
 			var filterCommissionID string
 			if missionFilter == "current" {
-				// Get current mission from context
-				commissionCtx, _ := ctx.DetectCommissionContext()
-				if commissionCtx == nil || commissionCtx.CommissionID == "" {
-					return fmt.Errorf("--commission current requires being in a mission context (no .orc/config.json found)")
+				// Get current mission from config in cwd
+				commissionID := ctx.GetContextCommissionID()
+				if commissionID == "" {
+					return fmt.Errorf("--commission current requires being in a mission context (no .orc/config.json found with commission_id)")
 				}
-				filterCommissionID = commissionCtx.CommissionID
+				filterCommissionID = commissionID
 			} else if missionFilter != "" {
 				filterCommissionID = missionFilter
 			}

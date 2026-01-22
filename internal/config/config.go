@@ -7,55 +7,19 @@ import (
 	"path/filepath"
 )
 
-type ConfigType string
-
-const (
-	TypeCommission ConfigType = "commission"
-	TypeGrove      ConfigType = "grove"
-	TypeGlobal     ConfigType = "global"
-)
-
 // Role constants
 const (
-	RoleORC = "ORC" // Orchestrator agent
-	RoleIMP = "IMP" // Implementation agent
+	RoleGoblin = "GOBLIN" // Orchestrator agent (formerly ORC)
+	RoleIMP    = "IMP"    // Implementation agent
 )
 
+// Config represents the flat ORC configuration
 type Config struct {
-	Version string     `json:"version"`
-	Type    ConfigType `json:"type"`
-
-	Commission *CommissionConfig `json:"commission,omitempty"`
-	Grove      *GroveConfig      `json:"grove,omitempty"`
-	State      *StateConfig      `json:"state,omitempty"`
-}
-
-// CommissionConfig represents commission workspace configuration
-type CommissionConfig struct {
-	CommissionID  string `json:"commission_id"`
-	WorkspacePath string `json:"workspace_path"`
-	IsMaster      bool   `json:"is_master,omitempty"`
-	Role          string `json:"role,omitempty"`          // "ORC", "IMP", or empty
-	CurrentFocus  string `json:"current_focus,omitempty"` // Focused container ID (SHIP-*, CON-*, INV-*, TOME-*)
-	CreatedAt     string `json:"created_at"`
-}
-
-type GroveConfig struct {
-	GroveID      string   `json:"grove_id"`
-	CommissionID string   `json:"commission_id"`
-	Name         string   `json:"name"`
-	Repos        []string `json:"repos"`
-	Role         string   `json:"role,omitempty"`          // "IMP" typically, or empty
-	CurrentFocus string   `json:"current_focus,omitempty"` // Focused container ID (SHIP-*, CON-*, INV-*, TOME-*)
-	CreatedAt    string   `json:"created_at"`
-}
-
-type StateConfig struct {
-	ActiveCommissionID string `json:"active_commission_id"`
-	CurrentHandoffID   string `json:"current_handoff_id"`
-	Role               string `json:"role,omitempty"`          // "ORC" for global orchestrator
-	CurrentFocus       string `json:"current_focus,omitempty"` // Focused container ID (SHIP-*, CON-*, INV-*, TOME-*)
-	LastUpdated        string `json:"last_updated"`
+	Version      string `json:"version"`
+	Role         string `json:"role"`                    // "GOBLIN" or "IMP"
+	WorkbenchID  string `json:"workbench_id,omitempty"`  // BENCH-XXX (for IMP)
+	CommissionID string `json:"commission_id,omitempty"` // COMM-XXX
+	CurrentFocus string `json:"current_focus,omitempty"` // SHIP-*, CON-*, etc.
 }
 
 // LoadConfig reads config.json from directory
@@ -71,20 +35,11 @@ func LoadConfig(dir string) (*Config, error) {
 		return nil, fmt.Errorf("failed to parse config: %w", err)
 	}
 
-	// Validate type matches populated fields
-	if err := cfg.Validate(); err != nil {
-		return nil, err
-	}
-
 	return &cfg, nil
 }
 
 // SaveConfig writes config.json to directory
 func SaveConfig(dir string, cfg *Config) error {
-	if err := cfg.Validate(); err != nil {
-		return err
-	}
-
 	orcDir := filepath.Join(dir, ".orc")
 	if err := os.MkdirAll(orcDir, 0755); err != nil {
 		return fmt.Errorf("failed to create .orc dir: %w", err)
@@ -103,40 +58,15 @@ func SaveConfig(dir string, cfg *Config) error {
 	return nil
 }
 
-// Validate ensures config structure matches type
-func (c *Config) Validate() error {
-	switch c.Type {
-	case TypeCommission:
-		if c.Commission == nil {
-			return fmt.Errorf("type 'commission' requires commission field")
-		}
-		if c.Grove != nil || c.State != nil {
-			return fmt.Errorf("type 'commission' should only have commission field")
-		}
-	case TypeGrove:
-		if c.Grove == nil {
-			return fmt.Errorf("type 'grove' requires grove field")
-		}
-		if c.Commission != nil || c.State != nil {
-			return fmt.Errorf("type 'grove' should only have grove field")
-		}
-	case TypeGlobal:
-		if c.State == nil {
-			return fmt.Errorf("type 'global' requires state field")
-		}
-		if c.Commission != nil || c.Grove != nil {
-			return fmt.Errorf("type 'global' should only have state field")
-		}
-	default:
-		return fmt.Errorf("invalid type: %s", c.Type)
-	}
-	return nil
-}
-
 // LoadConfigWithFallback loads config from .orc/config.json
 // Name kept for compatibility with callers, but no longer has fallback behavior
 func LoadConfigWithFallback(dir string) (*Config, error) {
 	return LoadConfig(dir)
+}
+
+// IsGoblinRole returns true if the role is Goblin (including backwards-compat "ORC")
+func IsGoblinRole(role string) bool {
+	return role == RoleGoblin || role == "ORC"
 }
 
 // DefaultWorkspacePath returns the default workspace path for a commission.

@@ -8,6 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/example/orc/internal/config"
 	"github.com/example/orc/internal/context"
 )
 
@@ -33,8 +34,8 @@ func debugSessionInfoCmd() *cobra.Command {
 
 Shows:
 - Current working directory
-- Commission context (.orc/config.json)
-- Grove context (.orc/config.json with grove config)
+- Config information (.orc/config.json)
+- Workbench context (if IMP)
 - Environment variables (TMUX, etc.)
 
 Useful for debugging context detection issues.
@@ -53,65 +54,50 @@ Examples:
 			fmt.Printf("Current Directory:\n")
 			fmt.Printf("  %s\n\n", cwd)
 
-			// Check for mission config
-			fmt.Printf("Commission Context (.orc/config.json):\n")
-			commissionCtx, err := context.DetectCommissionContext()
-			if err == nil && commissionCtx != nil {
-				configPath := filepath.Join(commissionCtx.WorkspacePath, ".orc", "config.json")
-				fmt.Printf("  ✓ Found: %s\n", configPath)
-				fmt.Printf("  Mission ID: %s\n", commissionCtx.CommissionID)
-				fmt.Printf("  Workspace: %s\n\n", commissionCtx.WorkspacePath)
+			// Check for config in current directory
+			fmt.Printf("Config (.orc/config.json):\n")
+			cfg, err := config.LoadConfig(cwd)
+			if err == nil {
+				configPath := filepath.Join(cwd, ".orc", "config.json")
+				fmt.Printf("  Found: %s\n", configPath)
+				fmt.Printf("  Role: %s\n", cfg.Role)
+				if cfg.WorkbenchID != "" {
+					fmt.Printf("  Workbench ID: %s\n", cfg.WorkbenchID)
+				}
+				if cfg.CommissionID != "" {
+					fmt.Printf("  Commission ID: %s\n", cfg.CommissionID)
+				}
+				if cfg.CurrentFocus != "" {
+					fmt.Printf("  Current Focus: %s\n", cfg.CurrentFocus)
+				}
+				fmt.Println()
 
-				// Read and display .orc/config.json content
+				// Read and display raw .orc/config.json content
 				data, err := os.ReadFile(configPath)
 				if err == nil {
-					fmt.Printf("  Content:\n")
-					var cfg map[string]interface{}
-					if err := json.Unmarshal(data, &cfg); err == nil {
-						formatted, _ := json.MarshalIndent(cfg, "    ", "  ")
+					fmt.Printf("  Raw Content:\n")
+					var raw map[string]interface{}
+					if err := json.Unmarshal(data, &raw); err == nil {
+						formatted, _ := json.MarshalIndent(raw, "    ", "  ")
 						fmt.Printf("    %s\n\n", string(formatted))
 					} else {
 						fmt.Printf("    %s\n\n", string(data))
 					}
 				}
 			} else {
-				fmt.Printf("  ✗ Not found (not in a mission context)\n\n")
+				fmt.Printf("  Not found (no .orc/config.json in current directory)\n\n")
 			}
 
-			// Check for workspace config
-			fmt.Printf("Workspace Config (.orc/config.json):\n")
-			if commissionCtx != nil {
-				configPath := filepath.Join(commissionCtx.WorkspacePath, ".orc", "config.json")
-				if data, err := os.ReadFile(configPath); err == nil {
-					fmt.Printf("  ✓ Found: %s\n", configPath)
-
-					var config map[string]interface{}
-					if err := json.Unmarshal(data, &config); err == nil {
-						fmt.Printf("  Content:\n")
-						formatted, _ := json.MarshalIndent(config, "    ", "  ")
-						fmt.Printf("    %s\n\n", string(formatted))
-					}
-				} else {
-					fmt.Printf("  ✗ Not found\n\n")
-				}
+			// Check workbench context
+			fmt.Printf("Workbench Context:\n")
+			workbenchCtx, err := context.DetectWorkbenchContext()
+			if err == nil && workbenchCtx != nil {
+				fmt.Printf("  Detected IMP context\n")
+				fmt.Printf("  Workbench ID: %s\n", workbenchCtx.WorkbenchID)
+				fmt.Printf("  Commission ID: %s\n", workbenchCtx.CommissionID)
+				fmt.Printf("  Config Path: %s\n\n", workbenchCtx.ConfigPath)
 			} else {
-				fmt.Printf("  N/A (no mission context)\n\n")
-			}
-
-			// Check for grove config
-			fmt.Printf("Grove Config (.orc/config.json in current dir):\n")
-			localConfigPath := filepath.Join(cwd, ".orc", "config.json")
-			if data, err := os.ReadFile(localConfigPath); err == nil {
-				fmt.Printf("  ✓ Found: %s\n", localConfigPath)
-
-				var config map[string]interface{}
-				if err := json.Unmarshal(data, &config); err == nil {
-					fmt.Printf("  Content:\n")
-					formatted, _ := json.MarshalIndent(config, "    ", "  ")
-					fmt.Printf("    %s\n\n", string(formatted))
-				}
-			} else {
-				fmt.Printf("  ✗ Not found (not in a grove)\n\n")
+				fmt.Printf("  Not in a workbench (Goblin context)\n\n")
 			}
 
 			// Environment variables
@@ -124,11 +110,15 @@ Examples:
 
 			// Context detection result
 			fmt.Printf("\nContext Detection Result:\n")
-			if commissionCtx != nil {
-				fmt.Printf("  Context: Commission (mission-specific)\n")
-				fmt.Printf("  Mission: %s\n", commissionCtx.CommissionID)
+			if workbenchCtx != nil {
+				fmt.Printf("  Context: IMP (workbench-specific)\n")
+				fmt.Printf("  Workbench: %s\n", workbenchCtx.WorkbenchID)
+				fmt.Printf("  Commission: %s\n", workbenchCtx.CommissionID)
 			} else {
-				fmt.Printf("  Context: Master (global orchestrator)\n")
+				fmt.Printf("  Context: Goblin (orchestrator)\n")
+				if cfg != nil && cfg.CommissionID != "" {
+					fmt.Printf("  Commission: %s\n", cfg.CommissionID)
+				}
 			}
 
 			fmt.Println()
@@ -146,14 +136,14 @@ func debugValidateContextCmd() *cobra.Command {
 
 Checks:
 - .orc/config.json exists and is valid JSON
-- Commission ID or grove ID is present
-- Directory structure is correct
+- Role is set (GOBLIN or IMP)
+- Workbench ID is present (for IMP)
+- Commission ID is present
 
-Useful for debugging mission workspace setup and grove creation issues.
+Useful for debugging workspace setup issues.
 
 Examples:
-  orc debug validate-context ~/src/factories/MISSION-001
-  orc debug validate-context ~/src/worktrees/test-grove
+  orc debug validate-context ~/src/worktrees/test-workbench
   orc debug validate-context .`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -179,13 +169,13 @@ Examples:
 			orcDir := filepath.Join(absDir, ".orc")
 			if info, err := os.Stat(orcDir); err == nil {
 				if info.IsDir() {
-					fmt.Printf("   ✓ Directory exists: %s\n", orcDir)
+					fmt.Printf("   OK: Directory exists: %s\n", orcDir)
 				} else {
-					fmt.Printf("   ✗ .orc exists but is not a directory\n")
+					fmt.Printf("   FAIL: .orc exists but is not a directory\n")
 					validationPassed = false
 				}
 			} else {
-				fmt.Printf("   ✗ Directory not found: %s\n", orcDir)
+				fmt.Printf("   FAIL: Directory not found: %s\n", orcDir)
 				validationPassed = false
 			}
 			fmt.Println()
@@ -194,47 +184,51 @@ Examples:
 			fmt.Printf("2. .orc/config.json\n")
 			configPath := filepath.Join(orcDir, "config.json")
 			if data, err := os.ReadFile(configPath); err == nil {
-				fmt.Printf("   ✓ File exists: %s\n", configPath)
+				fmt.Printf("   OK: File exists: %s\n", configPath)
 
 				// Validate JSON
-				var cfg map[string]interface{}
+				var cfg config.Config
 				if err := json.Unmarshal(data, &cfg); err == nil {
-					fmt.Printf("   ✓ Valid JSON\n")
+					fmt.Printf("   OK: Valid JSON\n")
 
-					// Check for type and relevant ID fields
-					if cfgType, ok := cfg["type"].(string); ok {
-						fmt.Printf("   ✓ Config type: %s\n", cfgType)
+					// Check role
+					if cfg.Role != "" {
+						fmt.Printf("   OK: Role: %s\n", cfg.Role)
+					} else {
+						fmt.Printf("   INFO: No role set (defaults to Goblin)\n")
 					}
-					// Check nested objects for mission_id
-					if grove, ok := cfg["grove"].(map[string]interface{}); ok {
-						if missionID, ok := grove["mission_id"].(string); ok && missionID != "" {
-							fmt.Printf("   ✓ grove.mission_id present: %s\n", missionID)
-						}
-					} else if mission, ok := cfg["mission"].(map[string]interface{}); ok {
-						if missionID, ok := mission["mission_id"].(string); ok && missionID != "" {
-							fmt.Printf("   ✓ mission.mission_id present: %s\n", missionID)
-						}
-					} else if state, ok := cfg["state"].(map[string]interface{}); ok {
-						if activeCommissionID, ok := state["active_mission_id"].(string); ok && activeCommissionID != "" {
-							fmt.Printf("   ✓ state.active_mission_id present: %s\n", activeCommissionID)
+
+					// Check commission_id
+					if cfg.CommissionID != "" {
+						fmt.Printf("   OK: Commission ID: %s\n", cfg.CommissionID)
+					} else {
+						fmt.Printf("   INFO: No commission_id set\n")
+					}
+
+					// Check workbench_id for IMP
+					if cfg.Role == config.RoleIMP {
+						if cfg.WorkbenchID != "" {
+							fmt.Printf("   OK: Workbench ID: %s\n", cfg.WorkbenchID)
+						} else {
+							fmt.Printf("   WARN: IMP role but no workbench_id set\n")
 						}
 					}
 				} else {
-					fmt.Printf("   ✗ Invalid JSON: %v\n", err)
+					fmt.Printf("   FAIL: Invalid JSON: %v\n", err)
 					validationPassed = false
 				}
 			} else {
-				fmt.Printf("   ⚠️  File not found: %s (optional for some contexts)\n", configPath)
+				fmt.Printf("   INFO: File not found: %s (Goblin context assumed)\n", configPath)
 			}
 			fmt.Println()
 
 			// Overall result
 			fmt.Printf("=== Validation Result ===\n")
 			if validationPassed {
-				fmt.Printf("✓ All critical checks passed\n")
+				fmt.Printf("OK: All critical checks passed\n")
 				fmt.Printf("  Context appears to be properly configured\n")
 			} else {
-				fmt.Printf("✗ Some checks failed\n")
+				fmt.Printf("FAIL: Some checks failed\n")
 				fmt.Printf("  Context may not be properly configured\n")
 			}
 			fmt.Println()

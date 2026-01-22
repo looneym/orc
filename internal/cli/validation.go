@@ -9,7 +9,7 @@ import (
 )
 
 // validateClaudeWorkspaceTrust checks if Claude Code settings include required directories
-// for ORC groves and missions. Returns nil if valid, error with fix instructions if not.
+// for ORC workbenches and commissions. Returns nil if valid, error with fix instructions if not.
 func validateClaudeWorkspaceTrust() error {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
@@ -107,7 +107,7 @@ Add to ~/.claude/settings.json:
 		return fmt.Errorf(`Missing trusted directories in ~/.claude/settings.json:
   %s
 
-These directories are required for ORC groves and missions.
+These directories are required for ORC workbenches and commissions.
 
 Add them to permissions.additionalDirectories:
 

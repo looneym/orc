@@ -7,11 +7,9 @@ import (
 	"io"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/spf13/cobra"
 
-	"github.com/example/orc/internal/config"
 	"github.com/example/orc/internal/ports/primary"
 	"github.com/example/orc/internal/wire"
 )
@@ -73,7 +71,7 @@ Examples:
 
 		// Get active context from flags
 		missionID, _ := cmd.Flags().GetString("commission")
-		workbenchID, _ := cmd.Flags().GetString("grove")
+		workbenchID, _ := cmd.Flags().GetString("workbench")
 		todosFile, _ := cmd.Flags().GetString("todos")
 
 		// Read todos JSON if provided
@@ -103,20 +101,13 @@ Examples:
 		}
 
 		handoff := resp.Handoff
-		fmt.Printf("✓ Created handoff %s\n", handoff.ID)
+		fmt.Printf("Created handoff %s\n", handoff.ID)
 		fmt.Printf("  Created: %s\n", handoff.CreatedAt)
 		if handoff.ActiveCommissionID != "" {
-			fmt.Printf("  Mission: %s\n", handoff.ActiveCommissionID)
+			fmt.Printf("  Commission: %s\n", handoff.ActiveCommissionID)
 		}
 		if handoff.ActiveWorkbenchID != "" {
 			fmt.Printf("  Workbench: %s\n", handoff.ActiveWorkbenchID)
-		}
-
-		// Update global state config
-		if err := updateMetadata(handoff); err != nil {
-			fmt.Printf("  Warning: Failed to update .orc/config.json: %v\n", err)
-		} else {
-			fmt.Printf("  Updated: .orc/config.json\n")
 		}
 
 		return nil
@@ -139,7 +130,7 @@ var handoffShowCmd = &cobra.Command{
 		fmt.Printf("\nHandoff: %s\n", handoff.ID)
 		fmt.Printf("Created: %s\n", handoff.CreatedAt)
 		if handoff.ActiveCommissionID != "" {
-			fmt.Printf("Mission: %s\n", handoff.ActiveCommissionID)
+			fmt.Printf("Commission: %s\n", handoff.ActiveCommissionID)
 		}
 		if handoff.ActiveWorkbenchID != "" {
 			fmt.Printf("Workbench: %s\n", handoff.ActiveWorkbenchID)
@@ -172,12 +163,12 @@ var handoffListCmd = &cobra.Command{
 			return nil
 		}
 
-		fmt.Printf("\n%-10s %-20s %-15s %-15s\n", "ID", "CREATED", "MISSION", "WORKBENCH")
-		fmt.Println("────────────────────────────────────────────────────────────────")
+		fmt.Printf("\n%-10s %-20s %-15s %-15s\n", "ID", "CREATED", "COMMISSION", "WORKBENCH")
+		fmt.Println("---------------------------------------------------------------")
 		for _, h := range handoffs {
-			mission := "-"
+			commission := "-"
 			if h.ActiveCommissionID != "" {
-				mission = h.ActiveCommissionID
+				commission = h.ActiveCommissionID
 			}
 			workbench := "-"
 			if h.ActiveWorkbenchID != "" {
@@ -186,7 +177,7 @@ var handoffListCmd = &cobra.Command{
 			fmt.Printf("%-10s %-20s %-15s %-15s\n",
 				h.ID,
 				h.CreatedAt,
-				mission,
+				commission,
 				workbench,
 			)
 		}
@@ -196,36 +187,14 @@ var handoffListCmd = &cobra.Command{
 	},
 }
 
-// updateMetadata updates the .orc/config.json file with global state
-func updateMetadata(handoff *primary.Handoff) error {
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return err
-	}
-
-	activeCommissionID := handoff.ActiveCommissionID
-
-	cfg := &config.Config{
-		Version: "1.0",
-		Type:    config.TypeGlobal,
-		State: &config.StateConfig{
-			ActiveCommissionID: activeCommissionID,
-			CurrentHandoffID:   handoff.ID,
-			LastUpdated:        time.Now().Format(time.RFC3339),
-		},
-	}
-
-	return config.SaveConfig(homeDir, cfg)
-}
-
 // HandoffCmd returns the handoff command
 func HandoffCmd() *cobra.Command {
 	// Add flags
 	handoffCreateCmd.Flags().StringP("note", "n", "", "Handoff note text")
 	handoffCreateCmd.Flags().StringP("file", "f", "", "Read handoff note from file")
 	handoffCreateCmd.Flags().Bool("stdin", false, "Read handoff note from stdin")
-	handoffCreateCmd.Flags().StringP("commission", "c", "", "Active mission ID")
-	handoffCreateCmd.Flags().String("grove", "", "Active workbench ID (for IMP handoffs)")
+	handoffCreateCmd.Flags().StringP("commission", "c", "", "Active commission ID")
+	handoffCreateCmd.Flags().String("workbench", "", "Active workbench ID (for IMP handoffs)")
 	handoffCreateCmd.Flags().StringP("todos", "t", "", "Path to todos JSON file")
 
 	handoffListCmd.Flags().IntP("limit", "l", 10, "Maximum number of handoffs to show")

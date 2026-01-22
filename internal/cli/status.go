@@ -8,7 +8,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/example/orc/internal/config"
-	ctx "github.com/example/orc/internal/context"
 	"github.com/example/orc/internal/wire"
 )
 
@@ -19,132 +18,103 @@ func StatusCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "status",
 		Short: "Show current work context from config.json",
-		Long: `Display the current work context based on .orc/config.json:
-- Active mission, shipments, and tasks
-- Latest handoff ID and timestamp (use --handoff to see full note)
+		Long: `Display the current work context based on .orc/config.json in current directory:
+- Active commission, shipments, and tasks
+- Current focus (if any)
+- Role (GOBLIN or IMP)
 
 This provides a focused view of "where am I right now?"`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Check if we're in a mission context first
-			commissionCtx, _ := ctx.DetectCommissionContext()
-			var activeCommissionID string
-			var currentHandoffID string
-			var lastUpdated string
-			var currentFocus string
+			// Load config from current directory
+			cwd, err := os.Getwd()
+			if err != nil {
+				return fmt.Errorf("failed to get working directory: %w", err)
+			}
 
-			if commissionCtx != nil {
-				// Commission context - try to load config from workspace or current directory
-				cfg, err := config.LoadConfig(commissionCtx.WorkspacePath)
-				if err != nil {
-					// Try current directory
-					cwd, _ := os.Getwd()
-					cfg, err = config.LoadConfig(cwd)
-				}
+			cfg, cfgErr := config.LoadConfig(cwd)
+			if cfgErr != nil {
+				// No config - show minimal status
+				fmt.Println("ORC Status - No Context")
+				fmt.Println()
+				fmt.Println("No .orc/config.json found in current directory.")
+				fmt.Println("This is a Goblin context (no workbench configured).")
+				fmt.Println()
+				fmt.Println("Run `orc commission list` to see available commissions.")
+				return nil //nolint:nilerr // Missing config is intentionally not an error
+			}
 
-				if err == nil {
-					// Extract fields based on config type
-					switch cfg.Type {
-					case config.TypeGrove:
-						activeCommissionID = cfg.Grove.CommissionID
-						currentFocus = cfg.Grove.CurrentFocus
-					case config.TypeCommission:
-						activeCommissionID = cfg.Commission.CommissionID
-						currentFocus = cfg.Commission.CurrentFocus
-					case config.TypeGlobal:
-						activeCommissionID = cfg.State.ActiveCommissionID
-						currentHandoffID = cfg.State.CurrentHandoffID
-						lastUpdated = cfg.State.LastUpdated
-						currentFocus = cfg.State.CurrentFocus
-					}
+			// Show status based on role
+			role := cfg.Role
+			if config.IsGoblinRole(role) || role == "" {
+				fmt.Println("ORC Status - Goblin Context")
+			} else if role == config.RoleIMP {
+				fmt.Println("ORC Status - IMP Context")
+				if cfg.WorkbenchID != "" {
+					fmt.Printf("  Workbench: %s\n", cfg.WorkbenchID)
 				}
-
-				// If still no active mission, use mission from .orc-mission file
-				if activeCommissionID == "" {
-					activeCommissionID = commissionCtx.CommissionID
-				}
-				fmt.Println("🎯 ORC Status - Commission Context")
-			} else {
-				// Master context - read from global config.json
-				homeDir, err := os.UserHomeDir()
-				if err != nil {
-					return fmt.Errorf("failed to get home directory: %w", err)
-				}
-
-				cfg, err := config.LoadConfig(homeDir)
-				if err != nil {
-					return fmt.Errorf("failed to read config.json: %w\nHint: Run 'orc init' if you haven't initialized ORC yet", err)
-				}
-
-				if cfg.State != nil {
-					activeCommissionID = cfg.State.ActiveCommissionID
-					currentHandoffID = cfg.State.CurrentHandoffID
-					lastUpdated = cfg.State.LastUpdated
-					currentFocus = cfg.State.CurrentFocus
-				}
-
-				fmt.Println("🎯 ORC Status - Current Context")
 			}
 			fmt.Println()
 
-			// Display active commission
-			if activeCommissionID != "" {
-				commission, err := wire.CommissionService().GetCommission(context.Background(), activeCommissionID)
+			// Display commission
+			if cfg.CommissionID != "" {
+				commission, err := wire.CommissionService().GetCommission(context.Background(), cfg.CommissionID)
 				if err != nil {
-					fmt.Printf("❌ Commission: %s (error loading: %v)\n", activeCommissionID, err)
+					fmt.Printf("Commission: %s (error loading: %v)\n", cfg.CommissionID, err)
 				} else {
-					fmt.Printf("🎯 Commission: %s - %s [%s]\n", commission.ID, commission.Title, commission.Status)
+					fmt.Printf("Commission: %s - %s [%s]\n", commission.ID, commission.Title, commission.Status)
 					if commission.Description != "" {
 						fmt.Printf("   %s\n", commission.Description)
 					}
 				}
 			} else {
-				fmt.Println("🎯 Commission: (none active)")
+				fmt.Println("Commission: (none active)")
 			}
 			fmt.Println()
 
 			// Display current focus if set
-			if currentFocus != "" {
-				containerType, title, status := GetFocusInfo(currentFocus)
+			if cfg.CurrentFocus != "" {
+				containerType, title, status := GetFocusInfo(cfg.CurrentFocus)
 				if containerType != "" {
-					fmt.Printf("Focus: %s - %s [%s]\n", currentFocus, title, status)
+					fmt.Printf("Focus: %s - %s [%s]\n", cfg.CurrentFocus, title, status)
 					fmt.Printf("   (%s)\n", containerType)
 				} else {
-					fmt.Printf("Focus: %s (container not found)\n", currentFocus)
+					fmt.Printf("Focus: %s (container not found)\n", cfg.CurrentFocus)
 				}
 				fmt.Println()
 			}
 
-			// Display latest handoff
-			if currentHandoffID != "" {
-				handoff, err := wire.HandoffService().GetHandoff(context.Background(), currentHandoffID)
-				if err != nil {
-					fmt.Printf("❌ Latest Handoff: %s (error loading: %v)\n", currentHandoffID, err)
-				} else {
-					fmt.Printf("📝 Latest Handoff: %s\n", handoff.ID)
-					fmt.Printf("   Created: %s\n", handoff.CreatedAt)
-
-					// Show full note if --handoff flag is set
-					if showHandoff {
-						fmt.Println()
-						fmt.Println("--- HANDOFF NOTE ---")
-						fmt.Println(handoff.HandoffNote)
-						fmt.Println("--- END HANDOFF ---")
+			// If IMP, show workbench-specific info
+			if role == config.RoleIMP && cfg.WorkbenchID != "" {
+				// Show shipments assigned to this workbench
+				shipments, err := wire.ShipmentService().GetShipmentsByGrove(context.Background(), cfg.WorkbenchID)
+				if err == nil && len(shipments) > 0 {
+					fmt.Println("Assigned Shipments:")
+					for _, s := range shipments {
+						fmt.Printf("  - %s: %s [%s]\n", s.ID, s.Title, s.Status)
 					}
+					fmt.Println()
 				}
-			} else {
-				fmt.Println("📝 Latest Handoff: (none)")
 			}
-			fmt.Println()
 
-			if lastUpdated != "" {
-				fmt.Printf("Last updated: %s\n", lastUpdated)
+			// Show latest handoff if requested
+			if showHandoff {
+				handoffs, err := wire.HandoffService().ListHandoffs(context.Background(), 1)
+				if err == nil && len(handoffs) > 0 {
+					h := handoffs[0]
+					fmt.Printf("Latest Handoff: %s\n", h.ID)
+					fmt.Printf("   Created: %s\n", h.CreatedAt)
+					fmt.Println()
+					fmt.Println("--- HANDOFF NOTE ---")
+					fmt.Println(h.HandoffNote)
+					fmt.Println("--- END HANDOFF ---")
+				}
 			}
 
 			return nil
 		},
 	}
 
-	cmd.Flags().BoolVarP(&showHandoff, "handoff", "n", false, "Show full handoff note")
+	cmd.Flags().BoolVarP(&showHandoff, "handoff", "n", false, "Show latest handoff note")
 
 	return cmd
 }

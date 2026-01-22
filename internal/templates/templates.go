@@ -25,13 +25,18 @@ func GetGitDiscovery() (string, error) {
 	return string(content), nil
 }
 
-// GetWelcomeORC returns the ORC welcome message template content
-func GetWelcomeORC() (string, error) {
-	content, err := primeTemplates.ReadFile("prime/welcome-orc.tmpl")
+// GetWelcomeGoblin returns the Goblin welcome message template content
+func GetWelcomeGoblin() (string, error) {
+	content, err := primeTemplates.ReadFile("prime/welcome-goblin.tmpl")
 	if err != nil {
 		return "", err
 	}
 	return string(content), nil
+}
+
+// GetWelcomeORC returns the ORC welcome message template content (deprecated, use GetWelcomeGoblin)
+func GetWelcomeORC() (string, error) {
+	return GetWelcomeGoblin()
 }
 
 // GetWelcomeIMP returns the IMP welcome message template content

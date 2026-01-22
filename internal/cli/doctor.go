@@ -132,7 +132,7 @@ func checkClaudeSettings(quiet bool) error {
    ERROR: Claude Code workspace trust not configured
 
    This is REQUIRED for ORC to function. Without it, Claude instances
-   in groves and missions will fail with permission errors.
+   in workbenches and commissions will fail with permission errors.
 
    FIX: Create ~/.claude/settings.json with:
 

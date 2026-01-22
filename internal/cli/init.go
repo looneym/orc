@@ -2,12 +2,9 @@ package cli
 
 import (
 	"fmt"
-	"os"
-	"time"
 
 	"github.com/spf13/cobra"
 
-	"github.com/example/orc/internal/config"
 	"github.com/example/orc/internal/db"
 )
 
@@ -30,14 +27,7 @@ func InitCmd() *cobra.Command {
 				return fmt.Errorf("failed to initialize schema: %w", err)
 			}
 
-			fmt.Println("✓ Database initialized successfully")
-
-			// Initialize config.json
-			if err := initConfig(); err != nil {
-				return fmt.Errorf("failed to initialize config: %w", err)
-			}
-
-			fmt.Println("✓ Config file created at ~/.orc/config.json")
+			fmt.Println("Database initialized successfully")
 			fmt.Println()
 			fmt.Println("Next steps:")
 			fmt.Println("  orc expedition create \"My First Expedition\"")
@@ -46,32 +36,4 @@ func InitCmd() *cobra.Command {
 			return nil
 		},
 	}
-}
-
-// initConfig creates the initial config.json file
-func initConfig() error {
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return err
-	}
-
-	configPath := fmt.Sprintf("%s/.orc/config.json", homeDir)
-
-	// Check if file already exists
-	if _, err := os.Stat(configPath); err == nil {
-		return nil // Already exists, skip
-	}
-
-	cfg := &config.Config{
-		Version: "1.0",
-		Type:    config.TypeGlobal,
-		State: &config.StateConfig{
-			ActiveCommissionID: "",
-			CurrentHandoffID:   "",
-			CurrentFocus:       "",
-			LastUpdated:        time.Now().Format(time.RFC3339),
-		},
-	}
-
-	return config.SaveConfig(homeDir, cfg)
 }

@@ -26,7 +26,7 @@ NOTE: Originally designed for SessionStart hook injection, but hooks are current
 broken in Claude Code v2.1.7. ORC now uses direct prompt pattern when starting agents:
   claude "Run orc prime"
 
-This command detects the agent's location (grove/mission/global) and provides
+This command detects the agent's location (workbench/global) and provides
 appropriate context automatically.
 
 Output includes:
@@ -63,9 +63,8 @@ func runPrime(cmd *cobra.Command, args []string) error {
 		cwd = "(unknown)"
 	}
 
-	// Detect contexts
-	groveCtx, _ := ctx.DetectGroveContext()
-	commissionCtx, _ := ctx.DetectCommissionContext()
+	// Detect workbench context (IMP territory)
+	workbenchCtx, _ := ctx.DetectWorkbenchContext()
 
 	// Load config to check role
 	cfg, _ := config.LoadConfig(cwd)
@@ -73,42 +72,25 @@ func runPrime(cmd *cobra.Command, args []string) error {
 	// Determine role from config
 	var role string
 	if cfg != nil {
-		switch cfg.Type {
-		case config.TypeGrove:
-			if cfg.Grove != nil {
-				role = cfg.Grove.Role
-			}
-		case config.TypeCommission:
-			if cfg.Commission != nil {
-				role = cfg.Commission.Role
-			}
-		case config.TypeGlobal:
-			if cfg.State != nil {
-				role = cfg.State.Role
-			}
-		}
-	}
-
-	// If no role configured, show fallback guidance
-	if role == "" {
-		output := buildFallbackOutput(cwd, groveCtx, commissionCtx)
-		fmt.Println(truncateOutput(output, format, maxLines))
-		return nil
+		role = cfg.Role
 	}
 
 	// Route based on role
 	var fullOutput string
-	switch role {
-	case config.RoleIMP:
-		if groveCtx != nil {
-			fullOutput = buildIMPPrimeOutput(groveCtx, cwd)
+	switch {
+	case role == config.RoleIMP:
+		if workbenchCtx != nil {
+			fullOutput = buildIMPPrimeOutput(workbenchCtx, cwd)
 		} else {
-			fullOutput = buildFallbackOutput(cwd, groveCtx, commissionCtx)
+			// IMP role but no workbench context - show Goblin fallback
+			fullOutput = buildGoblinPrimeOutput(cwd, cfg)
 		}
-	case config.RoleORC:
-		fullOutput = buildORCPrimeOutput(commissionCtx, cwd, cfg)
+	case config.IsGoblinRole(role):
+		// Explicit Goblin role (or backwards-compat "ORC")
+		fullOutput = buildGoblinPrimeOutput(cwd, cfg)
 	default:
-		fullOutput = buildFallbackOutput(cwd, groveCtx, commissionCtx)
+		// No config = Goblin context (default behavior)
+		fullOutput = buildGoblinPrimeOutput(cwd, nil)
 	}
 
 	fmt.Println(truncateOutput(fullOutput, format, maxLines))
@@ -128,39 +110,35 @@ func truncateOutput(output, format string, maxLines int) string {
 	return output
 }
 
-// buildORCPrimeOutput creates ORC orchestrator context output
-func buildORCPrimeOutput(commissionCtx *ctx.CommissionContext, cwd string, cfg *config.Config) string {
+// buildGoblinPrimeOutput creates Goblin orchestrator context output
+func buildGoblinPrimeOutput(cwd string, cfg *config.Config) string {
 	var output strings.Builder
 
-	output.WriteString("# ORC Context (Session Prime)\n\n")
+	output.WriteString("# Goblin Context (Session Prime)\n\n")
 
 	// Identity
 	output.WriteString("## Identity\n\n")
-	output.WriteString("**Role**: Orchestrator (ORC)\n")
+	output.WriteString("**Role**: Goblin (Orchestrator)\n")
 	output.WriteString(fmt.Sprintf("**Location**: `%s`\n\n", cwd))
 
 	// Git context
 	output.WriteString(getGitInstructions())
 
 	// Current focus (if set)
-	if cfg != nil {
-		focusID := GetCurrentFocus(cfg)
-		if focusID != "" {
-			containerType, title, status := GetFocusInfo(focusID)
-			if containerType != "" {
-				output.WriteString("## Current Focus\n\n")
-				output.WriteString(fmt.Sprintf("**%s**: %s - %s [%s]\n\n", containerType, focusID, title, status))
-			}
+	if cfg != nil && cfg.CurrentFocus != "" {
+		containerType, title, status := GetFocusInfo(cfg.CurrentFocus)
+		if containerType != "" {
+			output.WriteString("## Current Focus\n\n")
+			output.WriteString(fmt.Sprintf("**%s**: %s - %s [%s]\n\n", containerType, cfg.CurrentFocus, title, status))
 		}
 	}
 
-	// Commission context
-	if commissionCtx != nil {
-		output.WriteString(fmt.Sprintf("**Commission**: %s\n", commissionCtx.CommissionID))
-		output.WriteString(fmt.Sprintf("**Workspace**: %s\n\n", commissionCtx.WorkspacePath))
+	// Commission context (if set)
+	if cfg != nil && cfg.CommissionID != "" {
+		output.WriteString(fmt.Sprintf("**Commission**: %s\n\n", cfg.CommissionID))
 
 		// Get commission details
-		commission, err := wire.CommissionService().GetCommission(context.Background(), commissionCtx.CommissionID)
+		commission, err := wire.CommissionService().GetCommission(context.Background(), cfg.CommissionID)
 		if err == nil {
 			output.WriteString(fmt.Sprintf("## %s\n\n", commission.Title))
 			if commission.Description != "" {
@@ -179,22 +157,25 @@ func buildORCPrimeOutput(commissionCtx *ctx.CommissionContext, cwd string, cfg *
 		output.WriteString("Run `orc commission list` to see available commissions.\n\n")
 	}
 
+	// Cross-workshop summary
+	output.WriteString(getCrossWorkshopSummary())
+
 	// Core rules (shared)
 	output.WriteString(getCoreRules())
 
 	// Footer (loaded from template)
-	welcome, err := templates.GetWelcomeORC()
+	welcome, err := templates.GetWelcomeGoblin()
 	if err == nil {
 		output.WriteString(welcome)
 	} else {
-		output.WriteString("---\nYou are the ORC - Orchestrator coordinating missions and IMPs.\n")
+		output.WriteString("---\nYou are a Goblin - Orchestrator coordinating missions and IMPs.\n")
 	}
 
 	return output.String()
 }
 
-// buildIMPPrimeOutput creates IMP-focused context prompt when in grove territory
-func buildIMPPrimeOutput(groveCtx *ctx.GroveContext, cwd string) string {
+// buildIMPPrimeOutput creates IMP-focused context prompt when in workbench territory
+func buildIMPPrimeOutput(workbenchCtx *ctx.WorkbenchContext, cwd string) string {
 	var output strings.Builder
 
 	output.WriteString("# IMP Boot Context\n\n")
@@ -202,20 +183,20 @@ func buildIMPPrimeOutput(groveCtx *ctx.GroveContext, cwd string) string {
 	// Section 1: IMP Identity
 	output.WriteString("## Identity\n\n")
 	output.WriteString("**Role**: Implementation Agent (IMP)\n")
-	output.WriteString(fmt.Sprintf("**Grove**: %s (`%s`)\n", groveCtx.Name, groveCtx.GroveID))
-	output.WriteString(fmt.Sprintf("**Mission**: `%s`\n", groveCtx.CommissionID))
+	output.WriteString(fmt.Sprintf("**Workbench**: `%s`\n", workbenchCtx.WorkbenchID))
+	output.WriteString(fmt.Sprintf("**Commission**: `%s`\n", workbenchCtx.CommissionID))
 	output.WriteString(fmt.Sprintf("**Location**: `%s`\n\n", cwd))
 
 	// Git context
 	output.WriteString(getGitInstructions())
 
-	// Section 2: Assignment - All containers assigned to this grove
+	// Section 2: Assignment - All containers assigned to this workbench
 	output.WriteString("## Assignment\n\n")
 
 	hasAssignments := false
 
 	// Shipments
-	shipments, _ := wire.ShipmentService().GetShipmentsByGrove(context.Background(), groveCtx.GroveID)
+	shipments, _ := wire.ShipmentService().GetShipmentsByGrove(context.Background(), workbenchCtx.WorkbenchID)
 	for i, shipment := range shipments {
 		hasAssignments = true
 		output.WriteString(fmt.Sprintf("### Shipment %d: %s\n\n", i+1, shipment.ID))
@@ -251,11 +232,8 @@ func buildIMPPrimeOutput(groveCtx *ctx.GroveContext, cwd string) string {
 		}
 	}
 
-	// Conclaves - no longer tied to workbenches, skip for now
-	// Conclaves are now tied to shipments instead
-
 	// Investigations
-	investigations, _ := wire.InvestigationService().GetInvestigationsByGrove(context.Background(), groveCtx.GroveID)
+	investigations, _ := wire.InvestigationService().GetInvestigationsByGrove(context.Background(), workbenchCtx.WorkbenchID)
 	for i, inv := range investigations {
 		hasAssignments = true
 		output.WriteString(fmt.Sprintf("### Investigation %d: %s\n\n", i+1, inv.ID))
@@ -268,7 +246,7 @@ func buildIMPPrimeOutput(groveCtx *ctx.GroveContext, cwd string) string {
 	}
 
 	if !hasAssignments {
-		output.WriteString("*No containers currently assigned to this grove.*\n\n")
+		output.WriteString("*No containers currently assigned to this workbench.*\n\n")
 		output.WriteString("Run `orc summary` to see the full mission tree.\n\n")
 	}
 
@@ -283,14 +261,14 @@ func buildIMPPrimeOutput(groveCtx *ctx.GroveContext, cwd string) string {
 
 	// Section 4: Core Rules (shared across all session types)
 	output.WriteString(getCoreRules())
-	output.WriteString("- **Stay in grove territory** - Work within assigned containers only\n\n")
+	output.WriteString("- **Stay in workbench territory** - Work within assigned containers only\n\n")
 
 	// Footer (loaded from template)
 	welcome, err := templates.GetWelcomeIMP()
 	if err == nil {
 		output.WriteString(welcome)
 	} else {
-		output.WriteString("---\nYou are an IMP - Implementation agent working within a grove on assigned shipments.\n")
+		output.WriteString("---\nYou are an IMP - Implementation agent working within a workbench on assigned shipments.\n")
 	}
 
 	return output.String()
@@ -318,41 +296,47 @@ func getCoreRules() string {
 	return content
 }
 
-// buildFallbackOutput creates output when no role is configured
-func buildFallbackOutput(cwd string, groveCtx *ctx.GroveContext, commissionCtx *ctx.CommissionContext) string {
+// getCrossWorkshopSummary returns a summary of active workshops for Goblin context
+func getCrossWorkshopSummary() string {
 	var output strings.Builder
 
-	output.WriteString("# ORC Context - Role Not Configured\n\n")
-	output.WriteString(fmt.Sprintf("**Location**: `%s`\n\n", cwd))
-
-	output.WriteString("## Configuration Required\n\n")
-	output.WriteString("No role is configured for this context. The `role` field must be set in `.orc/config.json`.\n\n")
-
-	if groveCtx != nil {
-		output.WriteString(fmt.Sprintf("**Detected grove**: %s (%s)\n", groveCtx.Name, groveCtx.GroveID))
-		output.WriteString("**Suggested role**: `IMP` (Implementation Agent)\n\n")
-		output.WriteString("To configure, edit `.orc/config.json` and add:\n")
-		output.WriteString("```json\n")
-		output.WriteString("\"role\": \"IMP\"\n")
-		output.WriteString("```\n\n")
-	} else if commissionCtx != nil {
-		output.WriteString(fmt.Sprintf("**Detected mission**: %s\n", commissionCtx.CommissionID))
-		output.WriteString("**Suggested role**: `ORC` (Orchestrator)\n\n")
-		output.WriteString("To configure, edit `.orc/config.json` and add:\n")
-		output.WriteString("```json\n")
-		output.WriteString("\"role\": \"ORC\"\n")
-		output.WriteString("```\n\n")
-	} else {
-		output.WriteString("No mission or grove context detected.\n")
-		output.WriteString("You may be in the wrong directory.\n\n")
-		output.WriteString("**To connect to ORC**: Run `orc attach` to attach to the orchestrator session.\n\n")
+	// Get all active commissions
+	commissions, err := wire.CommissionService().ListCommissions(context.Background(), primary.CommissionFilters{})
+	if err != nil || len(commissions) == 0 {
+		return ""
 	}
 
-	output.WriteString(getGitInstructions())
-	output.WriteString(getCoreRules())
+	// Filter to active commissions
+	var activeCommissions []*primary.Commission
+	for _, c := range commissions {
+		if c.Status == "active" || c.Status == "in_progress" {
+			activeCommissions = append(activeCommissions, c)
+		}
+	}
 
-	output.WriteString("---\n")
-	output.WriteString("⚠️ **Action Required**: Ask the user to configure the role or direct you to the correct context.\n")
+	if len(activeCommissions) == 0 {
+		return ""
+	}
 
+	output.WriteString("## Workshop Floor Summary\n\n")
+
+	for _, comm := range activeCommissions {
+		// Get shipments for this commission to count work
+		shipments, _ := wire.ShipmentService().ListShipments(context.Background(), primary.ShipmentFilters{CommissionID: comm.ID})
+		activeCount := 0
+		for _, s := range shipments {
+			if s.Status == "active" || s.Status == "in_progress" {
+				activeCount++
+			}
+		}
+
+		if activeCount > 0 {
+			output.WriteString(fmt.Sprintf("- **%s**: %s (%d active shipments)\n", comm.ID, comm.Title, activeCount))
+		} else {
+			output.WriteString(fmt.Sprintf("- **%s**: %s (idle)\n", comm.ID, comm.Title))
+		}
+	}
+
+	output.WriteString("\n")
 	return output.String()
 }
