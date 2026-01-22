@@ -11,13 +11,15 @@ import (
 
 // CycleWorkOrderServiceImpl implements the CycleWorkOrderService interface.
 type CycleWorkOrderServiceImpl struct {
-	cwoRepo secondary.CycleWorkOrderRepository
+	cwoRepo      secondary.CycleWorkOrderRepository
+	cycleService primary.CycleService
 }
 
 // NewCycleWorkOrderService creates a new CycleWorkOrderService with injected dependencies.
-func NewCycleWorkOrderService(cwoRepo secondary.CycleWorkOrderRepository) *CycleWorkOrderServiceImpl {
+func NewCycleWorkOrderService(cwoRepo secondary.CycleWorkOrderRepository, cycleService primary.CycleService) *CycleWorkOrderServiceImpl {
 	return &CycleWorkOrderServiceImpl{
-		cwoRepo: cwoRepo,
+		cwoRepo:      cwoRepo,
+		cycleService: cycleService,
 	}
 }
 
@@ -147,8 +149,9 @@ func (s *CycleWorkOrderServiceImpl) DeleteCycleWorkOrder(ctx context.Context, cw
 	return s.cwoRepo.Delete(ctx, cwoID)
 }
 
-// ActivateCycleWorkOrder transitions a cycle work order from draft to active.
-func (s *CycleWorkOrderServiceImpl) ActivateCycleWorkOrder(ctx context.Context, cwoID string) error {
+// ApproveCycleWorkOrder transitions a cycle work order from draft to active.
+// Also cascades: updates parent Cycle status to "approved".
+func (s *CycleWorkOrderServiceImpl) ApproveCycleWorkOrder(ctx context.Context, cwoID string) error {
 	// Get current CWO
 	record, err := s.cwoRepo.GetByID(ctx, cwoID)
 	if err != nil {
@@ -169,12 +172,24 @@ func (s *CycleWorkOrderServiceImpl) ActivateCycleWorkOrder(ctx context.Context, 
 		CycleExists:   cycleExists,
 	}
 
-	result := cycleworkorder.CanActivate(guardCtx)
+	result := cycleworkorder.CanApprove(guardCtx)
 	if !result.Allowed {
 		return fmt.Errorf("%s", result.Reason)
 	}
 
-	return s.cwoRepo.UpdateStatus(ctx, cwoID, "active")
+	// Update CWO status to active
+	if err := s.cwoRepo.UpdateStatus(ctx, cwoID, "active"); err != nil {
+		return err
+	}
+
+	// CASCADE: Update parent Cycle status to "approved"
+	if s.cycleService != nil {
+		if err := s.cycleService.UpdateCycleStatus(ctx, record.CycleID, "approved"); err != nil {
+			return fmt.Errorf("failed to cascade cycle status update: %w", err)
+		}
+	}
+
+	return nil
 }
 
 // CompleteCycleWorkOrder transitions a cycle work order from active to complete.

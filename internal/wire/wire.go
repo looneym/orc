@@ -232,11 +232,10 @@ func initServices() {
 	conclaveService = app.NewConclaveService(conclaveRepo)
 	operationService = app.NewOperationService(operationRepo)
 
-	// Create investigation and plan services
+	// Create investigation service (plan service created later after cycleService)
 	investigationRepo := sqlite.NewInvestigationRepository(database)
 	planRepo := sqlite.NewPlanRepository(database)
 	investigationService = app.NewInvestigationService(investigationRepo)
-	planService = app.NewPlanService(planRepo)
 
 	// Create tag and message services
 	tagService = app.NewTagService(tagRepo)
@@ -263,12 +262,15 @@ func initServices() {
 	cycleWorkOrderRepo := sqlite.NewCycleWorkOrderRepository(database)
 	workOrderService = app.NewWorkOrderService(workOrderRepo)
 	cycleService = app.NewCycleService(cycleRepo)
-	cycleWorkOrderService = app.NewCycleWorkOrderService(cycleWorkOrderRepo)
+	cycleWorkOrderService = app.NewCycleWorkOrderService(cycleWorkOrderRepo, cycleService)
 
-	// Create receipt services
+	// Create plan service (depends on cycleService for cascade)
+	planService = app.NewPlanService(planRepo, cycleService)
+
+	// Create receipt services (depends on cycleService for cascade)
 	cycleReceiptRepo := sqlite.NewCycleReceiptRepository(database)
 	receiptRepo := sqlite.NewReceiptRepository(database)
-	cycleReceiptService = app.NewCycleReceiptService(cycleReceiptRepo)
+	cycleReceiptService = app.NewCycleReceiptService(cycleReceiptRepo, cycleService)
 	receiptService = app.NewReceiptService(receiptRepo)
 
 	// Create orchestration services

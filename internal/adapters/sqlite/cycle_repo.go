@@ -222,7 +222,8 @@ func (r *CycleRepository) GetActiveCycle(ctx context.Context, shipmentID string)
 	record := &secondary.CycleRecord{}
 	err := r.db.QueryRowContext(ctx,
 		`SELECT id, shipment_id, sequence_number, status, created_at, updated_at, started_at, completed_at
-		 FROM cycles WHERE shipment_id = ? AND status = 'active'`,
+		 FROM cycles WHERE shipment_id = ? AND status IN ('approved', 'implementing', 'review')
+		 ORDER BY sequence_number DESC LIMIT 1`,
 		shipmentID,
 	).Scan(&record.ID,
 		&record.ShipmentID,

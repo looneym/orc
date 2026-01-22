@@ -1208,6 +1208,9 @@ type CycleReceiptRepository interface {
 
 	// GetCWOShipmentID retrieves the shipment ID for a CWO.
 	GetCWOShipmentID(ctx context.Context, cwoID string) (string, error)
+
+	// GetCWOCycleID retrieves the cycle ID for a CWO.
+	GetCWOCycleID(ctx context.Context, cwoID string) (string, error)
 }
 
 // CycleReceiptRecord represents a cycle receipt as stored in persistence.

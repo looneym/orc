@@ -10,15 +10,18 @@ import (
 
 // PlanServiceImpl implements the PlanService interface.
 type PlanServiceImpl struct {
-	planRepo secondary.PlanRepository
+	planRepo     secondary.PlanRepository
+	cycleService primary.CycleService
 }
 
 // NewPlanService creates a new PlanService with injected dependencies.
 func NewPlanService(
 	planRepo secondary.PlanRepository,
+	cycleService primary.CycleService,
 ) *PlanServiceImpl {
 	return &PlanServiceImpl{
-		planRepo: planRepo,
+		planRepo:     planRepo,
+		cycleService: cycleService,
 	}
 }
 
@@ -127,8 +130,27 @@ func (s *PlanServiceImpl) ListPlans(ctx context.Context, filters primary.PlanFil
 }
 
 // ApprovePlan approves a plan (marks it as approved).
+// Also cascades: updates parent Cycle status to "implementing" if the plan has a CycleID.
 func (s *PlanServiceImpl) ApprovePlan(ctx context.Context, planID string) error {
-	return s.planRepo.Approve(ctx, planID)
+	// Get the plan to check for CycleID
+	plan, err := s.planRepo.GetByID(ctx, planID)
+	if err != nil {
+		return fmt.Errorf("failed to get plan: %w", err)
+	}
+
+	// Approve the plan
+	if err := s.planRepo.Approve(ctx, planID); err != nil {
+		return err
+	}
+
+	// CASCADE: Update parent Cycle status to "implementing"
+	if plan.CycleID != "" && s.cycleService != nil {
+		if err := s.cycleService.UpdateCycleStatus(ctx, plan.CycleID, "implementing"); err != nil {
+			return fmt.Errorf("failed to cascade cycle status update: %w", err)
+		}
+	}
+
+	return nil
 }
 
 // UpdatePlan updates a plan's title, description, and/or content.

@@ -22,8 +22,9 @@ type CycleWorkOrderService interface {
 	// DeleteCycleWorkOrder deletes a cycle work order.
 	DeleteCycleWorkOrder(ctx context.Context, cwoID string) error
 
-	// ActivateCycleWorkOrder transitions a cycle work order from draft to active.
-	ActivateCycleWorkOrder(ctx context.Context, cwoID string) error
+	// ApproveCycleWorkOrder transitions a cycle work order from draft to active.
+	// Also cascades: updates parent Cycle status to "approved".
+	ApproveCycleWorkOrder(ctx context.Context, cwoID string) error
 
 	// CompleteCycleWorkOrder transitions a cycle work order from active to complete.
 	CompleteCycleWorkOrder(ctx context.Context, cwoID string) error

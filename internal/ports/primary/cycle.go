@@ -24,6 +24,9 @@ type CycleService interface {
 
 	// GetActiveCycle returns the active cycle for a shipment (if any).
 	GetActiveCycle(ctx context.Context, shipmentID string) (*Cycle, error)
+
+	// UpdateCycleStatus updates the cycle status directly (for cascade updates).
+	UpdateCycleStatus(ctx context.Context, cycleID string, status string) error
 }
 
 // CreateCycleRequest contains parameters for creating a cycle.
@@ -58,7 +61,11 @@ type CycleFilters struct {
 
 // Cycle status constants
 const (
-	CycleStatusQueued   = "queued"
-	CycleStatusActive   = "active"
-	CycleStatusComplete = "complete"
+	CycleStatusDraft        = "draft"
+	CycleStatusApproved     = "approved"
+	CycleStatusImplementing = "implementing"
+	CycleStatusReview       = "review"
+	CycleStatusComplete     = "complete"
+	CycleStatusBlocked      = "blocked"
+	CycleStatusClosed       = "closed"
 )

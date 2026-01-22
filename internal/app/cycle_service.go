@@ -48,7 +48,7 @@ func (s *CycleServiceImpl) CreateCycle(ctx context.Context, req primary.CreateCy
 		ID:             nextID,
 		ShipmentID:     req.ShipmentID,
 		SequenceNumber: seqNum,
-		Status:         "queued",
+		Status:         "draft",
 	}
 
 	if err := s.cycleRepo.Create(ctx, record); err != nil {
@@ -149,6 +149,25 @@ func (s *CycleServiceImpl) GetActiveCycle(ctx context.Context, shipmentID string
 		return nil, nil
 	}
 	return s.recordToCycle(record), nil
+}
+
+// UpdateCycleStatus updates the cycle status directly.
+// Used by cascade updates from child entity state changes (CWO, Plan, CREC).
+func (s *CycleServiceImpl) UpdateCycleStatus(ctx context.Context, cycleID string, status string) error {
+	// Validate the status is allowed
+	validStatuses := map[string]bool{
+		"draft": true, "approved": true, "implementing": true,
+		"review": true, "complete": true, "blocked": true, "closed": true,
+	}
+	if !validStatuses[status] {
+		return fmt.Errorf("invalid cycle status: %s", status)
+	}
+
+	// Determine if we should set started_at or completed_at
+	setStarted := status == "implementing"
+	setCompleted := status == "complete"
+
+	return s.cycleRepo.UpdateStatus(ctx, cycleID, status, setStarted, setCompleted)
 }
 
 // Helper methods

@@ -130,6 +130,14 @@ func getEntityType(id string) string {
 		return "plan"
 	case "NOTE":
 		return "note"
+	case "WO":
+		return "work_order"
+	case "CWO":
+		return "cycle_work_order"
+	case "CREC":
+		return "cycle_receipt"
+	case "REC":
+		return "receipt"
 	default:
 		return ""
 	}
@@ -172,93 +180,186 @@ func shouldShowLeaf(entityID string, filters *filterConfig) (bool, string) {
 	return true, tagName
 }
 
-// displayShipmentChildren shows tasks and notes under a shipment with tag filtering
+// displayShipmentChildren shows Spec-Kit artifacts, tasks, and notes under a shipment
 // Returns count of visible items
 func displayShipmentChildren(shipmentID, prefix string, filters *filterConfig) int {
-	shipmentTasks, _ := wire.ShipmentService().GetShipmentTasks(context.Background(), shipmentID)
-	// Convert to models.Task for the rest of the function
-	var tasks []*models.Task
+	ctx := context.Background()
+	visibleCount := 0
+
+	// Collect all items to display (to calculate isLast correctly)
+	type displayItem struct {
+		render func(isLast bool)
+	}
+	var items []displayItem
+
+	// 1. WorkOrder (1:1 with shipment)
+	wo, _ := wire.WorkOrderService().GetWorkOrderByShipment(ctx, shipmentID)
+	if wo != nil {
+		items = append(items, displayItem{
+			render: func(isLast bool) {
+				childPrefix := prefix + "├── "
+				if isLast {
+					childPrefix = prefix + "└── "
+				}
+				outcome := truncate(wo.Outcome, 50)
+				statusInfo := colorizeStatus(wo.Status)
+				if statusInfo != "" {
+					fmt.Printf("%s%s - %s - %s\n", childPrefix, colorizeID(wo.ID), statusInfo, outcome)
+				} else {
+					fmt.Printf("%s%s - %s\n", childPrefix, colorizeID(wo.ID), outcome)
+				}
+			},
+		})
+	}
+
+	// 2. Receipt (1:1 with shipment)
+	rec, _ := wire.ReceiptService().GetReceiptByShipment(ctx, shipmentID)
+	if rec != nil {
+		items = append(items, displayItem{
+			render: func(isLast bool) {
+				childPrefix := prefix + "├── "
+				if isLast {
+					childPrefix = prefix + "└── "
+				}
+				outcome := truncate(rec.DeliveredOutcome, 50)
+				statusInfo := colorizeStatus(rec.Status)
+				if statusInfo != "" {
+					fmt.Printf("%s%s - %s - %s\n", childPrefix, colorizeID(rec.ID), statusInfo, outcome)
+				} else {
+					fmt.Printf("%s%s - %s\n", childPrefix, colorizeID(rec.ID), outcome)
+				}
+			},
+		})
+	}
+
+	// 3. Cycles (1:many with shipment) - with nested CWO and CREC
+	cycles, _ := wire.CycleService().ListCycles(ctx, primary.CycleFilters{ShipmentID: shipmentID})
+	for _, cycle := range cycles {
+		// Capture cycle in closure
+		c := cycle
+		items = append(items, displayItem{
+			render: func(isLast bool) {
+				childPrefix := prefix + "├── "
+				nestedPrefix := prefix + "│   "
+				if isLast {
+					childPrefix = prefix + "└── "
+					nestedPrefix = prefix + "    "
+				}
+				// Format cycle ID as SHIP-XXX-C# for display
+				cycleDisplayID := fmt.Sprintf("%s-C%d", shipmentID, c.SequenceNumber)
+				statusInfo := colorizeStatus(c.Status)
+				if statusInfo != "" {
+					fmt.Printf("%s%s - %s\n", childPrefix, colorizeID(cycleDisplayID), statusInfo)
+				} else {
+					fmt.Printf("%s%s\n", childPrefix, colorizeID(cycleDisplayID))
+				}
+
+				// Nested: CWO (1:1 with cycle)
+				cwo, _ := wire.CycleWorkOrderService().GetCycleWorkOrderByCycle(ctx, c.ID)
+				if cwo != nil {
+					cwoOutcome := truncate(cwo.Outcome, 40)
+					cwoStatus := colorizeStatus(cwo.Status)
+					// Check if CREC exists to determine if CWO is last
+					crec, _ := wire.CycleReceiptService().GetCycleReceiptByCWO(ctx, cwo.ID)
+					cwoPrefix := nestedPrefix + "├── "
+					if crec == nil {
+						cwoPrefix = nestedPrefix + "└── "
+					}
+					if cwoStatus != "" {
+						fmt.Printf("%s%s - %s - %s\n", cwoPrefix, colorizeID(cwo.ID), cwoStatus, cwoOutcome)
+					} else {
+						fmt.Printf("%s%s - %s\n", cwoPrefix, colorizeID(cwo.ID), cwoOutcome)
+					}
+
+					// Nested: CREC (1:1 with CWO)
+					if crec != nil {
+						crecOutcome := truncate(crec.DeliveredOutcome, 40)
+						crecStatus := colorizeStatus(crec.Status)
+						crecPrefix := nestedPrefix + "└── "
+						if crecStatus != "" {
+							fmt.Printf("%s%s - %s - %s\n", crecPrefix, colorizeID(crec.ID), crecStatus, crecOutcome)
+						} else {
+							fmt.Printf("%s%s - %s\n", crecPrefix, colorizeID(crec.ID), crecOutcome)
+						}
+					}
+				}
+			},
+		})
+	}
+
+	// 4. Tasks
+	shipmentTasks, _ := wire.ShipmentService().GetShipmentTasks(ctx, shipmentID)
 	for _, t := range shipmentTasks {
-		tasks = append(tasks, &models.Task{
-			ID:     t.ID,
-			Title:  t.Title,
-			Status: t.Status,
-			Pinned: t.Pinned,
-		})
-	}
-	serviceNotes, _ := wire.NoteService().GetNotesByContainer(context.Background(), "shipment", shipmentID)
-	// Convert to models.Note for the rest of the function (filter out closed notes)
-	var notes []*models.Note
-	for _, n := range serviceNotes {
-		if n.Status == "closed" {
-			continue
-		}
-		notes = append(notes, &models.Note{
-			ID:     n.ID,
-			Title:  n.Title,
-			Pinned: n.Pinned,
-		})
-	}
-
-	// Collect all children with tag filtering
-	type childItem struct {
-		id      string
-		title   string
-		status  string
-		pinned  bool
-		tagName string
-	}
-	var visible []childItem
-	hiddenCount := 0
-
-	for _, t := range tasks {
 		if t.Status == "complete" || filters.statusMap[t.Status] {
 			continue
 		}
 		show, tagName := shouldShowLeaf(t.ID, filters)
-		if show {
-			visible = append(visible, childItem{t.ID, t.Title, t.Status, t.Pinned, tagName})
-		} else {
-			hiddenCount++
+		if !show {
+			continue
 		}
+		// Capture in closure
+		task := t
+		tag := tagName
+		items = append(items, displayItem{
+			render: func(isLast bool) {
+				childPrefix := prefix + "├── "
+				if isLast {
+					childPrefix = prefix + "└── "
+				}
+				tagInfo := ""
+				if tag != "" {
+					tagInfo = " " + colorizeTag(tag)
+				}
+				statusInfo := colorizeStatus(task.Status)
+				if statusInfo != "" {
+					fmt.Printf("%s%s - %s - %s%s\n", childPrefix, colorizeID(task.ID), statusInfo, task.Title, tagInfo)
+				} else {
+					fmt.Printf("%s%s - %s%s\n", childPrefix, colorizeID(task.ID), task.Title, tagInfo)
+				}
+			},
+		})
 	}
-	for _, n := range notes {
+
+	// 5. Notes (filter out closed)
+	serviceNotes, _ := wire.NoteService().GetNotesByContainer(ctx, "shipment", shipmentID)
+	for _, n := range serviceNotes {
+		if n.Status == "closed" {
+			continue
+		}
 		show, tagName := shouldShowLeaf(n.ID, filters)
-		if show {
-			visible = append(visible, childItem{n.ID, n.Title, "", n.Pinned, tagName})
-		} else {
-			hiddenCount++
+		if !show {
+			continue
 		}
+		// Capture in closure
+		note := n
+		tag := tagName
+		items = append(items, displayItem{
+			render: func(isLast bool) {
+				pinnedEmoji := ""
+				if note.Pinned {
+					pinnedEmoji = "📌 "
+				}
+				childPrefix := prefix + "├── "
+				if isLast {
+					childPrefix = prefix + "└── "
+				}
+				tagInfo := ""
+				if tag != "" {
+					tagInfo = " " + colorizeTag(tag)
+				}
+				fmt.Printf("%s%s%s - %s%s\n", childPrefix, pinnedEmoji, colorizeID(note.ID), note.Title, tagInfo)
+			},
+		})
 	}
 
-	for k, child := range visible {
-		pinnedEmoji := ""
-		if child.pinned {
-			pinnedEmoji = "📌 "
-		}
-		isLast := k == len(visible)-1 && hiddenCount == 0
-		childPrefix := prefix + "├── "
-		if isLast {
-			childPrefix = prefix + "└── "
-		}
-		tagInfo := ""
-		if child.tagName != "" {
-			tagInfo = " " + colorizeTag(child.tagName)
-		}
-		statusInfo := colorizeStatus(child.status)
-		if statusInfo != "" {
-			fmt.Printf("%s%s%s - %s - %s%s\n", childPrefix, pinnedEmoji, colorizeID(child.id), statusInfo, child.title, tagInfo)
-		} else {
-			fmt.Printf("%s%s%s - %s%s\n", childPrefix, pinnedEmoji, colorizeID(child.id), child.title, tagInfo)
-		}
+	// Render all items
+	for i, item := range items {
+		isLast := i == len(items)-1
+		item.render(isLast)
+		visibleCount++
 	}
 
-	// Show hidden count if any
-	if hiddenCount > 0 {
-		fmt.Printf("%s└── (%d other items)\n", prefix, hiddenCount)
-	}
-
-	return len(visible)
+	return visibleCount
 }
 
 // displayConclaveChildren shows tasks/plans/notes under a conclave with tag filtering

@@ -198,7 +198,7 @@ func (m *mockPlanRepository) GetByCycle(ctx context.Context, cycleID string) ([]
 
 func newTestPlanService() (*PlanServiceImpl, *mockPlanRepository) {
 	planRepo := newMockPlanRepository()
-	service := NewPlanService(planRepo)
+	service := NewPlanService(planRepo, nil) // nil cycleService for basic tests
 	return service, planRepo
 }
 

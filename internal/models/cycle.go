@@ -18,7 +18,11 @@ type Cycle struct {
 
 // Cycle status constants
 const (
-	CycleStatusQueued   = "queued"
-	CycleStatusActive   = "active"
-	CycleStatusComplete = "complete"
+	CycleStatusDraft        = "draft"
+	CycleStatusApproved     = "approved"
+	CycleStatusImplementing = "implementing"
+	CycleStatusReview       = "review"
+	CycleStatusComplete     = "complete"
+	CycleStatusBlocked      = "blocked"
+	CycleStatusClosed       = "closed"
 )

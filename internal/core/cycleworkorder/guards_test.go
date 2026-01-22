@@ -83,7 +83,7 @@ func TestCanCreateCWO(t *testing.T) {
 	}
 }
 
-func TestCanActivate(t *testing.T) {
+func TestCanApprove(t *testing.T) {
 	tests := []struct {
 		name        string
 		ctx         StatusTransitionContext
@@ -91,30 +91,30 @@ func TestCanActivate(t *testing.T) {
 		wantReason  string
 	}{
 		{
-			name: "can activate draft CWO",
+			name: "can approve draft CWO",
 			ctx: StatusTransitionContext{
 				CWOID:         "CWO-001",
 				CurrentStatus: "draft",
 				Outcome:       "Implement feature X",
 				CycleExists:   true,
-				CycleStatus:   "active",
+				CycleStatus:   "draft",
 			},
 			wantAllowed: true,
 		},
 		{
-			name: "cannot activate active CWO",
+			name: "cannot approve active CWO",
 			ctx: StatusTransitionContext{
 				CWOID:         "CWO-001",
 				CurrentStatus: "active",
 				Outcome:       "Implement feature X",
 				CycleExists:   true,
-				CycleStatus:   "active",
+				CycleStatus:   "approved",
 			},
 			wantAllowed: false,
-			wantReason:  "can only activate draft CWOs (current status: active)",
+			wantReason:  "can only approve draft CWOs (current status: active)",
 		},
 		{
-			name: "cannot activate complete CWO",
+			name: "cannot approve complete CWO",
 			ctx: StatusTransitionContext{
 				CWOID:         "CWO-001",
 				CurrentStatus: "complete",
@@ -123,22 +123,22 @@ func TestCanActivate(t *testing.T) {
 				CycleStatus:   "complete",
 			},
 			wantAllowed: false,
-			wantReason:  "can only activate draft CWOs (current status: complete)",
+			wantReason:  "can only approve draft CWOs (current status: complete)",
 		},
 		{
-			name: "cannot activate CWO with empty outcome",
+			name: "cannot approve CWO with empty outcome",
 			ctx: StatusTransitionContext{
 				CWOID:         "CWO-001",
 				CurrentStatus: "draft",
 				Outcome:       "",
 				CycleExists:   true,
-				CycleStatus:   "active",
+				CycleStatus:   "draft",
 			},
 			wantAllowed: false,
-			wantReason:  "cannot activate CWO: outcome is empty",
+			wantReason:  "cannot approve CWO: outcome is empty",
 		},
 		{
-			name: "cannot activate CWO when cycle does not exist",
+			name: "cannot approve CWO when cycle does not exist",
 			ctx: StatusTransitionContext{
 				CWOID:         "CWO-001",
 				CurrentStatus: "draft",
@@ -147,13 +147,13 @@ func TestCanActivate(t *testing.T) {
 				CycleStatus:   "",
 			},
 			wantAllowed: false,
-			wantReason:  "cannot activate CWO: parent cycle no longer exists",
+			wantReason:  "cannot approve CWO: parent cycle no longer exists",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := CanActivate(tt.ctx)
+			result := CanApprove(tt.ctx)
 			if result.Allowed != tt.wantAllowed {
 				t.Errorf("Allowed = %v, want %v", result.Allowed, tt.wantAllowed)
 			}
@@ -172,13 +172,24 @@ func TestCanComplete(t *testing.T) {
 		wantReason  string
 	}{
 		{
-			name: "can complete active CWO when cycle is complete",
+			name: "can complete active CWO when cycle exists",
 			ctx: StatusTransitionContext{
 				CWOID:         "CWO-001",
 				CurrentStatus: "active",
 				Outcome:       "Implement feature X",
 				CycleExists:   true,
-				CycleStatus:   "complete",
+				CycleStatus:   "implementing",
+			},
+			wantAllowed: true,
+		},
+		{
+			name: "can complete active CWO regardless of cycle status",
+			ctx: StatusTransitionContext{
+				CWOID:         "CWO-001",
+				CurrentStatus: "active",
+				Outcome:       "Implement feature X",
+				CycleExists:   true,
+				CycleStatus:   "approved",
 			},
 			wantAllowed: true,
 		},
@@ -189,7 +200,7 @@ func TestCanComplete(t *testing.T) {
 				CurrentStatus: "draft",
 				Outcome:       "Implement feature X",
 				CycleExists:   true,
-				CycleStatus:   "complete",
+				CycleStatus:   "implementing",
 			},
 			wantAllowed: false,
 			wantReason:  "can only complete active CWOs (current status: draft)",
@@ -205,30 +216,6 @@ func TestCanComplete(t *testing.T) {
 			},
 			wantAllowed: false,
 			wantReason:  "can only complete active CWOs (current status: complete)",
-		},
-		{
-			name: "cannot complete CWO when cycle is active",
-			ctx: StatusTransitionContext{
-				CWOID:         "CWO-001",
-				CurrentStatus: "active",
-				Outcome:       "Implement feature X",
-				CycleExists:   true,
-				CycleStatus:   "active",
-			},
-			wantAllowed: false,
-			wantReason:  "cannot complete CWO: parent cycle is not complete (status: active)",
-		},
-		{
-			name: "cannot complete CWO when cycle is queued",
-			ctx: StatusTransitionContext{
-				CWOID:         "CWO-001",
-				CurrentStatus: "active",
-				Outcome:       "Implement feature X",
-				CycleExists:   true,
-				CycleStatus:   "queued",
-			},
-			wantAllowed: false,
-			wantReason:  "cannot complete CWO: parent cycle is not complete (status: queued)",
 		},
 		{
 			name: "cannot complete CWO when cycle does not exist",

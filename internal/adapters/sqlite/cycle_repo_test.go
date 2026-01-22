@@ -22,7 +22,7 @@ func TestCycleRepository_Create(t *testing.T) {
 			ID:             "CYC-001",
 			ShipmentID:     "SHIP-001",
 			SequenceNumber: 1,
-			Status:         "queued",
+			Status:         "draft",
 		}
 
 		err := repo.Create(ctx, record)
@@ -38,8 +38,8 @@ func TestCycleRepository_Create(t *testing.T) {
 		if got.SequenceNumber != 1 {
 			t.Errorf("SequenceNumber = %d, want %d", got.SequenceNumber, 1)
 		}
-		if got.Status != "queued" {
-			t.Errorf("Status = %q, want %q", got.Status, "queued")
+		if got.Status != "draft" {
+			t.Errorf("Status = %q, want %q", got.Status, "draft")
 		}
 	})
 
@@ -48,7 +48,7 @@ func TestCycleRepository_Create(t *testing.T) {
 			ID:             "CYC-002",
 			ShipmentID:     "SHIP-001",
 			SequenceNumber: 1, // Same as CYC-001
-			Status:         "queued",
+			Status:         "draft",
 		}
 
 		err := repo.Create(ctx, record)
@@ -64,7 +64,7 @@ func TestCycleRepository_Create(t *testing.T) {
 			ID:             "CYC-003",
 			ShipmentID:     "SHIP-002",
 			SequenceNumber: 1, // Same sequence but different shipment
-			Status:         "queued",
+			Status:         "draft",
 		}
 
 		err := repo.Create(ctx, record)
@@ -95,8 +95,8 @@ func TestCycleRepository_GetNextSequenceNumber(t *testing.T) {
 	})
 
 	t.Run("returns next sequence after creating cycles", func(t *testing.T) {
-		repo.Create(ctx, &secondary.CycleRecord{ID: "CYC-001", ShipmentID: "SHIP-001", SequenceNumber: 1, Status: "queued"})
-		repo.Create(ctx, &secondary.CycleRecord{ID: "CYC-002", ShipmentID: "SHIP-001", SequenceNumber: 2, Status: "queued"})
+		repo.Create(ctx, &secondary.CycleRecord{ID: "CYC-001", ShipmentID: "SHIP-001", SequenceNumber: 1, Status: "draft"})
+		repo.Create(ctx, &secondary.CycleRecord{ID: "CYC-002", ShipmentID: "SHIP-001", SequenceNumber: 2, Status: "draft"})
 
 		seq, err := repo.GetNextSequenceNumber(ctx, "SHIP-001")
 		if err != nil {
@@ -129,8 +129,8 @@ func TestCycleRepository_GetActiveCycle(t *testing.T) {
 	db.ExecContext(ctx, "INSERT INTO shipments (id, commission_id, title, status) VALUES (?, ?, ?, ?)", "SHIP-002", "COMM-001", "Test 2", "active")
 
 	repo.Create(ctx, &secondary.CycleRecord{ID: "CYC-001", ShipmentID: "SHIP-001", SequenceNumber: 1, Status: "complete"})
-	repo.Create(ctx, &secondary.CycleRecord{ID: "CYC-002", ShipmentID: "SHIP-001", SequenceNumber: 2, Status: "active"})
-	repo.Create(ctx, &secondary.CycleRecord{ID: "CYC-003", ShipmentID: "SHIP-001", SequenceNumber: 3, Status: "queued"})
+	repo.Create(ctx, &secondary.CycleRecord{ID: "CYC-002", ShipmentID: "SHIP-001", SequenceNumber: 2, Status: "implementing"})
+	repo.Create(ctx, &secondary.CycleRecord{ID: "CYC-003", ShipmentID: "SHIP-001", SequenceNumber: 3, Status: "draft"})
 
 	t.Run("returns active cycle", func(t *testing.T) {
 		got, err := repo.GetActiveCycle(ctx, "SHIP-001")
@@ -165,8 +165,8 @@ func TestCycleRepository_GetByShipmentAndSequence(t *testing.T) {
 	db.ExecContext(ctx, "INSERT OR IGNORE INTO commissions (id, title, status) VALUES (?, ?, ?)", "COMM-001", "Test", "active")
 	db.ExecContext(ctx, "INSERT INTO shipments (id, commission_id, title, status) VALUES (?, ?, ?, ?)", "SHIP-001", "COMM-001", "Test", "active")
 
-	repo.Create(ctx, &secondary.CycleRecord{ID: "CYC-001", ShipmentID: "SHIP-001", SequenceNumber: 1, Status: "queued"})
-	repo.Create(ctx, &secondary.CycleRecord{ID: "CYC-002", ShipmentID: "SHIP-001", SequenceNumber: 2, Status: "queued"})
+	repo.Create(ctx, &secondary.CycleRecord{ID: "CYC-001", ShipmentID: "SHIP-001", SequenceNumber: 1, Status: "draft"})
+	repo.Create(ctx, &secondary.CycleRecord{ID: "CYC-002", ShipmentID: "SHIP-001", SequenceNumber: 2, Status: "draft"})
 
 	t.Run("finds cycle by shipment and sequence", func(t *testing.T) {
 		got, err := repo.GetByShipmentAndSequence(ctx, "SHIP-001", 2)
@@ -195,17 +195,17 @@ func TestCycleRepository_UpdateStatus(t *testing.T) {
 	db.ExecContext(ctx, "INSERT OR IGNORE INTO commissions (id, title, status) VALUES (?, ?, ?)", "COMM-001", "Test", "active")
 	db.ExecContext(ctx, "INSERT INTO shipments (id, commission_id, title, status) VALUES (?, ?, ?, ?)", "SHIP-001", "COMM-001", "Test", "active")
 
-	repo.Create(ctx, &secondary.CycleRecord{ID: "CYC-001", ShipmentID: "SHIP-001", SequenceNumber: 1, Status: "queued"})
+	repo.Create(ctx, &secondary.CycleRecord{ID: "CYC-001", ShipmentID: "SHIP-001", SequenceNumber: 1, Status: "draft"})
 
-	t.Run("updates to active with started_at", func(t *testing.T) {
-		err := repo.UpdateStatus(ctx, "CYC-001", "active", true, false)
+	t.Run("updates to implementing with started_at", func(t *testing.T) {
+		err := repo.UpdateStatus(ctx, "CYC-001", "implementing", true, false)
 		if err != nil {
 			t.Fatalf("UpdateStatus failed: %v", err)
 		}
 
 		got, _ := repo.GetByID(ctx, "CYC-001")
-		if got.Status != "active" {
-			t.Errorf("Status = %q, want %q", got.Status, "active")
+		if got.Status != "implementing" {
+			t.Errorf("Status = %q, want %q", got.Status, "implementing")
 		}
 		if got.StartedAt == "" {
 			t.Error("StartedAt should be set")
@@ -231,7 +231,7 @@ func TestCycleRepository_UpdateStatus(t *testing.T) {
 	})
 
 	t.Run("returns error for non-existent cycle", func(t *testing.T) {
-		err := repo.UpdateStatus(ctx, "CYC-999", "active", true, false)
+		err := repo.UpdateStatus(ctx, "CYC-999", "implementing", true, false)
 		if err == nil {
 			t.Error("expected error, got nil")
 		}
@@ -265,8 +265,8 @@ func TestCycleRepository_List(t *testing.T) {
 	db.ExecContext(ctx, "INSERT INTO shipments (id, commission_id, title, status) VALUES (?, ?, ?, ?)", "SHIP-002", "COMM-001", "Test 2", "active")
 
 	repo.Create(ctx, &secondary.CycleRecord{ID: "CYC-001", ShipmentID: "SHIP-001", SequenceNumber: 1, Status: "complete"})
-	repo.Create(ctx, &secondary.CycleRecord{ID: "CYC-002", ShipmentID: "SHIP-001", SequenceNumber: 2, Status: "active"})
-	repo.Create(ctx, &secondary.CycleRecord{ID: "CYC-003", ShipmentID: "SHIP-002", SequenceNumber: 1, Status: "queued"})
+	repo.Create(ctx, &secondary.CycleRecord{ID: "CYC-002", ShipmentID: "SHIP-001", SequenceNumber: 2, Status: "implementing"})
+	repo.Create(ctx, &secondary.CycleRecord{ID: "CYC-003", ShipmentID: "SHIP-002", SequenceNumber: 1, Status: "draft"})
 
 	t.Run("lists all cycles", func(t *testing.T) {
 		list, err := repo.List(ctx, secondary.CycleFilters{})
@@ -279,7 +279,7 @@ func TestCycleRepository_List(t *testing.T) {
 	})
 
 	t.Run("filters by status", func(t *testing.T) {
-		list, err := repo.List(ctx, secondary.CycleFilters{Status: "active"})
+		list, err := repo.List(ctx, secondary.CycleFilters{Status: "implementing"})
 		if err != nil {
 			t.Fatalf("List failed: %v", err)
 		}
@@ -324,7 +324,7 @@ func TestCycleRepository_Delete(t *testing.T) {
 	db.ExecContext(ctx, "INSERT OR IGNORE INTO commissions (id, title, status) VALUES (?, ?, ?)", "COMM-001", "Test", "active")
 	db.ExecContext(ctx, "INSERT INTO shipments (id, commission_id, title, status) VALUES (?, ?, ?, ?)", "SHIP-001", "COMM-001", "Test", "active")
 
-	repo.Create(ctx, &secondary.CycleRecord{ID: "CYC-001", ShipmentID: "SHIP-001", SequenceNumber: 1, Status: "queued"})
+	repo.Create(ctx, &secondary.CycleRecord{ID: "CYC-001", ShipmentID: "SHIP-001", SequenceNumber: 1, Status: "draft"})
 
 	t.Run("deletes cycle", func(t *testing.T) {
 		err := repo.Delete(ctx, "CYC-001")

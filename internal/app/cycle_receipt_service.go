@@ -11,13 +11,15 @@ import (
 
 // CycleReceiptServiceImpl implements the CycleReceiptService interface.
 type CycleReceiptServiceImpl struct {
-	crecRepo secondary.CycleReceiptRepository
+	crecRepo     secondary.CycleReceiptRepository
+	cycleService primary.CycleService
 }
 
 // NewCycleReceiptService creates a new CycleReceiptService with injected dependencies.
-func NewCycleReceiptService(crecRepo secondary.CycleReceiptRepository) *CycleReceiptServiceImpl {
+func NewCycleReceiptService(crecRepo secondary.CycleReceiptRepository, cycleService primary.CycleService) *CycleReceiptServiceImpl {
 	return &CycleReceiptServiceImpl{
-		crecRepo: crecRepo,
+		crecRepo:     crecRepo,
+		cycleService: cycleService,
 	}
 }
 
@@ -150,6 +152,7 @@ func (s *CycleReceiptServiceImpl) DeleteCycleReceipt(ctx context.Context, crecID
 }
 
 // SubmitCycleReceipt transitions a cycle receipt from draft to submitted.
+// Also cascades: updates parent Cycle status to "review".
 func (s *CycleReceiptServiceImpl) SubmitCycleReceipt(ctx context.Context, crecID string) error {
 	// Get current CREC
 	record, err := s.crecRepo.GetByID(ctx, crecID)
@@ -184,10 +187,27 @@ func (s *CycleReceiptServiceImpl) SubmitCycleReceipt(ctx context.Context, crecID
 		return fmt.Errorf("%s", result.Reason)
 	}
 
-	return s.crecRepo.UpdateStatus(ctx, crecID, "submitted")
+	// Update CREC status to submitted
+	if err := s.crecRepo.UpdateStatus(ctx, crecID, "submitted"); err != nil {
+		return err
+	}
+
+	// CASCADE: Update parent Cycle status to "review"
+	if s.cycleService != nil {
+		cycleID, err := s.crecRepo.GetCWOCycleID(ctx, record.CWOID)
+		if err != nil {
+			return fmt.Errorf("failed to get cycle ID for cascade: %w", err)
+		}
+		if err := s.cycleService.UpdateCycleStatus(ctx, cycleID, "review"); err != nil {
+			return fmt.Errorf("failed to cascade cycle status update: %w", err)
+		}
+	}
+
+	return nil
 }
 
 // VerifyCycleReceipt transitions a cycle receipt from submitted to verified.
+// Also cascades: updates parent Cycle status to "complete".
 func (s *CycleReceiptServiceImpl) VerifyCycleReceipt(ctx context.Context, crecID string) error {
 	// Get current CREC
 	record, err := s.crecRepo.GetByID(ctx, crecID)
@@ -206,7 +226,23 @@ func (s *CycleReceiptServiceImpl) VerifyCycleReceipt(ctx context.Context, crecID
 		return fmt.Errorf("%s", result.Reason)
 	}
 
-	return s.crecRepo.UpdateStatus(ctx, crecID, "verified")
+	// Update CREC status to verified
+	if err := s.crecRepo.UpdateStatus(ctx, crecID, "verified"); err != nil {
+		return err
+	}
+
+	// CASCADE: Update parent Cycle status to "complete"
+	if s.cycleService != nil {
+		cycleID, err := s.crecRepo.GetCWOCycleID(ctx, record.CWOID)
+		if err != nil {
+			return fmt.Errorf("failed to get cycle ID for cascade: %w", err)
+		}
+		if err := s.cycleService.UpdateCycleStatus(ctx, cycleID, "complete"); err != nil {
+			return fmt.Errorf("failed to cascade cycle status update: %w", err)
+		}
+	}
+
+	return nil
 }
 
 // Helper methods

@@ -274,28 +274,42 @@ brew install ariga/tap/atlas
 
 ### Core Workflow
 
+**CRITICAL: Always use `--exclude` for SQLite autoindexes.**
+
+SQLite auto-generates indexes named `sqlite_autoindex_<table>_N` for UNIQUE and PRIMARY KEY constraints. Atlas has a bug where it generates incorrect names when trying to drop these, causing migrations to fail with "no such index" errors.
+
 **1. Inspect current schema:**
 ```bash
-atlas schema inspect -u "sqlite:///$HOME/.orc/orc.db"
+atlas schema inspect \
+  -u "sqlite:///$HOME/.orc/orc.db" \
+  --exclude "*.sqlite_autoindex*[type=index]"
 ```
 
-**2. Edit desired schema** in `schema.hcl` (declarative - say what you want, not how to get there)
+**2. Edit desired schema** in `schema_inspected.hcl` (declarative - say what you want, not how to get there)
 
 **3. Preview migration:**
 ```bash
 atlas schema diff \
   --from "sqlite:///$HOME/.orc/orc.db" \
-  --to "file://schema.hcl" \
-  --dev-url "sqlite://dev?mode=memory"
+  --to "file://schema_inspected.hcl" \
+  --dev-url "sqlite://dev?mode=memory" \
+  --exclude "*.sqlite_autoindex*[type=index]"
 ```
 
 **4. Apply migration:**
 ```bash
 atlas schema apply \
   --url "sqlite:///$HOME/.orc/orc.db" \
-  --to "file://schema.hcl" \
-  --dev-url "sqlite://dev?mode=memory"
+  --to "file://schema_inspected.hcl" \
+  --dev-url "sqlite://dev?mode=memory" \
+  --exclude "*.sqlite_autoindex*[type=index]"
 ```
+
+**Why the `--exclude` flag?**
+- SQLite manages `sqlite_autoindex_*` indexes internally for unique constraints
+- Atlas inspect captures them, but diff generates wrong drop statements (e.g., `DROP INDEX tags_name` instead of `DROP INDEX sqlite_autoindex_tags_2`)
+- The exclude pattern tells Atlas to ignore these on both sides of the diff
+- This is an Atlas bug (confirmed with canary v1.0.1), not a config issue
 
 ### Key Behaviors
 
@@ -323,18 +337,21 @@ You just declare the end state. Atlas figures out the migration path.
 
 ## Common Mistakes to Avoid
 
-❌ Writing business logic in adapters  
+❌ Writing business logic in adapters
 ✅ Keep adapters as pure translation layers
 
-❌ Importing adapters/infra from core/  
-✅ Core has no non-core jmports
+❌ Importing adapters/infra from core/
+✅ Core has no non-core imports
 
-❌ Calling tmux directly from app  
+❌ Calling tmux directly from app
 ✅ Use a port (adapter executes tmux)
 
-❌ Skipping FSM spec for new stateful behavior  
+❌ Skipping FSM spec for new stateful behavior
 ✅ Spec → tests → implementation
 
-❌ Claiming checks passed without running them  
+❌ Claiming checks passed without running them
 ✅ Run them and report explicitly
+
+❌ Running Atlas without `--exclude "*.sqlite_autoindex*[type=index]"`
+✅ Always include the exclude flag for SQLite migrations (see Atlas section above)
 

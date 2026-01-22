@@ -72,17 +72,17 @@ func CanCreateCWO(ctx CreateCWOContext) GuardResult {
 	return GuardResult{Allowed: true}
 }
 
-// CanActivate evaluates whether a CWO can be activated.
+// CanApprove evaluates whether a CWO can be approved.
 // Rules:
 // - CWO must be in draft status
 // - Outcome must not be empty
 // - Cycle must exist
-func CanActivate(ctx StatusTransitionContext) GuardResult {
+func CanApprove(ctx StatusTransitionContext) GuardResult {
 	// Rule 1: Must be in draft status
 	if ctx.CurrentStatus != "draft" {
 		return GuardResult{
 			Allowed: false,
-			Reason:  fmt.Sprintf("can only activate draft CWOs (current status: %s)", ctx.CurrentStatus),
+			Reason:  fmt.Sprintf("can only approve draft CWOs (current status: %s)", ctx.CurrentStatus),
 		}
 	}
 
@@ -90,7 +90,7 @@ func CanActivate(ctx StatusTransitionContext) GuardResult {
 	if strings.TrimSpace(ctx.Outcome) == "" {
 		return GuardResult{
 			Allowed: false,
-			Reason:  "cannot activate CWO: outcome is empty",
+			Reason:  "cannot approve CWO: outcome is empty",
 		}
 	}
 
@@ -98,7 +98,7 @@ func CanActivate(ctx StatusTransitionContext) GuardResult {
 	if !ctx.CycleExists {
 		return GuardResult{
 			Allowed: false,
-			Reason:  "cannot activate CWO: parent cycle no longer exists",
+			Reason:  "cannot approve CWO: parent cycle no longer exists",
 		}
 	}
 
@@ -108,7 +108,7 @@ func CanActivate(ctx StatusTransitionContext) GuardResult {
 // CanComplete evaluates whether a CWO can be completed.
 // Rules:
 // - CWO must be in active status
-// - Parent cycle must be complete
+// - Parent cycle must exist
 func CanComplete(ctx StatusTransitionContext) GuardResult {
 	// Rule 1: Must be in active status
 	if ctx.CurrentStatus != "active" {
@@ -123,14 +123,6 @@ func CanComplete(ctx StatusTransitionContext) GuardResult {
 		return GuardResult{
 			Allowed: false,
 			Reason:  "cannot complete CWO: parent cycle no longer exists",
-		}
-	}
-
-	// Rule 3: Cycle must be complete
-	if ctx.CycleStatus != "complete" {
-		return GuardResult{
-			Allowed: false,
-			Reason:  fmt.Sprintf("cannot complete CWO: parent cycle is not complete (status: %s)", ctx.CycleStatus),
 		}
 	}
 

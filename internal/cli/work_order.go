@@ -156,6 +156,56 @@ var workOrderCompleteCmd = &cobra.Command{
 	},
 }
 
+var workOrderUpdateCmd = &cobra.Command{
+	Use:   "update [work-order-id]",
+	Short: "Update an active work order",
+	Long:  "Update outcome or acceptance criteria of an active work order. Requires --confirm flag.",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		ctx := context.Background()
+		workOrderID := args[0]
+		confirm, _ := cmd.Flags().GetBool("confirm")
+		outcome, _ := cmd.Flags().GetString("outcome")
+		acceptanceCriteria, _ := cmd.Flags().GetString("acceptance-criteria")
+
+		if !confirm {
+			return fmt.Errorf("--confirm flag is required to update work orders")
+		}
+
+		if outcome == "" && acceptanceCriteria == "" {
+			return fmt.Errorf("at least one of --outcome or --acceptance-criteria must be provided")
+		}
+
+		// Get current work order to preserve unchanged fields
+		current, err := wire.WorkOrderService().GetWorkOrder(ctx, workOrderID)
+		if err != nil {
+			return fmt.Errorf("work order not found: %w", err)
+		}
+
+		// Build update request, preserving current values for unset flags
+		req := primary.UpdateWorkOrderRequest{
+			WorkOrderID:        workOrderID,
+			Outcome:            current.Outcome,
+			AcceptanceCriteria: current.AcceptanceCriteria,
+		}
+
+		if outcome != "" {
+			req.Outcome = outcome
+		}
+		if acceptanceCriteria != "" {
+			req.AcceptanceCriteria = acceptanceCriteria
+		}
+
+		err = wire.WorkOrderService().UpdateWorkOrder(ctx, req)
+		if err != nil {
+			return fmt.Errorf("failed to update work order: %w", err)
+		}
+
+		fmt.Printf("✓ Work order %s updated\n", workOrderID)
+		return nil
+	},
+}
+
 var workOrderDeleteCmd = &cobra.Command{
 	Use:   "delete [work-order-id]",
 	Short: "Delete a work order",
@@ -184,10 +234,16 @@ func init() {
 	workOrderListCmd.Flags().String("shipment-id", "", "Filter by shipment")
 	workOrderListCmd.Flags().StringP("status", "s", "", "Filter by status")
 
+	// work_order update flags
+	workOrderUpdateCmd.Flags().Bool("confirm", false, "Confirm the update (required)")
+	workOrderUpdateCmd.Flags().String("outcome", "", "New outcome")
+	workOrderUpdateCmd.Flags().String("acceptance-criteria", "", "New acceptance criteria (JSON array)")
+
 	// Register subcommands
 	workOrderCmd.AddCommand(workOrderCreateCmd)
 	workOrderCmd.AddCommand(workOrderListCmd)
 	workOrderCmd.AddCommand(workOrderShowCmd)
+	workOrderCmd.AddCommand(workOrderUpdateCmd)
 	workOrderCmd.AddCommand(workOrderActivateCmd)
 	workOrderCmd.AddCommand(workOrderCompleteCmd)
 	workOrderCmd.AddCommand(workOrderDeleteCmd)

@@ -16,7 +16,7 @@ func TestCycleWorkOrderRepository_Create(t *testing.T) {
 	// Create test fixtures: commission -> shipment -> cycle
 	db.ExecContext(ctx, "INSERT OR IGNORE INTO commissions (id, title, status) VALUES (?, ?, ?)", "COMM-001", "Test", "active")
 	db.ExecContext(ctx, "INSERT INTO shipments (id, commission_id, title, status) VALUES (?, ?, ?, ?)", "SHIP-001", "COMM-001", "Test Shipment", "active")
-	db.ExecContext(ctx, "INSERT INTO cycles (id, shipment_id, sequence_number, status) VALUES (?, ?, ?, ?)", "CYC-001", "SHIP-001", 1, "active")
+	db.ExecContext(ctx, "INSERT INTO cycles (id, shipment_id, sequence_number, status) VALUES (?, ?, ?, ?)", "CYC-001", "SHIP-001", 1, "implementing")
 
 	t.Run("creates cycle work order successfully", func(t *testing.T) {
 		record := &secondary.CycleWorkOrderRecord{
@@ -46,7 +46,7 @@ func TestCycleWorkOrderRepository_Create(t *testing.T) {
 	})
 
 	t.Run("creates cycle work order with acceptance criteria", func(t *testing.T) {
-		db.ExecContext(ctx, "INSERT INTO cycles (id, shipment_id, sequence_number, status) VALUES (?, ?, ?, ?)", "CYC-002", "SHIP-001", 2, "queued")
+		db.ExecContext(ctx, "INSERT INTO cycles (id, shipment_id, sequence_number, status) VALUES (?, ?, ?, ?)", "CYC-002", "SHIP-001", 2, "draft")
 
 		record := &secondary.CycleWorkOrderRecord{
 			ID:                 "CWO-002",
@@ -96,7 +96,7 @@ func TestCycleWorkOrderRepository_GetByID(t *testing.T) {
 	// Setup
 	db.ExecContext(ctx, "INSERT OR IGNORE INTO commissions (id, title, status) VALUES (?, ?, ?)", "COMM-001", "Test", "active")
 	db.ExecContext(ctx, "INSERT INTO shipments (id, commission_id, title, status) VALUES (?, ?, ?, ?)", "SHIP-001", "COMM-001", "Test", "active")
-	db.ExecContext(ctx, "INSERT INTO cycles (id, shipment_id, sequence_number, status) VALUES (?, ?, ?, ?)", "CYC-001", "SHIP-001", 1, "active")
+	db.ExecContext(ctx, "INSERT INTO cycles (id, shipment_id, sequence_number, status) VALUES (?, ?, ?, ?)", "CYC-001", "SHIP-001", 1, "implementing")
 
 	repo.Create(ctx, &secondary.CycleWorkOrderRecord{
 		ID:         "CWO-001",
@@ -132,7 +132,7 @@ func TestCycleWorkOrderRepository_GetByCycle(t *testing.T) {
 	// Setup
 	db.ExecContext(ctx, "INSERT OR IGNORE INTO commissions (id, title, status) VALUES (?, ?, ?)", "COMM-001", "Test", "active")
 	db.ExecContext(ctx, "INSERT INTO shipments (id, commission_id, title, status) VALUES (?, ?, ?, ?)", "SHIP-001", "COMM-001", "Test", "active")
-	db.ExecContext(ctx, "INSERT INTO cycles (id, shipment_id, sequence_number, status) VALUES (?, ?, ?, ?)", "CYC-001", "SHIP-001", 1, "active")
+	db.ExecContext(ctx, "INSERT INTO cycles (id, shipment_id, sequence_number, status) VALUES (?, ?, ?, ?)", "CYC-001", "SHIP-001", 1, "implementing")
 
 	repo.Create(ctx, &secondary.CycleWorkOrderRecord{
 		ID:         "CWO-001",
@@ -172,8 +172,8 @@ func TestCycleWorkOrderRepository_List(t *testing.T) {
 	db.ExecContext(ctx, "INSERT OR IGNORE INTO commissions (id, title, status) VALUES (?, ?, ?)", "COMM-001", "Test", "active")
 	db.ExecContext(ctx, "INSERT INTO shipments (id, commission_id, title, status) VALUES (?, ?, ?, ?)", "SHIP-001", "COMM-001", "Test 1", "active")
 	db.ExecContext(ctx, "INSERT INTO shipments (id, commission_id, title, status) VALUES (?, ?, ?, ?)", "SHIP-002", "COMM-001", "Test 2", "active")
-	db.ExecContext(ctx, "INSERT INTO cycles (id, shipment_id, sequence_number, status) VALUES (?, ?, ?, ?)", "CYC-001", "SHIP-001", 1, "active")
-	db.ExecContext(ctx, "INSERT INTO cycles (id, shipment_id, sequence_number, status) VALUES (?, ?, ?, ?)", "CYC-002", "SHIP-002", 1, "active")
+	db.ExecContext(ctx, "INSERT INTO cycles (id, shipment_id, sequence_number, status) VALUES (?, ?, ?, ?)", "CYC-001", "SHIP-001", 1, "implementing")
+	db.ExecContext(ctx, "INSERT INTO cycles (id, shipment_id, sequence_number, status) VALUES (?, ?, ?, ?)", "CYC-002", "SHIP-002", 1, "implementing")
 
 	repo.Create(ctx, &secondary.CycleWorkOrderRecord{ID: "CWO-001", CycleID: "CYC-001", ShipmentID: "SHIP-001", Outcome: "Test 1", Status: "draft"})
 	repo.Create(ctx, &secondary.CycleWorkOrderRecord{ID: "CWO-002", CycleID: "CYC-002", ShipmentID: "SHIP-002", Outcome: "Test 2", Status: "active"})
@@ -236,7 +236,7 @@ func TestCycleWorkOrderRepository_Update(t *testing.T) {
 	// Setup
 	db.ExecContext(ctx, "INSERT OR IGNORE INTO commissions (id, title, status) VALUES (?, ?, ?)", "COMM-001", "Test", "active")
 	db.ExecContext(ctx, "INSERT INTO shipments (id, commission_id, title, status) VALUES (?, ?, ?, ?)", "SHIP-001", "COMM-001", "Test", "active")
-	db.ExecContext(ctx, "INSERT INTO cycles (id, shipment_id, sequence_number, status) VALUES (?, ?, ?, ?)", "CYC-001", "SHIP-001", 1, "active")
+	db.ExecContext(ctx, "INSERT INTO cycles (id, shipment_id, sequence_number, status) VALUES (?, ?, ?, ?)", "CYC-001", "SHIP-001", 1, "implementing")
 
 	repo.Create(ctx, &secondary.CycleWorkOrderRecord{
 		ID:         "CWO-001",
@@ -280,7 +280,7 @@ func TestCycleWorkOrderRepository_Delete(t *testing.T) {
 	// Setup
 	db.ExecContext(ctx, "INSERT OR IGNORE INTO commissions (id, title, status) VALUES (?, ?, ?)", "COMM-001", "Test", "active")
 	db.ExecContext(ctx, "INSERT INTO shipments (id, commission_id, title, status) VALUES (?, ?, ?, ?)", "SHIP-001", "COMM-001", "Test", "active")
-	db.ExecContext(ctx, "INSERT INTO cycles (id, shipment_id, sequence_number, status) VALUES (?, ?, ?, ?)", "CYC-001", "SHIP-001", 1, "active")
+	db.ExecContext(ctx, "INSERT INTO cycles (id, shipment_id, sequence_number, status) VALUES (?, ?, ?, ?)", "CYC-001", "SHIP-001", 1, "implementing")
 
 	repo.Create(ctx, &secondary.CycleWorkOrderRecord{ID: "CWO-001", CycleID: "CYC-001", ShipmentID: "SHIP-001", Outcome: "Test", Status: "draft"})
 
@@ -328,7 +328,7 @@ func TestCycleWorkOrderRepository_UpdateStatus(t *testing.T) {
 	// Setup
 	db.ExecContext(ctx, "INSERT OR IGNORE INTO commissions (id, title, status) VALUES (?, ?, ?)", "COMM-001", "Test", "active")
 	db.ExecContext(ctx, "INSERT INTO shipments (id, commission_id, title, status) VALUES (?, ?, ?, ?)", "SHIP-001", "COMM-001", "Test", "active")
-	db.ExecContext(ctx, "INSERT INTO cycles (id, shipment_id, sequence_number, status) VALUES (?, ?, ?, ?)", "CYC-001", "SHIP-001", 1, "active")
+	db.ExecContext(ctx, "INSERT INTO cycles (id, shipment_id, sequence_number, status) VALUES (?, ?, ?, ?)", "CYC-001", "SHIP-001", 1, "implementing")
 
 	repo.Create(ctx, &secondary.CycleWorkOrderRecord{
 		ID:         "CWO-001",
@@ -378,7 +378,7 @@ func TestCycleWorkOrderRepository_CycleExists(t *testing.T) {
 	// Setup
 	db.ExecContext(ctx, "INSERT OR IGNORE INTO commissions (id, title, status) VALUES (?, ?, ?)", "COMM-001", "Test", "active")
 	db.ExecContext(ctx, "INSERT INTO shipments (id, commission_id, title, status) VALUES (?, ?, ?, ?)", "SHIP-001", "COMM-001", "Test", "active")
-	db.ExecContext(ctx, "INSERT INTO cycles (id, shipment_id, sequence_number, status) VALUES (?, ?, ?, ?)", "CYC-001", "SHIP-001", 1, "active")
+	db.ExecContext(ctx, "INSERT INTO cycles (id, shipment_id, sequence_number, status) VALUES (?, ?, ?, ?)", "CYC-001", "SHIP-001", 1, "implementing")
 
 	t.Run("returns true for existing cycle", func(t *testing.T) {
 		exists, err := repo.CycleExists(ctx, "CYC-001")
@@ -439,8 +439,8 @@ func TestCycleWorkOrderRepository_CycleHasCWO(t *testing.T) {
 	// Setup
 	db.ExecContext(ctx, "INSERT OR IGNORE INTO commissions (id, title, status) VALUES (?, ?, ?)", "COMM-001", "Test", "active")
 	db.ExecContext(ctx, "INSERT INTO shipments (id, commission_id, title, status) VALUES (?, ?, ?, ?)", "SHIP-001", "COMM-001", "Test", "active")
-	db.ExecContext(ctx, "INSERT INTO cycles (id, shipment_id, sequence_number, status) VALUES (?, ?, ?, ?)", "CYC-001", "SHIP-001", 1, "active")
-	db.ExecContext(ctx, "INSERT INTO cycles (id, shipment_id, sequence_number, status) VALUES (?, ?, ?, ?)", "CYC-002", "SHIP-001", 2, "queued")
+	db.ExecContext(ctx, "INSERT INTO cycles (id, shipment_id, sequence_number, status) VALUES (?, ?, ?, ?)", "CYC-001", "SHIP-001", 1, "implementing")
+	db.ExecContext(ctx, "INSERT INTO cycles (id, shipment_id, sequence_number, status) VALUES (?, ?, ?, ?)", "CYC-002", "SHIP-001", 2, "draft")
 
 	repo.Create(ctx, &secondary.CycleWorkOrderRecord{
 		ID:         "CWO-001",
@@ -479,15 +479,15 @@ func TestCycleWorkOrderRepository_GetCycleStatus(t *testing.T) {
 	// Setup
 	db.ExecContext(ctx, "INSERT OR IGNORE INTO commissions (id, title, status) VALUES (?, ?, ?)", "COMM-001", "Test", "active")
 	db.ExecContext(ctx, "INSERT INTO shipments (id, commission_id, title, status) VALUES (?, ?, ?, ?)", "SHIP-001", "COMM-001", "Test", "active")
-	db.ExecContext(ctx, "INSERT INTO cycles (id, shipment_id, sequence_number, status) VALUES (?, ?, ?, ?)", "CYC-001", "SHIP-001", 1, "active")
+	db.ExecContext(ctx, "INSERT INTO cycles (id, shipment_id, sequence_number, status) VALUES (?, ?, ?, ?)", "CYC-001", "SHIP-001", 1, "implementing")
 
 	t.Run("returns status for existing cycle", func(t *testing.T) {
 		status, err := repo.GetCycleStatus(ctx, "CYC-001")
 		if err != nil {
 			t.Fatalf("GetCycleStatus failed: %v", err)
 		}
-		if status != "active" {
-			t.Errorf("Status = %q, want %q", status, "active")
+		if status != "implementing" {
+			t.Errorf("Status = %q, want %q", status, "implementing")
 		}
 	})
 
@@ -507,7 +507,7 @@ func TestCycleWorkOrderRepository_GetCycleShipmentID(t *testing.T) {
 	// Setup
 	db.ExecContext(ctx, "INSERT OR IGNORE INTO commissions (id, title, status) VALUES (?, ?, ?)", "COMM-001", "Test", "active")
 	db.ExecContext(ctx, "INSERT INTO shipments (id, commission_id, title, status) VALUES (?, ?, ?, ?)", "SHIP-001", "COMM-001", "Test", "active")
-	db.ExecContext(ctx, "INSERT INTO cycles (id, shipment_id, sequence_number, status) VALUES (?, ?, ?, ?)", "CYC-001", "SHIP-001", 1, "active")
+	db.ExecContext(ctx, "INSERT INTO cycles (id, shipment_id, sequence_number, status) VALUES (?, ?, ?, ?)", "CYC-001", "SHIP-001", 1, "implementing")
 
 	t.Run("returns shipment ID for existing cycle", func(t *testing.T) {
 		shipmentID, err := repo.GetCycleShipmentID(ctx, "CYC-001")

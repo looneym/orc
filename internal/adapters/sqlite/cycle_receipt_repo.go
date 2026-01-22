@@ -306,5 +306,18 @@ func (r *CycleReceiptRepository) GetCWOShipmentID(ctx context.Context, cwoID str
 	return shipmentID, nil
 }
 
+// GetCWOCycleID retrieves the cycle ID for a CWO.
+func (r *CycleReceiptRepository) GetCWOCycleID(ctx context.Context, cwoID string) (string, error) {
+	var cycleID string
+	err := r.db.QueryRowContext(ctx, "SELECT cycle_id FROM cycle_work_orders WHERE id = ?", cwoID).Scan(&cycleID)
+	if err == sql.ErrNoRows {
+		return "", fmt.Errorf("CWO %s not found", cwoID)
+	}
+	if err != nil {
+		return "", fmt.Errorf("failed to get CWO cycle ID: %w", err)
+	}
+	return cycleID, nil
+}
+
 // Ensure CycleReceiptRepository implements the interface
 var _ secondary.CycleReceiptRepository = (*CycleReceiptRepository)(nil)

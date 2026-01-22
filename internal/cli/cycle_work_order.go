@@ -125,20 +125,20 @@ var cwoShowCmd = &cobra.Command{
 	},
 }
 
-var cwoActivateCmd = &cobra.Command{
-	Use:   "activate [cwo-id]",
-	Short: "Activate a draft cycle work order",
+var cwoApproveCmd = &cobra.Command{
+	Use:   "approve [cwo-id]",
+	Short: "Approve a draft cycle work order (cascades: Cycle → approved)",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
 		cwoID := args[0]
 
-		err := wire.CycleWorkOrderService().ActivateCycleWorkOrder(ctx, cwoID)
+		err := wire.CycleWorkOrderService().ApproveCycleWorkOrder(ctx, cwoID)
 		if err != nil {
-			return fmt.Errorf("failed to activate CWO: %w", err)
+			return fmt.Errorf("failed to approve CWO: %w", err)
 		}
 
-		fmt.Printf("Cycle work order %s activated\n", cwoID)
+		fmt.Printf("✓ Cycle work order %s approved (Cycle status → approved)\n", cwoID)
 		return nil
 	},
 }
@@ -194,7 +194,7 @@ func init() {
 	cwoCmd.AddCommand(cwoCreateCmd)
 	cwoCmd.AddCommand(cwoListCmd)
 	cwoCmd.AddCommand(cwoShowCmd)
-	cwoCmd.AddCommand(cwoActivateCmd)
+	cwoCmd.AddCommand(cwoApproveCmd)
 	cwoCmd.AddCommand(cwoCompleteCmd)
 	cwoCmd.AddCommand(cwoDeleteCmd)
 }
