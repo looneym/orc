@@ -32,8 +32,11 @@ func (r *{{.Name}}Repository) Create(ctx context.Context, {{.NameLower}} *second
 {{- end}}
 
 	_, err := r.db.ExecContext(ctx,
-		`INSERT INTO {{.NamePlural}} (id, mission_id{{range .Fields}}, {{.NameSnake}}{{end}}{{if .HasStatus}}, status{{end}}) VALUES (?{{range .Fields}}, ?{{end}}{{if .HasStatus}}, ?{{end}}, ?)`,
-		{{.NameLower}}.ID, {{.NameLower}}.MissionID,
+		`INSERT INTO {{.NamePlural}} (id{{if .HasParent}}, {{.ParentFK}}{{end}}{{range .Fields}}, {{.NameSnake}}{{end}}{{if .HasStatus}}, status{{end}}) VALUES (?{{if .HasParent}}, ?{{end}}{{range .Fields}}, ?{{end}}{{if .HasStatus}}, ?{{end}})`,
+		{{.NameLower}}.ID,
+{{- if .HasParent}}
+		{{.NameLower}}.{{.ParentEntity}}ID,
+{{- end}}
 {{- range .Fields}}
 {{- if .Nullable}}
 		{{.NameLower}},
@@ -67,9 +70,12 @@ func (r *{{.Name}}Repository) GetByID(ctx context.Context, id string) (*secondar
 
 	record := &secondary.{{.Name}}Record{}
 	err := r.db.QueryRowContext(ctx,
-		`SELECT id, mission_id{{range .Fields}}, {{.NameSnake}}{{end}}{{if .HasStatus}}, status{{end}}, pinned, created_at, updated_at FROM {{.NamePlural}} WHERE id = ?`,
+		`SELECT id{{if .HasParent}}, {{.ParentFK}}{{end}}{{range .Fields}}, {{.NameSnake}}{{end}}{{if .HasStatus}}, status{{end}}, pinned, created_at, updated_at FROM {{.NamePlural}} WHERE id = ?`,
 		id,
-	).Scan(&record.ID, &record.MissionID,
+	).Scan(&record.ID,
+{{- if .HasParent}}
+		&record.{{.ParentEntity}}ID,
+{{- end}}
 {{- range .Fields}}
 {{- if .Nullable}}
 		&{{.NameLower}},
@@ -103,13 +109,15 @@ func (r *{{.Name}}Repository) GetByID(ctx context.Context, id string) (*secondar
 
 // List retrieves {{.NamePlural}} matching the given filters.
 func (r *{{.Name}}Repository) List(ctx context.Context, filters secondary.{{.Name}}Filters) ([]*secondary.{{.Name}}Record, error) {
-	query := `SELECT id, mission_id{{range .Fields}}, {{.NameSnake}}{{end}}{{if .HasStatus}}, status{{end}}, pinned, created_at, updated_at FROM {{.NamePlural}} WHERE 1=1`
+	query := `SELECT id{{if .HasParent}}, {{.ParentFK}}{{end}}{{range .Fields}}, {{.NameSnake}}{{end}}{{if .HasStatus}}, status{{end}}, pinned, created_at, updated_at FROM {{.NamePlural}} WHERE 1=1`
 	args := []any{}
+{{- if .HasParent}}
 
-	if filters.MissionID != "" {
-		query += " AND mission_id = ?"
-		args = append(args, filters.MissionID)
+	if filters.{{.ParentEntity}}ID != "" {
+		query += " AND {{.ParentFK}} = ?"
+		args = append(args, filters.{{.ParentEntity}}ID)
 	}
+{{- end}}
 {{- if .HasStatus}}
 
 	if filters.Status != "" {
@@ -140,7 +148,10 @@ func (r *{{.Name}}Repository) List(ctx context.Context, filters secondary.{{.Nam
 		)
 
 		record := &secondary.{{.Name}}Record{}
-		err := rows.Scan(&record.ID, &record.MissionID,
+		err := rows.Scan(&record.ID,
+{{- if .HasParent}}
+			&record.{{.ParentEntity}}ID,
+{{- end}}
 {{- range .Fields}}
 {{- if .Nullable}}
 			&{{.NameLower}},
@@ -268,15 +279,29 @@ func (r *{{.Name}}Repository) GetNextID(ctx context.Context) (string, error) {
 	return fmt.Sprintf("{{.IDPrefix}}-%03d", maxID+1), nil
 }
 
-// MissionExists checks if a mission exists.
-func (r *{{.Name}}Repository) MissionExists(ctx context.Context, missionID string) (bool, error) {
+{{- if .HasParent}}
+// {{.ParentEntity}}Exists checks if a {{.ParentEntityLower}} exists.
+func (r *{{.Name}}Repository) {{.ParentEntity}}Exists(ctx context.Context, {{.ParentEntityLower}}ID string) (bool, error) {
 	var count int
-	err := r.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM missions WHERE id = ?", missionID).Scan(&count)
+	err := r.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM {{.ParentTable}} WHERE id = ?", {{.ParentEntityLower}}ID).Scan(&count)
 	if err != nil {
-		return false, fmt.Errorf("failed to check mission existence: %w", err)
+		return false, fmt.Errorf("failed to check {{.ParentEntityLower}} existence: %w", err)
 	}
 	return count > 0, nil
 }
+{{- if eq .ParentCardinality "1:1"}}
+
+// {{.ParentEntity}}Has{{.Name}} checks if a {{.ParentEntityLower}} already has a {{.NameLower}} (for 1:1 relationships).
+func (r *{{.Name}}Repository) {{.ParentEntity}}Has{{.Name}}(ctx context.Context, {{.ParentEntityLower}}ID string) (bool, error) {
+	var count int
+	err := r.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM {{.NamePlural}} WHERE {{.ParentFK}} = ?", {{.ParentEntityLower}}ID).Scan(&count)
+	if err != nil {
+		return false, fmt.Errorf("failed to check existing {{.NameLower}}: %w", err)
+	}
+	return count > 0, nil
+}
+{{- end}}
+{{- end}}
 
 // Ensure {{.Name}}Repository implements the interface
 var _ secondary.{{.Name}}Repository = (*{{.Name}}Repository)(nil)

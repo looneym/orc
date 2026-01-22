@@ -22,14 +22,27 @@ func New{{.Name}}Service({{.NameLower}}Repo secondary.{{.Name}}Repository) *{{.N
 
 // Create{{.Name}} creates a new {{.NameLower}}.
 func (s *{{.Name}}ServiceImpl) Create{{.Name}}(ctx context.Context, req primary.Create{{.Name}}Request) (*primary.Create{{.Name}}Response, error) {
-	// Validate mission exists
-	exists, err := s.{{.NameLower}}Repo.MissionExists(ctx, req.MissionID)
+{{- if .HasParent}}
+	// Validate {{.ParentEntityLower}} exists
+	exists, err := s.{{.NameLower}}Repo.{{.ParentEntity}}Exists(ctx, req.{{.ParentEntity}}ID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to validate mission: %w", err)
+		return nil, fmt.Errorf("failed to validate {{.ParentEntityLower}}: %w", err)
 	}
 	if !exists {
-		return nil, fmt.Errorf("mission %s not found", req.MissionID)
+		return nil, fmt.Errorf("{{.ParentEntityLower}} %s not found", req.{{.ParentEntity}}ID)
 	}
+{{- if eq .ParentCardinality "1:1"}}
+
+	// Check if {{.ParentEntityLower}} already has a {{.NameLower}} (1:1 relationship)
+	has{{.Name}}, err := s.{{.NameLower}}Repo.{{.ParentEntity}}Has{{.Name}}(ctx, req.{{.ParentEntity}}ID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check existing {{.NameLower}}: %w", err)
+	}
+	if has{{.Name}} {
+		return nil, fmt.Errorf("{{.ParentEntityLower}} %s already has a {{.NameLower}}", req.{{.ParentEntity}}ID)
+	}
+{{- end}}
+{{- end}}
 
 	// Get next ID
 	nextID, err := s.{{.NameLower}}Repo.GetNextID(ctx)
@@ -39,8 +52,10 @@ func (s *{{.Name}}ServiceImpl) Create{{.Name}}(ctx context.Context, req primary.
 
 	// Create record
 	record := &secondary.{{.Name}}Record{
-		ID:        nextID,
-		MissionID: req.MissionID,
+		ID: nextID,
+{{- if .HasParent}}
+		{{.ParentEntity}}ID: req.{{.ParentEntity}}ID,
+{{- end}}
 {{- range .Fields}}
 {{- if not .Nullable}}
 		{{.Name}}: req.{{.Name}},
@@ -79,7 +94,9 @@ func (s *{{.Name}}ServiceImpl) Get{{.Name}}(ctx context.Context, {{.NameLower}}I
 // List{{.NamePlural | title}} lists {{.NamePlural}} with optional filters.
 func (s *{{.Name}}ServiceImpl) List{{.NamePlural | title}}(ctx context.Context, filters primary.{{.Name}}Filters) ([]*primary.{{.Name}}, error) {
 	records, err := s.{{.NameLower}}Repo.List(ctx, secondary.{{.Name}}Filters{
-		MissionID: filters.MissionID,
+{{- if .HasParent}}
+		{{.ParentEntity}}ID: filters.{{.ParentEntity}}ID,
+{{- end}}
 {{- if .HasStatus}}
 		Status: filters.Status,
 {{- end}}
@@ -125,8 +142,10 @@ func (s *{{.Name}}ServiceImpl) Unpin{{.Name}}(ctx context.Context, {{.NameLower}
 
 func (s *{{.Name}}ServiceImpl) recordTo{{.Name}}(r *secondary.{{.Name}}Record) *primary.{{.Name}} {
 	return &primary.{{.Name}}{
-		ID:        r.ID,
-		MissionID: r.MissionID,
+		ID: r.ID,
+{{- if .HasParent}}
+		{{.ParentEntity}}ID: r.{{.ParentEntity}}ID,
+{{- end}}
 {{- range .Fields}}
 		{{.Name}}: r.{{.Name}},
 {{- end}}

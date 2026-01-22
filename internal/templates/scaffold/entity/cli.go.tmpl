@@ -27,18 +27,22 @@ var {{.NameLower}}CreateCmd = &cobra.Command{
 	Args:  cobra.MinimumNArgs({{$requiredFields}}),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
-		missionID, _ := cmd.Flags().GetString("mission")
+{{- if .HasParent}}
+		{{.ParentEntityLower}}ID, _ := cmd.Flags().GetString("{{.ParentFK | replace "_" "-"}}")
 
-		// Get mission from context or require explicit flag
-		if missionID == "" {
-			missionID = orccontext.GetContextMissionID()
-			if missionID == "" {
-				return fmt.Errorf("no mission context detected\nHint: Use --mission flag or run from a grove/mission directory")
+		// Get {{.ParentEntityLower}} from context or require explicit flag
+		if {{.ParentEntityLower}}ID == "" {
+			{{.ParentEntityLower}}ID = orccontext.GetContext{{.ParentEntity}}ID()
+			if {{.ParentEntityLower}}ID == "" {
+				return fmt.Errorf("no {{.ParentEntityLower}} context detected\nHint: Use --{{.ParentFK | replace "_" "-"}} flag or run from a {{.ParentEntityLower}} directory")
 			}
 		}
+{{- end}}
 
 		req := primary.Create{{.Name}}Request{
-			MissionID: missionID,
+{{- if .HasParent}}
+			{{.ParentEntity}}ID: {{.ParentEntityLower}}ID,
+{{- end}}
 		}
 
 		// Parse positional arguments
@@ -62,7 +66,9 @@ var {{.NameLower}}CreateCmd = &cobra.Command{
 		fmt.Printf("  {{.Name}}: %v\n", {{$.NameLower}}.{{.Name}})
 {{- end}}
 {{- end}}
-		fmt.Printf("  Mission: %s\n", {{.NameLower}}.MissionID)
+{{- if .HasParent}}
+		fmt.Printf("  {{.ParentEntity}}: %s\n", {{.NameLower}}.{{.ParentEntity}}ID)
+{{- end}}
 		return nil
 	},
 }
@@ -72,18 +78,24 @@ var {{.NameLower}}ListCmd = &cobra.Command{
 	Short: "List {{.NamePlural}}",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
-		missionID, _ := cmd.Flags().GetString("mission")
+{{- if .HasParent}}
+		{{.ParentEntityLower}}ID, _ := cmd.Flags().GetString("{{.ParentFK | replace "_" "-"}}")
+{{- end}}
 {{- if .HasStatus}}
 		status, _ := cmd.Flags().GetString("status")
 {{- end}}
+{{- if .HasParent}}
 
-		// Get mission from context if not specified
-		if missionID == "" {
-			missionID = orccontext.GetContextMissionID()
+		// Get {{.ParentEntityLower}} from context if not specified
+		if {{.ParentEntityLower}}ID == "" {
+			{{.ParentEntityLower}}ID = orccontext.GetContext{{.ParentEntity}}ID()
 		}
+{{- end}}
 
 		{{.NamePlural}}, err := wire.{{.Name}}Service().List{{.NamePlural | title}}(ctx, primary.{{.Name}}Filters{
-			MissionID: missionID,
+{{- if .HasParent}}
+			{{.ParentEntity}}ID: {{.ParentEntityLower}}ID,
+{{- end}}
 {{- if .HasStatus}}
 			Status: status,
 {{- end}}
@@ -141,7 +153,9 @@ var {{.NameLower}}ShowCmd = &cobra.Command{
 {{- if .HasStatus}}
 		fmt.Printf("Status: %s\n", {{.NameLower}}.Status)
 {{- end}}
-		fmt.Printf("Mission: %s\n", {{.NameLower}}.MissionID)
+{{- if .HasParent}}
+		fmt.Printf("{{.ParentEntity}}: %s\n", {{.NameLower}}.{{.ParentEntity}}ID)
+{{- end}}
 		if {{.NameLower}}.Pinned {
 			fmt.Printf("Pinned: yes\n")
 		}
@@ -207,11 +221,13 @@ var {{.NameLower}}DeleteCmd = &cobra.Command{
 }
 
 func init() {
+{{- if .HasParent}}
 	// {{.NameLower}} create flags
-	{{.NameLower}}CreateCmd.Flags().StringP("mission", "m", "", "Mission ID (defaults to context)")
+	{{.NameLower}}CreateCmd.Flags().String("{{.ParentFK | replace "_" "-"}}", "", "{{.ParentEntity}} ID (defaults to context)")
 
 	// {{.NameLower}} list flags
-	{{.NameLower}}ListCmd.Flags().StringP("mission", "m", "", "Filter by mission")
+	{{.NameLower}}ListCmd.Flags().String("{{.ParentFK | replace "_" "-"}}", "", "Filter by {{.ParentEntityLower}}")
+{{- end}}
 {{- if .HasStatus}}
 	{{.NameLower}}ListCmd.Flags().StringP("status", "s", "", "Filter by status")
 {{- end}}

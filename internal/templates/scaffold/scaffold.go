@@ -35,12 +35,19 @@ func TemplateFuncs() template.FuncMap {
 		"toUpper":     strings.ToUpper,
 		"title":       capitalize,
 		"join":        strings.Join,
+		"replace":     replaceAll,
 		"statusList":  formatStatusList,
 		"statusConst": formatStatusConst,
 		"repeat":      strings.Repeat,
 		"add":         func(a, b int) int { return a + b },
 		"sub":         func(a, b int) int { return a - b },
 	}
+}
+
+// replaceAll is a template-friendly version of strings.ReplaceAll.
+// Usage: {{.ParentFK | replace "_" "-"}}
+func replaceAll(old, new, s string) string {
+	return strings.ReplaceAll(s, old, new)
 }
 
 // formatStatusList formats status values for SQL CHECK constraint.

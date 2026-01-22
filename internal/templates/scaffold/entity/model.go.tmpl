@@ -6,8 +6,10 @@ import (
 )
 
 type {{.Name}} struct {
-	ID        string
-	MissionID string
+	ID string
+{{- if .HasParent}}
+	{{.ParentEntity}}ID string
+{{- end}}
 {{- range .Fields}}
 {{- if .Nullable}}
 	{{.Name}} {{.GoNullType}}

@@ -24,15 +24,24 @@ type {{.Name}}Repository interface {
 
 	// GetNextID returns the next available {{.NameLower}} ID.
 	GetNextID(ctx context.Context) (string, error)
+{{- if .HasParent}}
 
-	// MissionExists checks if a mission exists.
-	MissionExists(ctx context.Context, missionID string) (bool, error)
+	// {{.ParentEntity}}Exists checks if a {{.ParentEntityLower}} exists.
+	{{.ParentEntity}}Exists(ctx context.Context, {{.ParentEntityLower}}ID string) (bool, error)
+{{- if eq .ParentCardinality "1:1"}}
+
+	// {{.ParentEntity}}Has{{.Name}} checks if a {{.ParentEntityLower}} already has a {{.NameLower}} (for 1:1 relationships).
+	{{.ParentEntity}}Has{{.Name}}(ctx context.Context, {{.ParentEntityLower}}ID string) (bool, error)
+{{- end}}
+{{- end}}
 }
 
 // {{.Name}}Record represents a {{.NameLower}} as stored in persistence.
 type {{.Name}}Record struct {
-	ID        string
-	MissionID string
+	ID string
+{{- if .HasParent}}
+	{{.ParentEntity}}ID string
+{{- end}}
 {{- range .Fields}}
 	{{.Name}} {{if eq .Type "time.Time"}}string{{else}}{{.Type}}{{end}}
 {{- end}}
@@ -46,7 +55,9 @@ type {{.Name}}Record struct {
 
 // {{.Name}}Filters contains filter options for querying {{.NamePlural}}.
 type {{.Name}}Filters struct {
-	MissionID string
+{{- if .HasParent}}
+	{{.ParentEntity}}ID string
+{{- end}}
 {{- if .HasStatus}}
 	Status string
 {{- end}}

@@ -43,10 +43,11 @@ Examples:
 		fieldsStr, _ := cmd.Flags().GetString("fields")
 		statusStr, _ := cmd.Flags().GetString("status")
 		idPrefix, _ := cmd.Flags().GetString("id-prefix")
+		parentStr, _ := cmd.Flags().GetString("parent")
 		dryRun, _ := cmd.Flags().GetBool("dry-run")
 
 		// Build entity spec
-		spec, err := scaffold.BuildEntitySpec(entityName, fieldsStr, statusStr, idPrefix)
+		spec, err := scaffold.BuildEntitySpec(entityName, fieldsStr, statusStr, idPrefix, parentStr)
 		if err != nil {
 			return err
 		}
@@ -175,8 +176,9 @@ Examples:
 			fieldsStr, _ := cmd.Flags().GetString("fields")
 			statusStr, _ := cmd.Flags().GetString("status")
 			idPrefix, _ := cmd.Flags().GetString("id-prefix")
+			parentStr, _ := cmd.Flags().GetString("parent")
 
-			entitySpec, err = scaffold.BuildEntitySpec(forEntity, fieldsStr, statusStr, idPrefix)
+			entitySpec, err = scaffold.BuildEntitySpec(forEntity, fieldsStr, statusStr, idPrefix, parentStr)
 			if err != nil {
 				return err
 			}
@@ -241,6 +243,7 @@ func init() {
 	scaffoldEntityCmd.Flags().String("fields", "", "Field specifications (e.g., 'name:string,count:int,active:bool')")
 	scaffoldEntityCmd.Flags().String("status", "", "Status values for FSM (e.g., 'draft,active,completed')")
 	scaffoldEntityCmd.Flags().String("id-prefix", "", "ID prefix (defaults to uppercase entity name)")
+	scaffoldEntityCmd.Flags().String("parent", "", "Parent entity relationship (e.g., 'shipment:1:1' or 'shipment:n:1')")
 	scaffoldEntityCmd.Flags().Bool("dry-run", false, "Preview without writing files")
 
 	// Migration flags
@@ -249,6 +252,7 @@ func init() {
 	scaffoldMigrationCmd.Flags().String("fields", "", "Field specifications (for --for-entity)")
 	scaffoldMigrationCmd.Flags().String("status", "", "Status values (for --for-entity)")
 	scaffoldMigrationCmd.Flags().String("id-prefix", "", "ID prefix (for --for-entity)")
+	scaffoldMigrationCmd.Flags().String("parent", "", "Parent entity relationship (for --for-entity)")
 
 	scaffoldCmd.AddCommand(scaffoldEntityCmd)
 	scaffoldCmd.AddCommand(scaffoldMigrationCmd)

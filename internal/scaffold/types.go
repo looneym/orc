@@ -11,6 +11,14 @@ type EntitySpec struct {
 	Fields       []Field  // Custom fields
 	HasStatus    bool     // Whether entity has FSM status
 	StatusValues []string // e.g., ["draft", "active", "completed"]
+
+	// Parent relationship (optional)
+	HasParent         bool   // Whether entity has a parent FK
+	ParentEntity      string // PascalCase: "Shipment"
+	ParentEntityLower string // camelCase: "shipment"
+	ParentFK          string // snake_case: "shipment_id"
+	ParentTable       string // Plural snake: "shipments"
+	ParentCardinality string // "1:1" or "n:1"
 }
 
 // Field represents a field in an entity.

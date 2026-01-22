@@ -99,6 +99,49 @@ func mapFieldType(dslType string, nullable bool) (goType, sqlType, goNullType st
 	}
 }
 
+// ParentConfig contains parsed parent relationship information.
+type ParentConfig struct {
+	Entity      string // PascalCase: "Shipment"
+	EntityLower string // camelCase: "shipment"
+	FK          string // snake_case: "shipment_id"
+	Table       string // Plural snake: "shipments"
+	Cardinality string // "1:1" or "n:1"
+}
+
+// ParseParent parses the --parent flag into parent configuration.
+// Format: "shipment:1:1" or "shipment:n:1"
+func ParseParent(parentStr string) (*ParentConfig, error) {
+	if parentStr == "" {
+		return nil, nil
+	}
+
+	parts := strings.SplitN(parentStr, ":", 2)
+	if len(parts) != 2 {
+		return nil, fmt.Errorf("invalid parent spec %q: expected 'entity:cardinality' (e.g., 'shipment:1:1' or 'shipment:n:1')", parentStr)
+	}
+
+	entityName := strings.TrimSpace(parts[0])
+	cardinality := strings.TrimSpace(parts[1])
+
+	if entityName == "" {
+		return nil, fmt.Errorf("invalid parent spec %q: empty entity name", parentStr)
+	}
+
+	// Validate cardinality
+	if cardinality != "1:1" && cardinality != "n:1" {
+		return nil, fmt.Errorf("invalid parent spec %q: cardinality must be '1:1' or 'n:1'", parentStr)
+	}
+
+	snakeName := ToSnakeCase(entityName)
+	return &ParentConfig{
+		Entity:      ToPascalCase(entityName),
+		EntityLower: ToCamelCase(entityName),
+		FK:          snakeName + "_id",
+		Table:       Pluralize(snakeName),
+		Cardinality: cardinality,
+	}, nil
+}
+
 // ParseStatus parses the --status flag into status values.
 // Format: "draft,active,completed"
 func ParseStatus(statusStr string) ([]string, error) {
@@ -140,7 +183,7 @@ func isValidIdentifier(s string) bool {
 }
 
 // BuildEntitySpec builds an EntitySpec from parsed inputs.
-func BuildEntitySpec(name, fieldsStr, statusStr, idPrefix string) (*EntitySpec, error) {
+func BuildEntitySpec(name, fieldsStr, statusStr, idPrefix, parentStr string) (*EntitySpec, error) {
 	if name == "" {
 		return nil, fmt.Errorf("entity name is required")
 	}
@@ -155,12 +198,17 @@ func BuildEntitySpec(name, fieldsStr, statusStr, idPrefix string) (*EntitySpec, 
 		return nil, fmt.Errorf("failed to parse status: %w", err)
 	}
 
+	parent, err := ParseParent(parentStr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse parent: %w", err)
+	}
+
 	pascalName := ToPascalCase(name)
 	if idPrefix == "" {
 		idPrefix = strings.ToUpper(ToSnakeCase(name))
 	}
 
-	return &EntitySpec{
+	spec := &EntitySpec{
 		Name:         pascalName,
 		NameLower:    ToCamelCase(name),
 		NamePlural:   Pluralize(ToSnakeCase(name)),
@@ -169,7 +217,19 @@ func BuildEntitySpec(name, fieldsStr, statusStr, idPrefix string) (*EntitySpec, 
 		Fields:       fields,
 		HasStatus:    len(statuses) > 0,
 		StatusValues: statuses,
-	}, nil
+	}
+
+	// Populate parent fields if present
+	if parent != nil {
+		spec.HasParent = true
+		spec.ParentEntity = parent.Entity
+		spec.ParentEntityLower = parent.EntityLower
+		spec.ParentFK = parent.FK
+		spec.ParentTable = parent.Table
+		spec.ParentCardinality = parent.Cardinality
+	}
+
+	return spec, nil
 }
 
 // Name transformation helpers
