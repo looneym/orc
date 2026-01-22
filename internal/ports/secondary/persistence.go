@@ -219,9 +219,6 @@ type TaskRecord struct {
 	UpdatedAt           string
 	ClaimedAt           string // Empty string means null
 	CompletedAt         string // Empty string means null
-	ConclaveID          string // Empty string means null
-	PromotedFromID      string // Empty string means null
-	PromotedFromType    string // Empty string means null
 }
 
 // TaskFilters contains filter options for querying tasks.

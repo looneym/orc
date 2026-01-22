@@ -168,12 +168,6 @@ var taskShowCmd = &cobra.Command{
 		if task.Pinned {
 			fmt.Printf("Pinned: yes\n")
 		}
-		if task.ConclaveID != "" {
-			fmt.Printf("Conclave: %s\n", task.ConclaveID)
-		}
-		if task.PromotedFromID != "" {
-			fmt.Printf("Promoted from: %s (%s)\n", task.PromotedFromID, task.PromotedFromType)
-		}
 		fmt.Printf("Created: %s\n", task.CreatedAt)
 		if task.ClaimedAt != "" {
 			fmt.Printf("Claimed: %s\n", task.ClaimedAt)

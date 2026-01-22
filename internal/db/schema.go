@@ -142,12 +142,14 @@ CREATE TABLE IF NOT EXISTS tomes (
 	commission_id TEXT NOT NULL,
 	title TEXT NOT NULL,
 	description TEXT,
-	content TEXT,
-	status TEXT NOT NULL CHECK(status IN ('draft', 'published', 'archived')) DEFAULT 'draft',
+	status TEXT NOT NULL CHECK(status IN ('active', 'in_progress', 'complete')) DEFAULT 'active',
+	assigned_workbench_id TEXT,
 	pinned INTEGER DEFAULT 0,
 	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 	updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-	FOREIGN KEY (commission_id) REFERENCES commissions(id)
+	completed_at DATETIME,
+	FOREIGN KEY (commission_id) REFERENCES commissions(id),
+	FOREIGN KEY (assigned_workbench_id) REFERENCES workbenches(id)
 );
 
 -- Tasks (Atomic units of work)
@@ -289,7 +291,7 @@ CREATE TABLE IF NOT EXISTS questions (
 	investigation_id TEXT,
 	conclave_id TEXT,
 	title TEXT NOT NULL,
-	content TEXT,
+	description TEXT,
 	answer TEXT,
 	status TEXT NOT NULL CHECK(status IN ('open', 'answered', 'closed')) DEFAULT 'open',
 	pinned INTEGER DEFAULT 0,

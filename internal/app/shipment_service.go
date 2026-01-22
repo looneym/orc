@@ -252,9 +252,6 @@ func recordToTask(r *secondary.TaskRecord) *primary.Task {
 		UpdatedAt:           r.UpdatedAt,
 		ClaimedAt:           r.ClaimedAt,
 		CompletedAt:         r.CompletedAt,
-		ConclaveID:          r.ConclaveID,
-		PromotedFromID:      r.PromotedFromID,
-		PromotedFromType:    r.PromotedFromType,
 	}
 }
 

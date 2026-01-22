@@ -30,7 +30,7 @@ func setupQuestionTestDB(t *testing.T) *sql.DB {
 
 	// Insert test data
 	_, _ = testDB.Exec("INSERT INTO commissions (id, title, status) VALUES ('MISSION-001', 'Test Mission', 'active')")
-	_, _ = testDB.Exec("INSERT INTO investigations (id, commission_id, title, status) VALUES ('INV-001', 'MISSION-001', 'Test Investigation', 'open')")
+	_, _ = testDB.Exec("INSERT INTO investigations (id, commission_id, title, status) VALUES ('INV-001', 'MISSION-001', 'Test Investigation', 'active')")
 
 	t.Cleanup(func() {
 		testDB.Close()

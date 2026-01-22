@@ -329,7 +329,7 @@ func (r *ConclaveRepository) GetTasksByConclave(ctx context.Context, conclaveID 
 
 // GetQuestionsByConclave retrieves questions belonging to a conclave.
 func (r *ConclaveRepository) GetQuestionsByConclave(ctx context.Context, conclaveID string) ([]*secondary.ConclaveQuestionRecord, error) {
-	query := `SELECT id, commission_id, shipment_id, investigation_id, conclave_id, title, content, answer, status, pinned,
+	query := `SELECT id, commission_id, shipment_id, investigation_id, conclave_id, title, description, answer, status, pinned,
 		created_at, updated_at, answered_at
 		FROM questions WHERE conclave_id = ? ORDER BY created_at ASC`
 

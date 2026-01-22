@@ -97,9 +97,6 @@ type Task struct {
 	UpdatedAt           string
 	ClaimedAt           string
 	CompletedAt         string
-	ConclaveID          string
-	PromotedFromID      string
-	PromotedFromType    string
 	Tag                 *TaskTag // Populated when retrieving task details
 }
 
