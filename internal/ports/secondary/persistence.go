@@ -128,6 +128,8 @@ type ShipmentRecord struct {
 	Description         string // Empty string means null
 	Status              string
 	AssignedWorkbenchID string // Empty string means null
+	RepoID              string // Empty string means null - FK to repos table
+	Branch              string // Empty string means null - owned branch (e.g., ml/SHIP-001-feature-name)
 	Pinned              bool
 	CreatedAt           string
 	UpdatedAt           string
@@ -988,14 +990,16 @@ type WorkbenchRepository interface {
 
 // WorkbenchRecord represents a workbench as stored in persistence.
 type WorkbenchRecord struct {
-	ID           string
-	Name         string
-	WorkshopID   string
-	RepoID       string // Optional - linked repo
-	WorktreePath string
-	Status       string
-	CreatedAt    string
-	UpdatedAt    string
+	ID            string
+	Name          string
+	WorkshopID    string
+	RepoID        string // Optional - linked repo
+	WorktreePath  string
+	Status        string
+	HomeBranch    string // Git home branch for this workbench (e.g., ml/BENCH-name)
+	CurrentBranch string // Currently checked out branch
+	CreatedAt     string
+	UpdatedAt     string
 }
 
 // WorkOrderRepository defines the secondary port for workOrder persistence.

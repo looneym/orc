@@ -28,6 +28,8 @@ var shipmentCreateCmd = &cobra.Command{
 		title := args[0]
 		missionID, _ := cmd.Flags().GetString("commission")
 		description, _ := cmd.Flags().GetString("description")
+		repoID, _ := cmd.Flags().GetString("repo")
+		branch, _ := cmd.Flags().GetString("branch")
 
 		// Get mission from context or require explicit flag
 		if missionID == "" {
@@ -41,6 +43,8 @@ var shipmentCreateCmd = &cobra.Command{
 			CommissionID: missionID,
 			Title:        title,
 			Description:  description,
+			RepoID:       repoID,
+			Branch:       branch,
 		})
 		if err != nil {
 			return fmt.Errorf("failed to create shipment: %w", err)
@@ -48,6 +52,9 @@ var shipmentCreateCmd = &cobra.Command{
 
 		fmt.Printf("Created shipment %s: %s\n", resp.Shipment.ID, resp.Shipment.Title)
 		fmt.Printf("  Under mission: %s\n", resp.Shipment.CommissionID)
+		if resp.Shipment.Branch != "" {
+			fmt.Printf("  Branch: %s\n", resp.Shipment.Branch)
+		}
 		fmt.Println()
 		fmt.Println("Next steps:")
 		fmt.Printf("   orc task create \"Task title\" --shipment %s\n", resp.Shipment.ID)
@@ -118,6 +125,12 @@ var shipmentShowCmd = &cobra.Command{
 		fmt.Printf("Mission: %s\n", shipment.CommissionID)
 		if shipment.AssignedWorkbenchID != "" {
 			fmt.Printf("Assigned Workbench: %s\n", shipment.AssignedWorkbenchID)
+		}
+		if shipment.RepoID != "" {
+			fmt.Printf("Repository: %s\n", shipment.RepoID)
+		}
+		if shipment.Branch != "" {
+			fmt.Printf("Branch: %s\n", shipment.Branch)
 		}
 		if shipment.Pinned {
 			fmt.Printf("Pinned: yes\n")
@@ -286,6 +299,8 @@ func init() {
 	// shipment create flags
 	shipmentCreateCmd.Flags().StringP("commission", "c", "", "Commission ID (defaults to context)")
 	shipmentCreateCmd.Flags().StringP("description", "d", "", "Shipment description")
+	shipmentCreateCmd.Flags().StringP("repo", "r", "", "Repository ID to link for branch ownership")
+	shipmentCreateCmd.Flags().String("branch", "", "Override auto-generated branch name")
 
 	// shipment list flags
 	shipmentListCmd.Flags().StringP("commission", "c", "", "Filter by mission")

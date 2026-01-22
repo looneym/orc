@@ -49,6 +49,8 @@ type CreateShipmentRequest struct {
 	CommissionID string
 	Title        string
 	Description  string
+	RepoID       string // Optional - link shipment to a repository for branch ownership
+	Branch       string // Optional - override auto-generated branch name
 }
 
 // CreateShipmentResponse contains the result of creating a shipment.
@@ -72,6 +74,8 @@ type Shipment struct {
 	Description         string
 	Status              string
 	AssignedWorkbenchID string
+	RepoID              string // Linked repository for branch ownership
+	Branch              string // Owned branch (e.g., ml/SHIP-001-feature-name)
 	Pinned              bool
 	CreatedAt           string
 	UpdatedAt           string

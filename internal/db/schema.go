@@ -85,6 +85,8 @@ CREATE TABLE IF NOT EXISTS workbenches (
 	path TEXT NOT NULL UNIQUE,
 	repo_id TEXT,
 	status TEXT NOT NULL CHECK(status IN ('active', 'archived')) DEFAULT 'active',
+	home_branch TEXT,
+	current_branch TEXT,
 	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 	updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (workshop_id) REFERENCES workshops(id),
@@ -127,12 +129,15 @@ CREATE TABLE IF NOT EXISTS shipments (
 	description TEXT,
 	status TEXT NOT NULL CHECK(status IN ('active', 'in_progress', 'paused', 'complete')) DEFAULT 'active',
 	assigned_workbench_id TEXT,
+	repo_id TEXT,
+	branch TEXT,
 	pinned INTEGER DEFAULT 0,
 	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 	updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 	completed_at DATETIME,
 	FOREIGN KEY (commission_id) REFERENCES commissions(id),
-	FOREIGN KEY (assigned_workbench_id) REFERENCES workbenches(id)
+	FOREIGN KEY (assigned_workbench_id) REFERENCES workbenches(id),
+	FOREIGN KEY (repo_id) REFERENCES repos(id)
 );
 
 -- Investigations (Research containers)
@@ -478,7 +483,7 @@ func InitSchema() error {
 				return err
 			}
 			// Insert all migration versions as applied
-			for i := 1; i <= 37; i++ {
+			for i := 1; i <= 39; i++ {
 				_, err = db.Exec("INSERT INTO schema_version (version) VALUES (?)", i)
 				if err != nil {
 					return err

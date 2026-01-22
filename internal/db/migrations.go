@@ -204,6 +204,11 @@ var migrations = []Migration{
 		Name:    "add_investigation_id_to_tasks",
 		Up:      migrationV38,
 	},
+	{
+		Version: 39,
+		Name:    "add_git_branch_columns",
+		Up:      migrationV39,
+	},
 }
 
 // RunMigrations executes all pending migrations
@@ -3876,5 +3881,31 @@ func migrationV38(db *sql.DB) error {
 	if err != nil {
 		return fmt.Errorf("failed to add investigation_id column to tasks: %w", err)
 	}
+	return nil
+}
+
+func migrationV39(db *sql.DB) error {
+	// Add home_branch and current_branch columns to workbenches table
+	_, err := db.Exec(`ALTER TABLE workbenches ADD COLUMN home_branch TEXT`)
+	if err != nil {
+		return fmt.Errorf("failed to add home_branch column to workbenches: %w", err)
+	}
+
+	_, err = db.Exec(`ALTER TABLE workbenches ADD COLUMN current_branch TEXT`)
+	if err != nil {
+		return fmt.Errorf("failed to add current_branch column to workbenches: %w", err)
+	}
+
+	// Add repo_id and branch columns to shipments table
+	_, err = db.Exec(`ALTER TABLE shipments ADD COLUMN repo_id TEXT REFERENCES repos(id) ON DELETE SET NULL`)
+	if err != nil {
+		return fmt.Errorf("failed to add repo_id column to shipments: %w", err)
+	}
+
+	_, err = db.Exec(`ALTER TABLE shipments ADD COLUMN branch TEXT`)
+	if err != nil {
+		return fmt.Errorf("failed to add branch column to shipments: %w", err)
+	}
+
 	return nil
 }

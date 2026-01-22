@@ -28,6 +28,12 @@ type WorkbenchService interface {
 
 	// DeleteWorkbench deletes a workbench.
 	DeleteWorkbench(ctx context.Context, req DeleteWorkbenchRequest) error
+
+	// CheckoutBranch switches to a target branch using stash dance (stash, checkout, pop).
+	CheckoutBranch(ctx context.Context, req CheckoutBranchRequest) (*CheckoutBranchResponse, error)
+
+	// GetWorkbenchStatus returns the current git status of a workbench.
+	GetWorkbenchStatus(ctx context.Context, workbenchID string) (*WorkbenchGitStatus, error)
 }
 
 // CreateWorkbenchRequest contains parameters for creating a workbench.
@@ -75,14 +81,16 @@ type DeleteWorkbenchRequest struct {
 // Workbench represents a workbench entity at the port boundary.
 // A Workbench is a git worktree - replaces Grove.
 type Workbench struct {
-	ID         string
-	Name       string
-	WorkshopID string
-	RepoID     string
-	Path       string
-	Status     string
-	CreatedAt  string
-	UpdatedAt  string
+	ID            string
+	Name          string
+	WorkshopID    string
+	RepoID        string
+	Path          string
+	Status        string
+	HomeBranch    string // Git home branch (e.g., ml/BENCH-name)
+	CurrentBranch string // Currently checked out branch
+	CreatedAt     string
+	UpdatedAt     string
 }
 
 // WorkbenchFilters contains filter options for listing workbenches.
@@ -91,4 +99,28 @@ type WorkbenchFilters struct {
 	RepoID     string
 	Status     string
 	Limit      int
+}
+
+// CheckoutBranchRequest contains parameters for switching branches.
+type CheckoutBranchRequest struct {
+	WorkbenchID  string
+	TargetBranch string
+}
+
+// CheckoutBranchResponse contains the result of a branch checkout.
+type CheckoutBranchResponse struct {
+	PreviousBranch string
+	CurrentBranch  string
+	StashApplied   bool // True if changes were stashed and reapplied
+}
+
+// WorkbenchGitStatus represents the git status of a workbench.
+type WorkbenchGitStatus struct {
+	WorkbenchID   string
+	CurrentBranch string
+	HomeBranch    string
+	IsDirty       bool // Has uncommitted changes
+	DirtyFiles    int  // Number of modified/untracked files
+	AheadBy       int  // Commits ahead of remote
+	BehindBy      int  // Commits behind remote
 }

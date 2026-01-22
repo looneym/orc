@@ -17,6 +17,7 @@ type WorkbenchServiceImpl struct {
 	workshopRepo  secondary.WorkshopRepository
 	agentProvider secondary.AgentIdentityProvider
 	executor      EffectExecutor
+	gitService    *GitService
 }
 
 // NewWorkbenchService creates a new WorkbenchService with injected dependencies.
@@ -31,6 +32,7 @@ func NewWorkbenchService(
 		workshopRepo:  workshopRepo,
 		agentProvider: agentProvider,
 		executor:      executor,
+		gitService:    NewGitService(),
 	}
 }
 
@@ -75,13 +77,18 @@ func (s *WorkbenchServiceImpl) CreateWorkbench(ctx context.Context, req primary.
 
 	workbenchPath := filepath.Join(basePath, fmt.Sprintf("%s-%s", workshop.FactoryID, req.Name))
 
-	// 5. Create workbench record in DB
+	// 5. Generate home branch name
+	homeBranch := GenerateHomeBranchName(UserInitials, req.Name)
+
+	// 6. Create workbench record in DB
 	record := &secondary.WorkbenchRecord{
-		Name:         req.Name,
-		WorkshopID:   req.WorkshopID,
-		RepoID:       req.RepoID,
-		WorktreePath: workbenchPath,
-		Status:       "active",
+		Name:          req.Name,
+		WorkshopID:    req.WorkshopID,
+		RepoID:        req.RepoID,
+		WorktreePath:  workbenchPath,
+		Status:        "active",
+		HomeBranch:    homeBranch,
+		CurrentBranch: homeBranch,
 	}
 	if err := s.workbenchRepo.Create(ctx, record); err != nil {
 		return nil, fmt.Errorf("failed to create workbench: %w", err)
@@ -216,14 +223,16 @@ func (s *WorkbenchServiceImpl) DeleteWorkbench(ctx context.Context, req primary.
 
 func (s *WorkbenchServiceImpl) recordToWorkbench(r *secondary.WorkbenchRecord) *primary.Workbench {
 	return &primary.Workbench{
-		ID:         r.ID,
-		Name:       r.Name,
-		WorkshopID: r.WorkshopID,
-		RepoID:     r.RepoID,
-		Path:       r.WorktreePath,
-		Status:     r.Status,
-		CreatedAt:  r.CreatedAt,
-		UpdatedAt:  r.UpdatedAt,
+		ID:            r.ID,
+		Name:          r.Name,
+		WorkshopID:    r.WorkshopID,
+		RepoID:        r.RepoID,
+		Path:          r.WorktreePath,
+		Status:        r.Status,
+		HomeBranch:    r.HomeBranch,
+		CurrentBranch: r.CurrentBranch,
+		CreatedAt:     r.CreatedAt,
+		UpdatedAt:     r.UpdatedAt,
 	}
 }
 
@@ -240,6 +249,93 @@ func (s *WorkbenchServiceImpl) pathExists(path string) bool {
 func (s *WorkbenchServiceImpl) getTMuxSession() string {
 	// In production, would parse TMUX env var or run tmux display-message
 	return "orc"
+}
+
+// CheckoutBranch switches to a target branch using stash dance.
+func (s *WorkbenchServiceImpl) CheckoutBranch(ctx context.Context, req primary.CheckoutBranchRequest) (*primary.CheckoutBranchResponse, error) {
+	// 1. Get workbench
+	workbench, err := s.workbenchRepo.GetByID(ctx, req.WorkbenchID)
+	if err != nil {
+		return nil, fmt.Errorf("workbench not found: %w", err)
+	}
+
+	// 2. Check path exists
+	if !s.pathExists(workbench.WorktreePath) {
+		return nil, fmt.Errorf("workbench path does not exist: %s", workbench.WorktreePath)
+	}
+
+	// 3. Perform stash dance
+	result, err := s.gitService.StashDance(workbench.WorktreePath, req.TargetBranch)
+	if err != nil {
+		return nil, fmt.Errorf("stash dance failed: %w", err)
+	}
+
+	// 4. Update current branch in database
+	workbench.CurrentBranch = result.CurrentBranch
+	if err := s.workbenchRepo.Update(ctx, workbench); err != nil {
+		// Log but don't fail - the git operation succeeded
+		fmt.Printf("Warning: failed to update current branch in database: %v\n", err)
+	}
+
+	return &primary.CheckoutBranchResponse{
+		PreviousBranch: result.PreviousBranch,
+		CurrentBranch:  result.CurrentBranch,
+		StashApplied:   result.WasStashed && result.StashPopped,
+	}, nil
+}
+
+// GetWorkbenchStatus returns the current git status of a workbench.
+func (s *WorkbenchServiceImpl) GetWorkbenchStatus(ctx context.Context, workbenchID string) (*primary.WorkbenchGitStatus, error) {
+	// 1. Get workbench
+	workbench, err := s.workbenchRepo.GetByID(ctx, workbenchID)
+	if err != nil {
+		return nil, fmt.Errorf("workbench not found: %w", err)
+	}
+
+	status := &primary.WorkbenchGitStatus{
+		WorkbenchID: workbenchID,
+		HomeBranch:  workbench.HomeBranch,
+	}
+
+	// 2. Check if path exists
+	if !s.pathExists(workbench.WorktreePath) {
+		status.CurrentBranch = workbench.CurrentBranch // Use stored value
+		return status, nil
+	}
+
+	// 3. Get current branch from git
+	currentBranch, err := s.gitService.GetCurrentBranch(workbench.WorktreePath)
+	if err == nil {
+		status.CurrentBranch = currentBranch
+		// Update database if different
+		if currentBranch != workbench.CurrentBranch {
+			workbench.CurrentBranch = currentBranch
+			_ = s.workbenchRepo.Update(ctx, workbench)
+		}
+	} else {
+		status.CurrentBranch = workbench.CurrentBranch
+	}
+
+	// 4. Get dirty state
+	dirty, err := s.gitService.IsDirty(workbench.WorktreePath)
+	if err == nil {
+		status.IsDirty = dirty
+	}
+
+	// 5. Get dirty file count
+	count, err := s.gitService.GetDirtyFileCount(workbench.WorktreePath)
+	if err == nil {
+		status.DirtyFiles = count
+	}
+
+	// 6. Get ahead/behind
+	ahead, behind, err := s.gitService.GetAheadBehind(workbench.WorktreePath)
+	if err == nil {
+		status.AheadBy = ahead
+		status.BehindBy = behind
+	}
+
+	return status, nil
 }
 
 // Ensure WorkbenchServiceImpl implements the interface

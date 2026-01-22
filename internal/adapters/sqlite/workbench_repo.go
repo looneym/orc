@@ -55,9 +55,17 @@ func (r *WorkbenchRepository) Create(ctx context.Context, workbench *secondary.W
 		repoID = sql.NullString{String: workbench.RepoID, Valid: true}
 	}
 
+	var homeBranch, currentBranch sql.NullString
+	if workbench.HomeBranch != "" {
+		homeBranch = sql.NullString{String: workbench.HomeBranch, Valid: true}
+	}
+	if workbench.CurrentBranch != "" {
+		currentBranch = sql.NullString{String: workbench.CurrentBranch, Valid: true}
+	}
+
 	_, err = r.db.ExecContext(ctx,
-		"INSERT INTO workbenches (id, workshop_id, name, path, repo_id, status) VALUES (?, ?, ?, ?, ?, ?)",
-		id, workbench.WorkshopID, workbench.Name, workbench.WorktreePath, repoID, status,
+		"INSERT INTO workbenches (id, workshop_id, name, path, repo_id, status, home_branch, current_branch) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+		id, workbench.WorkshopID, workbench.Name, workbench.WorktreePath, repoID, status, homeBranch, currentBranch,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create workbench: %w", err)
@@ -71,16 +79,18 @@ func (r *WorkbenchRepository) Create(ctx context.Context, workbench *secondary.W
 // GetByID retrieves a workbench by its ID.
 func (r *WorkbenchRepository) GetByID(ctx context.Context, id string) (*secondary.WorkbenchRecord, error) {
 	var (
-		createdAt time.Time
-		updatedAt time.Time
-		repoID    sql.NullString
+		createdAt     time.Time
+		updatedAt     time.Time
+		repoID        sql.NullString
+		homeBranch    sql.NullString
+		currentBranch sql.NullString
 	)
 
 	record := &secondary.WorkbenchRecord{}
 	err := r.db.QueryRowContext(ctx,
-		"SELECT id, workshop_id, name, path, repo_id, status, created_at, updated_at FROM workbenches WHERE id = ?",
+		"SELECT id, workshop_id, name, path, repo_id, status, home_branch, current_branch, created_at, updated_at FROM workbenches WHERE id = ?",
 		id,
-	).Scan(&record.ID, &record.WorkshopID, &record.Name, &record.WorktreePath, &repoID, &record.Status, &createdAt, &updatedAt)
+	).Scan(&record.ID, &record.WorkshopID, &record.Name, &record.WorktreePath, &repoID, &record.Status, &homeBranch, &currentBranch, &createdAt, &updatedAt)
 
 	if err == sql.ErrNoRows {
 		return nil, fmt.Errorf("workbench %s not found", id)
@@ -92,6 +102,12 @@ func (r *WorkbenchRepository) GetByID(ctx context.Context, id string) (*secondar
 	if repoID.Valid {
 		record.RepoID = repoID.String
 	}
+	if homeBranch.Valid {
+		record.HomeBranch = homeBranch.String
+	}
+	if currentBranch.Valid {
+		record.CurrentBranch = currentBranch.String
+	}
 	record.CreatedAt = createdAt.Format(time.RFC3339)
 	record.UpdatedAt = updatedAt.Format(time.RFC3339)
 	return record, nil
@@ -100,16 +116,18 @@ func (r *WorkbenchRepository) GetByID(ctx context.Context, id string) (*secondar
 // GetByPath retrieves a workbench by its file path.
 func (r *WorkbenchRepository) GetByPath(ctx context.Context, path string) (*secondary.WorkbenchRecord, error) {
 	var (
-		createdAt time.Time
-		updatedAt time.Time
-		repoID    sql.NullString
+		createdAt     time.Time
+		updatedAt     time.Time
+		repoID        sql.NullString
+		homeBranch    sql.NullString
+		currentBranch sql.NullString
 	)
 
 	record := &secondary.WorkbenchRecord{}
 	err := r.db.QueryRowContext(ctx,
-		"SELECT id, workshop_id, name, path, repo_id, status, created_at, updated_at FROM workbenches WHERE path = ?",
+		"SELECT id, workshop_id, name, path, repo_id, status, home_branch, current_branch, created_at, updated_at FROM workbenches WHERE path = ?",
 		path,
-	).Scan(&record.ID, &record.WorkshopID, &record.Name, &record.WorktreePath, &repoID, &record.Status, &createdAt, &updatedAt)
+	).Scan(&record.ID, &record.WorkshopID, &record.Name, &record.WorktreePath, &repoID, &record.Status, &homeBranch, &currentBranch, &createdAt, &updatedAt)
 
 	if err == sql.ErrNoRows {
 		return nil, fmt.Errorf("workbench with path %s not found", path)
@@ -121,6 +139,12 @@ func (r *WorkbenchRepository) GetByPath(ctx context.Context, path string) (*seco
 	if repoID.Valid {
 		record.RepoID = repoID.String
 	}
+	if homeBranch.Valid {
+		record.HomeBranch = homeBranch.String
+	}
+	if currentBranch.Valid {
+		record.CurrentBranch = currentBranch.String
+	}
 	record.CreatedAt = createdAt.Format(time.RFC3339)
 	record.UpdatedAt = updatedAt.Format(time.RFC3339)
 	return record, nil
@@ -129,7 +153,7 @@ func (r *WorkbenchRepository) GetByPath(ctx context.Context, path string) (*seco
 // GetByWorkshop retrieves all workbenches for a workshop.
 func (r *WorkbenchRepository) GetByWorkshop(ctx context.Context, workshopID string) ([]*secondary.WorkbenchRecord, error) {
 	rows, err := r.db.QueryContext(ctx,
-		"SELECT id, workshop_id, name, path, repo_id, status, created_at, updated_at FROM workbenches WHERE workshop_id = ? AND status = 'active' ORDER BY created_at DESC",
+		"SELECT id, workshop_id, name, path, repo_id, status, home_branch, current_branch, created_at, updated_at FROM workbenches WHERE workshop_id = ? AND status = 'active' ORDER BY created_at DESC",
 		workshopID,
 	)
 	if err != nil {
@@ -140,19 +164,27 @@ func (r *WorkbenchRepository) GetByWorkshop(ctx context.Context, workshopID stri
 	var workbenches []*secondary.WorkbenchRecord
 	for rows.Next() {
 		var (
-			createdAt time.Time
-			updatedAt time.Time
-			repoID    sql.NullString
+			createdAt     time.Time
+			updatedAt     time.Time
+			repoID        sql.NullString
+			homeBranch    sql.NullString
+			currentBranch sql.NullString
 		)
 
 		record := &secondary.WorkbenchRecord{}
-		err := rows.Scan(&record.ID, &record.WorkshopID, &record.Name, &record.WorktreePath, &repoID, &record.Status, &createdAt, &updatedAt)
+		err := rows.Scan(&record.ID, &record.WorkshopID, &record.Name, &record.WorktreePath, &repoID, &record.Status, &homeBranch, &currentBranch, &createdAt, &updatedAt)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan workbench: %w", err)
 		}
 
 		if repoID.Valid {
 			record.RepoID = repoID.String
+		}
+		if homeBranch.Valid {
+			record.HomeBranch = homeBranch.String
+		}
+		if currentBranch.Valid {
+			record.CurrentBranch = currentBranch.String
 		}
 		record.CreatedAt = createdAt.Format(time.RFC3339)
 		record.UpdatedAt = updatedAt.Format(time.RFC3339)
@@ -164,7 +196,7 @@ func (r *WorkbenchRepository) GetByWorkshop(ctx context.Context, workshopID stri
 
 // List retrieves all workbenches, optionally filtered by workshop.
 func (r *WorkbenchRepository) List(ctx context.Context, workshopID string) ([]*secondary.WorkbenchRecord, error) {
-	query := "SELECT id, workshop_id, name, path, repo_id, status, created_at, updated_at FROM workbenches WHERE 1=1"
+	query := "SELECT id, workshop_id, name, path, repo_id, status, home_branch, current_branch, created_at, updated_at FROM workbenches WHERE 1=1"
 	args := []any{}
 
 	if workshopID != "" {
@@ -183,19 +215,27 @@ func (r *WorkbenchRepository) List(ctx context.Context, workshopID string) ([]*s
 	var workbenches []*secondary.WorkbenchRecord
 	for rows.Next() {
 		var (
-			createdAt time.Time
-			updatedAt time.Time
-			repoID    sql.NullString
+			createdAt     time.Time
+			updatedAt     time.Time
+			repoID        sql.NullString
+			homeBranch    sql.NullString
+			currentBranch sql.NullString
 		)
 
 		record := &secondary.WorkbenchRecord{}
-		err := rows.Scan(&record.ID, &record.WorkshopID, &record.Name, &record.WorktreePath, &repoID, &record.Status, &createdAt, &updatedAt)
+		err := rows.Scan(&record.ID, &record.WorkshopID, &record.Name, &record.WorktreePath, &repoID, &record.Status, &homeBranch, &currentBranch, &createdAt, &updatedAt)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan workbench: %w", err)
 		}
 
 		if repoID.Valid {
 			record.RepoID = repoID.String
+		}
+		if homeBranch.Valid {
+			record.HomeBranch = homeBranch.String
+		}
+		if currentBranch.Valid {
+			record.CurrentBranch = currentBranch.String
 		}
 		record.CreatedAt = createdAt.Format(time.RFC3339)
 		record.UpdatedAt = updatedAt.Format(time.RFC3339)
@@ -223,6 +263,16 @@ func (r *WorkbenchRepository) Update(ctx context.Context, workbench *secondary.W
 	if workbench.Status != "" {
 		query += ", status = ?"
 		args = append(args, workbench.Status)
+	}
+
+	if workbench.HomeBranch != "" {
+		query += ", home_branch = ?"
+		args = append(args, workbench.HomeBranch)
+	}
+
+	if workbench.CurrentBranch != "" {
+		query += ", current_branch = ?"
+		args = append(args, workbench.CurrentBranch)
 	}
 
 	query += " WHERE id = ?"

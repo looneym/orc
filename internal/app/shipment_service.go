@@ -43,12 +43,25 @@ func (s *ShipmentServiceImpl) CreateShipment(ctx context.Context, req primary.Cr
 		return nil, fmt.Errorf("failed to generate shipment ID: %w", err)
 	}
 
+	// Generate branch name if repo is specified
+	var branch string
+	if req.RepoID != "" {
+		if req.Branch != "" {
+			branch = req.Branch // Use provided branch name
+		} else {
+			// Auto-generate branch name: {initials}/SHIP-{id}-{slug}
+			branch = GenerateShipmentBranchName(UserInitials, nextID, req.Title)
+		}
+	}
+
 	// Create record
 	record := &secondary.ShipmentRecord{
 		ID:           nextID,
 		CommissionID: req.CommissionID,
 		Title:        req.Title,
 		Description:  req.Description,
+		RepoID:       req.RepoID,
+		Branch:       branch,
 		Status:       "active",
 	}
 
@@ -228,6 +241,8 @@ func (s *ShipmentServiceImpl) recordToShipment(r *secondary.ShipmentRecord) *pri
 		Description:         r.Description,
 		Status:              r.Status,
 		AssignedWorkbenchID: r.AssignedWorkbenchID,
+		RepoID:              r.RepoID,
+		Branch:              r.Branch,
 		Pinned:              r.Pinned,
 		CreatedAt:           r.CreatedAt,
 		UpdatedAt:           r.UpdatedAt,

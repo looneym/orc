@@ -30,6 +30,8 @@ func WorkbenchCmd() *cobra.Command {
 	cmd.AddCommand(workbenchRenameCmd())
 	cmd.AddCommand(workbenchOpenCmd())
 	cmd.AddCommand(workbenchDeleteCmd())
+	cmd.AddCommand(workbenchCheckoutCmd())
+	cmd.AddCommand(workbenchStatusCmd())
 
 	return cmd
 }
@@ -177,6 +179,12 @@ func workbenchShowCmd() *cobra.Command {
 			fmt.Printf("Workshop: %s\n", workbench.WorkshopID)
 			fmt.Printf("Path: %s\n", workbench.Path)
 			fmt.Printf("Status: %s\n", workbench.Status)
+			if workbench.HomeBranch != "" {
+				fmt.Printf("Home Branch: %s\n", workbench.HomeBranch)
+			}
+			if workbench.CurrentBranch != "" {
+				fmt.Printf("Current Branch: %s\n", workbench.CurrentBranch)
+			}
 			fmt.Printf("Created: %s\n", workbench.CreatedAt)
 
 			return nil
@@ -372,6 +380,91 @@ Examples:
 			return nil
 		},
 	}
+}
+
+func workbenchCheckoutCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "checkout [workbench-id] [branch]",
+		Short: "Switch to a target branch using stash dance",
+		Long: `Switch to a target branch using the stash dance workflow.
+
+The stash dance safely handles uncommitted changes:
+1. Stash any uncommitted changes
+2. Checkout the target branch
+3. Pop the stash (reapply changes)
+
+This allows seamless context switching even with dirty working directories.
+
+Examples:
+  orc workbench checkout BENCH-001 main
+  orc workbench checkout BENCH-001 ml/SHIP-205-feature`,
+		Args: cobra.ExactArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			ctx := context.Background()
+			workbenchID := args[0]
+			targetBranch := args[1]
+
+			resp, err := wire.WorkbenchService().CheckoutBranch(ctx, primary.CheckoutBranchRequest{
+				WorkbenchID:  workbenchID,
+				TargetBranch: targetBranch,
+			})
+			if err != nil {
+				return fmt.Errorf("checkout failed: %w", err)
+			}
+
+			fmt.Printf("Switched from %s to %s\n", resp.PreviousBranch, resp.CurrentBranch)
+			if resp.StashApplied {
+				fmt.Println("  (stashed changes have been reapplied)")
+			}
+
+			return nil
+		},
+	}
+
+	return cmd
+}
+
+func workbenchStatusCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "status [workbench-id]",
+		Short: "Show git status of a workbench",
+		Long: `Show the current git status of a workbench including:
+- Current branch
+- Home branch
+- Dirty state (uncommitted changes)
+- Ahead/behind remote
+
+Examples:
+  orc workbench status BENCH-001`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			ctx := context.Background()
+			workbenchID := args[0]
+
+			status, err := wire.WorkbenchService().GetWorkbenchStatus(ctx, workbenchID)
+			if err != nil {
+				return fmt.Errorf("failed to get status: %w", err)
+			}
+
+			fmt.Printf("Workbench: %s\n", status.WorkbenchID)
+			fmt.Printf("Current Branch: %s\n", status.CurrentBranch)
+			fmt.Printf("Home Branch: %s\n", status.HomeBranch)
+
+			if status.IsDirty {
+				fmt.Printf("Status: dirty (%d modified files)\n", status.DirtyFiles)
+			} else {
+				fmt.Println("Status: clean")
+			}
+
+			if status.AheadBy > 0 || status.BehindBy > 0 {
+				fmt.Printf("Remote: %d ahead, %d behind\n", status.AheadBy, status.BehindBy)
+			}
+
+			return nil
+		},
+	}
+
+	return cmd
 }
 
 // createWorkbenchWorktree attempts to create a git worktree for a repo
