@@ -25,4 +25,5 @@ const (
 	CycleStatusComplete     = "complete"
 	CycleStatusBlocked      = "blocked"
 	CycleStatusClosed       = "closed"
+	CycleStatusFailed       = "failed"
 )

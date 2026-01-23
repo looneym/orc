@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/example/orc/internal/core/cyclereceipt"
 	"github.com/example/orc/internal/ports/primary"
@@ -231,13 +232,18 @@ func (s *CycleReceiptServiceImpl) VerifyCycleReceipt(ctx context.Context, crecID
 		return err
 	}
 
-	// CASCADE: Update parent Cycle status to "complete"
+	// CASCADE: Update parent Cycle status based on CREC outcome
+	// If delivered outcome starts with "FAILED:", mark cycle as failed instead of complete
 	if s.cycleService != nil {
 		cycleID, err := s.crecRepo.GetCWOCycleID(ctx, record.CWOID)
 		if err != nil {
 			return fmt.Errorf("failed to get cycle ID for cascade: %w", err)
 		}
-		if err := s.cycleService.UpdateCycleStatus(ctx, cycleID, "complete"); err != nil {
+		targetStatus := "complete"
+		if strings.HasPrefix(record.DeliveredOutcome, "FAILED:") {
+			targetStatus = "failed"
+		}
+		if err := s.cycleService.UpdateCycleStatus(ctx, cycleID, targetStatus); err != nil {
 			return fmt.Errorf("failed to cascade cycle status update: %w", err)
 		}
 	}

@@ -254,15 +254,40 @@ func displayShipmentChildren(shipmentID, prefix string, filters *filterConfig) i
 					fmt.Printf("%s%s\n", childPrefix, colorizeID(cycleDisplayID))
 				}
 
-				// Nested: CWO (1:1 with cycle)
+				// Get cycle children: Plans, CWO, CREC
+				cyclePlans, _ := wire.PlanService().ListPlans(ctx, primary.PlanFilters{CycleID: c.ID})
 				cwo, _ := wire.CycleWorkOrderService().GetCycleWorkOrderByCycle(ctx, c.ID)
+				var crec *primary.CycleReceipt
+				if cwo != nil {
+					crec, _ = wire.CycleReceiptService().GetCycleReceiptByCWO(ctx, cwo.ID)
+				}
+
+				// Determine what children exist for prefix logic
+				hasCWO := cwo != nil
+				hasCREC := crec != nil
+
+				// Nested: Plans (linked to cycle)
+				for i, plan := range cyclePlans {
+					planTitle := truncate(plan.Title, 40)
+					planStatus := colorizeStatus(plan.Status)
+					isLastPlan := i == len(cyclePlans)-1 && !hasCWO
+					planPrefix := nestedPrefix + "├── "
+					if isLastPlan {
+						planPrefix = nestedPrefix + "└── "
+					}
+					if planStatus != "" {
+						fmt.Printf("%s%s - %s - %s\n", planPrefix, colorizeID(plan.ID), planStatus, planTitle)
+					} else {
+						fmt.Printf("%s%s - %s\n", planPrefix, colorizeID(plan.ID), planTitle)
+					}
+				}
+
+				// Nested: CWO (1:1 with cycle)
 				if cwo != nil {
 					cwoOutcome := truncate(cwo.Outcome, 40)
 					cwoStatus := colorizeStatus(cwo.Status)
-					// Check if CREC exists to determine if CWO is last
-					crec, _ := wire.CycleReceiptService().GetCycleReceiptByCWO(ctx, cwo.ID)
 					cwoPrefix := nestedPrefix + "├── "
-					if crec == nil {
+					if !hasCREC {
 						cwoPrefix = nestedPrefix + "└── "
 					}
 					if cwoStatus != "" {

@@ -371,7 +371,7 @@ CREATE TABLE IF NOT EXISTS cycles (
 	id TEXT PRIMARY KEY,
 	shipment_id TEXT NOT NULL,
 	sequence_number INTEGER NOT NULL,
-	status TEXT NOT NULL CHECK(status IN ('draft', 'approved', 'implementing', 'review', 'complete', 'blocked', 'closed')) DEFAULT 'draft',
+	status TEXT NOT NULL CHECK(status IN ('draft', 'approved', 'implementing', 'review', 'complete', 'blocked', 'closed', 'failed')) DEFAULT 'draft',
 	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 	updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 	started_at DATETIME,
