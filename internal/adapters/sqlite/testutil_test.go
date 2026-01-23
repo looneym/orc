@@ -78,19 +78,57 @@ func seedShipment(t *testing.T, db *sql.DB, id, commissionID, title string) stri
 	return id
 }
 
-// seedWorkbench inserts a test workbench and returns its ID.
-func seedWorkbench(t *testing.T, db *sql.DB, id, commissionID, name string) string {
+// seedFactory inserts a test factory (if not exists) and returns its ID.
+func seedFactory(t *testing.T, db *sql.DB, id, name string) string {
+	t.Helper()
+	if id == "" {
+		id = "FACT-001"
+	}
+	if name == "" {
+		name = "test-factory"
+	}
+	_, err := db.Exec("INSERT OR IGNORE INTO factories (id, name, status) VALUES (?, ?, 'active')", id, name)
+	if err != nil {
+		t.Fatalf("failed to seed factory: %v", err)
+	}
+	return id
+}
+
+// seedWorkshop inserts a test workshop (if not exists) and returns its ID.
+func seedWorkshop(t *testing.T, db *sql.DB, id, factoryID, name string) string {
+	t.Helper()
+	if id == "" {
+		id = "SHOP-001"
+	}
+	if factoryID == "" {
+		factoryID = "FACT-001"
+	}
+	if name == "" {
+		name = "test-workshop"
+	}
+	_, err := db.Exec("INSERT OR IGNORE INTO workshops (id, factory_id, name, status) VALUES (?, ?, ?, 'active')", id, factoryID, name)
+	if err != nil {
+		t.Fatalf("failed to seed workshop: %v", err)
+	}
+	return id
+}
+
+// seedWorkbench inserts a test workbench (and required factory/workshop) and returns its ID.
+// The commissionID parameter is legacy and ignored - workbenches now use workshop hierarchy.
+func seedWorkbench(t *testing.T, db *sql.DB, id, _ /* commissionID */, name string) string {
 	t.Helper()
 	if id == "" {
 		id = "BENCH-001"
 	}
-	if commissionID == "" {
-		commissionID = "COMM-001"
-	}
+	// Seed factory and workshop if they don't exist
+	seedFactory(t, db, "FACT-001", "test-factory")
+	seedWorkshop(t, db, "SHOP-001", "FACT-001", "test-workshop")
+
 	if name == "" {
 		name = "test-workbench"
 	}
-	_, err := db.Exec("INSERT INTO groves (id, commission_id, name, status) VALUES (?, ?, ?, 'active')", id, commissionID, name)
+	path := "/tmp/test/" + id // Use ID to ensure unique paths
+	_, err := db.Exec("INSERT INTO workbenches (id, workshop_id, name, path, status) VALUES (?, ?, ?, ?, 'active')", id, "SHOP-001", name, path)
 	if err != nil {
 		t.Fatalf("failed to seed workbench: %v", err)
 	}

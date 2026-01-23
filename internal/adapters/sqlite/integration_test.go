@@ -3,6 +3,7 @@ package sqlite_test
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/example/orc/internal/adapters/sqlite"
 	"github.com/example/orc/internal/ports/secondary"
@@ -15,11 +16,74 @@ import (
 // ============================================================================
 
 func TestIntegration_CommissionWithShipmentsAndTasks(t *testing.T) {
-	t.Skip("Skipped: uses deprecated CommissionExists method - needs update for schema changes")
+	db := setupTestDB(t)
+	ctx := context.Background()
+
+	shipmentRepo := sqlite.NewShipmentRepository(db)
+	taskRepo := sqlite.NewTaskRepository(db)
+
+	// Commission doesn't exist - should return false
+	exists, err := shipmentRepo.CommissionExists(ctx, "COMM-NONEXISTENT")
+	if err != nil {
+		t.Fatalf("CommissionExists failed: %v", err)
+	}
+	if exists {
+		t.Error("expected CommissionExists to return false for non-existent commission")
+	}
+
+	// Create a real commission
+	seedCommission(t, db, "COMM-001", "Test")
+
+	exists, err = shipmentRepo.CommissionExists(ctx, "COMM-001")
+	if err != nil {
+		t.Fatalf("CommissionExists failed: %v", err)
+	}
+	if !exists {
+		t.Error("expected CommissionExists to return true for existing commission")
+	}
+
+	// Create shipment and tasks
+	if err := shipmentRepo.Create(ctx, &secondary.ShipmentRecord{ID: "SHIP-001", CommissionID: "COMM-001", Title: "Test"}); err != nil {
+		t.Fatalf("Create shipment failed: %v", err)
+	}
+	if err := taskRepo.Create(ctx, &secondary.TaskRecord{ID: "TASK-001", CommissionID: "COMM-001", ShipmentID: "SHIP-001", Title: "Test"}); err != nil {
+		t.Fatalf("Create task failed: %v", err)
+	}
+
+	// Verify retrieval
+	tasks, err := taskRepo.GetByShipment(ctx, "SHIP-001")
+	if err != nil {
+		t.Fatalf("GetByShipment failed: %v", err)
+	}
+	if len(tasks) != 1 {
+		t.Errorf("expected 1 task, got %d", len(tasks))
+	}
 }
 
 func TestIntegration_CommissionExistsConstraint(t *testing.T) {
-	t.Skip("Skipped: uses deprecated CommissionExists method - needs update for schema changes")
+	db := setupTestDB(t)
+	ctx := context.Background()
+
+	taskRepo := sqlite.NewTaskRepository(db)
+
+	// Check non-existent commission
+	exists, err := taskRepo.CommissionExists(ctx, "COMM-NONE")
+	if err != nil {
+		t.Fatalf("CommissionExists failed: %v", err)
+	}
+	if exists {
+		t.Error("expected false for non-existent commission")
+	}
+
+	// Create commission and verify
+	seedCommission(t, db, "COMM-001", "Test")
+	exists, err = taskRepo.CommissionExists(ctx, "COMM-001")
+	if err != nil {
+		t.Fatalf("CommissionExists failed: %v", err)
+	}
+	if !exists {
+		t.Error("expected true for existing commission")
+	}
 }
 
 // ============================================================================
@@ -98,19 +162,111 @@ func TestIntegration_ShipmentWithPlanAndTasks(t *testing.T) {
 // ============================================================================
 
 func TestIntegration_WorkbenchAssignmentPropagation(t *testing.T) {
-	t.Skip("Skipped: uses deprecated AssignWorkbench/GetByWorkbench methods - needs update for schema changes")
+	db := setupTestDB(t)
+	ctx := context.Background()
+
+	seedCommission(t, db, "COMM-001", "Test")
+	seedWorkbench(t, db, "BENCH-001", "COMM-001", "test-bench")
+
+	shipmentRepo := sqlite.NewShipmentRepository(db)
+	taskRepo := sqlite.NewTaskRepository(db)
+
+	// Create shipment and tasks
+	if err := shipmentRepo.Create(ctx, &secondary.ShipmentRecord{ID: "SHIP-001", CommissionID: "COMM-001", Title: "Test"}); err != nil {
+		t.Fatalf("Create shipment failed: %v", err)
+	}
+	if err := taskRepo.Create(ctx, &secondary.TaskRecord{ID: "TASK-001", CommissionID: "COMM-001", ShipmentID: "SHIP-001", Title: "Task 1"}); err != nil {
+		t.Fatalf("Create task 1 failed: %v", err)
+	}
+	if err := taskRepo.Create(ctx, &secondary.TaskRecord{ID: "TASK-002", CommissionID: "COMM-001", ShipmentID: "SHIP-001", Title: "Task 2"}); err != nil {
+		t.Fatalf("Create task 2 failed: %v", err)
+	}
+
+	// Assign workbench to shipment
+	if err := shipmentRepo.AssignWorkbench(ctx, "SHIP-001", "BENCH-001"); err != nil {
+		t.Fatalf("AssignWorkbench failed: %v", err)
+	}
+
+	// Propagate to tasks
+	if err := taskRepo.AssignWorkbenchByShipment(ctx, "SHIP-001", "BENCH-001"); err != nil {
+		t.Fatalf("AssignWorkbenchByShipment failed: %v", err)
+	}
+
+	// Verify shipment has workbench
+	shipments, err := shipmentRepo.GetByWorkbench(ctx, "BENCH-001")
+	if err != nil {
+		t.Fatalf("GetByWorkbench for shipments failed: %v", err)
+	}
+	if len(shipments) != 1 {
+		t.Errorf("expected 1 shipment assigned to workbench, got %d", len(shipments))
+	}
+
+	// Verify tasks have workbench
+	tasks, err := taskRepo.GetByWorkbench(ctx, "BENCH-001")
+	if err != nil {
+		t.Fatalf("GetByWorkbench for tasks failed: %v", err)
+	}
+	if len(tasks) != 2 {
+		t.Errorf("expected 2 tasks assigned to workbench, got %d", len(tasks))
+	}
 }
 
 func TestIntegration_MultipleEntitiesAssignedToWorkbench(t *testing.T) {
-	t.Skip("Skipped: uses deprecated AssignWorkbench/GetByWorkbench methods - needs update for schema changes")
-}
+	db := setupTestDB(t)
+	ctx := context.Background()
 
-// ============================================================================
-// Investigation Flow Tests
-// ============================================================================
+	seedCommission(t, db, "COMM-001", "Test")
+	seedWorkbench(t, db, "BENCH-001", "COMM-001", "shared-bench")
 
-func TestIntegration_InvestigationWithQuestions(t *testing.T) {
-	t.Skip("Skipped: question schema mismatch (description vs content) - needs update for schema changes")
+	shipmentRepo := sqlite.NewShipmentRepository(db)
+	taskRepo := sqlite.NewTaskRepository(db)
+
+	// Create multiple shipments
+	if err := shipmentRepo.Create(ctx, &secondary.ShipmentRecord{ID: "SHIP-001", CommissionID: "COMM-001", Title: "Shipment 1"}); err != nil {
+		t.Fatalf("Create shipment 1 failed: %v", err)
+	}
+	if err := shipmentRepo.Create(ctx, &secondary.ShipmentRecord{ID: "SHIP-002", CommissionID: "COMM-001", Title: "Shipment 2"}); err != nil {
+		t.Fatalf("Create shipment 2 failed: %v", err)
+	}
+
+	// Create tasks for each shipment
+	if err := taskRepo.Create(ctx, &secondary.TaskRecord{ID: "TASK-001", CommissionID: "COMM-001", ShipmentID: "SHIP-001", Title: "Task 1"}); err != nil {
+		t.Fatalf("Create task 1 failed: %v", err)
+	}
+	if err := taskRepo.Create(ctx, &secondary.TaskRecord{ID: "TASK-002", CommissionID: "COMM-001", ShipmentID: "SHIP-002", Title: "Task 2"}); err != nil {
+		t.Fatalf("Create task 2 failed: %v", err)
+	}
+
+	// Assign same workbench to both shipments
+	if err := shipmentRepo.AssignWorkbench(ctx, "SHIP-001", "BENCH-001"); err != nil {
+		t.Fatalf("AssignWorkbench to shipment 1 failed: %v", err)
+	}
+	if err := shipmentRepo.AssignWorkbench(ctx, "SHIP-002", "BENCH-001"); err != nil {
+		t.Fatalf("AssignWorkbench to shipment 2 failed: %v", err)
+	}
+	if err := taskRepo.AssignWorkbenchByShipment(ctx, "SHIP-001", "BENCH-001"); err != nil {
+		t.Fatalf("AssignWorkbenchByShipment for shipment 1 failed: %v", err)
+	}
+	if err := taskRepo.AssignWorkbenchByShipment(ctx, "SHIP-002", "BENCH-001"); err != nil {
+		t.Fatalf("AssignWorkbenchByShipment for shipment 2 failed: %v", err)
+	}
+
+	// Verify all entities retrievable by workbench
+	shipments, err := shipmentRepo.GetByWorkbench(ctx, "BENCH-001")
+	if err != nil {
+		t.Fatalf("GetByWorkbench for shipments failed: %v", err)
+	}
+	if len(shipments) != 2 {
+		t.Errorf("expected 2 shipments, got %d", len(shipments))
+	}
+
+	tasks, err := taskRepo.GetByWorkbench(ctx, "BENCH-001")
+	if err != nil {
+		t.Fatalf("GetByWorkbench for tasks failed: %v", err)
+	}
+	if len(tasks) != 2 {
+		t.Errorf("expected 2 tasks, got %d", len(tasks))
+	}
 }
 
 // ============================================================================
@@ -216,7 +372,45 @@ func TestIntegration_TagAcrossEntities(t *testing.T) {
 // ============================================================================
 
 func TestIntegration_HandoffWithContext(t *testing.T) {
-	t.Skip("Skipped: uses deprecated GetLatestForWorkbench method - needs update for schema changes")
+	db := setupTestDB(t)
+	ctx := context.Background()
+
+	seedCommission(t, db, "COMM-001", "Test")
+	seedWorkbench(t, db, "BENCH-001", "COMM-001", "test-bench")
+
+	handoffRepo := sqlite.NewHandoffRepository(db)
+
+	// Create multiple handoffs for workbench
+	h1 := &secondary.HandoffRecord{
+		ID:                "HO-001",
+		ActiveCommissionID: "COMM-001",
+		ActiveWorkbenchID:  "BENCH-001",
+		HandoffNote:        "First handoff",
+	}
+	h2 := &secondary.HandoffRecord{
+		ID:                "HO-002",
+		ActiveCommissionID: "COMM-001",
+		ActiveWorkbenchID:  "BENCH-001",
+		HandoffNote:        "Second handoff",
+	}
+
+	if err := handoffRepo.Create(ctx, h1); err != nil {
+		t.Fatalf("Create handoff 1 failed: %v", err)
+	}
+	// Sleep to ensure different created_at timestamps (SQLite DATETIME has second precision)
+	time.Sleep(1100 * time.Millisecond)
+	if err := handoffRepo.Create(ctx, h2); err != nil {
+		t.Fatalf("Create handoff 2 failed: %v", err)
+	}
+
+	// Get latest should return most recent
+	latest, err := handoffRepo.GetLatestForWorkbench(ctx, "BENCH-001")
+	if err != nil {
+		t.Fatalf("GetLatestForWorkbench failed: %v", err)
+	}
+	if latest.ID != "HO-002" {
+		t.Errorf("expected latest handoff HO-002, got %s", latest.ID)
+	}
 }
 
 // ============================================================================
