@@ -63,19 +63,12 @@ func (s *WorkbenchServiceImpl) CreateWorkbench(ctx context.Context, req primary.
 		return nil, result.Error()
 	}
 
-	// 4. Build workbench path
+	// 4. Build workbench path (~/wb/<name>)
 	basePath := req.BasePath
 	if basePath == "" {
 		basePath = s.defaultBasePath()
 	}
-
-	// Get workshop for path naming
-	workshop, err := s.workshopRepo.GetByID(ctx, req.WorkshopID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get workshop: %w", err)
-	}
-
-	workbenchPath := filepath.Join(basePath, fmt.Sprintf("%s-%s", workshop.FactoryID, req.Name))
+	workbenchPath := filepath.Join(basePath, req.Name)
 
 	// 5. Generate home branch name
 	homeBranch := GenerateHomeBranchName(UserInitials, req.Name)
@@ -238,7 +231,7 @@ func (s *WorkbenchServiceImpl) recordToWorkbench(r *secondary.WorkbenchRecord) *
 
 func (s *WorkbenchServiceImpl) defaultBasePath() string {
 	home, _ := os.UserHomeDir()
-	return filepath.Join(home, "src", "worktrees")
+	return filepath.Join(home, "wb")
 }
 
 func (s *WorkbenchServiceImpl) pathExists(path string) bool {

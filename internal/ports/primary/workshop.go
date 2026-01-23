@@ -19,6 +19,12 @@ type WorkshopService interface {
 
 	// DeleteWorkshop deletes a workshop.
 	DeleteWorkshop(ctx context.Context, req DeleteWorkshopRequest) error
+
+	// OpenWorkshop launches a TMux session for the workshop.
+	OpenWorkshop(ctx context.Context, req OpenWorkshopRequest) (*OpenWorkshopResponse, error)
+
+	// CloseWorkshop kills the workshop's TMux session.
+	CloseWorkshop(ctx context.Context, workshopID string) error
 }
 
 // CreateWorkshopRequest contains parameters for creating a workshop.
@@ -61,4 +67,17 @@ type UpdateWorkshopRequest struct {
 type DeleteWorkshopRequest struct {
 	WorkshopID string
 	Force      bool
+}
+
+// OpenWorkshopRequest contains parameters for opening a workshop TMux session.
+type OpenWorkshopRequest struct {
+	WorkshopID string
+}
+
+// OpenWorkshopResponse contains the result of opening a workshop.
+type OpenWorkshopResponse struct {
+	Workshop           *Workshop
+	SessionName        string
+	SessionAlreadyOpen bool
+	AttachInstructions string
 }

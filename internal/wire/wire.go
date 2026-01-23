@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	cliadapter "github.com/example/orc/internal/adapters/cli"
+	"github.com/example/orc/internal/adapters/filesystem"
 	"github.com/example/orc/internal/adapters/persistence"
 	"github.com/example/orc/internal/adapters/sqlite"
 	tmuxadapter "github.com/example/orc/internal/adapters/tmux"
@@ -252,8 +253,13 @@ func initServices() {
 	factoryRepo := sqlite.NewFactoryRepository(database)
 	workshopRepo := sqlite.NewWorkshopRepository(database)
 	workbenchRepo := sqlite.NewWorkbenchRepository(database)
+	home, _ := os.UserHomeDir()
+	workspaceAdapter, err := filesystem.NewWorkspaceAdapter(home+"/wb", home+"/src") // ~/wb for worktrees, ~/src for repos
+	if err != nil {
+		log.Fatalf("failed to create workspace adapter: %v", err)
+	}
 	factoryService = app.NewFactoryService(factoryRepo)
-	workshopService = app.NewWorkshopService(workshopRepo)
+	workshopService = app.NewWorkshopService(workshopRepo, workbenchRepo, repoRepo, tmuxService, workspaceAdapter)
 	workbenchService = app.NewWorkbenchService(workbenchRepo, workshopRepo, agentProvider, executor)
 
 	// Create work order, cycle, and cycle work order services

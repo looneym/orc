@@ -110,14 +110,15 @@ func (s *Session) CreateOrcWindow(workingDir string) error {
 	}
 
 	// Now we have 3 panes:
-	// Pane 1 (left): claude (orchestrator)
+	// Pane 1 (left): claude (orchestrator via orc connect)
 	// Pane 2 (top right): vim
 	// Pane 3 (bottom right): shell
 
-	// Launch claude in pane 1 (left) with orc prime prompt
+	// Launch orc connect in pane 1 (left) - uses respawn-pane so it's the root command
 	pane1 := fmt.Sprintf("%s.1", target)
-	if err := s.SendKeys(pane1, "claude \"Run the orc prime command to get context\""); err != nil {
-		return fmt.Errorf("failed to launch claude: %w", err)
+	connectCmd := exec.Command("tmux", "respawn-pane", "-t", pane1, "-k", "orc", "connect")
+	if err := connectCmd.Run(); err != nil {
+		return fmt.Errorf("failed to launch orc connect: %w", err)
 	}
 
 	// Launch vim in pane 2 (top right)
@@ -210,7 +211,7 @@ func (s *Session) CreateGroveWindow(index int, name, workingDir string) (*Window
 
 	// Now we have 3 panes:
 	// Pane 1 (left): vim
-	// Pane 2 (top right): claude (IMP)
+	// Pane 2 (top right): claude (IMP via orc connect)
 	// Pane 3 (bottom right): shell
 
 	// Launch vim in pane 1 (left)
@@ -219,10 +220,11 @@ func (s *Session) CreateGroveWindow(index int, name, workingDir string) (*Window
 		return nil, fmt.Errorf("failed to launch vim: %w", err)
 	}
 
-	// Launch claude in pane 2 (top right - IMP) with orc prime prompt
+	// Launch orc connect in pane 2 (top right - IMP) - uses respawn-pane so it's the root command
 	pane2 := fmt.Sprintf("%s.2", target)
-	if err := s.SendKeys(pane2, "claude \"Run the orc prime command to get context\""); err != nil {
-		return nil, fmt.Errorf("failed to launch claude IMP: %w", err)
+	connectCmd := exec.Command("tmux", "respawn-pane", "-t", pane2, "-k", "orc", "connect")
+	if err := connectCmd.Run(); err != nil {
+		return nil, fmt.Errorf("failed to launch orc connect: %w", err)
 	}
 
 	// Pane 3 (bottom right) is just a shell, already there

@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/example/orc/internal/config"
+	"github.com/example/orc/internal/ports/primary"
 	"github.com/example/orc/internal/wire"
 )
 
@@ -17,20 +18,24 @@ func FocusCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "focus [container-id]",
 		Short: "Set or show the currently focused container",
-		Long: `Focus on a specific container (Shipment, Conclave, Investigation, or Tome).
+		Long: `Focus on a specific container (Commission, Shipment, Conclave, Investigation, or Tome).
 
 The focused container appears in 'orc prime' output and can be used as default
 for other commands.
 
 Container types are auto-detected from ID prefix:
+  COMM-*  → Commission (work package)
   SHIP-*  → Shipment (execution work)
   CON-*   → Conclave (ideation session)
   INV-*   → Investigation (research)
   TOME-*  → Tome (knowledge collection)
 
+When focusing on a Shipment while in a workbench context, the shipment's branch
+will be automatically checked out using the stash dance.
+
 Examples:
-  orc focus CON-001     # Focus on a conclave
-  orc focus SHIP-178    # Focus on a shipment
+  orc focus COMM-001    # Focus on a commission
+  orc focus SHIP-178    # Focus on a shipment (auto-checkouts branch)
   orc focus             # Clear focus
   orc focus --show      # Show current focus`,
 		Args: cobra.MaximumNArgs(1),
@@ -78,6 +83,13 @@ func runFocus(cmd *cobra.Command, args []string) error {
 func validateAndGetInfo(id string) (containerType string, title string, err error) {
 	ctx := context.Background()
 	switch {
+	case strings.HasPrefix(id, "COMM-"):
+		comm, err := wire.CommissionService().GetCommission(ctx, id)
+		if err != nil {
+			return "", "", fmt.Errorf("commission %s not found", id)
+		}
+		return "Commission", comm.Title, nil
+
 	case strings.HasPrefix(id, "SHIP-"):
 		ship, err := wire.ShipmentService().GetShipment(ctx, id)
 		if err != nil {
@@ -107,7 +119,7 @@ func validateAndGetInfo(id string) (containerType string, title string, err erro
 		return "Tome", tome.Title, nil
 
 	default:
-		return "", "", fmt.Errorf("unknown container type for ID: %s (expected SHIP-*, CON-*, INV-*, or TOME-*)", id)
+		return "", "", fmt.Errorf("unknown container type for ID: %s (expected COMM-*, SHIP-*, CON-*, INV-*, or TOME-*)", id)
 	}
 }
 
@@ -141,8 +153,41 @@ func setFocus(cfg *config.Config, configDir, containerID, containerType, title s
 
 	fmt.Printf("Focused on %s: %s\n", containerType, containerID)
 	fmt.Printf("  %s\n", title)
+
+	// Auto-checkout branch for shipments when in a workbench
+	if strings.HasPrefix(containerID, "SHIP-") && cfg.WorkbenchID != "" {
+		if err := autoCheckoutShipmentBranch(cfg.WorkbenchID, containerID); err != nil {
+			fmt.Printf("  (branch checkout skipped: %v)\n", err)
+		} else {
+			fmt.Println("  ✓ Branch checked out")
+		}
+	}
+
 	fmt.Println("\nRun 'orc prime' to see updated context.")
 	return nil
+}
+
+// autoCheckoutShipmentBranch checks out the shipment's branch in the workbench
+func autoCheckoutShipmentBranch(workbenchID, shipmentID string) error {
+	ctx := context.Background()
+
+	// Get shipment to find its branch
+	ship, err := wire.ShipmentService().GetShipment(ctx, shipmentID)
+	if err != nil {
+		return err
+	}
+
+	// Shipments should have a branch field
+	if ship.Branch == "" {
+		return fmt.Errorf("shipment has no branch assigned")
+	}
+
+	// Checkout via workbench service (uses stash dance)
+	_, err = wire.WorkbenchService().CheckoutBranch(ctx, primary.CheckoutBranchRequest{
+		WorkbenchID:  workbenchID,
+		TargetBranch: ship.Branch,
+	})
+	return err
 }
 
 // clearFocus clears the current focus
@@ -173,6 +218,10 @@ func GetFocusInfo(focusID string) (containerType, title, status string) {
 
 	ctx := context.Background()
 	switch {
+	case strings.HasPrefix(focusID, "COMM-"):
+		if comm, err := wire.CommissionService().GetCommission(ctx, focusID); err == nil {
+			return "Commission", comm.Title, comm.Status
+		}
 	case strings.HasPrefix(focusID, "SHIP-"):
 		if ship, err := wire.ShipmentService().GetShipment(ctx, focusID); err == nil {
 			return "Shipment", ship.Title, ship.Status

@@ -24,6 +24,8 @@ func WorkshopCmd() *cobra.Command {
 	cmd.AddCommand(workshopListCmd())
 	cmd.AddCommand(workshopShowCmd())
 	cmd.AddCommand(workshopDeleteCmd())
+	cmd.AddCommand(workshopOpenCmd())
+	cmd.AddCommand(workshopCloseCmd())
 
 	return cmd
 }
@@ -178,4 +180,62 @@ Examples:
 	cmd.Flags().BoolVarP(&force, "force", "f", false, "Force delete even with workbenches")
 
 	return cmd
+}
+
+func workshopOpenCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "open [workshop-id]",
+		Short: "Open a workshop TMux session",
+		Long: `Launch a TMux session for the workshop with:
+- Window 1: Gatehouse (Goblin orchestration)
+- Window 2+: One per workbench
+
+If session already exists, prints attach instructions.
+
+Examples:
+  orc workshop open WORK-001`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			workshopID := args[0]
+			ctx := context.Background()
+
+			resp, err := wire.WorkshopService().OpenWorkshop(ctx, primary.OpenWorkshopRequest{
+				WorkshopID: workshopID,
+			})
+			if err != nil {
+				return err
+			}
+
+			if resp.SessionAlreadyOpen {
+				fmt.Printf("Workshop %s session already running\n", workshopID)
+			} else {
+				fmt.Printf("✓ Workshop %s opened: %s\n", workshopID, resp.Workshop.Name)
+			}
+			fmt.Println(resp.AttachInstructions)
+			return nil
+		},
+	}
+}
+
+func workshopCloseCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "close [workshop-id]",
+		Short: "Close a workshop TMux session",
+		Long: `Close the TMux session for a workshop.
+
+Examples:
+  orc workshop close WORK-001`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			workshopID := args[0]
+			ctx := context.Background()
+
+			if err := wire.WorkshopService().CloseWorkshop(ctx, workshopID); err != nil {
+				return fmt.Errorf("failed to close session: %w", err)
+			}
+
+			fmt.Printf("✓ Workshop %s session closed\n", workshopID)
+			return nil
+		},
+	}
 }
