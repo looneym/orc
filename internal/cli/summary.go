@@ -17,6 +17,19 @@ import (
 	"github.com/example/orc/internal/wire"
 )
 
+// commissionAliases maps user-friendly aliases to commission IDs
+var commissionAliases = map[string]string{
+	"test": "COMM-003",
+}
+
+// resolveCommissionAlias resolves a commission alias to its ID, or returns the input unchanged
+func resolveCommissionAlias(input string) string {
+	if resolved, ok := commissionAliases[input]; ok {
+		return resolved
+	}
+	return input
+}
+
 // filterConfig holds all filtering settings for the summary display
 type filterConfig struct {
 	statusMap      map[string]bool // statuses to hide
@@ -825,7 +838,14 @@ Examples:
 				}
 				filterCommissionID = commissionID
 			} else if missionFilter != "" {
-				filterCommissionID = missionFilter
+				// Resolve aliases first (e.g., "test" -> "COMM-003")
+				resolved := resolveCommissionAlias(missionFilter)
+
+				// Validate commission exists
+				if _, err := wire.CommissionService().GetCommission(cmd.Context(), resolved); err != nil {
+					return fmt.Errorf("commission %q not found", missionFilter)
+				}
+				filterCommissionID = resolved
 			} else if focusID != "" && !expandAll {
 				// DEFAULT BEHAVIOR: When focused (and not --all), scope to focus's commission
 				filterCommissionID = resolveContainerCommission(focusID)

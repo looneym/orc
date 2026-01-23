@@ -190,6 +190,39 @@ When completing work, report verification explicitly:
 
 ---
 
+## Test Commission for CLI Validation
+
+When developing changes that affect CLI display (summary, containers, leafs, etc.), use the test commission to validate output:
+
+```bash
+./orc summary --commission COMM-003
+```
+
+### What's in COMM-003
+
+The test commission contains representative examples of all container types:
+- **Shipment** (SHIP-205) with cycles, work orders, plans, and tasks (including paused status)
+- **Conclave** (CON-007) with nested tome and notes (including pinned note)
+- **Tome** (TOME-008, standalone) with notes
+
+Also includes items with various statuses (ready, paused, draft, complete) and pinned items.
+
+### When to Use
+
+Run `orc summary --commission COMM-003` after changes to:
+- Summary display logic
+- Container creation/update commands
+- Leaf item (task, note, plan) display
+- Status filtering or colorization
+- Pinned item display
+- Hierarchical nesting
+
+### Maintenance
+
+If you add new container types or display features, add corresponding test data to COMM-003.
+
+---
+
 ## Checklists
 
 ### Add Field to Entity

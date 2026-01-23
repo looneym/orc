@@ -209,6 +209,11 @@ var migrations = []Migration{
 		Name:    "add_git_branch_columns",
 		Up:      migrationV39,
 	},
+	{
+		Version: 40,
+		Name:    "add_conclave_id_to_investigations",
+		Up:      migrationV40,
+	},
 }
 
 // RunMigrations executes all pending migrations
@@ -3907,5 +3912,14 @@ func migrationV39(db *sql.DB) error {
 		return fmt.Errorf("failed to add branch column to shipments: %w", err)
 	}
 
+	return nil
+}
+
+func migrationV40(db *sql.DB) error {
+	// Add conclave_id column to investigations table (was omitted in migrationV31)
+	_, err := db.Exec(`ALTER TABLE investigations ADD COLUMN conclave_id TEXT REFERENCES conclaves(id) ON DELETE SET NULL`)
+	if err != nil {
+		return fmt.Errorf("failed to add conclave_id column to investigations: %w", err)
+	}
 	return nil
 }
