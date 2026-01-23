@@ -24,10 +24,10 @@
 
 | ID | Test Case | Input | Expected | Status |
 |----|-----------|-------|----------|--------|
-| G1.1.1 | Mission exists, no shipment | MissionExists: true, ShipmentID: "" | Allowed: true | To implement |
-| G1.1.2 | Mission exists, shipment exists | MissionExists: true, ShipmentID: "SHIP-001", ShipmentExists: true | Allowed: true | To implement |
-| G1.1.3 | Mission not found | MissionExists: false | Allowed: false, "mission not found" | To implement |
-| G1.1.4 | Shipment not found | MissionExists: true, ShipmentID: "SHIP-999", ShipmentExists: false | Allowed: false, "shipment not found" | To implement |
+| G1.1.1 | Commission exists, no shipment | CommissionExists: true, ShipmentID: "" | Allowed: true | To implement |
+| G1.1.2 | Commission exists, shipment exists | CommissionExists: true, ShipmentID: "SHIP-001", ShipmentExists: true | Allowed: true | To implement |
+| G1.1.3 | Commission not found | CommissionExists: false | Allowed: false, "commission not found" | To implement |
+| G1.1.4 | Shipment not found | CommissionExists: true, ShipmentID: "SHIP-999", ShipmentExists: false | Allowed: false, "shipment not found" | To implement |
 
 ### 1.2 CanCompleteTask
 
@@ -92,7 +92,7 @@ These tests verify end-to-end transitions through the service layer.
 
 | ID | Transition | From | To | Test Case | File | Status |
 |----|------------|------|-----|-----------|------|--------|
-| T3.1.1 | create | initial | ready | Create task with mission | task_service_test.go | Exists |
+| T3.1.1 | create | initial | ready | Create task with commission | task_service_test.go | Exists |
 | T3.1.2 | claim | ready | in_progress | Claim ready task | task_service_test.go | Exists |
 | T3.1.3 | pause | in_progress | paused | Pause in_progress task | task_service_test.go | Exists |
 | T3.1.4 | resume | paused | in_progress | Resume paused task | task_service_test.go | Exists |
@@ -113,11 +113,11 @@ These tests verify end-to-end transitions through the service layer.
 
 ## 4. Guard Failure Tests (Negative Cases)
 
-### 4.1 mission_exists Guard
+### 4.1 commission_exists Guard
 
 | ID | Guard | Transition | Test Case | Expected Error | File |
 |----|-------|------------|-----------|----------------|------|
-| F4.1.1 | mission_exists | create | Create with missing mission | "mission not found" | guards_test.go |
+| F4.1.1 | commission_exists | create | Create with missing commission | "commission not found" | guards_test.go |
 
 ### 4.2 shipment_exists Guard
 
@@ -177,7 +177,7 @@ These tests verify end-to-end transitions through the service layer.
 | I6.1 | id_format | IDs follow TASK-XXX | Regex check | task_repo_test.go | Exists |
 | I6.2 | id_unique | IDs are unique | Duplicate check | task_repo_test.go | Exists |
 | I6.3 | status_valid | Status in (ready, in_progress, paused, complete) | Enum check | task_repo_test.go | Exists |
-| I6.4 | mission_reference | Mission exists | FK constraint | task_repo_test.go | Exists |
+| I6.4 | commission_reference | Commission exists | FK constraint | task_repo_test.go | Exists |
 | I6.5 | shipment_reference | Shipment exists (if set) | FK constraint | task_repo_test.go | Exists |
 | I6.6 | complete_not_pinned | Complete implies not pinned | Business logic | guards_test.go | New |
 | I6.7 | single_tag | Task has at most one tag | Count check | task_repo_test.go | Exists |
@@ -201,7 +201,7 @@ These tests verify end-to-end transitions through the service layer.
 
 ### Context Structs to Create
 
-- [ ] `GuardResult` - shared pattern from shipment/grove
+- [ ] `GuardResult` - shared pattern from shipment/workbench
 - [ ] `CreateTaskContext`
 - [ ] `CompleteTaskContext`
 - [ ] `StatusTransitionContext`
@@ -218,9 +218,9 @@ These tests verify end-to-end transitions through the service layer.
 ### Test Cases to Create (18 total)
 
 **CanCreateTask (4):**
-- [ ] TestCanCreateTask_MissionExistsNoShipment
-- [ ] TestCanCreateTask_MissionAndShipmentExist
-- [ ] TestCanCreateTask_MissionNotFound
+- [ ] TestCanCreateTask_CommissionExistsNoShipment
+- [ ] TestCanCreateTask_CommissionAndShipmentExist
+- [ ] TestCanCreateTask_CommissionNotFound
 - [ ] TestCanCreateTask_ShipmentNotFound
 
 **CanCompleteTask (2):**
@@ -256,7 +256,7 @@ These tests verify end-to-end transitions through the service layer.
 | Initial state | active | ready |
 | Working state | active | in_progress |
 | Pause from | active | in_progress |
-| Parent guards | mission_exists | mission_exists + shipment_exists |
+| Parent guards | commission_exists | commission_exists + shipment_exists |
 | Claim operation | No | Yes |
 | Tag constraint | No | Yes (one max) |
 | Total guards | 5 | 5 |

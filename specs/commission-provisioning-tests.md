@@ -16,9 +16,9 @@ Generated from: `specs/commission-provisioning.yaml`
 | | | | | | Update with empty values (no-op) |
 | start_commission | active | active | start | is_orc, not_in_orc_source | ORC starts commission, creates workspace |
 | | | | | | ORC starts commission with custom workspace path |
-| launch_commission | active | active | launch | is_orc, not_in_orc_source | Launch creates workspace and groves directory |
-| | | | | | Launch moves groves to standard location |
-| | | | | | Launch writes grove configs |
+| launch_commission | active | active | launch | is_orc, not_in_orc_source | Launch creates workspace and workbenches directory |
+| | | | | | Launch moves workbenches to standard location |
+| | | | | | Launch writes workbench configs |
 | | | | | | Launch with --tmux creates session |
 | | | | | | Launch without --tmux skips TMux |
 | | | | | | Launch is idempotent (run twice, same result) |
@@ -46,8 +46,8 @@ Generated from: `specs/commission-provisioning.yaml`
 | not_in_orc_source | launch_commission | Launch from ORC source directory blocked | "Cannot run this command from ORC source directory" |
 | not_pinned | complete_commission | Complete pinned commission (error) | "Cannot complete pinned commission {id}. Unpin first with: orc commission unpin {id}" |
 | not_pinned | archive_active_commission | Archive pinned commission (error) | "Cannot archive pinned commission {id}. Unpin first with: orc commission unpin {id}" |
-| no_dependents_or_force | delete_active_commission | Delete commission with groves (error without --force) | "Commission has {count} groves and {count} shipments. Use --force to delete anyway" |
-| no_dependents_or_force | delete_active_commission | Delete commission with shipments (error without --force) | "Commission has {count} groves and {count} shipments. Use --force to delete anyway" |
+| no_dependents_or_force | delete_active_commission | Delete commission with workbenches (error without --force) | "Commission has {count} workbenches and {count} shipments. Use --force to delete anyway" |
+| no_dependents_or_force | delete_active_commission | Delete commission with shipments (error without --force) | "Commission has {count} workbenches and {count} shipments. Use --force to delete anyway" |
 | exists | pin_commission | Pin non-existent commission (error) | "Commission {id} not found" |
 
 ### 3. Edge Case Tests

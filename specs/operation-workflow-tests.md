@@ -24,8 +24,8 @@
 
 | ID | Test Case | Input | Expected | Status |
 |----|-----------|-------|----------|--------|
-| G1.1.1 | Mission exists | MissionExists: true | Allowed: true | To implement |
-| G1.1.2 | Mission not found | MissionExists: false | Allowed: false, "mission not found" | To implement |
+| G1.1.1 | Commission exists | CommissionExists: true | Allowed: true | To implement |
+| G1.1.2 | Commission not found | CommissionExists: false | Allowed: false, "commission not found" | To implement |
 
 ### 1.2 CanCompleteOperation
 
@@ -62,7 +62,7 @@ These tests verify end-to-end transitions through the service layer.
 
 | ID | Transition | From | To | Test Case | File | Status |
 |----|------------|------|-----|-----------|------|--------|
-| T3.1.1 | create | initial | ready | Create operation with mission | operation_service_test.go | Exists |
+| T3.1.1 | create | initial | ready | Create operation with commission | operation_service_test.go | Exists |
 | T3.1.2 | complete | ready | complete | Complete ready operation | operation_service_test.go | Exists |
 
 ### 3.2 Self-Transitions
@@ -75,11 +75,11 @@ These tests verify end-to-end transitions through the service layer.
 
 ## 4. Guard Failure Tests (Negative Cases)
 
-### 4.1 mission_exists Guard
+### 4.1 commission_exists Guard
 
 | ID | Guard | Transition | Test Case | Expected Error | File |
 |----|-------|------------|-----------|----------------|------|
-| F4.1.1 | mission_exists | create | Create with missing mission | "mission not found" | guards_test.go |
+| F4.1.1 | commission_exists | create | Create with missing commission | "commission not found" | guards_test.go |
 
 ### 4.2 is_ready Guard
 
@@ -106,7 +106,7 @@ These tests verify end-to-end transitions through the service layer.
 | I6.1 | id_format | IDs follow OP-XXX | Regex check | operation_repo_test.go | Exists |
 | I6.2 | id_unique | IDs are unique | Duplicate check | operation_repo_test.go | Exists |
 | I6.3 | status_valid | Status in (ready, complete) | Enum check | operation_repo_test.go | Exists |
-| I6.4 | mission_reference | Mission exists | FK constraint | operation_repo_test.go | Exists |
+| I6.4 | commission_reference | Commission exists | FK constraint | operation_repo_test.go | Exists |
 | I6.5 | complete_requires_completed_at | Complete implies completed_at | Business logic | guards_test.go | New |
 
 ---
@@ -140,8 +140,8 @@ These tests verify end-to-end transitions through the service layer.
 ### Test Cases to Create (6 total)
 
 **CanCreateOperation (2):**
-- [ ] TestCanCreateOperation_MissionExists
-- [ ] TestCanCreateOperation_MissionNotFound
+- [ ] TestCanCreateOperation_CommissionExists
+- [ ] TestCanCreateOperation_CommissionNotFound
 
 **CanCompleteOperation (2):**
 - [ ] TestCanCompleteOperation_ReadyStatus
@@ -176,8 +176,8 @@ Operation is intentionally the simplest entity in ORC:
 1. **No pin/unpin:** No need to protect operations from accidental changes
 2. **No delete:** Operations serve as permanent audit trail
 3. **No pause/resume:** Linear workflow from ready to complete
-4. **Single parent:** Only Mission (no optional secondary parent)
-5. **Minimal guards:** Only validate mission exists and ready status
+4. **Single parent:** Only Commission (no optional secondary parent)
+5. **Minimal guards:** Only validate commission exists and ready status
 
 This simplicity makes Operation ideal for tracking discrete, atomic units of work.
 

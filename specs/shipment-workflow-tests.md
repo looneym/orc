@@ -24,8 +24,8 @@
 
 | ID | Test Case | Input | Expected | Status |
 |----|-----------|-------|----------|--------|
-| G1.1.1 | Mission exists | MissionExists: true | Allowed: true | To implement |
-| G1.1.2 | Mission not found | MissionExists: false | Allowed: false, "mission not found" | To implement |
+| G1.1.1 | Commission exists | CommissionExists: true | Allowed: true | To implement |
+| G1.1.2 | Commission not found | CommissionExists: false | Allowed: false, "commission not found" | To implement |
 
 ### 1.2 CanCompleteShipment
 
@@ -50,13 +50,13 @@
 | G1.4.2 | Active shipment | Status: "active" | Allowed: false, "can only resume paused" | To implement |
 | G1.4.3 | Complete shipment | Status: "complete" | Allowed: false, "can only resume paused" | To implement |
 
-### 1.5 CanAssignGrove
+### 1.5 CanAssignWorkbench
 
 | ID | Test Case | Input | Expected | Status |
 |----|-----------|-------|----------|--------|
-| G1.5.1 | Unassigned grove | ShipmentExists: true, GroveAssignedToID: "" | Allowed: true | To implement |
-| G1.5.2 | Grove assigned to same shipment | ShipmentExists: true, GroveAssignedToID: "SHIP-001" (same) | Allowed: true | To implement |
-| G1.5.3 | Grove assigned to other shipment | ShipmentExists: true, GroveAssignedToID: "SHIP-002" | Allowed: false, "grove already assigned" | To implement |
+| G1.5.1 | Unassigned workbench | ShipmentExists: true, WorkbenchAssignedToID: "" | Allowed: true | To implement |
+| G1.5.2 | Workbench assigned to same shipment | ShipmentExists: true, WorkbenchAssignedToID: "SHIP-001" (same) | Allowed: true | To implement |
+| G1.5.3 | Workbench assigned to other shipment | ShipmentExists: true, WorkbenchAssignedToID: "SHIP-002" | Allowed: false, "workbench already assigned" | To implement |
 | G1.5.4 | Shipment not found | ShipmentExists: false | Allowed: false, "shipment not found" | To implement |
 
 ### 1.6 GuardResult.Error
@@ -76,7 +76,7 @@
 | CanCompleteShipment | 2 | shipment_service.go:104-107 |
 | CanPauseShipment | 3 | shipment_service.go:119-122 |
 | CanResumeShipment | 3 | shipment_service.go:134-137 |
-| CanAssignGrove | 4 | shipment_service.go:170-177 |
+| CanAssignWorkbench | 4 | shipment_service.go:170-177 |
 | GuardResult.Error | 2 | (helper method) |
 | **Total** | **16+** | |
 
@@ -90,7 +90,7 @@ These tests verify end-to-end transitions through the service layer.
 
 | ID | Transition | From | To | Test Case | File | Status |
 |----|------------|------|-----|-----------|------|--------|
-| T3.1.1 | create | initial | active | Create shipment with mission | shipment_service_test.go | Exists |
+| T3.1.1 | create | initial | active | Create shipment with commission | shipment_service_test.go | Exists |
 | T3.1.2 | pause | active | paused | Pause active shipment | shipment_service_test.go | Exists |
 | T3.1.3 | resume | paused | active | Resume paused shipment | shipment_service_test.go | Exists |
 | T3.1.4 | complete | active | complete | Complete unpinned shipment | shipment_service_test.go | Exists |
@@ -102,17 +102,17 @@ These tests verify end-to-end transitions through the service layer.
 | T3.2.1 | update | active | Update title/description | shipment_service_test.go | Exists |
 | T3.2.2 | pin | active | Pin shipment | shipment_service_test.go | Exists |
 | T3.2.3 | unpin | active | Unpin shipment | shipment_service_test.go | Exists |
-| T3.2.4 | assign_grove | active | Assign grove | shipment_service_test.go | Exists |
+| T3.2.4 | assign_workbench | active | Assign workbench | shipment_service_test.go | Exists |
 
 ---
 
 ## 4. Guard Failure Tests (Negative Cases)
 
-### 4.1 mission_exists Guard
+### 4.1 commission_exists Guard
 
 | ID | Guard | Transition | Test Case | Expected Error | File |
 |----|-------|------------|-----------|----------------|------|
-| F4.1.1 | mission_exists | create | Create with missing mission | "mission not found" | guards_test.go |
+| F4.1.1 | commission_exists | create | Create with missing commission | "commission not found" | guards_test.go |
 
 ### 4.2 is_active Guard
 
@@ -134,12 +134,12 @@ These tests verify end-to-end transitions through the service layer.
 |----|-------|------------|-----------|----------------|------|
 | F4.4.1 | not_pinned | complete | Complete pinned shipment | "cannot complete pinned" | guards_test.go |
 
-### 4.5 grove_not_assigned_elsewhere Guard
+### 4.5 workbench_not_assigned_elsewhere Guard
 
 | ID | Guard | Transition | Test Case | Expected Error | File |
 |----|-------|------------|-----------|----------------|------|
-| F4.5.1 | grove_not_assigned | assign_grove | Grove assigned elsewhere | "grove already assigned" | guards_test.go |
-| F4.5.2 | shipment_exists | assign_grove | Shipment not found | "shipment not found" | guards_test.go |
+| F4.5.1 | workbench_not_assigned | assign_workbench | Workbench assigned elsewhere | "workbench already assigned" | guards_test.go |
+| F4.5.2 | shipment_exists | assign_workbench | Shipment not found | "shipment not found" | guards_test.go |
 
 ---
 
@@ -151,7 +151,7 @@ These tests verify end-to-end transitions through the service layer.
 | E5.2 | WriteDB UPDATE | pause | Status updated to paused | shipment_repo_test.go | Exists |
 | E5.3 | WriteDB UPDATE | resume | Status updated to active | shipment_repo_test.go | Exists |
 | E5.4 | WriteDB UPDATE | complete | Status + completed_at | shipment_repo_test.go | Exists |
-| E5.5 | CascadeGrove | assign_grove | Tasks receive grove_id | shipment_service_test.go | Exists |
+| E5.5 | CascadeWorkbench | assign_workbench | Tasks receive workbench_id | shipment_service_test.go | Exists |
 | E5.6 | WriteDB DELETE | delete | Shipment deleted | shipment_repo_test.go | Exists |
 
 ---
@@ -163,7 +163,7 @@ These tests verify end-to-end transitions through the service layer.
 | I6.1 | id_format | IDs follow SHIP-XXX | Regex check | shipment_repo_test.go | Exists |
 | I6.2 | id_unique | IDs are unique | Duplicate check | shipment_repo_test.go | Exists |
 | I6.3 | status_valid | Status in (active, paused, complete) | Enum check | shipment_repo_test.go | Exists |
-| I6.4 | mission_reference | Mission exists | FK constraint | shipment_repo_test.go | Exists |
+| I6.4 | commission_reference | Commission exists | FK constraint | shipment_repo_test.go | Exists |
 | I6.5 | complete_not_pinned | Complete implies not pinned | Business logic | guards_test.go | New |
 
 ---
@@ -185,11 +185,11 @@ These tests verify end-to-end transitions through the service layer.
 
 ### Context Structs to Create
 
-- [x] `GuardResult` - shared from grove package pattern
+- [x] `GuardResult` - shared from workbench package pattern
 - [ ] `CreateShipmentContext`
 - [ ] `CompleteShipmentContext`
 - [ ] `StatusTransitionContext`
-- [ ] `AssignGroveContext`
+- [ ] `AssignWorkbenchContext`
 
 ### Guard Functions to Create
 
@@ -197,13 +197,13 @@ These tests verify end-to-end transitions through the service layer.
 - [ ] `CanCompleteShipment(ctx CompleteShipmentContext) GuardResult`
 - [ ] `CanPauseShipment(ctx StatusTransitionContext) GuardResult`
 - [ ] `CanResumeShipment(ctx StatusTransitionContext) GuardResult`
-- [ ] `CanAssignGrove(ctx AssignGroveContext) GuardResult`
+- [ ] `CanAssignWorkbench(ctx AssignWorkbenchContext) GuardResult`
 
 ### Test Cases to Create (17 total)
 
 **CanCreateShipment (2):**
-- [ ] TestCanCreateShipment_MissionExists
-- [ ] TestCanCreateShipment_MissionNotFound
+- [ ] TestCanCreateShipment_CommissionExists
+- [ ] TestCanCreateShipment_CommissionNotFound
 
 **CanCompleteShipment (2):**
 - [ ] TestCanCompleteShipment_Unpinned
@@ -219,11 +219,11 @@ These tests verify end-to-end transitions through the service layer.
 - [ ] TestCanResumeShipment_Active
 - [ ] TestCanResumeShipment_Complete
 
-**CanAssignGrove (4):**
-- [ ] TestCanAssignGrove_Unassigned
-- [ ] TestCanAssignGrove_SameShipment
-- [ ] TestCanAssignGrove_OtherShipment
-- [ ] TestCanAssignGrove_ShipmentNotFound
+**CanAssignWorkbench (4):**
+- [ ] TestCanAssignWorkbench_Unassigned
+- [ ] TestCanAssignWorkbench_SameShipment
+- [ ] TestCanAssignWorkbench_OtherShipment
+- [ ] TestCanAssignWorkbench_ShipmentNotFound
 
 **GuardResult.Error (2):**
 - [ ] TestGuardResult_Error_Allowed
@@ -231,13 +231,13 @@ These tests verify end-to-end transitions through the service layer.
 
 ---
 
-## 9. Comparison: Grove vs Shipment Guards
+## 9. Comparison: Workbench vs Shipment Guards
 
-| Aspect | Grove | Shipment |
+| Aspect | Workbench | Shipment |
 |--------|-------|----------|
 | ORC-only guards | Yes (create, archive, restore) | No |
 | Status guards | not_archived, is_archived | is_active, is_paused, not_pinned |
-| Exclusivity guards | No | grove_not_assigned_elsewhere |
+| Exclusivity guards | No | workbench_not_assigned_elsewhere |
 | Total guards | 8 | 5 |
 | Total test cases | 24 | 17 |
 

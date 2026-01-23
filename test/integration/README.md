@@ -10,40 +10,40 @@ cd ~/src/orc
 ./test/integration/run-all-tests.sh
 
 # Run individual test
-./test/integration/01-test-mission-creation.sh
-./test/integration/02-test-grove-tmux.sh
+./test/integration/01-test-commission-creation.sh
+./test/integration/02-test-workbench-tmux.sh
 ```
 
 ## Test Coverage
 
-### 01-test-mission-creation.sh (7 tests)
-Tests mission creation and context bootstrap workflow:
-- ✓ Create mission
-- ✓ Create mission workspace directory structure
-- ✓ Write .orc-mission marker (JSON format)
+### 01-test-commission-creation.sh (7 tests)
+Tests commission creation and context bootstrap workflow:
+- ✓ Create commission
+- ✓ Create commission workspace directory structure
+- ✓ Write .orc-commission marker (JSON format)
 - ✓ Write workspace config.json
-- ✓ Mission context detection from .orc-mission file
-- ✓ Create work order in mission context (auto-scoping)
-- ✓ Command auto-scoping to mission
+- ✓ Commission context detection from .orc-commission file
+- ✓ Create work order in commission context (auto-scoping)
+- ✓ Command auto-scoping to commission
 
 **Validates:**
-- Mission lifecycle
-- Mission context detection
-- File-based mission markers
-- Auto-scoping of commands to mission
+- Commission lifecycle
+- Commission context detection
+- File-based commission markers
+- Auto-scoping of commands to commission
 
-### 02-test-grove-tmux.sh (6 tests)
-Tests grove creation and TMux integration:
-- ✓ Create grove with git worktree
-- ✓ Verify grove metadata in .orc/ directory
-- ✓ Verify mission marker propagation to grove
-- ✓ Test commands from grove directory
+### 02-test-workbench-tmux.sh (6 tests)
+Tests workbench creation and TMux integration:
+- ✓ Create workbench with git worktree
+- ✓ Verify workbench metadata in .orc/ directory
+- ✓ Verify commission marker propagation to workbench
+- ✓ Test commands from workbench directory
 - ✓ TMux session basics
-- ✓ Grove show command
+- ✓ Workbench show command
 
 **Validates:**
 - Git worktree integration
-- Grove database registration
+- Workbench database registration
 - Metadata propagation
 - Cross-directory command execution
 - TMux session management
@@ -76,10 +76,10 @@ Provides reusable test utilities:
 ### Test Isolation
 
 Each test:
-- Uses MISSION-420 as the dedicated test mission (avoids DB pollution)
-- Creates unique groves (using timestamps)
+- Uses COMM-420 as the dedicated test commission (avoids DB pollution)
+- Creates unique workbenches (using timestamps)
 - Registers cleanup functions
-- Cleans up groves/worktrees on exit (success or failure)
+- Cleans up workbenches/worktrees on exit (success or failure)
 - Does not interfere with other tests
 
 ## Prerequisites
@@ -89,7 +89,7 @@ Each test:
 - TMux installed
 - orc-canary repository at ~/src/orc-canary
 - Git configured
-- MISSION-420 exists as the dedicated test mission (`orc mission create "Integration Test Mission" --id MISSION-420`)
+- COMM-420 exists as the dedicated test commission (`orc commission create "Integration Test Commission" --id COMM-420`)
 
 ## Running Tests
 
@@ -102,9 +102,9 @@ cd ~/src/orc
 **Output:**
 ```
 ━━━ ORC Integration Test Suite ━━━
-Running: 01-test-mission-creation.sh
+Running: 01-test-commission-creation.sh
   ✓ 7/7 tests passed
-Running: 02-test-grove-tmux.sh
+Running: 02-test-workbench-tmux.sh
   ✓ 6/6 tests passed
 
 ✓✓✓ ALL TESTS PASSED ✓✓✓
@@ -115,11 +115,11 @@ Test Files Failed: 0
 
 ### Individual Tests
 ```bash
-# Mission creation tests only
-./test/integration/01-test-mission-creation.sh
+# Commission creation tests only
+./test/integration/01-test-commission-creation.sh
 
-# Grove and TMux tests only
-./test/integration/02-test-grove-tmux.sh
+# Workbench and TMux tests only
+./test/integration/02-test-workbench-tmux.sh
 ```
 
 ## Test Development
@@ -151,13 +151,13 @@ test_something() {
 
 ### Cleanup Pattern
 ```bash
-TEST_MISSION_ID=""
+TEST_COMMISSION_ID=""
 
 cleanup() {
     log_section "Cleanup"
-    if [[ -n "$TEST_MISSION_ID" ]]; then
+    if [[ -n "$TEST_COMMISSION_ID" ]]; then
         # Clean up test data
-        rm -rf "$HOME/src/factories/$TEST_MISSION_ID"
+        rm -rf "$HOME/src/factories/$TEST_COMMISSION_ID"
     fi
 }
 
@@ -166,26 +166,26 @@ trap cleanup EXIT
 
 ## Test Scenarios Validated
 
-### Mission Lifecycle
-- ✓ Mission creation with auto-generated IDs
-- ✓ Mission workspace directory structure
-- ✓ .orc-mission marker (JSON format with mission_id)
-- ✓ Workspace config.json (active_mission_id)
-- ✓ Mission context detection from any subdirectory
+### Commission Lifecycle
+- ✓ Commission creation with auto-generated IDs
+- ✓ Commission workspace directory structure
+- ✓ .orc-commission marker (JSON format with commission_id)
+- ✓ Workspace config.json (active_commission_id)
+- ✓ Commission context detection from any subdirectory
 
-### Mission Context
+### Commission Context
 - ✓ Context auto-detection from .orc/config.json file
-- ✓ Command auto-scoping to mission (no --mission flag needed)
-- ✓ Work order creation scoped to mission
-- ✓ Summary and status commands show correct mission
+- ✓ Command auto-scoping to commission (no --commission flag needed)
+- ✓ Work order creation scoped to commission
+- ✓ Summary and status commands show correct commission
 
-### Grove Management
-- ✓ Grove creation with database registration
+### Workbench Management
+- ✓ Workbench creation with database registration
 - ✓ Git worktree creation and validation
 - ✓ Config propagation (.orc/config.json)
-- ✓ Mission marker propagation (.orc-mission)
-- ✓ Commands work from grove directories
-- ✓ Grove show command displays correct info
+- ✓ Commission marker propagation (.orc-commission)
+- ✓ Commands work from workbench directories
+- ✓ Workbench show command displays correct info
 
 ### TMux Integration
 - ✓ TMux session creation
@@ -196,7 +196,7 @@ trap cleanup EXIT
 
 1. **TMux Pane Testing**: Tests verify TMux sessions and windows exist but don't test actual pane content or IMP spawning (requires interactive environment)
 
-2. **Mission Deletion**: Currently only cleans up directories, not database records (DeleteMission function exists but not exposed via CLI yet)
+2. **Commission Deletion**: Currently only cleans up directories, not database records (DeleteCommission function exists but not exposed via CLI yet)
 
 3. **Parallel Execution**: Tests should be run sequentially to avoid TMux session conflicts
 
@@ -236,11 +236,11 @@ cd ~/src
 git clone git@github.com:example/orc-canary.git
 ```
 
-### "MISSION-420 not found"
+### "COMM-420 not found"
 ```bash
-# Create dedicated test mission
-orc mission create "Integration Test Mission" --description "Dedicated mission for integration tests"
-# Note: Mission ID will be auto-generated; rename to MISSION-420 or update tests
+# Create dedicated test commission
+orc commission create "Integration Test Commission" --description "Dedicated commission for integration tests"
+# Note: Commission ID will be auto-generated; rename to COMM-420 or update tests
 ```
 
 ### "TMux session already exists"
@@ -249,10 +249,10 @@ orc mission create "Integration Test Mission" --description "Dedicated mission f
 tmux kill-session -t test-orc-session
 ```
 
-### Stale test missions/groves
+### Stale test commissions/workbenches
 ```bash
 # Manual cleanup
-rm -rf ~/src/factories/MISSION-*
+rm -rf ~/src/factories/COMM-*
 rm -rf ~/src/worktrees/test-canary-*
 cd ~/src/orc-canary && git worktree prune
 ```
@@ -274,9 +274,9 @@ Success Rate: 100%
 Future test additions:
 - [ ] Work order state transitions
 - [ ] Handoff creation and retrieval
-- [ ] Grove open command (IMP layout validation)
+- [ ] Workbench open command (IMP layout validation)
 - [ ] Proto-mail system (WO-061 ↔ WO-065)
-- [ ] Cross-grove coordination
+- [ ] Cross-workbench coordination
 - [ ] Error cases and edge conditions
 - [ ] Performance benchmarks
 

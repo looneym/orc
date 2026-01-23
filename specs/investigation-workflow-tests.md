@@ -24,8 +24,8 @@
 
 | ID | Test Case | Input | Expected | Status |
 |----|-----------|-------|----------|--------|
-| G1.1.1 | Mission exists | MissionExists: true | Allowed: true | To implement |
-| G1.1.2 | Mission not found | MissionExists: false | Allowed: false, "mission not found" | To implement |
+| G1.1.1 | Commission exists | CommissionExists: true | Allowed: true | To implement |
+| G1.1.2 | Commission not found | CommissionExists: false | Allowed: false, "commission not found" | To implement |
 
 ### 1.2 CanCompleteInvestigation
 
@@ -80,7 +80,7 @@ These tests verify end-to-end transitions through the service layer.
 
 | ID | Transition | From | To | Test Case | File | Status |
 |----|------------|------|-----|-----------|------|--------|
-| T3.1.1 | create | initial | active | Create investigation with mission | investigation_service_test.go | Exists |
+| T3.1.1 | create | initial | active | Create investigation with commission | investigation_service_test.go | Exists |
 | T3.1.2 | pause | active | paused | Pause active investigation | investigation_service_test.go | Exists |
 | T3.1.3 | resume | paused | active | Resume paused investigation | investigation_service_test.go | Exists |
 | T3.1.4 | complete | active | complete | Complete unpinned investigation | investigation_service_test.go | Exists |
@@ -97,11 +97,11 @@ These tests verify end-to-end transitions through the service layer.
 
 ## 4. Guard Failure Tests (Negative Cases)
 
-### 4.1 mission_exists Guard
+### 4.1 commission_exists Guard
 
 | ID | Guard | Transition | Test Case | Expected Error | File |
 |----|-------|------------|-----------|----------------|------|
-| F4.1.1 | mission_exists | create | Create with missing mission | "mission not found" | guards_test.go |
+| F4.1.1 | commission_exists | create | Create with missing commission | "commission not found" | guards_test.go |
 
 ### 4.2 is_active Guard
 
@@ -144,7 +144,7 @@ These tests verify end-to-end transitions through the service layer.
 | I6.1 | id_format | IDs follow INV-XXX | Regex check | investigation_repo_test.go | Exists |
 | I6.2 | id_unique | IDs are unique | Duplicate check | investigation_repo_test.go | Exists |
 | I6.3 | status_valid | Status in (active, paused, complete) | Enum check | investigation_repo_test.go | Exists |
-| I6.4 | mission_reference | Mission exists | FK constraint | investigation_repo_test.go | Exists |
+| I6.4 | commission_reference | Commission exists | FK constraint | investigation_repo_test.go | Exists |
 | I6.5 | complete_not_pinned | Complete implies not pinned | Business logic | guards_test.go | New |
 
 ---
@@ -166,7 +166,7 @@ These tests verify end-to-end transitions through the service layer.
 
 ### Context Structs to Create
 
-- [x] `GuardResult` - shared pattern from shipment/grove/conclave packages
+- [x] `GuardResult` - shared pattern from shipment/workbench/conclave packages
 - [ ] `CreateInvestigationContext`
 - [ ] `CompleteInvestigationContext`
 - [ ] `StatusTransitionContext`
@@ -181,8 +181,8 @@ These tests verify end-to-end transitions through the service layer.
 ### Test Cases to Create (12 total)
 
 **CanCreateInvestigation (2):**
-- [ ] TestCanCreateInvestigation_MissionExists
-- [ ] TestCanCreateInvestigation_MissionNotFound
+- [ ] TestCanCreateInvestigation_CommissionExists
+- [ ] TestCanCreateInvestigation_CommissionNotFound
 
 **CanCompleteInvestigation (2):**
 - [ ] TestCanCompleteInvestigation_Unpinned
@@ -208,7 +208,7 @@ These tests verify end-to-end transitions through the service layer.
 
 | Aspect | Conclave | Investigation |
 |--------|----------|---------------|
-| Parent entity | Mission | Mission |
+| Parent entity | Commission | Commission |
 | Child entities | Tasks, Questions, Plans | Questions |
 | Status guards | is_active, is_paused, not_pinned | is_active, is_paused, not_pinned |
 | ID format | CON-XXX | INV-XXX |

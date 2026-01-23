@@ -24,11 +24,11 @@
 
 | ID | Test Case | Input | Expected | Status |
 |----|-----------|-------|----------|--------|
-| G1.1.1 | Mission exists, no shipment | MissionExists: true, ShipmentID: "" | Allowed: true | To implement |
-| G1.1.2 | Mission exists with shipment, no active plan | MissionExists: true, ShipmentID: "SHIP-001", ShipmentExists: true, ShipmentHasActivePlan: false | Allowed: true | To implement |
-| G1.1.3 | Mission not found | MissionExists: false | Allowed: false, "mission not found" | To implement |
-| G1.1.4 | Shipment not found | MissionExists: true, ShipmentID: "SHIP-999", ShipmentExists: false | Allowed: false, "shipment not found" | To implement |
-| G1.1.5 | Shipment already has active plan | MissionExists: true, ShipmentID: "SHIP-001", ShipmentExists: true, ShipmentHasActivePlan: true | Allowed: false, "already has active plan" | To implement |
+| G1.1.1 | Commission exists, no shipment | CommissionExists: true, ShipmentID: "" | Allowed: true | To implement |
+| G1.1.2 | Commission exists with shipment, no active plan | CommissionExists: true, ShipmentID: "SHIP-001", ShipmentExists: true, ShipmentHasActivePlan: false | Allowed: true | To implement |
+| G1.1.3 | Commission not found | CommissionExists: false | Allowed: false, "commission not found" | To implement |
+| G1.1.4 | Shipment not found | CommissionExists: true, ShipmentID: "SHIP-999", ShipmentExists: false | Allowed: false, "shipment not found" | To implement |
+| G1.1.5 | Shipment already has active plan | CommissionExists: true, ShipmentID: "SHIP-001", ShipmentExists: true, ShipmentHasActivePlan: true | Allowed: false, "already has active plan" | To implement |
 
 ### 1.2 CanApprovePlan
 
@@ -76,7 +76,7 @@ These tests verify end-to-end transitions through the service layer.
 
 | ID | Transition | From | To | Test Case | File | Status |
 |----|------------|------|-----|-----------|------|--------|
-| T3.1.1 | create | initial | draft | Create plan with mission | plan_service_test.go | Exists |
+| T3.1.1 | create | initial | draft | Create plan with commission | plan_service_test.go | Exists |
 | T3.1.2 | approve | draft | approved | Approve draft plan | plan_service_test.go | Exists |
 
 ### 3.2 Self-Transitions
@@ -91,11 +91,11 @@ These tests verify end-to-end transitions through the service layer.
 
 ## 4. Guard Failure Tests (Negative Cases)
 
-### 4.1 mission_exists Guard
+### 4.1 commission_exists Guard
 
 | ID | Guard | Transition | Test Case | Expected Error | File |
 |----|-------|------------|-----------|----------------|------|
-| F4.1.1 | mission_exists | create | Create with missing mission | "mission not found" | guards_test.go |
+| F4.1.1 | commission_exists | create | Create with missing commission | "commission not found" | guards_test.go |
 
 ### 4.2 shipment_exists_if_provided Guard
 
@@ -147,7 +147,7 @@ These tests verify end-to-end transitions through the service layer.
 | I6.1 | id_format | IDs follow PLAN-XXX | Regex check | plan_repo_test.go | Exists |
 | I6.2 | id_unique | IDs are unique | Duplicate check | plan_repo_test.go | Exists |
 | I6.3 | status_valid | Status in (draft, approved) | Enum check | plan_repo_test.go | Exists |
-| I6.4 | mission_reference | Mission exists | FK constraint | plan_repo_test.go | Exists |
+| I6.4 | commission_reference | Commission exists | FK constraint | plan_repo_test.go | Exists |
 | I6.5 | shipment_reference | Shipment exists if set | FK constraint | plan_repo_test.go | Exists |
 | I6.6 | approved_not_pinned | Approved implies not pinned | Business logic | guards_test.go | New |
 | I6.7 | one_draft_per_shipment | Max 1 draft per shipment | Business logic | guards_test.go | New |
@@ -185,9 +185,9 @@ These tests verify end-to-end transitions through the service layer.
 ### Test Cases to Create (14 total)
 
 **CanCreatePlan (5):**
-- [ ] TestCanCreatePlan_MissionExists_NoShipment
-- [ ] TestCanCreatePlan_MissionExists_WithShipment_NoActivePlan
-- [ ] TestCanCreatePlan_MissionNotFound
+- [ ] TestCanCreatePlan_CommissionExists_NoShipment
+- [ ] TestCanCreatePlan_CommissionExists_WithShipment_NoActivePlan
+- [ ] TestCanCreatePlan_CommissionNotFound
 - [ ] TestCanCreatePlan_ShipmentNotFound
 - [ ] TestCanCreatePlan_ShipmentHasActivePlan
 
@@ -212,7 +212,7 @@ These tests verify end-to-end transitions through the service layer.
 
 | Aspect | Question | Plan |
 |--------|----------|------|
-| Parent entity | Mission (required), Investigation (optional) | Mission (required), Shipment (optional) |
+| Parent entity | Commission (required), Investigation (optional) | Commission (required), Shipment (optional) |
 | States | open, answered | draft, approved |
 | Pause/Resume | No | No |
 | Status guards | is_open | is_draft |
