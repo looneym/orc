@@ -862,7 +862,7 @@ func TestUntagTask_NoTag(t *testing.T) {
 // GetTasksByGrove Tests
 // ============================================================================
 
-func TestGetTasksByGrove_Success(t *testing.T) {
+func TestGetTasksByWorkbench_Success(t *testing.T) {
 	service, taskRepo, _ := newTestTaskService()
 	ctx := context.Background()
 
