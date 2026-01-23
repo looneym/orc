@@ -143,9 +143,9 @@ func (s *WorkshopServiceImpl) DeleteWorkshop(ctx context.Context, req primary.De
 	return s.workshopRepo.Delete(ctx, req.WorkshopID)
 }
 
-// OpenWorkshop launches a TMux session for the workshop.
-// This is the "apply" phase - it creates worktrees and directories if they don't exist.
-func (s *WorkshopServiceImpl) OpenWorkshop(ctx context.Context, req primary.OpenWorkshopRequest) (*primary.OpenWorkshopResponse, error) {
+// PlanOpenWorkshop generates a plan for opening a workshop without executing it.
+// This gathers current state and computes what operations would be needed.
+func (s *WorkshopServiceImpl) PlanOpenWorkshop(ctx context.Context, req primary.OpenWorkshopRequest) (*primary.OpenWorkshopPlan, error) {
 	// 1. Get workshop
 	workshop, err := s.workshopRepo.GetByID(ctx, req.WorkshopID)
 	if err != nil {
@@ -153,47 +153,117 @@ func (s *WorkshopServiceImpl) OpenWorkshop(ctx context.Context, req primary.Open
 	}
 
 	// 2. Check if session already exists
-	if s.tmuxAdapter.SessionExists(ctx, req.WorkshopID) {
+	sessionExists := s.tmuxAdapter.SessionExists(ctx, req.WorkshopID)
+
+	// 3. Compute gatehouse path and check existence
+	home, _ := os.UserHomeDir()
+	gatehouseDir := coreworkshop.GatehousePath(home, req.WorkshopID, workshop.Name)
+	gatehouseDirExists := s.dirExists(gatehouseDir)
+	gatehouseConfigExists := s.fileExists(filepath.Join(gatehouseDir, ".orc", "config.json"))
+
+	// 4. Get workbenches and check each one's state
+	workbenches, _ := s.workbenchRepo.List(ctx, req.WorkshopID)
+	var wbInputs []coreworkshop.WorkbenchPlanInput
+	for _, wb := range workbenches {
+		repoName := ""
+		if wb.RepoID != "" {
+			if repo, err := s.repoRepo.GetByID(ctx, wb.RepoID); err == nil {
+				repoName = repo.Name
+			}
+		}
+		wbInputs = append(wbInputs, coreworkshop.WorkbenchPlanInput{
+			ID:             wb.ID,
+			Name:           wb.Name,
+			WorktreePath:   wb.WorktreePath,
+			RepoName:       repoName,
+			HomeBranch:     wb.HomeBranch,
+			WorktreeExists: s.dirExists(wb.WorktreePath),
+			ConfigExists:   s.fileExists(filepath.Join(wb.WorktreePath, ".orc", "config.json")),
+		})
+	}
+
+	// 5. Generate plan using pure function
+	input := coreworkshop.OpenPlanInput{
+		WorkshopID:            req.WorkshopID,
+		WorkshopName:          workshop.Name,
+		SessionExists:         sessionExists,
+		GatehouseDir:          gatehouseDir,
+		GatehouseDirExists:    gatehouseDirExists,
+		GatehouseConfigExists: gatehouseConfigExists,
+		Workbenches:           wbInputs,
+	}
+	corePlan := coreworkshop.GenerateOpenPlan(input)
+
+	// 6. Convert core plan to primary plan
+	return s.corePlanToPrimary(&corePlan), nil
+}
+
+// ApplyOpenWorkshop executes a previously generated open plan.
+func (s *WorkshopServiceImpl) ApplyOpenWorkshop(ctx context.Context, plan *primary.OpenWorkshopPlan) (*primary.OpenWorkshopResponse, error) {
+	// Get workshop for response
+	workshop, err := s.workshopRepo.GetByID(ctx, plan.WorkshopID)
+	if err != nil {
+		return nil, fmt.Errorf("workshop not found: %w", err)
+	}
+
+	// If nothing to do, just return attach instructions
+	if plan.NothingToDo {
 		return &primary.OpenWorkshopResponse{
 			Workshop:           s.recordToWorkshop(workshop),
-			SessionName:        req.WorkshopID,
+			SessionName:        plan.SessionName,
 			SessionAlreadyOpen: true,
-			AttachInstructions: s.tmuxAdapter.AttachInstructions(req.WorkshopID),
+			AttachInstructions: s.tmuxAdapter.AttachInstructions(plan.SessionName),
 		}, nil
 	}
 
-	// 3. Create gatehouse directory (with slug)
-	gatehouseDir := s.createGatehouseDir(req.WorkshopID, workshop.Name)
+	// 1. Create gatehouse if needed (check Exists flag since GatehouseOp is always set)
+	home, _ := os.UserHomeDir()
+	gatehouseDir := coreworkshop.GatehousePath(home, plan.WorkshopID, plan.WorkshopName)
+	if plan.GatehouseOp != nil && (!plan.GatehouseOp.Exists || !plan.GatehouseOp.ConfigExists) {
+		gatehouseDir = s.createGatehouseDir(plan.WorkshopID, plan.WorkshopName)
+	}
 
-	// 4. Get workbenches and ensure worktrees exist
-	workbenches, _ := s.workbenchRepo.List(ctx, req.WorkshopID)
+	// 2. Create workbenches if needed
+	workbenches, _ := s.workbenchRepo.List(ctx, plan.WorkshopID)
 	for _, wb := range workbenches {
 		if err := s.ensureWorktreeExists(ctx, wb); err != nil {
 			return nil, fmt.Errorf("failed to create worktree for %s: %w", wb.Name, err)
 		}
 	}
 
-	// 5. Create tmux session
-	if err := s.tmuxAdapter.CreateSession(ctx, req.WorkshopID, gatehouseDir); err != nil {
-		return nil, fmt.Errorf("failed to create session: %w", err)
-	}
+	// 3. Create tmux session if needed
+	if plan.TMuxOp != nil {
+		if err := s.tmuxAdapter.CreateSession(ctx, plan.SessionName, gatehouseDir); err != nil {
+			return nil, fmt.Errorf("failed to create session: %w", err)
+		}
 
-	// 6. Setup Gatehouse (ORC) window
-	if err := s.tmuxAdapter.CreateOrcWindow(ctx, req.WorkshopID, gatehouseDir); err != nil {
-		return nil, fmt.Errorf("failed to create gatehouse: %w", err)
-	}
+		// Setup Gatehouse (ORC) window
+		if err := s.tmuxAdapter.CreateOrcWindow(ctx, plan.SessionName, gatehouseDir); err != nil {
+			return nil, fmt.Errorf("failed to create gatehouse: %w", err)
+		}
 
-	// 7. Create tmux windows for each workbench
-	for i, wb := range workbenches {
-		_ = s.tmuxAdapter.CreateGroveWindow(ctx, req.WorkshopID, i+2, wb.Name, wb.WorktreePath)
+		// Create tmux windows for each workbench
+		for i, wb := range workbenches {
+			_ = s.tmuxAdapter.CreateGroveWindow(ctx, plan.SessionName, i+2, wb.Name, wb.WorktreePath)
+		}
 	}
 
 	return &primary.OpenWorkshopResponse{
 		Workshop:           s.recordToWorkshop(workshop),
-		SessionName:        req.WorkshopID,
+		SessionName:        plan.SessionName,
 		SessionAlreadyOpen: false,
-		AttachInstructions: s.tmuxAdapter.AttachInstructions(req.WorkshopID),
+		AttachInstructions: s.tmuxAdapter.AttachInstructions(plan.SessionName),
 	}, nil
+}
+
+// OpenWorkshop launches a TMux session for the workshop (plan + apply in one call).
+// This is kept for backward compatibility.
+func (s *WorkshopServiceImpl) OpenWorkshop(ctx context.Context, req primary.OpenWorkshopRequest) (*primary.OpenWorkshopResponse, error) {
+	plan, err := s.PlanOpenWorkshop(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	return s.ApplyOpenWorkshop(ctx, plan)
 }
 
 // ensureWorktreeExists creates a worktree and IMP config if they don't exist.
@@ -315,6 +385,53 @@ func (s *WorkshopServiceImpl) recordToWorkshop(r *secondary.WorkshopRecord) *pri
 		CreatedAt: r.CreatedAt,
 		UpdatedAt: r.UpdatedAt,
 	}
+}
+
+func (s *WorkshopServiceImpl) dirExists(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && info.IsDir()
+}
+
+func (s *WorkshopServiceImpl) fileExists(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && !info.IsDir()
+}
+
+func (s *WorkshopServiceImpl) corePlanToPrimary(core *coreworkshop.OpenWorkshopPlan) *primary.OpenWorkshopPlan {
+	plan := &primary.OpenWorkshopPlan{
+		WorkshopID:   core.WorkshopID,
+		WorkshopName: core.WorkshopName,
+		SessionName:  core.SessionName,
+		NothingToDo:  core.NothingToDo,
+	}
+
+	if core.GatehouseOp != nil {
+		plan.GatehouseOp = &primary.GatehouseOp{
+			Path:         core.GatehouseOp.Path,
+			Exists:       core.GatehouseOp.Exists,
+			ConfigExists: core.GatehouseOp.ConfigExists,
+		}
+	}
+
+	for _, wb := range core.WorkbenchOps {
+		plan.WorkbenchOps = append(plan.WorkbenchOps, primary.WorkbenchOp{
+			Name:         wb.Name,
+			Path:         wb.Path,
+			Exists:       wb.Exists,
+			RepoName:     wb.RepoName,
+			Branch:       wb.Branch,
+			ConfigExists: wb.ConfigExists,
+		})
+	}
+
+	if core.TMuxOp != nil {
+		plan.TMuxOp = &primary.TMuxOp{
+			SessionName: core.TMuxOp.SessionName,
+			Windows:     core.TMuxOp.Windows,
+		}
+	}
+
+	return plan
 }
 
 // Ensure WorkshopServiceImpl implements the interface

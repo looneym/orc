@@ -20,7 +20,13 @@ type WorkshopService interface {
 	// DeleteWorkshop deletes a workshop.
 	DeleteWorkshop(ctx context.Context, req DeleteWorkshopRequest) error
 
-	// OpenWorkshop launches a TMux session for the workshop.
+	// PlanOpenWorkshop generates a plan for opening a workshop without executing it.
+	PlanOpenWorkshop(ctx context.Context, req OpenWorkshopRequest) (*OpenWorkshopPlan, error)
+
+	// ApplyOpenWorkshop executes a previously generated open plan.
+	ApplyOpenWorkshop(ctx context.Context, plan *OpenWorkshopPlan) (*OpenWorkshopResponse, error)
+
+	// OpenWorkshop launches a TMux session for the workshop (plan + apply in one call).
 	OpenWorkshop(ctx context.Context, req OpenWorkshopRequest) (*OpenWorkshopResponse, error)
 
 	// CloseWorkshop kills the workshop's TMux session.
@@ -80,4 +86,38 @@ type OpenWorkshopResponse struct {
 	SessionName        string
 	SessionAlreadyOpen bool
 	AttachInstructions string
+}
+
+// OpenWorkshopPlan describes what will be created when opening a workshop.
+type OpenWorkshopPlan struct {
+	WorkshopID   string
+	WorkshopName string
+	SessionName  string
+	GatehouseOp  *GatehouseOp
+	WorkbenchOps []WorkbenchOp
+	TMuxOp       *TMuxOp
+	NothingToDo  bool
+}
+
+// GatehouseOp describes the gatehouse directory operation.
+type GatehouseOp struct {
+	Path         string
+	Exists       bool
+	ConfigExists bool
+}
+
+// WorkbenchOp describes a workbench worktree operation.
+type WorkbenchOp struct {
+	Name         string
+	Path         string
+	Exists       bool
+	RepoName     string
+	Branch       string
+	ConfigExists bool
+}
+
+// TMuxOp describes the tmux session operation.
+type TMuxOp struct {
+	SessionName string
+	Windows     []string
 }

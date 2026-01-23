@@ -1,9 +1,11 @@
 package cli
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"text/tabwriter"
 
 	"github.com/spf13/cobra"
@@ -183,38 +185,127 @@ Examples:
 }
 
 func workshopOpenCmd() *cobra.Command {
-	return &cobra.Command{
+	var skipConfirm bool
+
+	cmd := &cobra.Command{
 		Use:   "open [workshop-id]",
 		Short: "Open a workshop TMux session",
 		Long: `Launch a TMux session for the workshop with:
 - Window 1: Gatehouse (Goblin orchestration)
 - Window 2+: One per workbench
 
-If session already exists, prints attach instructions.
+Shows a plan of what will be created and asks for confirmation.
+Use --yes to skip confirmation.
 
 Examples:
-  orc workshop open WORK-001`,
+  orc workshop open WORK-001
+  orc workshop open WORK-001 --yes`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			workshopID := args[0]
 			ctx := context.Background()
 
-			resp, err := wire.WorkshopService().OpenWorkshop(ctx, primary.OpenWorkshopRequest{
+			// 1. Generate plan
+			plan, err := wire.WorkshopService().PlanOpenWorkshop(ctx, primary.OpenWorkshopRequest{
 				WorkshopID: workshopID,
 			})
 			if err != nil {
 				return err
 			}
 
-			if resp.SessionAlreadyOpen {
-				fmt.Printf("Workshop %s session already running\n", workshopID)
-			} else {
-				fmt.Printf("✓ Workshop %s opened: %s\n", workshopID, resp.Workshop.Name)
+			// 2. Display plan
+			displayOpenPlan(plan)
+
+			// 3. If nothing to do, show attach instructions and return
+			if plan.NothingToDo {
+				fmt.Println("Nothing to create.")
+				fmt.Println()
+				fmt.Println(wire.TMuxAdapter().AttachInstructions(plan.SessionName))
+				return nil
 			}
+
+			// 4. Confirm (unless --yes)
+			if !skipConfirm {
+				if !confirmPrompt("Proceed?") {
+					fmt.Println("Aborted.")
+					return nil
+				}
+			}
+
+			// 5. Apply
+			resp, err := wire.WorkshopService().ApplyOpenWorkshop(ctx, plan)
+			if err != nil {
+				return err
+			}
+
+			fmt.Printf("✓ Workshop %s opened: %s\n", workshopID, resp.Workshop.Name)
 			fmt.Println(resp.AttachInstructions)
 			return nil
 		},
 	}
+
+	cmd.Flags().BoolVarP(&skipConfirm, "yes", "y", false, "Skip confirmation prompt")
+
+	return cmd
+}
+
+func displayOpenPlan(plan *primary.OpenWorkshopPlan) {
+	fmt.Printf("Workshop: %s (%s)\n\n", plan.WorkshopID, plan.WorkshopName)
+
+	// Gatehouse
+	if plan.GatehouseOp != nil {
+		if plan.GatehouseOp.Exists && plan.GatehouseOp.ConfigExists {
+			fmt.Printf("  ✓ %s (exists)\n", plan.GatehouseOp.Path)
+		} else if plan.GatehouseOp.Exists {
+			fmt.Printf("  ✓ %s (exists)\n", plan.GatehouseOp.Path)
+			fmt.Printf("    + .orc/config.json (Goblin)\n")
+		} else {
+			fmt.Printf("  + %s\n", plan.GatehouseOp.Path)
+			fmt.Printf("    + .orc/config.json (Goblin)\n")
+		}
+	}
+
+	// Workbenches
+	for _, wb := range plan.WorkbenchOps {
+		if wb.Exists && wb.ConfigExists {
+			fmt.Printf("  ✓ %s (exists)\n", wb.Path)
+		} else if wb.Exists {
+			fmt.Printf("  ✓ %s (exists)\n", wb.Path)
+			fmt.Printf("    + .orc/config.json (IMP)\n")
+		} else {
+			if wb.RepoName != "" {
+				fmt.Printf("  + %s (worktree: %s@%s)\n", wb.Path, wb.RepoName, wb.Branch)
+			} else {
+				fmt.Printf("  + %s (directory)\n", wb.Path)
+			}
+			if !wb.ConfigExists {
+				fmt.Printf("    + .orc/config.json (IMP)\n")
+			}
+		}
+	}
+
+	// TMux
+	if plan.TMuxOp != nil {
+		fmt.Printf("\n  + tmux session: %s\n", plan.TMuxOp.SessionName)
+		for _, w := range plan.TMuxOp.Windows {
+			fmt.Printf("    + window: %s\n", w)
+		}
+	} else {
+		fmt.Printf("\n  ✓ tmux session: %s (exists)\n", plan.SessionName)
+	}
+
+	fmt.Println()
+}
+
+func confirmPrompt(msg string) bool {
+	fmt.Printf("%s [y/N]: ", msg)
+	reader := bufio.NewReader(os.Stdin)
+	response, err := reader.ReadString('\n')
+	if err != nil {
+		return false
+	}
+	response = strings.TrimSpace(strings.ToLower(response))
+	return response == "y" || response == "yes"
 }
 
 func workshopCloseCmd() *cobra.Command {
