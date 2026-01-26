@@ -151,5 +151,10 @@ func (a *Adapter) ConfigureSessionBindings(ctx context.Context, session string, 
 	return nil
 }
 
+// GetCurrentSessionName returns the name of the current tmux session.
+func (a *Adapter) GetCurrentSessionName(ctx context.Context) string {
+	return tmuxpkg.GetCurrentSessionName()
+}
+
 // Ensure Adapter implements the interface
 var _ secondary.TMuxAdapter = (*Adapter)(nil)

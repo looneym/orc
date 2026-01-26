@@ -332,6 +332,17 @@ func RenameSession(oldName, newName string) error {
 	return cmd.Run()
 }
 
+// GetCurrentSessionName returns the name of the current tmux session.
+// Returns empty string if not in tmux or on error.
+func GetCurrentSessionName() string {
+	cmd := exec.Command("tmux", "display-message", "-p", "#{session_name}")
+	output, err := cmd.Output()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(output))
+}
+
 // SetOption sets a tmux option for a session.
 func SetOption(session, option, value string) error {
 	cmd := exec.Command("tmux", "set-option", "-t", session, option, value)

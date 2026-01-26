@@ -59,4 +59,7 @@ type TMuxAdapter interface {
 	ConfigureStatusBar(ctx context.Context, session string, config StatusBarConfig) error
 	DisplayPopup(ctx context.Context, session, command string, config PopupConfig) error
 	ConfigureSessionBindings(ctx context.Context, session string, bindings []KeyBinding) error
+
+	// Session info
+	GetCurrentSessionName(ctx context.Context) string
 }
