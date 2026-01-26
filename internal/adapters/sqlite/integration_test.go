@@ -382,13 +382,13 @@ func TestIntegration_HandoffWithContext(t *testing.T) {
 
 	// Create multiple handoffs for workbench
 	h1 := &secondary.HandoffRecord{
-		ID:                "HO-001",
+		ID:                 "HO-001",
 		ActiveCommissionID: "COMM-001",
 		ActiveWorkbenchID:  "BENCH-001",
 		HandoffNote:        "First handoff",
 	}
 	h2 := &secondary.HandoffRecord{
-		ID:                "HO-002",
+		ID:                 "HO-002",
 		ActiveCommissionID: "COMM-001",
 		ActiveWorkbenchID:  "BENCH-001",
 		HandoffNote:        "Second handoff",

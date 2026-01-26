@@ -15,6 +15,7 @@ import (
 
 // WorkshopServiceImpl implements the WorkshopService interface.
 type WorkshopServiceImpl struct {
+	factoryRepo      secondary.FactoryRepository
 	workshopRepo     secondary.WorkshopRepository
 	workbenchRepo    secondary.WorkbenchRepository
 	repoRepo         secondary.RepoRepository
@@ -24,6 +25,7 @@ type WorkshopServiceImpl struct {
 
 // NewWorkshopService creates a new WorkshopService with injected dependencies.
 func NewWorkshopService(
+	factoryRepo secondary.FactoryRepository,
 	workshopRepo secondary.WorkshopRepository,
 	workbenchRepo secondary.WorkbenchRepository,
 	repoRepo secondary.RepoRepository,
@@ -31,6 +33,7 @@ func NewWorkshopService(
 	workspaceAdapter secondary.WorkspaceAdapter,
 ) *WorkshopServiceImpl {
 	return &WorkshopServiceImpl{
+		factoryRepo:      factoryRepo,
 		workshopRepo:     workshopRepo,
 		workbenchRepo:    workbenchRepo,
 		repoRepo:         repoRepo,
@@ -41,6 +44,15 @@ func NewWorkshopService(
 
 // CreateWorkshop creates a new workshop in a factory.
 func (s *WorkshopServiceImpl) CreateWorkshop(ctx context.Context, req primary.CreateWorkshopRequest) (*primary.CreateWorkshopResponse, error) {
+	// If no factory specified, use default
+	if req.FactoryID == "" {
+		factory, err := s.getOrCreateDefaultFactory(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get default factory: %w", err)
+		}
+		req.FactoryID = factory.ID
+	}
+
 	// 1. Check if factory exists
 	factoryExists, err := s.workshopRepo.FactoryExists(ctx, req.FactoryID)
 	if err != nil {
@@ -70,6 +82,32 @@ func (s *WorkshopServiceImpl) CreateWorkshop(ctx context.Context, req primary.Cr
 		WorkshopID: record.ID,
 		Workshop:   s.recordToWorkshop(record),
 	}, nil
+}
+
+// getOrCreateDefaultFactory returns the "default" factory, creating it if needed.
+func (s *WorkshopServiceImpl) getOrCreateDefaultFactory(ctx context.Context) (*secondary.FactoryRecord, error) {
+	// Try to get existing "default" factory
+	factory, err := s.factoryRepo.GetByName(ctx, "default")
+	if err == nil {
+		return factory, nil
+	}
+
+	// Create default factory
+	id, err := s.factoryRepo.GetNextID(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate factory ID: %w", err)
+	}
+
+	record := &secondary.FactoryRecord{
+		ID:     id,
+		Name:   "default",
+		Status: "active",
+	}
+	if err := s.factoryRepo.Create(ctx, record); err != nil {
+		return nil, fmt.Errorf("failed to create default factory: %w", err)
+	}
+
+	return record, nil
 }
 
 // GetWorkshop retrieves a workshop by ID.

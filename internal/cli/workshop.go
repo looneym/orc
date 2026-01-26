@@ -38,22 +38,21 @@ func workshopCreateCmd() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "create",
-		Short: "Create a new workshop in a factory",
+		Short: "Create a new workshop",
 		Long: `Create a new workshop within a factory.
 
 A Workshop is a persistent named place within a Factory. Workshops
 have atmospheric names from a pool (e.g., "Ironmoss Forge", "Blackpine Foundry").
 If no name is provided, one will be assigned from the pool.
 
+If no factory is specified, the "default" factory is used (and created if needed).
+
 Examples:
-  orc workshop create --factory FACT-001
-  orc workshop create --factory FACT-001 --name "Custom Workshop"`,
+  orc workshop create                              # uses default factory
+  orc workshop create --factory FACT-001           # uses specific factory
+  orc workshop create --name "Custom Workshop"     # uses default factory with custom name`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := context.Background()
-
-			if factoryID == "" {
-				return fmt.Errorf("--factory flag is required")
-			}
 
 			resp, err := wire.WorkshopService().CreateWorkshop(ctx, primary.CreateWorkshopRequest{
 				FactoryID: factoryID,
@@ -69,7 +68,7 @@ Examples:
 		},
 	}
 
-	cmd.Flags().StringVarP(&factoryID, "factory", "f", "", "Factory ID (required)")
+	cmd.Flags().StringVarP(&factoryID, "factory", "f", "", "Factory ID (uses 'default' if not specified)")
 	cmd.Flags().StringVarP(&name, "name", "n", "", "Workshop name (optional - uses name pool if empty)")
 
 	return cmd
