@@ -3,6 +3,7 @@ package tmux
 import (
 	"fmt"
 	"os/exec"
+	"strconv"
 	"strings"
 )
 
@@ -322,6 +323,42 @@ func (s *Session) SendEscape(target string) error {
 // SendEnter sends the Enter key
 func (s *Session) SendEnter(target string) error {
 	cmd := exec.Command("tmux", "send-keys", "-t", target, "Enter")
+	return cmd.Run()
+}
+
+// RenameSession renames a tmux session.
+func RenameSession(oldName, newName string) error {
+	cmd := exec.Command("tmux", "rename-session", "-t", oldName, newName)
+	return cmd.Run()
+}
+
+// SetOption sets a tmux option for a session.
+func SetOption(session, option, value string) error {
+	cmd := exec.Command("tmux", "set-option", "-t", session, option, value)
+	return cmd.Run()
+}
+
+// DisplayPopup shows a popup window with a command.
+func DisplayPopup(session, command string, width, height int, title string) error {
+	args := []string{"display-popup", "-t", session, "-E"}
+	if width > 0 {
+		args = append(args, "-w", strconv.Itoa(width))
+	}
+	if height > 0 {
+		args = append(args, "-h", strconv.Itoa(height))
+	}
+	if title != "" {
+		args = append(args, "-T", title)
+	}
+	args = append(args, command)
+	cmd := exec.Command("tmux", args...)
+	return cmd.Run()
+}
+
+// BindKey binds a key to a command for a session.
+func BindKey(session, key, command string) error {
+	// Use bind-key with -T root for global bindings (like mouse events)
+	cmd := exec.Command("tmux", "bind-key", "-T", "root", key, "run-shell", command)
 	return cmd.Run()
 }
 
