@@ -813,13 +813,8 @@ Examples:
 				filters.excludeTags[t] = true
 			}
 
-			// Get current focus (check cwd config, fall back to global)
+			// Get current focus from cwd config only (no home fallback)
 			cfg, _ := config.LoadConfig(cwd)
-			if cfg == nil {
-				if homeDir, err := os.UserHomeDir(); err == nil {
-					cfg, _ = config.LoadConfig(homeDir)
-				}
-			}
 			focusID := GetCurrentFocus(cfg)
 
 			// Determine mission filter
