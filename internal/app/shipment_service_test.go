@@ -233,6 +233,14 @@ func (m *mockTaskRepositoryForShipment) ShipmentExists(ctx context.Context, ship
 	return true, nil
 }
 
+func (m *mockTaskRepositoryForShipment) TomeExists(ctx context.Context, tomeID string) (bool, error) {
+	return true, nil
+}
+
+func (m *mockTaskRepositoryForShipment) ConclaveExists(ctx context.Context, conclaveID string) (bool, error) {
+	return true, nil
+}
+
 func (m *mockTaskRepositoryForShipment) GetTag(ctx context.Context, taskID string) (*secondary.TagRecord, error) {
 	return nil, nil
 }

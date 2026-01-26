@@ -256,6 +256,8 @@ func recordToTask(r *secondary.TaskRecord) *primary.Task {
 		ID:                  r.ID,
 		ShipmentID:          r.ShipmentID,
 		InvestigationID:     r.InvestigationID,
+		TomeID:              r.TomeID,
+		ConclaveID:          r.ConclaveID,
 		CommissionID:        r.CommissionID,
 		Title:               r.Title,
 		Description:         r.Description,

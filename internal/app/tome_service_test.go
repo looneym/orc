@@ -217,6 +217,10 @@ func (m *mockNoteServiceForTome) ReopenNote(ctx context.Context, noteID string) 
 	return nil
 }
 
+func (m *mockNoteServiceForTome) MoveNote(ctx context.Context, req primary.MoveNoteRequest) error {
+	return nil
+}
+
 // ============================================================================
 // Test Helper
 // ============================================================================

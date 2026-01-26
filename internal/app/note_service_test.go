@@ -140,6 +140,18 @@ func (m *mockNoteRepository) CommissionExists(ctx context.Context, commissionID 
 	return m.commissionExistsResult, nil
 }
 
+func (m *mockNoteRepository) ShipmentExists(ctx context.Context, shipmentID string) (bool, error) {
+	return true, nil
+}
+
+func (m *mockNoteRepository) TomeExists(ctx context.Context, tomeID string) (bool, error) {
+	return true, nil
+}
+
+func (m *mockNoteRepository) ConclaveExists(ctx context.Context, conclaveID string) (bool, error) {
+	return true, nil
+}
+
 func (m *mockNoteRepository) UpdateStatus(ctx context.Context, id string, status string) error {
 	if note, ok := m.notes[id]; ok {
 		note.Status = status

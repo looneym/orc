@@ -342,6 +342,60 @@ var noteReopenCmd = &cobra.Command{
 	},
 }
 
+var noteMoveCmd = &cobra.Command{
+	Use:   "move [note-id]",
+	Short: "Move a note to a different container",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		ctx := context.Background()
+		noteID := args[0]
+		toTome, _ := cmd.Flags().GetString("to-tome")
+		toShipment, _ := cmd.Flags().GetString("to-shipment")
+		toConclave, _ := cmd.Flags().GetString("to-conclave")
+
+		// Validate exactly one target specified
+		targetCount := 0
+		if toTome != "" {
+			targetCount++
+		}
+		if toShipment != "" {
+			targetCount++
+		}
+		if toConclave != "" {
+			targetCount++
+		}
+
+		if targetCount == 0 {
+			return fmt.Errorf("must specify exactly one target: --to-tome, --to-shipment, or --to-conclave")
+		}
+		if targetCount > 1 {
+			return fmt.Errorf("cannot specify multiple targets")
+		}
+
+		err := wire.NoteService().MoveNote(ctx, primary.MoveNoteRequest{
+			NoteID:       noteID,
+			ToTomeID:     toTome,
+			ToShipmentID: toShipment,
+			ToConclaveID: toConclave,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to move note: %w", err)
+		}
+
+		target := ""
+		if toTome != "" {
+			target = toTome
+		} else if toShipment != "" {
+			target = toShipment
+		} else {
+			target = toConclave
+		}
+
+		fmt.Printf("✓ Note %s moved to %s\n", noteID, target)
+		return nil
+	},
+}
+
 func init() {
 	// note create flags
 	noteCreateCmd.Flags().StringP("commission", "c", "", "Commission ID (defaults to context)")
@@ -363,6 +417,11 @@ func init() {
 	noteUpdateCmd.Flags().String("title", "", "New title")
 	noteUpdateCmd.Flags().String("content", "", "New content")
 
+	// note move flags
+	noteMoveCmd.Flags().String("to-tome", "", "Move to tome")
+	noteMoveCmd.Flags().String("to-shipment", "", "Move to shipment")
+	noteMoveCmd.Flags().String("to-conclave", "", "Move to conclave")
+
 	// Register subcommands
 	noteCmd.AddCommand(noteCreateCmd)
 	noteCmd.AddCommand(noteListCmd)
@@ -373,6 +432,7 @@ func init() {
 	noteCmd.AddCommand(noteDeleteCmd)
 	noteCmd.AddCommand(noteCloseCmd)
 	noteCmd.AddCommand(noteReopenCmd)
+	noteCmd.AddCommand(noteMoveCmd)
 }
 
 // NoteCmd returns the note command
