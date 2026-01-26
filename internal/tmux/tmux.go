@@ -373,6 +373,35 @@ func BindKey(session, key, command string) error {
 	return cmd.Run()
 }
 
+// BindKeyPopup binds a key to display a command in a popup.
+func BindKeyPopup(session, key, command string, width, height int, title, workingDir string) error {
+	args := []string{"bind-key", "-T", "root", key, "display-popup", "-E"}
+	if workingDir != "" {
+		args = append(args, "-d", workingDir)
+	}
+	if width > 0 {
+		args = append(args, "-w", strconv.Itoa(width))
+	}
+	if height > 0 {
+		args = append(args, "-h", strconv.Itoa(height))
+	}
+	if title != "" {
+		args = append(args, "-T", title)
+	}
+	args = append(args, command)
+	cmd := exec.Command("tmux", args...)
+	return cmd.Run()
+}
+
+// ApplyGlobalBindings sets up ORC's global tmux key bindings.
+// Safe to call repeatedly (idempotent). Silently ignores errors (tmux may not be running).
+func ApplyGlobalBindings() {
+	// Double-click status bar → orc summary popup
+	_ = BindKeyPopup("", "DoubleClick1Status",
+		"CLICOLOR_FORCE=1 orc summary | less -R",
+		100, 30, "ORC Summary", "#{pane_current_path}")
+}
+
 // NudgeSession sends a message to a running Claude session using the Gastown pattern
 // This implements the 4-step reliable delivery:
 // 1. Send text literally (no interpretation)

@@ -11,15 +11,23 @@ type StatusBarConfig struct {
 
 // PopupConfig configures tmux popup display.
 type PopupConfig struct {
-	Width  int    // popup width (columns)
-	Height int    // popup height (rows)
-	Title  string // optional popup title
+	Width      int    // popup width (columns)
+	Height     int    // popup height (rows)
+	Title      string // optional popup title
+	WorkingDir string // working directory (supports tmux format strings like #{pane_current_path})
 }
 
 // KeyBinding defines a tmux key binding.
 type KeyBinding struct {
 	Key     string // e.g., "MouseDown3Status"
 	Command string // tmux command to execute
+}
+
+// PopupKeyBinding defines a key binding that shows a popup.
+type PopupKeyBinding struct {
+	Key     string      // e.g., "DoubleClick1Status"
+	Command string      // command to run in popup
+	Config  PopupConfig // popup dimensions/title
 }
 
 // TMuxAdapter defines the secondary port for TMux session and window management.
@@ -59,6 +67,7 @@ type TMuxAdapter interface {
 	ConfigureStatusBar(ctx context.Context, session string, config StatusBarConfig) error
 	DisplayPopup(ctx context.Context, session, command string, config PopupConfig) error
 	ConfigureSessionBindings(ctx context.Context, session string, bindings []KeyBinding) error
+	ConfigureSessionPopupBindings(ctx context.Context, session string, bindings []PopupKeyBinding) error
 
 	// Session info
 	GetCurrentSessionName(ctx context.Context) string

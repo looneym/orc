@@ -151,9 +151,25 @@ func (a *Adapter) ConfigureSessionBindings(ctx context.Context, session string, 
 	return nil
 }
 
+// ConfigureSessionPopupBindings sets up key bindings that display popups.
+func (a *Adapter) ConfigureSessionPopupBindings(ctx context.Context, session string, bindings []secondary.PopupKeyBinding) error {
+	for _, b := range bindings {
+		if err := tmuxpkg.BindKeyPopup(session, b.Key, b.Command, b.Config.Width, b.Config.Height, b.Config.Title, b.Config.WorkingDir); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // GetCurrentSessionName returns the name of the current tmux session.
 func (a *Adapter) GetCurrentSessionName(ctx context.Context) string {
 	return tmuxpkg.GetCurrentSessionName()
+}
+
+// ApplyGlobalBindings sets up ORC's global tmux key bindings.
+// Safe to call repeatedly (idempotent). Silently ignores errors (tmux may not be running).
+func ApplyGlobalBindings() {
+	tmuxpkg.ApplyGlobalBindings()
 }
 
 // Ensure Adapter implements the interface
