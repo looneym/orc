@@ -1,10 +1,13 @@
 package context
 
 import (
+	"context"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/example/orc/internal/config"
+	"github.com/example/orc/internal/wire"
 )
 
 // WorkbenchContext represents workbench context information (IMP territory)
@@ -41,7 +44,9 @@ func DetectWorkbenchContext() (*WorkbenchContext, error) {
 	return nil, nil
 }
 
-// GetContextCommissionID returns the commission ID from config in cwd
+// GetContextCommissionID returns the commission ID from:
+// 1. Local config CommissionID (workbench context)
+// 2. Focused container's commission_id (fallback)
 // Returns empty string if no context found - caller should handle this
 func GetContextCommissionID() string {
 	dir, err := os.Getwd()
@@ -54,7 +59,57 @@ func GetContextCommissionID() string {
 		return ""
 	}
 
-	return cfg.CommissionID
+	// First: explicit commission in config
+	if cfg.CommissionID != "" {
+		return cfg.CommissionID
+	}
+
+	// Second: look up commission from focused container
+	if cfg.CurrentFocus != "" {
+		return getCommissionFromFocus(cfg.CurrentFocus)
+	}
+
+	return ""
+}
+
+// getCommissionFromFocus looks up the commission_id for a focused container.
+func getCommissionFromFocus(focusID string) string {
+	ctx := context.Background()
+
+	switch {
+	case strings.HasPrefix(focusID, "COMM-"):
+		return focusID // Commission is its own context
+
+	case strings.HasPrefix(focusID, "SHIP-"):
+		ship, err := wire.ShipmentService().GetShipment(ctx, focusID)
+		if err != nil {
+			return ""
+		}
+		return ship.CommissionID
+
+	case strings.HasPrefix(focusID, "CON-"):
+		con, err := wire.ConclaveService().GetConclave(ctx, focusID)
+		if err != nil {
+			return ""
+		}
+		return con.CommissionID
+
+	case strings.HasPrefix(focusID, "INV-"):
+		inv, err := wire.InvestigationService().GetInvestigation(ctx, focusID)
+		if err != nil {
+			return ""
+		}
+		return inv.CommissionID
+
+	case strings.HasPrefix(focusID, "TOME-"):
+		tome, err := wire.TomeService().GetTome(ctx, focusID)
+		if err != nil {
+			return ""
+		}
+		return tome.CommissionID
+	}
+
+	return ""
 }
 
 // WriteCommissionContext creates a .orc/config.json file for a commission workspace
