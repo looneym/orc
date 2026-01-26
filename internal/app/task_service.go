@@ -27,7 +27,7 @@ func NewTaskService(
 
 // CreateTask creates a new task.
 func (s *TaskServiceImpl) CreateTask(ctx context.Context, req primary.CreateTaskRequest) (*primary.CreateTaskResponse, error) {
-	// Validate mission exists
+	// Validate commission exists
 	exists, err := s.taskRepo.CommissionExists(ctx, req.CommissionID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to validate commission: %w", err)

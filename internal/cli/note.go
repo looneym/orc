@@ -26,7 +26,7 @@ var noteCreateCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
 		title := args[0]
-		missionID, _ := cmd.Flags().GetString("commission")
+		commissionID, _ := cmd.Flags().GetString("commission")
 		content, _ := cmd.Flags().GetString("content")
 		noteType, _ := cmd.Flags().GetString("type")
 		shipmentID, _ := cmd.Flags().GetString("shipment")
@@ -34,10 +34,10 @@ var noteCreateCmd = &cobra.Command{
 		conclaveID, _ := cmd.Flags().GetString("conclave")
 		tomeID, _ := cmd.Flags().GetString("tome")
 
-		// Get mission from context or require explicit flag
-		if missionID == "" {
-			missionID = orccontext.GetContextCommissionID()
-			if missionID == "" {
+		// Get commission from context or require explicit flag
+		if commissionID == "" {
+			commissionID = orccontext.GetContextCommissionID()
+			if commissionID == "" {
 				return fmt.Errorf("no commission context detected\nHint: Use --commission flag or run from a workbench directory")
 			}
 		}
@@ -73,7 +73,7 @@ var noteCreateCmd = &cobra.Command{
 		}
 
 		resp, err := wire.NoteService().CreateNote(ctx, primary.CreateNoteRequest{
-			CommissionID:  missionID,
+			CommissionID:  commissionID,
 			Title:         title,
 			Content:       content,
 			Type:          noteType,
@@ -92,7 +92,7 @@ var noteCreateCmd = &cobra.Command{
 		if containerID != "" {
 			fmt.Printf("  Container: %s (%s)\n", containerID, containerType)
 		}
-		fmt.Printf("  Mission: %s\n", note.CommissionID)
+		fmt.Printf("  Commission: %s\n", note.CommissionID)
 		return nil
 	},
 }
@@ -102,15 +102,15 @@ var noteListCmd = &cobra.Command{
 	Short: "List notes",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
-		missionID, _ := cmd.Flags().GetString("commission")
+		commissionID, _ := cmd.Flags().GetString("commission")
 		noteType, _ := cmd.Flags().GetString("type")
 		shipmentID, _ := cmd.Flags().GetString("shipment")
 		investigationID, _ := cmd.Flags().GetString("investigation")
 		tomeID, _ := cmd.Flags().GetString("tome")
 
-		// Get mission from context if not specified
-		if missionID == "" {
-			missionID = orccontext.GetContextCommissionID()
+		// Get commission from context if not specified
+		if commissionID == "" {
+			commissionID = orccontext.GetContextCommissionID()
 		}
 
 		var notes []*primary.Note
@@ -126,7 +126,7 @@ var noteListCmd = &cobra.Command{
 		} else {
 			notes, err = wire.NoteService().ListNotes(ctx, primary.NoteFilters{
 				Type:         noteType,
-				CommissionID: missionID,
+				CommissionID: commissionID,
 			})
 		}
 

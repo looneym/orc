@@ -27,14 +27,14 @@ var taskCreateCmd = &cobra.Command{
 		title := args[0]
 		shipmentID, _ := cmd.Flags().GetString("shipment")
 		investigationID, _ := cmd.Flags().GetString("investigation")
-		missionID, _ := cmd.Flags().GetString("commission")
+		commissionID, _ := cmd.Flags().GetString("commission")
 		description, _ := cmd.Flags().GetString("description")
 		taskType, _ := cmd.Flags().GetString("type")
 
-		// Get mission from context or require explicit flag
-		if missionID == "" {
-			missionID = orccontext.GetContextCommissionID()
-			if missionID == "" {
+		// Get commission from context or require explicit flag
+		if commissionID == "" {
+			commissionID = orccontext.GetContextCommissionID()
+			if commissionID == "" {
 				return fmt.Errorf("no commission context detected\nHint: Use --commission flag or run from a workbench directory")
 			}
 		}
@@ -42,7 +42,7 @@ var taskCreateCmd = &cobra.Command{
 		resp, err := wire.TaskService().CreateTask(ctx, primary.CreateTaskRequest{
 			ShipmentID:      shipmentID,
 			InvestigationID: investigationID,
-			CommissionID:    missionID,
+			CommissionID:    commissionID,
 			Title:           title,
 			Description:     description,
 			Type:            taskType,
@@ -59,7 +59,7 @@ var taskCreateCmd = &cobra.Command{
 		if task.InvestigationID != "" {
 			fmt.Printf("  Under investigation: %s\n", task.InvestigationID)
 		}
-		fmt.Printf("  Mission: %s\n", task.CommissionID)
+		fmt.Printf("  Commission: %s\n", task.CommissionID)
 		return nil
 	},
 }

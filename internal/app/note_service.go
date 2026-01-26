@@ -22,7 +22,7 @@ func NewNoteService(noteRepo secondary.NoteRepository) *NoteServiceImpl {
 
 // CreateNote creates a new note.
 func (s *NoteServiceImpl) CreateNote(ctx context.Context, req primary.CreateNoteRequest) (*primary.CreateNoteResponse, error) {
-	// Validate mission exists
+	// Validate commission exists
 	exists, err := s.noteRepo.CommissionExists(ctx, req.CommissionID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to validate commission: %w", err)
