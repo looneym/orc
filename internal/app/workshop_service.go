@@ -319,6 +319,7 @@ func (s *WorkshopServiceImpl) OpenWorkshop(ctx context.Context, req primary.Open
 }
 
 // ensureWorktreeExists creates a worktree and IMP config if they don't exist.
+// All effects are batched into a single execute call for atomicity.
 func (s *WorkshopServiceImpl) ensureWorktreeExists(ctx context.Context, wb *secondary.WorkbenchRecord) error {
 	// Check if worktree already exists
 	exists, err := s.workspaceAdapter.WorktreeExists(ctx, wb.WorktreePath)
@@ -326,9 +327,10 @@ func (s *WorkshopServiceImpl) ensureWorktreeExists(ctx context.Context, wb *seco
 		return err
 	}
 
-	if !exists {
-		var effs []effects.Effect
+	var effs []effects.Effect
 
+	// 1. Build worktree effect (only if needed)
+	if !exists {
 		if wb.RepoID == "" {
 			// No repo linked - just create the directory via FileEffect
 			effs = append(effs, effects.FileEffect{
@@ -350,22 +352,11 @@ func (s *WorkshopServiceImpl) ensureWorktreeExists(ctx context.Context, wb *seco
 				Args:      []string{wb.HomeBranch, wb.WorktreePath},
 			})
 		}
-
-		if err := s.executor.Execute(ctx, effs); err != nil {
-			return err
-		}
 	}
 
-	// Ensure IMP config exists
-	return s.ensureWorkbenchConfig(ctx, wb)
-}
-
-// ensureWorkbenchConfig writes .orc/config.json for a workbench with IMP role.
-// Idempotent - always writes via effects (no direct I/O existence check).
-func (s *WorkshopServiceImpl) ensureWorkbenchConfig(ctx context.Context, wb *secondary.WorkbenchRecord) error {
+	// 2. Build config effects (always - idempotent)
 	orcDir := filepath.Join(wb.WorktreePath, ".orc")
 	configPath := filepath.Join(orcDir, "config.json")
-
 	cfg := &config.Config{
 		Version:     "1.0",
 		Role:        config.RoleIMP,
@@ -375,13 +366,16 @@ func (s *WorkshopServiceImpl) ensureWorkbenchConfig(ctx context.Context, wb *sec
 	if err != nil {
 		return fmt.Errorf("failed to marshal config: %w", err)
 	}
-
-	effs := []effects.Effect{
+	effs = append(effs,
 		effects.FileEffect{Operation: "mkdir", Path: orcDir, Mode: 0755},
 		effects.FileEffect{Operation: "write", Path: configPath, Content: configJSON, Mode: 0644},
-	}
+	)
 
-	return s.executor.Execute(ctx, effs)
+	// 3. Execute ALL effects in one batch
+	if len(effs) > 0 {
+		return s.executor.Execute(ctx, effs)
+	}
+	return nil
 }
 
 // CloseWorkshop kills the workshop's TMux session.
