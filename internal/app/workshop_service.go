@@ -327,12 +327,15 @@ func (s *WorkshopServiceImpl) ensureWorktreeExists(ctx context.Context, wb *seco
 	}
 
 	if !exists {
-		// Need repo to create worktree
+		var effs []effects.Effect
+
 		if wb.RepoID == "" {
-			// No repo linked - just create the directory
-			if err := s.workspaceAdapter.CreateDirectory(ctx, wb.WorktreePath); err != nil {
-				return err
-			}
+			// No repo linked - just create the directory via FileEffect
+			effs = append(effs, effects.FileEffect{
+				Operation: "mkdir",
+				Path:      wb.WorktreePath,
+				Mode:      0755,
+			})
 		} else {
 			// Get repo name
 			repo, err := s.repoRepo.GetByID(ctx, wb.RepoID)
@@ -340,10 +343,16 @@ func (s *WorkshopServiceImpl) ensureWorktreeExists(ctx context.Context, wb *seco
 				return fmt.Errorf("repo %s not found: %w", wb.RepoID, err)
 			}
 
-			// Create worktree
-			if err := s.workspaceAdapter.CreateWorktree(ctx, repo.Name, wb.HomeBranch, wb.WorktreePath); err != nil {
-				return err
-			}
+			// Create worktree via GitEffect
+			effs = append(effs, effects.GitEffect{
+				Operation: "worktree_add",
+				RepoPath:  repo.Name,
+				Args:      []string{wb.HomeBranch, wb.WorktreePath},
+			})
+		}
+
+		if err := s.executor.Execute(ctx, effs); err != nil {
+			return err
 		}
 	}
 

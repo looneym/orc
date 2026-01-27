@@ -199,8 +199,15 @@ func initServices() {
 	tmuxAdapter := tmuxadapter.NewAdapter()
 	tmuxService = tmuxAdapter // Store for getter
 
+	// Create workspace adapter (needed by effect executor and workshop service)
+	home, _ := os.UserHomeDir()
+	workspaceAdapter, err := filesystem.NewWorkspaceAdapter(home+"/wb", home+"/src") // ~/wb for worktrees, ~/src for repos
+	if err != nil {
+		log.Fatalf("failed to create workspace adapter: %v", err)
+	}
+
 	// Create effect executor with injected repositories and adapters
-	executor := app.NewEffectExecutor(commissionRepo, tmuxAdapter)
+	executor := app.NewEffectExecutor(commissionRepo, tmuxAdapter, workspaceAdapter)
 
 	// Create services (primary ports implementation)
 	commissionService = app.NewCommissionService(commissionRepo, agentProvider, executor)
@@ -244,11 +251,6 @@ func initServices() {
 	factoryRepo := sqlite.NewFactoryRepository(database)
 	workshopRepo := sqlite.NewWorkshopRepository(database)
 	workbenchRepo := sqlite.NewWorkbenchRepository(database)
-	home, _ := os.UserHomeDir()
-	workspaceAdapter, err := filesystem.NewWorkspaceAdapter(home+"/wb", home+"/src") // ~/wb for worktrees, ~/src for repos
-	if err != nil {
-		log.Fatalf("failed to create workspace adapter: %v", err)
-	}
 	factoryService = app.NewFactoryService(factoryRepo)
 	workshopService = app.NewWorkshopService(factoryRepo, workshopRepo, workbenchRepo, repoRepo, tmuxService, workspaceAdapter, executor)
 	workbenchService = app.NewWorkbenchService(workbenchRepo, workshopRepo, agentProvider, executor)

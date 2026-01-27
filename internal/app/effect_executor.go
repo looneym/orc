@@ -18,15 +18,21 @@ type EffectExecutor interface {
 
 // DefaultEffectExecutor implements EffectExecutor with real I/O.
 type DefaultEffectExecutor struct {
-	commissionRepo secondary.CommissionRepository
-	tmuxAdapter    secondary.TMuxAdapter
+	commissionRepo   secondary.CommissionRepository
+	tmuxAdapter      secondary.TMuxAdapter
+	workspaceAdapter secondary.WorkspaceAdapter
 }
 
 // NewEffectExecutor creates a new DefaultEffectExecutor with injected dependencies.
-func NewEffectExecutor(commissionRepo secondary.CommissionRepository, tmuxAdapter secondary.TMuxAdapter) *DefaultEffectExecutor {
+func NewEffectExecutor(
+	commissionRepo secondary.CommissionRepository,
+	tmuxAdapter secondary.TMuxAdapter,
+	workspaceAdapter secondary.WorkspaceAdapter,
+) *DefaultEffectExecutor {
 	return &DefaultEffectExecutor{
-		commissionRepo: commissionRepo,
-		tmuxAdapter:    tmuxAdapter,
+		commissionRepo:   commissionRepo,
+		tmuxAdapter:      tmuxAdapter,
+		workspaceAdapter: workspaceAdapter,
 	}
 }
 
@@ -48,6 +54,8 @@ func (e *DefaultEffectExecutor) executeOne(ctx context.Context, eff effects.Effe
 		return e.executePersist(ctx, typed)
 	case effects.TMuxEffect:
 		return e.executeTMux(ctx, typed)
+	case effects.GitEffect:
+		return e.executeGit(ctx, typed)
 	case effects.CompositeEffect:
 		return e.Execute(ctx, typed.Effects)
 	case effects.NoEffect:
@@ -120,5 +128,20 @@ func (e *DefaultEffectExecutor) executeTMux(ctx context.Context, eff effects.TMu
 		return nil
 	default:
 		return fmt.Errorf("unknown tmux operation: %s", eff.Operation)
+	}
+}
+
+func (e *DefaultEffectExecutor) executeGit(ctx context.Context, eff effects.GitEffect) error {
+	switch eff.Operation {
+	case "worktree_add":
+		// Args[0] = branchName, Args[1] = targetPath
+		if len(eff.Args) < 2 {
+			return fmt.Errorf("worktree_add requires branchName and targetPath in Args")
+		}
+		branchName := eff.Args[0]
+		targetPath := eff.Args[1]
+		return e.workspaceAdapter.CreateWorktree(ctx, eff.RepoPath, branchName, targetPath)
+	default:
+		return fmt.Errorf("unsupported git operation: %s", eff.Operation)
 	}
 }
