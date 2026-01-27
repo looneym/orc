@@ -6,23 +6,11 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 
-	"github.com/example/orc/internal/config"
 	orccontext "github.com/example/orc/internal/context"
 	"github.com/example/orc/internal/ports/primary"
-	"github.com/example/orc/internal/ports/secondary"
 	"github.com/example/orc/internal/wire"
-)
-
-// Color helpers for plan output
-var (
-	colorExists = color.New(color.FgBlue).SprintFunc()
-	colorCreate = color.New(color.FgGreen).SprintFunc()
-	colorUpdate = color.New(color.FgYellow).SprintFunc()
-	colorDelete = color.New(color.FgRed).SprintFunc()
-	colorDim    = color.New(color.Faint).SprintFunc()
 )
 
 var commissionCmd = &cobra.Command{
@@ -238,237 +226,6 @@ Examples:
 	},
 }
 
-var commissionLaunchCmd = &cobra.Command{
-	Use:   "launch [commission-id]",
-	Short: "Launch commission infrastructure (plan/apply)",
-	Long: `Launch or update commission infrastructure using plan/apply pattern.
-
-This command:
-1. Reads desired state from database (commissions, shipments, workbenches)
-2. Analyzes current filesystem state
-3. Generates a plan of changes needed
-4. Shows plan and asks for confirmation
-5. Applies changes to converge filesystem to desired state
-
-Idempotent: Can be run multiple times safely.
-
-Examples:
-  orc commission launch COMM-002
-  orc commission launch COMM-001 --workspace ~/custom/path`,
-	Args: cobra.ExactArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
-		ctx := context.Background()
-
-		// Check agent identity - only ORC can launch commissions
-		if err := wire.CommissionOrchestrationService().CheckLaunchPermission(ctx); err != nil {
-			return err
-		}
-
-		commissionID := args[0]
-		workspacePath, _ := cmd.Flags().GetString("workspace")
-		createTmux, _ := cmd.Flags().GetBool("tmux")
-
-		// Default workspace path
-		if workspacePath == "" {
-			var err error
-			workspacePath, err = config.DefaultWorkspacePath(commissionID)
-			if err != nil {
-				return err
-			}
-		}
-
-		// Phase 1: Load state using orchestration service
-		fmt.Printf("🔍 Analyzing commission: %s\n\n", commissionID)
-		orchSvc := wire.CommissionOrchestrationService()
-
-		state, err := orchSvc.LoadCommissionState(ctx, commissionID)
-		if err != nil {
-			return fmt.Errorf("commission not found in database: %w\nCreate it first: orc commission create", err)
-		}
-
-		// Phase 2: Generate infrastructure plan
-		infraPlan := orchSvc.AnalyzeInfrastructure(state, workspacePath)
-
-		// Phase 3: Display plan
-		displayCommissionState(state, workspacePath)
-		displayInfrastructurePlan(infraPlan)
-
-		if createTmux {
-			sessionName := fmt.Sprintf("orc-%s", commissionID)
-			tmuxAdapter := wire.TMuxAdapter()
-			tmuxPlan := orchSvc.PlanTmuxSession(state, workspacePath, sessionName, tmuxAdapter.SessionExists(ctx, sessionName), &tmuxChecker{adapter: tmuxAdapter})
-			displayTmuxPlan(tmuxPlan)
-		}
-
-		// Phase 4: Confirm
-		fmt.Print("Apply changes? [y/N]: ")
-		var response string
-		fmt.Scanln(&response)
-		if response != "y" && response != "Y" {
-			fmt.Println("Aborted")
-			return nil
-		}
-
-		// Phase 5: Apply infrastructure
-		fmt.Print("\n🚀 Applying changes...\n\n")
-		result := orchSvc.ApplyInfrastructure(ctx, infraPlan)
-		displayInfrastructureResult(result, commissionID)
-
-		// Phase 6: Apply TMux if requested
-		if createTmux {
-			sessionName := fmt.Sprintf("orc-%s", commissionID)
-			applyTmuxSession(sessionName, workspacePath)
-		}
-
-		// Next steps
-		fmt.Println()
-		fmt.Println("Next steps:")
-		fmt.Printf("  cd %s\n", workspacePath)
-		tmuxAdapterForCheck := wire.TMuxAdapter()
-		if createTmux && !tmuxAdapterForCheck.SessionExists(ctx, fmt.Sprintf("orc-%s", commissionID)) {
-			fmt.Printf("  tmux attach -t orc-%s\n", commissionID)
-		}
-		fmt.Printf("  orc summary --commission %s\n", commissionID)
-
-		return nil
-	},
-}
-
-// tmuxChecker implements primary.TmuxWindowChecker using the TMuxAdapter
-type tmuxChecker struct {
-	adapter secondary.TMuxAdapter
-}
-
-func (t *tmuxChecker) WindowExists(session, window string) bool {
-	return t.adapter.WindowExists(context.Background(), session, window)
-}
-
-func (t *tmuxChecker) GetPaneCount(session, window string) int {
-	return t.adapter.GetPaneCount(context.Background(), session, window)
-}
-
-func (t *tmuxChecker) GetPaneCommand(session, window string, pane int) string {
-	return t.adapter.GetPaneCommand(context.Background(), session, window, pane)
-}
-
-// displayCommissionState shows the database state section of the plan
-func displayCommissionState(state *primary.CommissionState, workspacePath string) {
-	fmt.Print("📋 Plan:\n\n")
-	fmt.Println(color.New(color.Bold).Sprint("Database State:"))
-	fmt.Printf("  Commission: %s - %s\n", colorDim(state.Commission.ID), state.Commission.Title)
-	fmt.Printf("    Workspace: %s\n", workspacePath)
-	fmt.Printf("    Created: %s\n", state.Commission.CreatedAt)
-	fmt.Println()
-}
-
-// displayInfrastructurePlan shows the infrastructure plan section
-func displayInfrastructurePlan(plan *primary.InfrastructurePlan) {
-	fmt.Println(color.New(color.Bold).Sprint("Infrastructure:"))
-
-	if plan.CreateWorkspace {
-		fmt.Printf("  %s commission workspace: %s\n", colorCreate("CREATE"), plan.WorkspacePath)
-	} else {
-		fmt.Printf("  %s commission workspace: %s\n", colorExists("EXISTS"), plan.WorkspacePath)
-	}
-
-	if plan.CreateWorkbenchesDir {
-		fmt.Printf("  %s workbenches directory: %s\n", colorCreate("CREATE"), plan.WorkbenchesDir)
-	} else {
-		fmt.Printf("  %s workbenches directory: %s\n", colorExists("EXISTS"), plan.WorkbenchesDir)
-	}
-
-	for _, configWrite := range plan.ConfigWrites {
-		fmt.Printf("  %s %s config: %s\n", colorCreate("CREATE"), configWrite.Type, configWrite.Path)
-	}
-
-	for _, cleanup := range plan.Cleanups {
-		fmt.Printf("  %s %s: %s\n", colorDelete("DELETE"), cleanup.Reason, cleanup.Path)
-	}
-	fmt.Println()
-}
-
-// displayTmuxPlan shows the TMux plan section
-func displayTmuxPlan(plan *primary.TmuxSessionPlan) {
-	fmt.Println(color.New(color.Bold).Sprint("TMux Session:"))
-	if plan.SessionExists {
-		fmt.Printf("  %s session: %s\n", colorExists("EXISTS"), plan.SessionName)
-	} else {
-		fmt.Printf("  %s session: %s\n", colorCreate("CREATE"), plan.SessionName)
-	}
-
-	for _, wp := range plan.WindowPlans {
-		switch wp.Action {
-		case "exists":
-			fmt.Printf("  %s window %d (%s): 3 panes, IMP running - Workbench %s\n", colorExists("EXISTS"), wp.Index, wp.Name, wp.WorkbenchID)
-		case "create":
-			fmt.Printf("  %s window %d (%s): 3 panes in %s - Workbench %s IMP\n", colorCreate("CREATE"), wp.Index, wp.Name, wp.WorkbenchPath, wp.WorkbenchID)
-		case "update":
-			fmt.Printf("  %s window %d (%s): needs update - Workbench %s\n", colorUpdate("UPDATE"), wp.Index, wp.Name, wp.WorkbenchID)
-		case "skip":
-			fmt.Printf("  SKIP window %d (%s): workbench path missing\n", wp.Index, wp.Name)
-		}
-	}
-	fmt.Println()
-}
-
-// displayInfrastructureResult shows the results of applying infrastructure changes
-func displayInfrastructureResult(result *primary.InfrastructureApplyResult, commissionID string) {
-	if result.WorkspaceCreated {
-		fmt.Println("✓ Commission workspace created")
-	} else {
-		fmt.Println("✓ Commission workspace ready")
-	}
-
-	if result.WorkbenchesDirCreated {
-		fmt.Println("✓ Workbenches directory created")
-	} else {
-		fmt.Println("✓ Workbenches directory ready")
-	}
-
-	if result.WorkbenchesProcessed > 0 {
-		fmt.Printf("✓ Processed %d workbenches\n", result.WorkbenchesProcessed)
-	}
-
-	if result.ConfigsWritten > 0 {
-		fmt.Printf("✓ Wrote %d config files\n", result.ConfigsWritten)
-	}
-
-	if result.CleanupsDone > 0 {
-		fmt.Printf("✓ Cleaned up %d old files\n", result.CleanupsDone)
-	}
-
-	for _, err := range result.Errors {
-		fmt.Printf("  ⚠️  %s\n", err)
-	}
-
-	fmt.Println()
-	fmt.Println("✅ Commission infrastructure ready")
-}
-
-// applyTmuxSession creates or updates the TMux session for a commission
-func applyTmuxSession(sessionName, workspacePath string) {
-	ctx := context.Background()
-	tmuxAdapter := wire.TMuxAdapter()
-
-	fmt.Println()
-	fmt.Println("🖥️  Creating TMux session...")
-
-	if tmuxAdapter.SessionExists(ctx, sessionName) {
-		fmt.Printf("  ℹ️  Session %s already exists\n", sessionName)
-		fmt.Printf("  Attach with: tmux attach -t %s\n", sessionName)
-		return
-	}
-
-	if err := tmuxAdapter.CreateSession(ctx, sessionName, workspacePath); err != nil {
-		fmt.Printf("  ⚠️  Failed to create TMux session: %v\n", err)
-		return
-	}
-
-	fmt.Println()
-	fmt.Printf("✓ TMux session created: %s\n", sessionName)
-	fmt.Printf("  Attach with: tmux attach -t %s\n", sessionName)
-}
-
 var commissionPinCmd = &cobra.Command{
 	Use:   "pin [commission-id]",
 	Short: "Pin commission to keep it visible",
@@ -495,8 +252,6 @@ func CommissionCmd() *cobra.Command {
 	commissionCreateCmd.Flags().StringP("description", "d", "", "Commission description")
 	commissionListCmd.Flags().StringP("status", "s", "", "Filter by status (active, paused, complete, archived)")
 	commissionStartCmd.Flags().StringP("workspace", "w", "", "Custom workspace path (default: ~/commissions/COMM-ID)")
-	commissionLaunchCmd.Flags().StringP("workspace", "w", "", "Custom workspace path (default: ~/src/commissions/COMM-ID)")
-	commissionLaunchCmd.Flags().Bool("tmux", false, "Create TMux session with window layout (no apps launched)")
 	commissionUpdateCmd.Flags().StringP("title", "t", "", "New commission title")
 	commissionUpdateCmd.Flags().StringP("description", "d", "", "New commission description")
 	commissionDeleteCmd.Flags().BoolP("force", "f", false, "Force delete even with associated data")
@@ -506,7 +261,6 @@ func CommissionCmd() *cobra.Command {
 	commissionCmd.AddCommand(commissionListCmd)
 	commissionCmd.AddCommand(commissionShowCmd)
 	commissionCmd.AddCommand(commissionStartCmd)
-	commissionCmd.AddCommand(commissionLaunchCmd)
 	commissionCmd.AddCommand(commissionCompleteCmd)
 	commissionCmd.AddCommand(commissionArchiveCmd)
 	commissionCmd.AddCommand(commissionUpdateCmd)
