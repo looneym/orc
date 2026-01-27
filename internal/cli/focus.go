@@ -167,7 +167,7 @@ func setFocus(cfg *config.Config, configDir, containerID, containerType, title s
 }
 
 // autoRenameTmuxSession renames the tmux session to reflect the focused container.
-// Format: "Workshop Name - ID - Title" (e.g., "Mosslight Mill - SHIP-215 - ORC UX Polish")
+// Format: "Workshop Name - COMM-XXX/SHIP-XXX - Title" (includes commission context)
 func autoRenameTmuxSession(cfg *config.Config, containerID, title string) error {
 	ctx := context.Background()
 
@@ -189,8 +189,28 @@ func autoRenameTmuxSession(cfg *config.Config, containerID, title string) error 
 		}
 	}
 
-	// Build new name: "Workshop Name - ID - Title"
-	newName := fmt.Sprintf("%s - %s - %s", workshopName, containerID, title)
+	// Resolve commission context for non-commission containers
+	contextPart := containerID
+	switch {
+	case strings.HasPrefix(containerID, "COMM-"):
+		// Commission is the top level, use as-is
+		contextPart = containerID
+	case strings.HasPrefix(containerID, "SHIP-"):
+		if ship, err := wire.ShipmentService().GetShipment(ctx, containerID); err == nil && ship.CommissionID != "" {
+			contextPart = ship.CommissionID + "/" + containerID
+		}
+	case strings.HasPrefix(containerID, "CON-"):
+		if con, err := wire.ConclaveService().GetConclave(ctx, containerID); err == nil && con.CommissionID != "" {
+			contextPart = con.CommissionID + "/" + containerID
+		}
+	case strings.HasPrefix(containerID, "TOME-"):
+		if tome, err := wire.TomeService().GetTome(ctx, containerID); err == nil && tome.CommissionID != "" {
+			contextPart = tome.CommissionID + "/" + containerID
+		}
+	}
+
+	// Build new name: "Workshop Name - COMM-XXX/SHIP-XXX - Title"
+	newName := fmt.Sprintf("%s - %s - %s", workshopName, contextPart, title)
 
 	return wire.TMuxAdapter().RenameSession(ctx, currentSession, newName)
 }
