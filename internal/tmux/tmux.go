@@ -393,6 +393,24 @@ func BindKeyPopup(session, key, command string, width, height int, title, workin
 	return cmd.Run()
 }
 
+// MenuItem represents an item in a tmux context menu.
+type MenuItem struct {
+	Label   string // Display text
+	Key     string // Shortcut key (single char, or "" for none)
+	Command string // tmux command to execute
+}
+
+// BindContextMenu binds a key to display a context menu.
+// Uses -x M -y M to position at mouse coordinates, -O to keep menu open.
+func BindContextMenu(key, title string, items []MenuItem) error {
+	args := []string{"bind-key", "-T", "root", key, "display-menu", "-O", "-T", title, "-x", "M", "-y", "M"}
+	for _, item := range items {
+		args = append(args, item.Label, item.Key, item.Command)
+	}
+	cmd := exec.Command("tmux", args...)
+	return cmd.Run()
+}
+
 // ApplyGlobalBindings sets up ORC's global tmux key bindings.
 // Safe to call repeatedly (idempotent). Silently ignores errors (tmux may not be running).
 func ApplyGlobalBindings() {
@@ -400,6 +418,23 @@ func ApplyGlobalBindings() {
 	_ = BindKeyPopup("", "DoubleClick1Status",
 		"CLICOLOR_FORCE=1 orc summary | less -R",
 		100, 30, "ORC Summary", "#{pane_current_path}")
+
+	// Right-click status bar → context menu
+	_ = BindContextMenu("MouseDown3Status", " ORC ", []MenuItem{
+		// ORC custom options
+		{Label: "New Workbench Like This", Key: "n", Command: "run-shell 'cd #{pane_current_path} && orc workbench like'"},
+		{Label: "Show Summary", Key: "s", Command: "display-popup -E -w 100 -h 30 -T 'ORC Summary' 'cd #{pane_current_path} && CLICOLOR_FORCE=1 orc summary | less -R'"},
+		// Separator
+		{Label: "", Key: "", Command: ""},
+		// Default tmux window options
+		{Label: "Swap Left", Key: "<", Command: "swap-window -t :-1"},
+		{Label: "Swap Right", Key: ">", Command: "swap-window -t :+1"},
+		{Label: "#{?pane_marked,Unmark,Mark}", Key: "m", Command: "select-pane -m"},
+		{Label: "Kill", Key: "X", Command: "kill-window"},
+		{Label: "Respawn", Key: "R", Command: "respawn-window -k"},
+		{Label: "Rename", Key: "r", Command: "command-prompt -I \"#W\" \"rename-window -- '%%'\""},
+		{Label: "New Window", Key: "c", Command: "new-window"},
+	})
 }
 
 // NudgeSession sends a message to a running Claude session using the Gastown pattern
