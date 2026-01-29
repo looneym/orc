@@ -71,4 +71,13 @@ type TMuxAdapter interface {
 
 	// Session info
 	GetCurrentSessionName(ctx context.Context) string
+
+	// Environment variables
+	SetEnvironment(ctx context.Context, sessionName, key, value string) error
+	GetEnvironment(ctx context.Context, sessionName, key string) (string, error)
+
+	// Session discovery
+	ListSessions(ctx context.Context) ([]string, error)
+	FindSessionByWorkshopID(ctx context.Context, workshopID string) string
+	ListWindows(ctx context.Context, sessionName string) ([]string, error)
 }

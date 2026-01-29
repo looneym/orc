@@ -437,6 +437,78 @@ func ApplyGlobalBindings() {
 	})
 }
 
+// SetEnvironment sets an environment variable for a tmux session.
+func SetEnvironment(sessionName, key, value string) error {
+	cmd := exec.Command("tmux", "set-environment", "-t", sessionName, key, value)
+	return cmd.Run()
+}
+
+// GetEnvironment gets an environment variable from a tmux session.
+// Returns the value, or error if not found.
+func GetEnvironment(sessionName, key string) (string, error) {
+	cmd := exec.Command("tmux", "show-environment", "-t", sessionName, key)
+	output, err := cmd.Output()
+	if err != nil {
+		return "", err
+	}
+	// Output format: "KEY=value\n"
+	line := strings.TrimSpace(string(output))
+	if strings.HasPrefix(line, key+"=") {
+		return strings.TrimPrefix(line, key+"="), nil
+	}
+	return "", fmt.Errorf("env var %s not found", key)
+}
+
+// ListSessions returns all tmux session names.
+func ListSessions() ([]string, error) {
+	cmd := exec.Command("tmux", "list-sessions", "-F", "#{session_name}")
+	output, err := cmd.Output()
+	if err != nil {
+		return nil, err
+	}
+	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
+	var sessions []string
+	for _, line := range lines {
+		if line != "" {
+			sessions = append(sessions, line)
+		}
+	}
+	return sessions, nil
+}
+
+// FindSessionByWorkshopID finds the session with ORC_WORKSHOP_ID=workshopID.
+// Returns session name, or empty string if not found.
+func FindSessionByWorkshopID(workshopID string) string {
+	sessions, err := ListSessions()
+	if err != nil {
+		return ""
+	}
+	for _, session := range sessions {
+		val, err := GetEnvironment(session, "ORC_WORKSHOP_ID")
+		if err == nil && val == workshopID {
+			return session
+		}
+	}
+	return ""
+}
+
+// ListWindows returns window names in a session.
+func ListWindows(sessionName string) ([]string, error) {
+	cmd := exec.Command("tmux", "list-windows", "-t", sessionName, "-F", "#{window_name}")
+	output, err := cmd.Output()
+	if err != nil {
+		return nil, err
+	}
+	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
+	var windows []string
+	for _, line := range lines {
+		if line != "" {
+			windows = append(windows, line)
+		}
+	}
+	return windows, nil
+}
+
 // NudgeSession sends a message to a running Claude session using the Gastown pattern
 // This implements the 4-step reliable delivery:
 // 1. Send text literally (no interpretation)

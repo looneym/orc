@@ -316,7 +316,11 @@ func displayTMuxPlan(plan *primary.OpenWorkshopPlan) {
 	}
 
 	fmt.Println("TMux Session:")
-	fmt.Printf("  %s session: %s\n", statusColor(plan.TMuxOp.SessionStatus), plan.SessionName)
+	if plan.TMuxOp.AddToExisting {
+		fmt.Printf("  %s session: %s (adding windows)\n", statusColor(primary.OpExists), plan.SessionName)
+	} else {
+		fmt.Printf("  %s session: %s\n", statusColor(plan.TMuxOp.SessionStatus), plan.SessionName)
+	}
 	for _, w := range plan.TMuxOp.Windows {
 		fmt.Printf("  %s window %d (%s): %s\n",
 			statusColor(w.Status), w.Index, w.Name, w.Path)

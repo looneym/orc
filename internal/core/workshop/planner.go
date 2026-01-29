@@ -11,6 +11,8 @@ type OpenPlanInput struct {
 	FactoryID             string
 	FactoryName           string
 	SessionExists         bool
+	ActualSessionName     string   // Existing session name (may differ from WorkshopID after renames)
+	ExistingWindows       []string // Window names in existing session (empty if no session)
 	GatehouseDir          string
 	GatehouseDirExists    bool
 	GatehouseConfigExists bool
@@ -71,8 +73,9 @@ type WorkbenchOp struct {
 
 // TMuxOp describes the tmux session operation.
 type TMuxOp struct {
-	SessionName string
-	Windows     []TMuxWindowOp
+	SessionName   string
+	Windows       []TMuxWindowOp
+	AddToExisting bool // true = add windows to existing session, false = create new session
 }
 
 // TMuxWindowOp describes a tmux window operation.
@@ -86,12 +89,18 @@ type TMuxWindowOp struct {
 // This is a pure function - all input data must be pre-fetched.
 // The plan includes ALL items (existing and new) so the display can show both.
 func GenerateOpenPlan(input OpenPlanInput) OpenWorkshopPlan {
+	// Determine session name - use actual if session exists and was renamed
+	sessionName := input.WorkshopID
+	if input.SessionExists && input.ActualSessionName != "" {
+		sessionName = input.ActualSessionName
+	}
+
 	plan := OpenWorkshopPlan{
 		WorkshopID:   input.WorkshopID,
 		WorkshopName: input.WorkshopName,
 		FactoryID:    input.FactoryID,
 		FactoryName:  input.FactoryName,
-		SessionName:  input.WorkshopID,
+		SessionName:  sessionName,
 	}
 
 	// DB State - workbenches from database
@@ -124,8 +133,35 @@ func GenerateOpenPlan(input OpenPlanInput) OpenWorkshopPlan {
 		})
 	}
 
-	// TMux - include if session doesn't exist
-	if !input.SessionExists {
+	// TMux operations - handle both new session and adding to existing
+	var windowsToCreate []TMuxWindowOp
+
+	if input.SessionExists {
+		// Session exists - find workbenches that don't have windows yet
+		existingSet := make(map[string]bool)
+		for _, w := range input.ExistingWindows {
+			existingSet[w] = true
+		}
+
+		for i, wb := range input.Workbenches {
+			if !existingSet[wb.Name] {
+				windowsToCreate = append(windowsToCreate, TMuxWindowOp{
+					Index: i + 2, // After orc window
+					Name:  wb.Name,
+					Path:  wb.WorktreePath,
+				})
+			}
+		}
+
+		if len(windowsToCreate) > 0 {
+			plan.TMuxOp = &TMuxOp{
+				SessionName:   sessionName,
+				Windows:       windowsToCreate,
+				AddToExisting: true,
+			}
+		}
+	} else {
+		// No session - create new with all windows
 		windows := []TMuxWindowOp{
 			{Index: 0, Name: "orc", Path: input.GatehouseDir},
 		}
@@ -137,8 +173,9 @@ func GenerateOpenPlan(input OpenPlanInput) OpenWorkshopPlan {
 			})
 		}
 		plan.TMuxOp = &TMuxOp{
-			SessionName: input.WorkshopID,
-			Windows:     windows,
+			SessionName:   input.WorkshopID,
+			Windows:       windows,
+			AddToExisting: false,
 		}
 	}
 
@@ -151,7 +188,8 @@ func GenerateOpenPlan(input OpenPlanInput) OpenWorkshopPlan {
 			break
 		}
 	}
-	sessionReady := input.SessionExists
+	// Session is ready if it exists AND no new windows need to be added
+	sessionReady := input.SessionExists && len(windowsToCreate) == 0
 
 	plan.NothingToDo = gatehouseReady && workbenchesReady && sessionReady
 

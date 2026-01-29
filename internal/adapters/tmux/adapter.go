@@ -166,6 +166,31 @@ func (a *Adapter) GetCurrentSessionName(ctx context.Context) string {
 	return tmuxpkg.GetCurrentSessionName()
 }
 
+// SetEnvironment sets an environment variable for a tmux session.
+func (a *Adapter) SetEnvironment(ctx context.Context, sessionName, key, value string) error {
+	return tmuxpkg.SetEnvironment(sessionName, key, value)
+}
+
+// GetEnvironment gets an environment variable from a tmux session.
+func (a *Adapter) GetEnvironment(ctx context.Context, sessionName, key string) (string, error) {
+	return tmuxpkg.GetEnvironment(sessionName, key)
+}
+
+// ListSessions returns all tmux session names.
+func (a *Adapter) ListSessions(ctx context.Context) ([]string, error) {
+	return tmuxpkg.ListSessions()
+}
+
+// FindSessionByWorkshopID finds the session with ORC_WORKSHOP_ID=workshopID.
+func (a *Adapter) FindSessionByWorkshopID(ctx context.Context, workshopID string) string {
+	return tmuxpkg.FindSessionByWorkshopID(workshopID)
+}
+
+// ListWindows returns window names in a session.
+func (a *Adapter) ListWindows(ctx context.Context, sessionName string) ([]string, error) {
+	return tmuxpkg.ListWindows(sessionName)
+}
+
 // ApplyGlobalBindings sets up ORC's global tmux key bindings.
 // Safe to call repeatedly (idempotent). Silently ignores errors (tmux may not be running).
 func ApplyGlobalBindings() {

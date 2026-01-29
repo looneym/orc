@@ -201,16 +201,23 @@ func (s *WorkshopServiceImpl) PlanOpenWorkshop(ctx context.Context, req primary.
 		return nil, fmt.Errorf("factory not found: %w", err)
 	}
 
-	// 3. Check if session already exists
-	sessionExists := s.tmuxAdapter.SessionExists(ctx, req.WorkshopID)
+	// 3. Find existing session by workshop ID env var (survives session renames)
+	actualSessionName := s.tmuxAdapter.FindSessionByWorkshopID(ctx, req.WorkshopID)
+	sessionExists := actualSessionName != ""
 
-	// 4. Compute gatehouse path and check existence
+	// 4. Get existing windows if session exists
+	var existingWindows []string
+	if sessionExists {
+		existingWindows, _ = s.tmuxAdapter.ListWindows(ctx, actualSessionName)
+	}
+
+	// 5. Compute gatehouse path and check existence
 	home, _ := os.UserHomeDir()
 	gatehouseDir := coreworkshop.GatehousePath(home, req.WorkshopID, workshop.Name)
 	gatehouseDirExists := s.dirExists(gatehouseDir)
 	gatehouseConfigExists := s.fileExists(filepath.Join(gatehouseDir, ".orc", "config.json"))
 
-	// 5. Get workbenches and check each one's state
+	// 6. Get workbenches and check each one's state
 	workbenches, _ := s.workbenchRepo.List(ctx, req.WorkshopID)
 	var wbInputs []coreworkshop.WorkbenchPlanInput
 	for _, wb := range workbenches {
@@ -232,13 +239,15 @@ func (s *WorkshopServiceImpl) PlanOpenWorkshop(ctx context.Context, req primary.
 		})
 	}
 
-	// 6. Generate plan using pure function
+	// 7. Generate plan using pure function
 	input := coreworkshop.OpenPlanInput{
 		WorkshopID:            req.WorkshopID,
 		WorkshopName:          workshop.Name,
 		FactoryID:             factory.ID,
 		FactoryName:           factory.Name,
 		SessionExists:         sessionExists,
+		ActualSessionName:     actualSessionName,
+		ExistingWindows:       existingWindows,
 		GatehouseDir:          gatehouseDir,
 		GatehouseDirExists:    gatehouseDirExists,
 		GatehouseConfigExists: gatehouseConfigExists,
@@ -246,7 +255,7 @@ func (s *WorkshopServiceImpl) PlanOpenWorkshop(ctx context.Context, req primary.
 	}
 	corePlan := coreworkshop.GenerateOpenPlan(input)
 
-	// 7. Convert core plan to primary plan
+	// 8. Convert core plan to primary plan
 	return s.corePlanToPrimary(&corePlan), nil
 }
 
@@ -283,27 +292,50 @@ func (s *WorkshopServiceImpl) ApplyOpenWorkshop(ctx context.Context, plan *prima
 		}
 	}
 
-	// 3. Create tmux session if needed
+	// 3. Handle tmux session
+	sessionAlreadyOpen := false
 	if plan.TMuxOp != nil {
-		if err := s.tmuxAdapter.CreateSession(ctx, plan.SessionName, gatehouseDir); err != nil {
-			return nil, fmt.Errorf("failed to create session: %w", err)
-		}
+		if plan.TMuxOp.AddToExisting {
+			// Add windows to existing session
+			for _, window := range plan.TMuxOp.Windows {
+				// Find the workbench path for this window
+				var wbPath string
+				for _, wb := range workbenches {
+					if wb.Name == window.Name {
+						wbPath = wb.WorktreePath
+						break
+					}
+				}
+				if wbPath != "" {
+					_ = s.tmuxAdapter.CreateWorkbenchWindow(ctx, plan.SessionName, window.Index, window.Name, wbPath)
+				}
+			}
+			sessionAlreadyOpen = true
+		} else {
+			// Create new session
+			if err := s.tmuxAdapter.CreateSession(ctx, plan.SessionName, gatehouseDir); err != nil {
+				return nil, fmt.Errorf("failed to create session: %w", err)
+			}
 
-		// Setup Gatehouse (ORC) window
-		if err := s.tmuxAdapter.CreateOrcWindow(ctx, plan.SessionName, gatehouseDir); err != nil {
-			return nil, fmt.Errorf("failed to create gatehouse: %w", err)
-		}
+			// Mark session with workshop ID env var (survives renames)
+			_ = s.tmuxAdapter.SetEnvironment(ctx, plan.SessionName, "ORC_WORKSHOP_ID", plan.WorkshopID)
 
-		// Create tmux windows for each workbench
-		for i, wb := range workbenches {
-			_ = s.tmuxAdapter.CreateWorkbenchWindow(ctx, plan.SessionName, i+2, wb.Name, wb.WorktreePath)
+			// Setup Gatehouse (ORC) window
+			if err := s.tmuxAdapter.CreateOrcWindow(ctx, plan.SessionName, gatehouseDir); err != nil {
+				return nil, fmt.Errorf("failed to create gatehouse: %w", err)
+			}
+
+			// Create tmux windows for each workbench
+			for i, wb := range workbenches {
+				_ = s.tmuxAdapter.CreateWorkbenchWindow(ctx, plan.SessionName, i+2, wb.Name, wb.WorktreePath)
+			}
 		}
 	}
 
 	return &primary.OpenWorkshopResponse{
 		Workshop:           s.recordToWorkshop(workshop),
 		SessionName:        plan.SessionName,
-		SessionAlreadyOpen: false,
+		SessionAlreadyOpen: sessionAlreadyOpen,
 		AttachInstructions: s.tmuxAdapter.AttachInstructions(plan.SessionName),
 	}, nil
 }
@@ -511,13 +543,21 @@ func (s *WorkshopServiceImpl) corePlanToPrimary(core *coreworkshop.OpenWorkshopP
 				Index:  w.Index,
 				Name:   w.Name,
 				Path:   w.Path,
-				Status: primary.OpCreate, // Windows in a new session are always CREATE
+				Status: primary.OpCreate, // New windows are always CREATE
 			})
 		}
+
+		// Session status depends on whether we're creating or adding to existing
+		sessionStatus := primary.OpCreate
+		if core.TMuxOp.AddToExisting {
+			sessionStatus = primary.OpExists
+		}
+
 		plan.TMuxOp = &primary.TMuxOp{
 			SessionName:   core.TMuxOp.SessionName,
-			SessionStatus: primary.OpCreate, // TMuxOp only exists if session doesn't
+			SessionStatus: sessionStatus,
 			Windows:       windows,
+			AddToExisting: core.TMuxOp.AddToExisting,
 		}
 	}
 

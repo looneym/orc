@@ -153,6 +153,7 @@ type TMuxOp struct {
 	SessionName   string
 	SessionStatus OpStatus
 	Windows       []TMuxWindowOp
+	AddToExisting bool // true = add windows to existing session, false = create new session
 }
 
 // TMuxWindowOp describes a tmux window operation.

@@ -419,6 +419,26 @@ func (m *mockTMuxAdapter) GetCurrentSessionName(ctx context.Context) string {
 	return ""
 }
 
+func (m *mockTMuxAdapter) SetEnvironment(ctx context.Context, sessionName, key, value string) error {
+	return nil
+}
+
+func (m *mockTMuxAdapter) GetEnvironment(ctx context.Context, sessionName, key string) (string, error) {
+	return "", nil
+}
+
+func (m *mockTMuxAdapter) ListSessions(ctx context.Context) ([]string, error) {
+	return nil, nil
+}
+
+func (m *mockTMuxAdapter) FindSessionByWorkshopID(ctx context.Context, workshopID string) string {
+	return ""
+}
+
+func (m *mockTMuxAdapter) ListWindows(ctx context.Context, sessionName string) ([]string, error) {
+	return nil, nil
+}
+
 // mockWorkspaceAdapter implements secondary.WorkspaceAdapter for testing.
 type mockWorkspaceAdapter struct {
 	worktrees map[string]bool
