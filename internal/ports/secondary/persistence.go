@@ -1078,3 +1078,262 @@ type ReceiptFilters struct {
 	ShipmentID string
 	Status     string
 }
+
+// GatehouseRepository defines the secondary port for gatehouse persistence.
+// Gatehouses are 1:1 with workshops (Goblin seat).
+type GatehouseRepository interface {
+	// Create persists a new gatehouse.
+	Create(ctx context.Context, gatehouse *GatehouseRecord) error
+
+	// GetByID retrieves a gatehouse by its ID.
+	GetByID(ctx context.Context, id string) (*GatehouseRecord, error)
+
+	// GetByWorkshop retrieves a gatehouse by workshop ID.
+	GetByWorkshop(ctx context.Context, workshopID string) (*GatehouseRecord, error)
+
+	// List retrieves gatehouses matching the given filters.
+	List(ctx context.Context, filters GatehouseFilters) ([]*GatehouseRecord, error)
+
+	// Update updates an existing gatehouse.
+	Update(ctx context.Context, gatehouse *GatehouseRecord) error
+
+	// Delete removes a gatehouse from persistence.
+	Delete(ctx context.Context, id string) error
+
+	// GetNextID returns the next available gatehouse ID.
+	GetNextID(ctx context.Context) (string, error)
+
+	// UpdateStatus updates the status of a gatehouse.
+	UpdateStatus(ctx context.Context, id, status string) error
+
+	// WorkshopExists checks if a workshop exists (for validation).
+	WorkshopExists(ctx context.Context, workshopID string) (bool, error)
+
+	// WorkshopHasGatehouse checks if a workshop already has a gatehouse (for 1:1 constraint).
+	WorkshopHasGatehouse(ctx context.Context, workshopID string) (bool, error)
+}
+
+// GatehouseRecord represents a gatehouse as stored in persistence.
+type GatehouseRecord struct {
+	ID         string
+	WorkshopID string
+	Status     string
+	CreatedAt  string
+	UpdatedAt  string
+}
+
+// GatehouseFilters contains filter options for querying gatehouses.
+type GatehouseFilters struct {
+	WorkshopID string
+	Status     string
+}
+
+// WatchdogRepository defines the secondary port for watchdog persistence.
+// Watchdogs are 1:1 with workbenches (IMP monitors).
+type WatchdogRepository interface {
+	// Create persists a new watchdog.
+	Create(ctx context.Context, watchdog *WatchdogRecord) error
+
+	// GetByID retrieves a watchdog by its ID.
+	GetByID(ctx context.Context, id string) (*WatchdogRecord, error)
+
+	// GetByWorkbench retrieves a watchdog by workbench ID.
+	GetByWorkbench(ctx context.Context, workbenchID string) (*WatchdogRecord, error)
+
+	// List retrieves watchdogs matching the given filters.
+	List(ctx context.Context, filters WatchdogFilters) ([]*WatchdogRecord, error)
+
+	// Update updates an existing watchdog.
+	Update(ctx context.Context, watchdog *WatchdogRecord) error
+
+	// Delete removes a watchdog from persistence.
+	Delete(ctx context.Context, id string) error
+
+	// GetNextID returns the next available watchdog ID.
+	GetNextID(ctx context.Context) (string, error)
+
+	// UpdateStatus updates the status of a watchdog.
+	UpdateStatus(ctx context.Context, id, status string) error
+
+	// WorkbenchExists checks if a workbench exists (for validation).
+	WorkbenchExists(ctx context.Context, workbenchID string) (bool, error)
+
+	// WorkbenchHasWatchdog checks if a workbench already has a watchdog (for 1:1 constraint).
+	WorkbenchHasWatchdog(ctx context.Context, workbenchID string) (bool, error)
+}
+
+// WatchdogRecord represents a watchdog as stored in persistence.
+type WatchdogRecord struct {
+	ID          string
+	WorkbenchID string
+	Status      string
+	CreatedAt   string
+	UpdatedAt   string
+}
+
+// WatchdogFilters contains filter options for querying watchdogs.
+type WatchdogFilters struct {
+	WorkbenchID string
+	Status      string
+}
+
+// ApprovalRepository defines the secondary port for approval persistence.
+// Approvals are 1:1 with plans.
+type ApprovalRepository interface {
+	// Create persists a new approval.
+	Create(ctx context.Context, approval *ApprovalRecord) error
+
+	// GetByID retrieves an approval by its ID.
+	GetByID(ctx context.Context, id string) (*ApprovalRecord, error)
+
+	// GetByPlan retrieves an approval by plan ID.
+	GetByPlan(ctx context.Context, planID string) (*ApprovalRecord, error)
+
+	// List retrieves approvals matching the given filters.
+	List(ctx context.Context, filters ApprovalFilters) ([]*ApprovalRecord, error)
+
+	// Delete removes an approval from persistence.
+	Delete(ctx context.Context, id string) error
+
+	// GetNextID returns the next available approval ID.
+	GetNextID(ctx context.Context) (string, error)
+
+	// PlanExists checks if a plan exists (for validation).
+	PlanExists(ctx context.Context, planID string) (bool, error)
+
+	// TaskExists checks if a task exists (for validation).
+	TaskExists(ctx context.Context, taskID string) (bool, error)
+
+	// PlanHasApproval checks if a plan already has an approval (for 1:1 constraint).
+	PlanHasApproval(ctx context.Context, planID string) (bool, error)
+}
+
+// ApprovalRecord represents an approval as stored in persistence.
+type ApprovalRecord struct {
+	ID             string
+	PlanID         string
+	TaskID         string
+	Mechanism      string // 'subagent' or 'manual'
+	ReviewerInput  string // Empty string means null
+	ReviewerOutput string // Empty string means null
+	Outcome        string // 'approved' or 'escalated'
+	CreatedAt      string
+}
+
+// ApprovalFilters contains filter options for querying approvals.
+type ApprovalFilters struct {
+	TaskID  string
+	Outcome string
+}
+
+// EscalationRepository defines the secondary port for escalation persistence.
+type EscalationRepository interface {
+	// Create persists a new escalation.
+	Create(ctx context.Context, escalation *EscalationRecord) error
+
+	// GetByID retrieves an escalation by its ID.
+	GetByID(ctx context.Context, id string) (*EscalationRecord, error)
+
+	// List retrieves escalations matching the given filters.
+	List(ctx context.Context, filters EscalationFilters) ([]*EscalationRecord, error)
+
+	// Update updates an existing escalation.
+	Update(ctx context.Context, escalation *EscalationRecord) error
+
+	// Delete removes an escalation from persistence.
+	Delete(ctx context.Context, id string) error
+
+	// GetNextID returns the next available escalation ID.
+	GetNextID(ctx context.Context) (string, error)
+
+	// UpdateStatus updates the status of an escalation.
+	UpdateStatus(ctx context.Context, id, status string, setResolved bool) error
+
+	// Resolve resolves an escalation with resolution text.
+	Resolve(ctx context.Context, id, resolution, resolvedBy string) error
+
+	// PlanExists checks if a plan exists (for validation).
+	PlanExists(ctx context.Context, planID string) (bool, error)
+
+	// TaskExists checks if a task exists (for validation).
+	TaskExists(ctx context.Context, taskID string) (bool, error)
+
+	// ApprovalExists checks if an approval exists (for validation).
+	ApprovalExists(ctx context.Context, approvalID string) (bool, error)
+}
+
+// EscalationRecord represents an escalation as stored in persistence.
+type EscalationRecord struct {
+	ID            string
+	ApprovalID    string // Empty string means null
+	PlanID        string
+	TaskID        string
+	Reason        string
+	Status        string // 'pending', 'resolved', 'dismissed'
+	RoutingRule   string // e.g. 'workshop_gatehouse'
+	OriginActorID string
+	TargetActorID string // Empty string means null
+	Resolution    string // Empty string means null
+	ResolvedBy    string // Empty string means null
+	CreatedAt     string
+	ResolvedAt    string // Empty string means null
+}
+
+// EscalationFilters contains filter options for querying escalations.
+type EscalationFilters struct {
+	Status        string
+	TargetActorID string
+}
+
+// ManifestRepository defines the secondary port for manifest persistence.
+// Manifests are 1:1 with shipments.
+type ManifestRepository interface {
+	// Create persists a new manifest.
+	Create(ctx context.Context, manifest *ManifestRecord) error
+
+	// GetByID retrieves a manifest by its ID.
+	GetByID(ctx context.Context, id string) (*ManifestRecord, error)
+
+	// GetByShipment retrieves a manifest by shipment ID.
+	GetByShipment(ctx context.Context, shipmentID string) (*ManifestRecord, error)
+
+	// List retrieves manifests matching the given filters.
+	List(ctx context.Context, filters ManifestFilters) ([]*ManifestRecord, error)
+
+	// Update updates an existing manifest.
+	Update(ctx context.Context, manifest *ManifestRecord) error
+
+	// Delete removes a manifest from persistence.
+	Delete(ctx context.Context, id string) error
+
+	// GetNextID returns the next available manifest ID.
+	GetNextID(ctx context.Context) (string, error)
+
+	// UpdateStatus updates the status of a manifest.
+	UpdateStatus(ctx context.Context, id, status string) error
+
+	// ShipmentExists checks if a shipment exists (for validation).
+	ShipmentExists(ctx context.Context, shipmentID string) (bool, error)
+
+	// ShipmentHasManifest checks if a shipment already has a manifest (for 1:1 constraint).
+	ShipmentHasManifest(ctx context.Context, shipmentID string) (bool, error)
+}
+
+// ManifestRecord represents a manifest as stored in persistence.
+type ManifestRecord struct {
+	ID            string
+	ShipmentID    string
+	CreatedBy     string
+	Attestation   string // Empty string means null
+	Tasks         string // JSON array of task IDs, empty string means null
+	OrderingNotes string // Empty string means null
+	Status        string // 'draft' or 'launched'
+	CreatedAt     string
+	UpdatedAt     string
+}
+
+// ManifestFilters contains filter options for querying manifests.
+type ManifestFilters struct {
+	ShipmentID string
+	Status     string
+}

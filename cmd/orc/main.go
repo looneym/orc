@@ -58,6 +58,13 @@ It coordinates IMPs (Implementation Agents) working in isolated workbenches (wor
 	// Receipt command
 	rootCmd.AddCommand(cli.ReceiptCmd())
 
+	// New entity commands (Stage 2)
+	rootCmd.AddCommand(cli.GatehouseCmd())
+	rootCmd.AddCommand(cli.WatchdogCmd())
+	rootCmd.AddCommand(cli.ApprovalCmd())
+	rootCmd.AddCommand(cli.EscalationCmd())
+	rootCmd.AddCommand(cli.ManifestCmd())
+
 	// Repository and PR commands
 	rootCmd.AddCommand(cli.RepoCmd())
 	rootCmd.AddCommand(cli.PRCmd())

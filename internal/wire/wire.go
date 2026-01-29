@@ -38,6 +38,11 @@ var (
 	workbenchService               primary.WorkbenchService
 	receiptService                 primary.ReceiptService
 	summaryService                 primary.SummaryService
+	gatehouseService               primary.GatehouseService
+	watchdogService                primary.WatchdogService
+	approvalService                primary.ApprovalService
+	escalationService              primary.EscalationService
+	manifestService                primary.ManifestService
 	commissionOrchestrationService *app.CommissionOrchestrationService
 	tmuxService                    secondary.TMuxAdapter
 	libraryRepo                    secondary.LibraryRepository
@@ -153,6 +158,36 @@ func SummaryService() primary.SummaryService {
 	return summaryService
 }
 
+// GatehouseService returns the singleton GatehouseService instance.
+func GatehouseService() primary.GatehouseService {
+	once.Do(initServices)
+	return gatehouseService
+}
+
+// WatchdogService returns the singleton WatchdogService instance.
+func WatchdogService() primary.WatchdogService {
+	once.Do(initServices)
+	return watchdogService
+}
+
+// ApprovalService returns the singleton ApprovalService instance.
+func ApprovalService() primary.ApprovalService {
+	once.Do(initServices)
+	return approvalService
+}
+
+// EscalationService returns the singleton EscalationService instance.
+func EscalationService() primary.EscalationService {
+	once.Do(initServices)
+	return escalationService
+}
+
+// ManifestService returns the singleton ManifestService instance.
+func ManifestService() primary.ManifestService {
+	once.Do(initServices)
+	return manifestService
+}
+
 // CommissionOrchestrationService returns the singleton CommissionOrchestrationService instance.
 func CommissionOrchestrationService() *app.CommissionOrchestrationService {
 	once.Do(initServices)
@@ -260,6 +295,22 @@ func initServices() {
 	// Create receipt service
 	receiptRepo := sqlite.NewReceiptRepository(database)
 	receiptService = app.NewReceiptService(receiptRepo)
+
+	// Create new entity services (gatehouses, watchdogs, approvals, escalations, manifests)
+	gatehouseRepo := sqlite.NewGatehouseRepository(database)
+	gatehouseService = app.NewGatehouseService(gatehouseRepo)
+
+	watchdogRepo := sqlite.NewWatchdogRepository(database)
+	watchdogService = app.NewWatchdogService(watchdogRepo)
+
+	approvalRepo := sqlite.NewApprovalRepository(database)
+	approvalService = app.NewApprovalService(approvalRepo)
+
+	escalationRepo := sqlite.NewEscalationRepository(database)
+	escalationService = app.NewEscalationService(escalationRepo)
+
+	manifestRepo := sqlite.NewManifestRepository(database)
+	manifestService = app.NewManifestService(manifestRepo)
 
 	// Create orchestration services
 	commissionOrchestrationService = app.NewCommissionOrchestrationService(commissionService, agentProvider)

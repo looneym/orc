@@ -380,6 +380,88 @@ CREATE TABLE IF NOT EXISTS receipts (
 
 CREATE INDEX IF NOT EXISTS idx_receipts_shipment ON receipts(shipment_id);
 CREATE INDEX IF NOT EXISTS idx_receipts_status ON receipts(status);
+
+-- Gatehouses (1:1 with Workshop - Goblin seat)
+CREATE TABLE IF NOT EXISTS gatehouses (
+	id TEXT PRIMARY KEY,
+	workshop_id TEXT NOT NULL UNIQUE,
+	status TEXT NOT NULL DEFAULT 'active',
+	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+	updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+	FOREIGN KEY (workshop_id) REFERENCES workshops(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_gatehouses_workshop ON gatehouses(workshop_id);
+CREATE INDEX IF NOT EXISTS idx_gatehouses_status ON gatehouses(status);
+
+-- Watchdogs (1:1 with Workbench - monitors IMP)
+CREATE TABLE IF NOT EXISTS watchdogs (
+	id TEXT PRIMARY KEY,
+	workbench_id TEXT NOT NULL UNIQUE,
+	status TEXT NOT NULL DEFAULT 'inactive' CHECK (status IN ('active', 'inactive')),
+	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+	updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+	FOREIGN KEY (workbench_id) REFERENCES workbenches(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_watchdogs_workbench ON watchdogs(workbench_id);
+CREATE INDEX IF NOT EXISTS idx_watchdogs_status ON watchdogs(status);
+
+-- Approvals (1:1 with Plan)
+CREATE TABLE IF NOT EXISTS approvals (
+	id TEXT PRIMARY KEY,
+	plan_id TEXT NOT NULL UNIQUE,
+	task_id TEXT NOT NULL,
+	mechanism TEXT NOT NULL,
+	reviewer_input TEXT,
+	reviewer_output TEXT,
+	outcome TEXT NOT NULL CHECK (outcome IN ('approved', 'escalated')),
+	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+	FOREIGN KEY (plan_id) REFERENCES plans(id) ON DELETE CASCADE,
+	FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_approvals_plan ON approvals(plan_id);
+CREATE INDEX IF NOT EXISTS idx_approvals_task ON approvals(task_id);
+CREATE INDEX IF NOT EXISTS idx_approvals_outcome ON approvals(outcome);
+
+-- Escalations (references approval, plan, task)
+CREATE TABLE IF NOT EXISTS escalations (
+	id TEXT PRIMARY KEY,
+	approval_id TEXT,
+	plan_id TEXT NOT NULL,
+	task_id TEXT NOT NULL,
+	reason TEXT NOT NULL,
+	status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'resolved', 'dismissed')),
+	routing_rule TEXT NOT NULL DEFAULT 'workshop_gatehouse',
+	origin_actor_id TEXT NOT NULL,
+	target_actor_id TEXT,
+	resolution TEXT,
+	resolved_by TEXT,
+	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+	resolved_at DATETIME,
+	FOREIGN KEY (approval_id) REFERENCES approvals(id) ON DELETE SET NULL,
+	FOREIGN KEY (plan_id) REFERENCES plans(id),
+	FOREIGN KEY (task_id) REFERENCES tasks(id)
+);
+CREATE INDEX IF NOT EXISTS idx_escalations_approval ON escalations(approval_id);
+CREATE INDEX IF NOT EXISTS idx_escalations_plan ON escalations(plan_id);
+CREATE INDEX IF NOT EXISTS idx_escalations_task ON escalations(task_id);
+CREATE INDEX IF NOT EXISTS idx_escalations_status ON escalations(status);
+CREATE INDEX IF NOT EXISTS idx_escalations_target ON escalations(target_actor_id);
+
+-- Manifests (1:1 with Shipment)
+CREATE TABLE IF NOT EXISTS manifests (
+	id TEXT PRIMARY KEY,
+	shipment_id TEXT NOT NULL UNIQUE,
+	created_by TEXT NOT NULL,
+	attestation TEXT,
+	tasks TEXT,
+	ordering_notes TEXT,
+	status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'launched')),
+	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+	updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+	FOREIGN KEY (shipment_id) REFERENCES shipments(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_manifests_shipment ON manifests(shipment_id);
+CREATE INDEX IF NOT EXISTS idx_manifests_status ON manifests(status);
 `
 
 // InitSchema creates the database schema
