@@ -136,6 +136,7 @@ type ShipmentRecord struct {
 	Pinned              bool
 	ContainerID         string // Empty string means null - CON-xxx or YARD-xxx
 	ContainerType       string // Empty string means null - "conclave" or "shipyard"
+	Autorun             bool   // Whether to auto-run tasks when shipment is launched
 	CreatedAt           string
 	UpdatedAt           string
 	CompletedAt         string // Empty string means null
@@ -230,6 +231,7 @@ type TaskRecord struct {
 	Priority            string // Empty string means null
 	AssignedWorkbenchID string // Empty string means null
 	Pinned              bool
+	DependsOn           string // JSON array of task IDs, empty string means null
 	CreatedAt           string
 	UpdatedAt           string
 	ClaimedAt           string // Empty string means null
@@ -586,7 +588,7 @@ type ConclaveTaskRecord struct {
 // ConclavePlanRecord represents a plan as returned from conclave cross-entity query.
 type ConclavePlanRecord struct {
 	ID               string
-	ShipmentID       string
+	TaskID           string
 	CommissionID     string
 	Title            string
 	Description      string
@@ -670,23 +672,26 @@ type PlanRepository interface {
 	// Approve approves a plan and sets the approved_at timestamp.
 	Approve(ctx context.Context, id string) error
 
-	// GetActivePlanForShipment retrieves the active (draft) plan for a shipment.
-	GetActivePlanForShipment(ctx context.Context, shipmentID string) (*PlanRecord, error)
+	// GetActivePlanForTask retrieves the active (draft) plan for a task.
+	GetActivePlanForTask(ctx context.Context, taskID string) (*PlanRecord, error)
 
-	// HasActivePlanForShipment checks if a shipment has an active (draft) plan.
-	HasActivePlanForShipment(ctx context.Context, shipmentID string) (bool, error)
+	// HasActivePlanForTask checks if a task has an active (draft) plan.
+	HasActivePlanForTask(ctx context.Context, taskID string) (bool, error)
+
+	// UpdateStatus updates the plan status.
+	UpdateStatus(ctx context.Context, id, status string) error
 
 	// CommissionExists checks if a commission exists (for validation).
 	CommissionExists(ctx context.Context, commissionID string) (bool, error)
 
-	// ShipmentExists checks if a shipment exists (for validation).
-	ShipmentExists(ctx context.Context, shipmentID string) (bool, error)
+	// TaskExists checks if a task exists (for validation).
+	TaskExists(ctx context.Context, taskID string) (bool, error)
 }
 
 // PlanRecord represents a plan as stored in persistence.
 type PlanRecord struct {
 	ID               string
-	ShipmentID       string // Empty string means null
+	TaskID           string // FK to tasks
 	CommissionID     string
 	Title            string
 	Description      string // Empty string means null
@@ -699,11 +704,12 @@ type PlanRecord struct {
 	ConclaveID       string // Empty string means null
 	PromotedFromID   string // Empty string means null
 	PromotedFromType string // Empty string means null
+	SupersedesPlanID string // Empty string means null - FK to plans
 }
 
 // PlanFilters contains filter options for querying plans.
 type PlanFilters struct {
-	ShipmentID   string
+	TaskID       string
 	CommissionID string
 	Status       string
 }
@@ -722,34 +728,32 @@ type MessageRepository interface {
 	// MarkRead marks a message as read.
 	MarkRead(ctx context.Context, id string) error
 
-	// GetConversation retrieves all messages between two agents.
-	GetConversation(ctx context.Context, agent1, agent2 string) ([]*MessageRecord, error)
+	// GetConversation retrieves all messages between two actors.
+	GetConversation(ctx context.Context, actor1, actor2 string) ([]*MessageRecord, error)
 
 	// GetUnreadCount returns the count of unread messages for a recipient.
 	GetUnreadCount(ctx context.Context, recipient string) (int, error)
 
-	// GetNextID returns the next available message ID for a commission.
-	GetNextID(ctx context.Context, commissionID string) (string, error)
-
-	// CommissionExists checks if a commission exists (for validation).
-	CommissionExists(ctx context.Context, commissionID string) (bool, error)
+	// GetNextID returns the next available message ID.
+	GetNextID(ctx context.Context) (string, error)
 }
 
 // MessageRecord represents a message as stored in persistence.
+// Sender and Recipient are actor IDs (e.g., BENCH-xxx, GATE-xxx, WATCH-xxx).
 type MessageRecord struct {
-	ID           string
-	Sender       string
-	Recipient    string
-	Subject      string
-	Body         string
-	Timestamp    string
-	Read         bool
-	CommissionID string
+	ID        string
+	Sender    string // Actor ID
+	Recipient string // Actor ID
+	Subject   string
+	Body      string
+	Timestamp string
+	Read      bool
 }
 
 // MessageFilters contains filter options for querying messages.
 type MessageFilters struct {
 	Recipient  string
+	Sender     string
 	UnreadOnly bool
 }
 
@@ -1034,8 +1038,8 @@ type ReceiptRepository interface {
 	// GetByID retrieves a receipt by its ID.
 	GetByID(ctx context.Context, id string) (*ReceiptRecord, error)
 
-	// GetByShipment retrieves a receipt by its shipment ID.
-	GetByShipment(ctx context.Context, shipmentID string) (*ReceiptRecord, error)
+	// GetByTask retrieves a receipt by its task ID.
+	GetByTask(ctx context.Context, taskID string) (*ReceiptRecord, error)
 
 	// List retrieves receipts matching the given filters.
 	List(ctx context.Context, filters ReceiptFilters) ([]*ReceiptRecord, error)
@@ -1054,17 +1058,17 @@ type ReceiptRepository interface {
 
 	// Validation helpers (for guards to query)
 
-	// ShipmentExists checks if a shipment exists.
-	ShipmentExists(ctx context.Context, shipmentID string) (bool, error)
+	// TaskExists checks if a task exists.
+	TaskExists(ctx context.Context, taskID string) (bool, error)
 
-	// ShipmentHasREC checks if a shipment already has a REC (for 1:1 constraint).
-	ShipmentHasREC(ctx context.Context, shipmentID string) (bool, error)
+	// TaskHasReceipt checks if a task already has a receipt (for 1:1 constraint).
+	TaskHasReceipt(ctx context.Context, taskID string) (bool, error)
 }
 
 // ReceiptRecord represents a receipt as stored in persistence.
 type ReceiptRecord struct {
 	ID                string
-	ShipmentID        string
+	TaskID            string // FK to tasks (1:1)
 	DeliveredOutcome  string
 	Evidence          string // Empty string means null
 	VerificationNotes string // Empty string means null
@@ -1075,8 +1079,8 @@ type ReceiptRecord struct {
 
 // ReceiptFilters contains filter options for querying receipts.
 type ReceiptFilters struct {
-	ShipmentID string
-	Status     string
+	TaskID string
+	Status string
 }
 
 // GatehouseRepository defines the secondary port for gatehouse persistence.

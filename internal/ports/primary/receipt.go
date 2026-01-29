@@ -10,8 +10,8 @@ type ReceiptService interface {
 	// GetReceipt retrieves a receipt by ID.
 	GetReceipt(ctx context.Context, recID string) (*Receipt, error)
 
-	// GetReceiptByShipment retrieves a receipt by shipment ID.
-	GetReceiptByShipment(ctx context.Context, shipmentID string) (*Receipt, error)
+	// GetReceiptByTask retrieves a receipt by task ID.
+	GetReceiptByTask(ctx context.Context, taskID string) (*Receipt, error)
 
 	// ListReceipts lists receipts with optional filters.
 	ListReceipts(ctx context.Context, filters ReceiptFilters) ([]*Receipt, error)
@@ -31,7 +31,7 @@ type ReceiptService interface {
 
 // CreateReceiptRequest contains parameters for creating a receipt.
 type CreateReceiptRequest struct {
-	ShipmentID        string
+	TaskID            string
 	DeliveredOutcome  string
 	Evidence          string // Optional
 	VerificationNotes string // Optional
@@ -54,7 +54,7 @@ type UpdateReceiptRequest struct {
 // Receipt represents a receipt entity at the port boundary.
 type Receipt struct {
 	ID                string
-	ShipmentID        string
+	TaskID            string
 	DeliveredOutcome  string
 	Evidence          string
 	VerificationNotes string
@@ -65,8 +65,8 @@ type Receipt struct {
 
 // ReceiptFilters contains filter options for listing receipts.
 type ReceiptFilters struct {
-	ShipmentID string
-	Status     string
+	TaskID string
+	Status string
 }
 
 // Receipt status constants

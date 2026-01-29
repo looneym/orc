@@ -12,28 +12,24 @@ import (
 
 // mockReceiptRepository implements secondary.ReceiptRepository for testing.
 type mockReceiptRepository struct {
-	receipts         map[string]*secondary.ReceiptRecord
-	receiptsByShip   map[string]*secondary.ReceiptRecord
-	shipmentExists   map[string]bool
-	shipmentHasREC   map[string]bool
-	woStatus         map[string]string
-	allCRECsVerified map[string]bool
-	nextID           int
-	createErr        error
-	getErr           error
-	updateErr        error
-	deleteErr        error
+	receipts       map[string]*secondary.ReceiptRecord
+	receiptsByTask map[string]*secondary.ReceiptRecord
+	taskExists     map[string]bool
+	taskHasReceipt map[string]bool
+	nextID         int
+	createErr      error
+	getErr         error
+	updateErr      error
+	deleteErr      error
 }
 
 func newMockReceiptRepository() *mockReceiptRepository {
 	return &mockReceiptRepository{
-		receipts:         make(map[string]*secondary.ReceiptRecord),
-		receiptsByShip:   make(map[string]*secondary.ReceiptRecord),
-		shipmentExists:   make(map[string]bool),
-		shipmentHasREC:   make(map[string]bool),
-		woStatus:         make(map[string]string),
-		allCRECsVerified: make(map[string]bool),
-		nextID:           1,
+		receipts:       make(map[string]*secondary.ReceiptRecord),
+		receiptsByTask: make(map[string]*secondary.ReceiptRecord),
+		taskExists:     make(map[string]bool),
+		taskHasReceipt: make(map[string]bool),
+		nextID:         1,
 	}
 }
 
@@ -42,8 +38,8 @@ func (m *mockReceiptRepository) Create(ctx context.Context, rec *secondary.Recei
 		return m.createErr
 	}
 	m.receipts[rec.ID] = rec
-	m.receiptsByShip[rec.ShipmentID] = rec
-	m.shipmentHasREC[rec.ShipmentID] = true
+	m.receiptsByTask[rec.TaskID] = rec
+	m.taskHasReceipt[rec.TaskID] = true
 	return nil
 }
 
@@ -57,8 +53,8 @@ func (m *mockReceiptRepository) GetByID(ctx context.Context, id string) (*second
 	return nil, errors.New("not found")
 }
 
-func (m *mockReceiptRepository) GetByShipment(ctx context.Context, shipmentID string) (*secondary.ReceiptRecord, error) {
-	if r, ok := m.receiptsByShip[shipmentID]; ok {
+func (m *mockReceiptRepository) GetByTask(ctx context.Context, taskID string) (*secondary.ReceiptRecord, error) {
+	if r, ok := m.receiptsByTask[taskID]; ok {
 		return r, nil
 	}
 	return nil, errors.New("not found")
@@ -67,7 +63,7 @@ func (m *mockReceiptRepository) GetByShipment(ctx context.Context, shipmentID st
 func (m *mockReceiptRepository) List(ctx context.Context, filters secondary.ReceiptFilters) ([]*secondary.ReceiptRecord, error) {
 	var result []*secondary.ReceiptRecord
 	for _, r := range m.receipts {
-		if filters.ShipmentID != "" && r.ShipmentID != filters.ShipmentID {
+		if filters.TaskID != "" && r.TaskID != filters.TaskID {
 			continue
 		}
 		if filters.Status != "" && r.Status != filters.Status {
@@ -106,9 +102,9 @@ func (m *mockReceiptRepository) Delete(ctx context.Context, id string) error {
 		return errors.New("not found")
 	}
 	r := m.receipts[id]
-	delete(m.receiptsByShip, r.ShipmentID)
+	delete(m.receiptsByTask, r.TaskID)
 	delete(m.receipts, id)
-	m.shipmentHasREC[r.ShipmentID] = false
+	m.taskHasReceipt[r.TaskID] = false
 	return nil
 }
 
@@ -126,23 +122,12 @@ func (m *mockReceiptRepository) UpdateStatus(ctx context.Context, id, status str
 	return errors.New("not found")
 }
 
-func (m *mockReceiptRepository) ShipmentExists(ctx context.Context, shipmentID string) (bool, error) {
-	return m.shipmentExists[shipmentID], nil
+func (m *mockReceiptRepository) TaskExists(ctx context.Context, taskID string) (bool, error) {
+	return m.taskExists[taskID], nil
 }
 
-func (m *mockReceiptRepository) ShipmentHasREC(ctx context.Context, shipmentID string) (bool, error) {
-	return m.shipmentHasREC[shipmentID], nil
-}
-
-func (m *mockReceiptRepository) GetWOStatus(ctx context.Context, shipmentID string) (string, error) {
-	if status, ok := m.woStatus[shipmentID]; ok {
-		return status, nil
-	}
-	return "", fmt.Errorf("Work Order for shipment %s not found", shipmentID)
-}
-
-func (m *mockReceiptRepository) AllCRECsVerified(ctx context.Context, shipmentID string) (bool, error) {
-	return m.allCRECsVerified[shipmentID], nil
+func (m *mockReceiptRepository) TaskHasReceipt(ctx context.Context, taskID string) (bool, error) {
+	return m.taskHasReceipt[taskID], nil
 }
 
 func newTestReceiptService() (*ReceiptServiceImpl, *mockReceiptRepository) {
@@ -155,10 +140,10 @@ func TestReceiptService_CreateReceipt(t *testing.T) {
 	service, repo := newTestReceiptService()
 	ctx := context.Background()
 
-	repo.shipmentExists["SHIP-001"] = true
+	repo.taskExists["TASK-001"] = true
 
 	resp, err := service.CreateReceipt(ctx, primary.CreateReceiptRequest{
-		ShipmentID:       "SHIP-001",
+		TaskID:           "TASK-001",
 		DeliveredOutcome: "Completed the task",
 		Evidence:         "Screenshot attached",
 	})
@@ -174,17 +159,17 @@ func TestReceiptService_CreateReceipt(t *testing.T) {
 	}
 }
 
-func TestReceiptService_CreateReceipt_ShipmentNotFound(t *testing.T) {
+func TestReceiptService_CreateReceipt_TaskNotFound(t *testing.T) {
 	service, _ := newTestReceiptService()
 	ctx := context.Background()
 
 	_, err := service.CreateReceipt(ctx, primary.CreateReceiptRequest{
-		ShipmentID:       "SHIP-999",
+		TaskID:           "TASK-999",
 		DeliveredOutcome: "Test",
 	})
 
 	if err == nil {
-		t.Error("expected error for non-existent shipment")
+		t.Error("expected error for non-existent task")
 	}
 }
 
@@ -192,16 +177,16 @@ func TestReceiptService_CreateReceipt_AlreadyExists(t *testing.T) {
 	service, repo := newTestReceiptService()
 	ctx := context.Background()
 
-	repo.shipmentExists["SHIP-001"] = true
-	repo.shipmentHasREC["SHIP-001"] = true
+	repo.taskExists["TASK-001"] = true
+	repo.taskHasReceipt["TASK-001"] = true
 
 	_, err := service.CreateReceipt(ctx, primary.CreateReceiptRequest{
-		ShipmentID:       "SHIP-001",
+		TaskID:           "TASK-001",
 		DeliveredOutcome: "Test",
 	})
 
 	if err == nil {
-		t.Error("expected error for shipment that already has REC")
+		t.Error("expected error for task that already has receipt")
 	}
 }
 
@@ -211,7 +196,7 @@ func TestReceiptService_GetReceipt(t *testing.T) {
 
 	repo.receipts["REC-001"] = &secondary.ReceiptRecord{
 		ID:               "REC-001",
-		ShipmentID:       "SHIP-001",
+		TaskID:           "TASK-001",
 		DeliveredOutcome: "Test outcome",
 		Status:           "draft",
 	}
@@ -235,19 +220,19 @@ func TestReceiptService_GetReceipt_NotFound(t *testing.T) {
 	}
 }
 
-func TestReceiptService_GetReceiptByShipment(t *testing.T) {
+func TestReceiptService_GetReceiptByTask(t *testing.T) {
 	service, repo := newTestReceiptService()
 	ctx := context.Background()
 
 	repo.receipts["REC-001"] = &secondary.ReceiptRecord{
 		ID:               "REC-001",
-		ShipmentID:       "SHIP-001",
+		TaskID:           "TASK-001",
 		DeliveredOutcome: "Test",
 		Status:           "draft",
 	}
-	repo.receiptsByShip["SHIP-001"] = repo.receipts["REC-001"]
+	repo.receiptsByTask["TASK-001"] = repo.receipts["REC-001"]
 
-	rec, err := service.GetReceiptByShipment(ctx, "SHIP-001")
+	rec, err := service.GetReceiptByTask(ctx, "TASK-001")
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -256,13 +241,13 @@ func TestReceiptService_GetReceiptByShipment(t *testing.T) {
 	}
 }
 
-func TestReceiptService_GetReceiptByShipment_NotFound(t *testing.T) {
+func TestReceiptService_GetReceiptByTask_NotFound(t *testing.T) {
 	service, _ := newTestReceiptService()
 	ctx := context.Background()
 
-	_, err := service.GetReceiptByShipment(ctx, "SHIP-999")
+	_, err := service.GetReceiptByTask(ctx, "TASK-999")
 	if err == nil {
-		t.Error("expected error for non-existent shipment")
+		t.Error("expected error for non-existent task")
 	}
 }
 
@@ -270,8 +255,8 @@ func TestReceiptService_ListReceipts(t *testing.T) {
 	service, repo := newTestReceiptService()
 	ctx := context.Background()
 
-	repo.receipts["REC-001"] = &secondary.ReceiptRecord{ID: "REC-001", ShipmentID: "SHIP-001", Status: "draft"}
-	repo.receipts["REC-002"] = &secondary.ReceiptRecord{ID: "REC-002", ShipmentID: "SHIP-002", Status: "submitted"}
+	repo.receipts["REC-001"] = &secondary.ReceiptRecord{ID: "REC-001", TaskID: "TASK-001", Status: "draft"}
+	repo.receipts["REC-002"] = &secondary.ReceiptRecord{ID: "REC-002", TaskID: "TASK-002", Status: "submitted"}
 
 	receipts, err := service.ListReceipts(ctx, primary.ReceiptFilters{})
 	if err != nil {
@@ -288,7 +273,7 @@ func TestReceiptService_UpdateReceipt(t *testing.T) {
 
 	repo.receipts["REC-001"] = &secondary.ReceiptRecord{
 		ID:               "REC-001",
-		ShipmentID:       "SHIP-001",
+		TaskID:           "TASK-001",
 		DeliveredOutcome: "Original",
 		Status:           "draft",
 	}
@@ -312,9 +297,9 @@ func TestReceiptService_UpdateReceipt_NotDraft(t *testing.T) {
 	ctx := context.Background()
 
 	repo.receipts["REC-001"] = &secondary.ReceiptRecord{
-		ID:         "REC-001",
-		ShipmentID: "SHIP-001",
-		Status:     "submitted",
+		ID:     "REC-001",
+		TaskID: "TASK-001",
+		Status: "submitted",
 	}
 
 	err := service.UpdateReceipt(ctx, primary.UpdateReceiptRequest{
@@ -343,8 +328,8 @@ func TestReceiptService_DeleteReceipt(t *testing.T) {
 	service, repo := newTestReceiptService()
 	ctx := context.Background()
 
-	repo.receipts["REC-001"] = &secondary.ReceiptRecord{ID: "REC-001", ShipmentID: "SHIP-001", Status: "draft"}
-	repo.receiptsByShip["SHIP-001"] = repo.receipts["REC-001"]
+	repo.receipts["REC-001"] = &secondary.ReceiptRecord{ID: "REC-001", TaskID: "TASK-001", Status: "draft"}
+	repo.receiptsByTask["TASK-001"] = repo.receipts["REC-001"]
 
 	err := service.DeleteReceipt(ctx, "REC-001")
 	if err != nil {
@@ -372,12 +357,10 @@ func TestReceiptService_SubmitReceipt(t *testing.T) {
 	ctx := context.Background()
 
 	repo.receipts["REC-001"] = &secondary.ReceiptRecord{
-		ID:         "REC-001",
-		ShipmentID: "SHIP-001",
-		Status:     "draft",
+		ID:     "REC-001",
+		TaskID: "TASK-001",
+		Status: "draft",
 	}
-	repo.woStatus["SHIP-001"] = "complete"
-	repo.allCRECsVerified["SHIP-001"] = true
 
 	err := service.SubmitReceipt(ctx, "REC-001")
 	if err != nil {
@@ -395,9 +378,9 @@ func TestReceiptService_SubmitReceipt_NotDraft(t *testing.T) {
 	ctx := context.Background()
 
 	repo.receipts["REC-001"] = &secondary.ReceiptRecord{
-		ID:         "REC-001",
-		ShipmentID: "SHIP-001",
-		Status:     "verified",
+		ID:     "REC-001",
+		TaskID: "TASK-001",
+		Status: "verified",
 	}
 
 	err := service.SubmitReceipt(ctx, "REC-001")
@@ -411,9 +394,9 @@ func TestReceiptService_VerifyReceipt(t *testing.T) {
 	ctx := context.Background()
 
 	repo.receipts["REC-001"] = &secondary.ReceiptRecord{
-		ID:         "REC-001",
-		ShipmentID: "SHIP-001",
-		Status:     "submitted",
+		ID:     "REC-001",
+		TaskID: "TASK-001",
+		Status: "submitted",
 	}
 
 	err := service.VerifyReceipt(ctx, "REC-001")
@@ -432,9 +415,9 @@ func TestReceiptService_VerifyReceipt_NotSubmitted(t *testing.T) {
 	ctx := context.Background()
 
 	repo.receipts["REC-001"] = &secondary.ReceiptRecord{
-		ID:         "REC-001",
-		ShipmentID: "SHIP-001",
-		Status:     "draft",
+		ID:     "REC-001",
+		TaskID: "TASK-001",
+		Status: "draft",
 	}
 
 	err := service.VerifyReceipt(ctx, "REC-001")

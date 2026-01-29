@@ -246,7 +246,7 @@ func (s *ConclaveServiceImpl) planRecordToConclavePlan(r *secondary.ConclavePlan
 	return &primary.ConclavePlan{
 		ID:           r.ID,
 		CommissionID: r.CommissionID,
-		ShipmentID:   r.ShipmentID,
+		TaskID:       r.TaskID,
 		Title:        r.Title,
 		Description:  r.Description,
 		Content:      r.Content,

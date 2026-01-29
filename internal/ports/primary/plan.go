@@ -28,17 +28,18 @@ type PlanService interface {
 	// DeletePlan deletes a plan.
 	DeletePlan(ctx context.Context, planID string) error
 
-	// GetShipmentActivePlan retrieves the active (draft) plan for a shipment.
-	GetShipmentActivePlan(ctx context.Context, shipmentID string) (*Plan, error)
+	// GetTaskActivePlan retrieves the active (draft) plan for a task.
+	GetTaskActivePlan(ctx context.Context, taskID string) (*Plan, error)
 }
 
 // CreatePlanRequest contains parameters for creating a plan.
 type CreatePlanRequest struct {
-	CommissionID string
-	ShipmentID   string // Optional
-	Title        string
-	Description  string
-	Content      string
+	CommissionID     string
+	TaskID           string
+	Title            string
+	Description      string
+	Content          string
+	SupersedesPlanID string // Optional - ID of plan this supersedes
 }
 
 // CreatePlanResponse contains the result of creating a plan.
@@ -58,7 +59,7 @@ type UpdatePlanRequest struct {
 // Plan represents a plan entity at the port boundary.
 type Plan struct {
 	ID               string
-	ShipmentID       string
+	TaskID           string
 	CommissionID     string
 	Title            string
 	Description      string
@@ -71,11 +72,12 @@ type Plan struct {
 	ConclaveID       string
 	PromotedFromID   string
 	PromotedFromType string
+	SupersedesPlanID string
 }
 
 // PlanFilters contains filter options for listing plans.
 type PlanFilters struct {
-	ShipmentID   string
+	TaskID       string
 	CommissionID string
 	Status       string
 }

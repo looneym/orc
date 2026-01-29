@@ -31,9 +31,9 @@ func (r *ReceiptRepository) Create(ctx context.Context, rec *secondary.ReceiptRe
 	}
 
 	_, err := r.db.ExecContext(ctx,
-		`INSERT INTO receipts (id, shipment_id, delivered_outcome, evidence, verification_notes, status) VALUES (?, ?, ?, ?, ?, ?)`,
+		`INSERT INTO receipts (id, task_id, delivered_outcome, evidence, verification_notes, status) VALUES (?, ?, ?, ?, ?, ?)`,
 		rec.ID,
-		rec.ShipmentID,
+		rec.TaskID,
 		rec.DeliveredOutcome,
 		evidence,
 		verificationNotes,
@@ -57,10 +57,10 @@ func (r *ReceiptRepository) GetByID(ctx context.Context, id string) (*secondary.
 
 	record := &secondary.ReceiptRecord{}
 	err := r.db.QueryRowContext(ctx,
-		`SELECT id, shipment_id, delivered_outcome, evidence, verification_notes, status, created_at, updated_at FROM receipts WHERE id = ?`,
+		`SELECT id, task_id, delivered_outcome, evidence, verification_notes, status, created_at, updated_at FROM receipts WHERE id = ?`,
 		id,
 	).Scan(&record.ID,
-		&record.ShipmentID,
+		&record.TaskID,
 		&record.DeliveredOutcome,
 		&evidence,
 		&verificationNotes,
@@ -81,8 +81,8 @@ func (r *ReceiptRepository) GetByID(ctx context.Context, id string) (*secondary.
 	return record, nil
 }
 
-// GetByShipment retrieves a receipt by its shipment ID.
-func (r *ReceiptRepository) GetByShipment(ctx context.Context, shipmentID string) (*secondary.ReceiptRecord, error) {
+// GetByTask retrieves a receipt by its task ID.
+func (r *ReceiptRepository) GetByTask(ctx context.Context, taskID string) (*secondary.ReceiptRecord, error) {
 	var (
 		evidence          sql.NullString
 		verificationNotes sql.NullString
@@ -92,10 +92,10 @@ func (r *ReceiptRepository) GetByShipment(ctx context.Context, shipmentID string
 
 	record := &secondary.ReceiptRecord{}
 	err := r.db.QueryRowContext(ctx,
-		`SELECT id, shipment_id, delivered_outcome, evidence, verification_notes, status, created_at, updated_at FROM receipts WHERE shipment_id = ?`,
-		shipmentID,
+		`SELECT id, task_id, delivered_outcome, evidence, verification_notes, status, created_at, updated_at FROM receipts WHERE task_id = ?`,
+		taskID,
 	).Scan(&record.ID,
-		&record.ShipmentID,
+		&record.TaskID,
 		&record.DeliveredOutcome,
 		&evidence,
 		&verificationNotes,
@@ -103,7 +103,7 @@ func (r *ReceiptRepository) GetByShipment(ctx context.Context, shipmentID string
 		&createdAt, &updatedAt)
 
 	if err == sql.ErrNoRows {
-		return nil, fmt.Errorf("receipt for shipment %s not found", shipmentID)
+		return nil, fmt.Errorf("receipt for task %s not found", taskID)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to get receipt: %w", err)
@@ -118,12 +118,12 @@ func (r *ReceiptRepository) GetByShipment(ctx context.Context, shipmentID string
 
 // List retrieves receipts matching the given filters.
 func (r *ReceiptRepository) List(ctx context.Context, filters secondary.ReceiptFilters) ([]*secondary.ReceiptRecord, error) {
-	query := `SELECT id, shipment_id, delivered_outcome, evidence, verification_notes, status, created_at, updated_at FROM receipts WHERE 1=1`
+	query := `SELECT id, task_id, delivered_outcome, evidence, verification_notes, status, created_at, updated_at FROM receipts WHERE 1=1`
 	args := []any{}
 
-	if filters.ShipmentID != "" {
-		query += " AND shipment_id = ?"
-		args = append(args, filters.ShipmentID)
+	if filters.TaskID != "" {
+		query += " AND task_id = ?"
+		args = append(args, filters.TaskID)
 	}
 
 	if filters.Status != "" {
@@ -150,7 +150,7 @@ func (r *ReceiptRepository) List(ctx context.Context, filters secondary.ReceiptF
 
 		record := &secondary.ReceiptRecord{}
 		err := rows.Scan(&record.ID,
-			&record.ShipmentID,
+			&record.TaskID,
 			&record.DeliveredOutcome,
 			&evidence,
 			&verificationNotes,
@@ -251,20 +251,20 @@ func (r *ReceiptRepository) UpdateStatus(ctx context.Context, id, status string)
 	return nil
 }
 
-// ShipmentExists checks if a shipment exists.
-func (r *ReceiptRepository) ShipmentExists(ctx context.Context, shipmentID string) (bool, error) {
+// TaskExists checks if a task exists.
+func (r *ReceiptRepository) TaskExists(ctx context.Context, taskID string) (bool, error) {
 	var count int
-	err := r.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM shipments WHERE id = ?", shipmentID).Scan(&count)
+	err := r.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM tasks WHERE id = ?", taskID).Scan(&count)
 	if err != nil {
-		return false, fmt.Errorf("failed to check shipment existence: %w", err)
+		return false, fmt.Errorf("failed to check task existence: %w", err)
 	}
 	return count > 0, nil
 }
 
-// ShipmentHasREC checks if a shipment already has a REC (for 1:1 constraint).
-func (r *ReceiptRepository) ShipmentHasREC(ctx context.Context, shipmentID string) (bool, error) {
+// TaskHasReceipt checks if a task already has a receipt (for 1:1 constraint).
+func (r *ReceiptRepository) TaskHasReceipt(ctx context.Context, taskID string) (bool, error) {
 	var count int
-	err := r.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM receipts WHERE shipment_id = ?", shipmentID).Scan(&count)
+	err := r.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM receipts WHERE task_id = ?", taskID).Scan(&count)
 	if err != nil {
 		return false, fmt.Errorf("failed to check existing receipt: %w", err)
 	}

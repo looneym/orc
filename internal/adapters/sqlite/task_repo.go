@@ -33,6 +33,7 @@ func scanTask(scanner interface {
 		priority            sql.NullString
 		assignedWorkbenchID sql.NullString
 		pinned              bool
+		dependsOn           sql.NullString
 		createdAt           time.Time
 		updatedAt           time.Time
 		claimedAt           sql.NullTime
@@ -43,7 +44,7 @@ func scanTask(scanner interface {
 	err := scanner.Scan(
 		&record.ID, &shipmentID, &record.CommissionID, &tomeID, &conclaveID, &record.Title, &desc,
 		&taskType, &record.Status, &priority, &assignedWorkbenchID,
-		&pinned, &createdAt, &updatedAt, &claimedAt, &completedAt,
+		&pinned, &dependsOn, &createdAt, &updatedAt, &claimedAt, &completedAt,
 	)
 	if err != nil {
 		return nil, err
@@ -57,6 +58,7 @@ func scanTask(scanner interface {
 	record.Priority = priority.String
 	record.AssignedWorkbenchID = assignedWorkbenchID.String
 	record.Pinned = pinned
+	record.DependsOn = dependsOn.String
 	record.CreatedAt = createdAt.Format(time.RFC3339)
 	record.UpdatedAt = updatedAt.Format(time.RFC3339)
 
@@ -70,7 +72,7 @@ func scanTask(scanner interface {
 	return record, nil
 }
 
-const taskSelectCols = "id, shipment_id, commission_id, tome_id, conclave_id, title, description, type, status, priority, assigned_workbench_id, pinned, created_at, updated_at, claimed_at, completed_at"
+const taskSelectCols = "id, shipment_id, commission_id, tome_id, conclave_id, title, description, type, status, priority, assigned_workbench_id, pinned, depends_on, created_at, updated_at, claimed_at, completed_at"
 
 // Create persists a new task.
 func (r *TaskRepository) Create(ctx context.Context, task *secondary.TaskRecord) error {
@@ -464,7 +466,7 @@ func (r *TaskRepository) ListByTag(ctx context.Context, tagID string) ([]*second
 	query := `
 		SELECT t.id, t.shipment_id, t.commission_id, t.tome_id, t.conclave_id, t.title, t.description,
 		       t.type, t.status, t.priority, t.assigned_workbench_id,
-		       t.pinned, t.created_at, t.updated_at, t.claimed_at, t.completed_at
+		       t.pinned, t.depends_on, t.created_at, t.updated_at, t.claimed_at, t.completed_at
 		FROM tasks t
 		INNER JOIN entity_tags et ON t.id = et.entity_id AND et.entity_type = 'task'
 		WHERE et.tag_id = ?

@@ -23,23 +23,23 @@ func NewReceiptService(recRepo secondary.ReceiptRepository) *ReceiptServiceImpl 
 
 // CreateReceipt creates a new receipt.
 func (s *ReceiptServiceImpl) CreateReceipt(ctx context.Context, req primary.CreateReceiptRequest) (*primary.CreateReceiptResponse, error) {
-	// Validate shipment exists
-	shipmentExists, err := s.recRepo.ShipmentExists(ctx, req.ShipmentID)
+	// Validate task exists
+	taskExists, err := s.recRepo.TaskExists(ctx, req.TaskID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to validate shipment: %w", err)
+		return nil, fmt.Errorf("failed to validate task: %w", err)
 	}
 
-	// Check if shipment already has a REC (1:1 relationship)
-	shipmentHasREC, err := s.recRepo.ShipmentHasREC(ctx, req.ShipmentID)
+	// Check if task already has a receipt (1:1 relationship)
+	taskHasReceipt, err := s.recRepo.TaskHasReceipt(ctx, req.TaskID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to check existing REC: %w", err)
+		return nil, fmt.Errorf("failed to check existing receipt: %w", err)
 	}
 
 	// Build guard context and evaluate
 	guardCtx := receipt.CreateRECContext{
-		ShipmentID:       req.ShipmentID,
-		ShipmentExists:   shipmentExists,
-		ShipmentHasREC:   shipmentHasREC,
+		TaskID:           req.TaskID,
+		TaskExists:       taskExists,
+		TaskHasReceipt:   taskHasReceipt,
 		DeliveredOutcome: req.DeliveredOutcome,
 	}
 
@@ -57,7 +57,7 @@ func (s *ReceiptServiceImpl) CreateReceipt(ctx context.Context, req primary.Crea
 	// Create record
 	record := &secondary.ReceiptRecord{
 		ID:                nextID,
-		ShipmentID:        req.ShipmentID,
+		TaskID:            req.TaskID,
 		DeliveredOutcome:  req.DeliveredOutcome,
 		Evidence:          req.Evidence,
 		VerificationNotes: req.VerificationNotes,
@@ -89,9 +89,9 @@ func (s *ReceiptServiceImpl) GetReceipt(ctx context.Context, recID string) (*pri
 	return s.recordToREC(record), nil
 }
 
-// GetReceiptByShipment retrieves a receipt by shipment ID.
-func (s *ReceiptServiceImpl) GetReceiptByShipment(ctx context.Context, shipmentID string) (*primary.Receipt, error) {
-	record, err := s.recRepo.GetByShipment(ctx, shipmentID)
+// GetReceiptByTask retrieves a receipt by task ID.
+func (s *ReceiptServiceImpl) GetReceiptByTask(ctx context.Context, taskID string) (*primary.Receipt, error) {
+	record, err := s.recRepo.GetByTask(ctx, taskID)
 	if err != nil {
 		return nil, err
 	}
@@ -101,8 +101,8 @@ func (s *ReceiptServiceImpl) GetReceiptByShipment(ctx context.Context, shipmentI
 // ListReceipts lists receipts with optional filters.
 func (s *ReceiptServiceImpl) ListReceipts(ctx context.Context, filters primary.ReceiptFilters) ([]*primary.Receipt, error) {
 	records, err := s.recRepo.List(ctx, secondary.ReceiptFilters{
-		ShipmentID: filters.ShipmentID,
-		Status:     filters.Status,
+		TaskID: filters.TaskID,
+		Status: filters.Status,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to list RECs: %w", err)
@@ -190,7 +190,7 @@ func (s *ReceiptServiceImpl) VerifyReceipt(ctx context.Context, recID string) er
 func (s *ReceiptServiceImpl) recordToREC(r *secondary.ReceiptRecord) *primary.Receipt {
 	return &primary.Receipt{
 		ID:                r.ID,
-		ShipmentID:        r.ShipmentID,
+		TaskID:            r.TaskID,
 		DeliveredOutcome:  r.DeliveredOutcome,
 		Evidence:          r.Evidence,
 		VerificationNotes: r.VerificationNotes,

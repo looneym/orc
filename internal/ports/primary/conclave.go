@@ -109,7 +109,7 @@ type ConclaveTask struct {
 type ConclavePlan struct {
 	ID           string
 	CommissionID string
-	ShipmentID   string
+	TaskID       string
 	Title        string
 	Description  string
 	Content      string

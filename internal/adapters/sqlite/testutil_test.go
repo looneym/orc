@@ -71,9 +71,28 @@ func seedShipment(t *testing.T, db *sql.DB, id, commissionID, title string) stri
 	if title == "" {
 		title = "Test Shipment"
 	}
-	_, err := db.Exec("INSERT INTO shipments (id, commission_id, title, status) VALUES (?, ?, ?, 'active')", id, commissionID, title)
+	_, err := db.Exec("INSERT INTO shipments (id, commission_id, title, status) VALUES (?, ?, ?, 'draft')", id, commissionID, title)
 	if err != nil {
 		t.Fatalf("failed to seed shipment: %v", err)
+	}
+	return id
+}
+
+// seedTask inserts a test task and returns its ID.
+func seedTask(t *testing.T, db *sql.DB, id, commissionID, title string) string {
+	t.Helper()
+	if id == "" {
+		id = "TASK-001"
+	}
+	if commissionID == "" {
+		commissionID = "COMM-001"
+	}
+	if title == "" {
+		title = "Test Task"
+	}
+	_, err := db.Exec("INSERT INTO tasks (id, commission_id, title, status) VALUES (?, ?, ?, 'ready')", id, commissionID, title)
+	if err != nil {
+		t.Fatalf("failed to seed task: %v", err)
 	}
 	return id
 }

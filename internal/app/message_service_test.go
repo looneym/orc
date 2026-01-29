@@ -15,19 +15,16 @@ import (
 
 // mockMessageRepository implements secondary.MessageRepository for testing.
 type mockMessageRepository struct {
-	messages               map[string]*secondary.MessageRecord
-	createErr              error
-	getErr                 error
-	listErr                error
-	markReadErr            error
-	commissionExistsResult bool
-	commissionExistsErr    error
+	messages    map[string]*secondary.MessageRecord
+	createErr   error
+	getErr      error
+	listErr     error
+	markReadErr error
 }
 
 func newMockMessageRepository() *mockMessageRepository {
 	return &mockMessageRepository{
-		messages:               make(map[string]*secondary.MessageRecord),
-		commissionExistsResult: true,
+		messages: make(map[string]*secondary.MessageRecord),
 	}
 }
 
@@ -98,15 +95,8 @@ func (m *mockMessageRepository) GetUnreadCount(ctx context.Context, recipient st
 	return count, nil
 }
 
-func (m *mockMessageRepository) GetNextID(ctx context.Context, commissionID string) (string, error) {
-	return "MSG-COMM-001-001", nil
-}
-
-func (m *mockMessageRepository) CommissionExists(ctx context.Context, commissionID string) (bool, error) {
-	if m.commissionExistsErr != nil {
-		return false, m.commissionExistsErr
-	}
-	return m.commissionExistsResult, nil
+func (m *mockMessageRepository) GetNextID(ctx context.Context) (string, error) {
+	return "MSG-001", nil
 }
 
 // ============================================================================
@@ -128,11 +118,10 @@ func TestCreateMessage_Success(t *testing.T) {
 	ctx := context.Background()
 
 	resp, err := service.CreateMessage(ctx, primary.CreateMessageRequest{
-		CommissionID: "COMM-001",
-		Sender:       "ORC",
-		Recipient:    "IMP-BENCH-001",
-		Subject:      "Task Assignment",
-		Body:         "Please work on TASK-001",
+		Sender:    "ORC",
+		Recipient: "IMP-BENCH-001",
+		Subject:   "Task Assignment",
+		Body:      "Please work on TASK-001",
 	})
 
 	if err != nil {
@@ -149,25 +138,6 @@ func TestCreateMessage_Success(t *testing.T) {
 	}
 }
 
-func TestCreateMessage_CommissionNotFound(t *testing.T) {
-	service, messageRepo := newTestMessageService()
-	ctx := context.Background()
-
-	messageRepo.commissionExistsResult = false
-
-	_, err := service.CreateMessage(ctx, primary.CreateMessageRequest{
-		CommissionID: "COMM-NONEXISTENT",
-		Sender:       "ORC",
-		Recipient:    "IMP-BENCH-001",
-		Subject:      "Test",
-		Body:         "Test message",
-	})
-
-	if err == nil {
-		t.Fatal("expected error for non-existent commission, got nil")
-	}
-}
-
 // ============================================================================
 // GetMessage Tests
 // ============================================================================
@@ -177,12 +147,11 @@ func TestGetMessage_Found(t *testing.T) {
 	ctx := context.Background()
 
 	messageRepo.messages["MSG-001"] = &secondary.MessageRecord{
-		ID:           "MSG-001",
-		CommissionID: "COMM-001",
-		Sender:       "ORC",
-		Recipient:    "IMP-BENCH-001",
-		Subject:      "Test Message",
-		Body:         "Hello",
+		ID:        "MSG-001",
+		Sender:    "ORC",
+		Recipient: "IMP-BENCH-001",
+		Subject:   "Test Message",
+		Body:      "Hello",
 	}
 
 	message, err := service.GetMessage(ctx, "MSG-001")
@@ -215,18 +184,16 @@ func TestListMessages_FilterByRecipient(t *testing.T) {
 	ctx := context.Background()
 
 	messageRepo.messages["MSG-001"] = &secondary.MessageRecord{
-		ID:           "MSG-001",
-		CommissionID: "COMM-001",
-		Sender:       "ORC",
-		Recipient:    "IMP-BENCH-001",
-		Subject:      "Message 1",
+		ID:        "MSG-001",
+		Sender:    "ORC",
+		Recipient: "IMP-BENCH-001",
+		Subject:   "Message 1",
 	}
 	messageRepo.messages["MSG-002"] = &secondary.MessageRecord{
-		ID:           "MSG-002",
-		CommissionID: "COMM-001",
-		Sender:       "ORC",
-		Recipient:    "IMP-BENCH-002",
-		Subject:      "Message 2",
+		ID:        "MSG-002",
+		Sender:    "ORC",
+		Recipient: "IMP-BENCH-002",
+		Subject:   "Message 2",
 	}
 
 	messages, err := service.ListMessages(ctx, "IMP-BENCH-001", false)
@@ -244,20 +211,18 @@ func TestListMessages_UnreadOnly(t *testing.T) {
 	ctx := context.Background()
 
 	messageRepo.messages["MSG-001"] = &secondary.MessageRecord{
-		ID:           "MSG-001",
-		CommissionID: "COMM-001",
-		Sender:       "ORC",
-		Recipient:    "IMP-BENCH-001",
-		Subject:      "Unread Message",
-		Read:         false,
+		ID:        "MSG-001",
+		Sender:    "ORC",
+		Recipient: "IMP-BENCH-001",
+		Subject:   "Unread Message",
+		Read:      false,
 	}
 	messageRepo.messages["MSG-002"] = &secondary.MessageRecord{
-		ID:           "MSG-002",
-		CommissionID: "COMM-001",
-		Sender:       "ORC",
-		Recipient:    "IMP-BENCH-001",
-		Subject:      "Read Message",
-		Read:         true,
+		ID:        "MSG-002",
+		Sender:    "ORC",
+		Recipient: "IMP-BENCH-001",
+		Subject:   "Read Message",
+		Read:      true,
 	}
 
 	messages, err := service.ListMessages(ctx, "IMP-BENCH-001", true)
@@ -279,12 +244,11 @@ func TestMarkRead_Success(t *testing.T) {
 	ctx := context.Background()
 
 	messageRepo.messages["MSG-001"] = &secondary.MessageRecord{
-		ID:           "MSG-001",
-		CommissionID: "COMM-001",
-		Sender:       "ORC",
-		Recipient:    "IMP-BENCH-001",
-		Subject:      "Test Message",
-		Read:         false,
+		ID:        "MSG-001",
+		Sender:    "ORC",
+		Recipient: "IMP-BENCH-001",
+		Subject:   "Test Message",
+		Read:      false,
 	}
 
 	err := service.MarkRead(ctx, "MSG-001")
@@ -306,25 +270,22 @@ func TestGetConversation_Success(t *testing.T) {
 	ctx := context.Background()
 
 	messageRepo.messages["MSG-001"] = &secondary.MessageRecord{
-		ID:           "MSG-001",
-		CommissionID: "COMM-001",
-		Sender:       "ORC",
-		Recipient:    "IMP-BENCH-001",
-		Subject:      "From ORC",
+		ID:        "MSG-001",
+		Sender:    "ORC",
+		Recipient: "IMP-BENCH-001",
+		Subject:   "From ORC",
 	}
 	messageRepo.messages["MSG-002"] = &secondary.MessageRecord{
-		ID:           "MSG-002",
-		CommissionID: "COMM-001",
-		Sender:       "IMP-BENCH-001",
-		Recipient:    "ORC",
-		Subject:      "Reply from IMP",
+		ID:        "MSG-002",
+		Sender:    "IMP-BENCH-001",
+		Recipient: "ORC",
+		Subject:   "Reply from IMP",
 	}
 	messageRepo.messages["MSG-003"] = &secondary.MessageRecord{
-		ID:           "MSG-003",
-		CommissionID: "COMM-001",
-		Sender:       "ORC",
-		Recipient:    "IMP-BENCH-002",
-		Subject:      "Different conversation",
+		ID:        "MSG-003",
+		Sender:    "ORC",
+		Recipient: "IMP-BENCH-002",
+		Subject:   "Different conversation",
 	}
 
 	messages, err := service.GetConversation(ctx, "ORC", "IMP-BENCH-001")
@@ -342,11 +303,10 @@ func TestGetConversation_ReverseOrder(t *testing.T) {
 	ctx := context.Background()
 
 	messageRepo.messages["MSG-001"] = &secondary.MessageRecord{
-		ID:           "MSG-001",
-		CommissionID: "COMM-001",
-		Sender:       "ORC",
-		Recipient:    "IMP-BENCH-001",
-		Subject:      "Message",
+		ID:        "MSG-001",
+		Sender:    "ORC",
+		Recipient: "IMP-BENCH-001",
+		Subject:   "Message",
 	}
 
 	// Should work regardless of argument order
@@ -369,25 +329,22 @@ func TestGetUnreadCount_Success(t *testing.T) {
 	ctx := context.Background()
 
 	messageRepo.messages["MSG-001"] = &secondary.MessageRecord{
-		ID:           "MSG-001",
-		CommissionID: "COMM-001",
-		Sender:       "ORC",
-		Recipient:    "IMP-BENCH-001",
-		Read:         false,
+		ID:        "MSG-001",
+		Sender:    "ORC",
+		Recipient: "IMP-BENCH-001",
+		Read:      false,
 	}
 	messageRepo.messages["MSG-002"] = &secondary.MessageRecord{
-		ID:           "MSG-002",
-		CommissionID: "COMM-001",
-		Sender:       "ORC",
-		Recipient:    "IMP-BENCH-001",
-		Read:         false,
+		ID:        "MSG-002",
+		Sender:    "ORC",
+		Recipient: "IMP-BENCH-001",
+		Read:      false,
 	}
 	messageRepo.messages["MSG-003"] = &secondary.MessageRecord{
-		ID:           "MSG-003",
-		CommissionID: "COMM-001",
-		Sender:       "ORC",
-		Recipient:    "IMP-BENCH-001",
-		Read:         true,
+		ID:        "MSG-003",
+		Sender:    "ORC",
+		Recipient: "IMP-BENCH-001",
+		Read:      true,
 	}
 
 	count, err := service.GetUnreadCount(ctx, "IMP-BENCH-001")

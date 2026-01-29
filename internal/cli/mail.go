@@ -68,48 +68,12 @@ Examples:
 				subject = "(no subject)"
 			}
 
-			// Determine commission ID for message via DB lookup
-			// Messages must be scoped to a commission for database storage
-			var commissionID string
-
-			// For IMP sender, look up commission via workbench → workshop chain
-			if identity.Type == agent.AgentTypeIMP {
-				workbench, err := wire.WorkbenchService().GetWorkbench(ctx, identity.ID)
-				if err != nil {
-					return fmt.Errorf("failed to get workbench for commission lookup: %w", err)
-				}
-				workshop, err := wire.WorkshopService().GetWorkshop(ctx, workbench.WorkshopID)
-				if err != nil {
-					return fmt.Errorf("failed to get workshop: %w", err)
-				}
-				// TODO: Resolve commission through factory chain when fully implemented
-				commissionID = workshop.Name // Use workshop name as fallback
-			}
-
-			// For IMP recipient, look up their commission if sender commission not set
-			if commissionID == "" && recipientIdentity.Type == agent.AgentTypeIMP {
-				workbench, err := wire.WorkbenchService().GetWorkbench(ctx, recipientIdentity.ID)
-				if err != nil {
-					return fmt.Errorf("failed to get recipient workbench: %w", err)
-				}
-				workshop, err := wire.WorkshopService().GetWorkshop(ctx, workbench.WorkshopID)
-				if err != nil {
-					return fmt.Errorf("failed to get recipient workshop: %w", err)
-				}
-				commissionID = workshop.Name
-			}
-
-			if commissionID == "" {
-				return fmt.Errorf("cannot determine commission context for message")
-			}
-
-			// Create message
+			// Create message (sender and recipient are actor IDs)
 			resp, err := wire.MessageService().CreateMessage(ctx, primary.CreateMessageRequest{
-				Sender:       identity.FullID,
-				Recipient:    recipientIdentity.FullID,
-				Subject:      subject,
-				Body:         body,
-				CommissionID: commissionID,
+				Sender:    identity.FullID,
+				Recipient: recipientIdentity.FullID,
+				Subject:   subject,
+				Body:      body,
 			})
 			if err != nil {
 				return fmt.Errorf("failed to create message: %w", err)

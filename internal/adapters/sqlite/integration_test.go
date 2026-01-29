@@ -90,31 +90,30 @@ func TestIntegration_CommissionExistsConstraint(t *testing.T) {
 // Shipment Workflow Tests
 // ============================================================================
 
-func TestIntegration_ShipmentWithPlanAndTasks(t *testing.T) {
+func TestIntegration_TaskWithPlan(t *testing.T) {
 	db := setupTestDB(t)
 	ctx := context.Background()
 
 	seedCommission(t, db, "COMM-001", "Test Commission")
 
-	shipmentRepo := sqlite.NewShipmentRepository(db)
 	planRepo := sqlite.NewPlanRepository(db)
 	taskRepo := sqlite.NewTaskRepository(db)
 
-	// Create shipment
-	shipment := &secondary.ShipmentRecord{
-		ID:           "SHIP-001",
+	// Create task
+	task := &secondary.TaskRecord{
+		ID:           "TASK-001",
 		CommissionID: "COMM-001",
-		Title:        "Feature Shipment",
+		Title:        "Implementation Task",
 	}
-	if err := shipmentRepo.Create(ctx, shipment); err != nil {
-		t.Fatalf("Create shipment failed: %v", err)
+	if err := taskRepo.Create(ctx, task); err != nil {
+		t.Fatalf("Create task failed: %v", err)
 	}
 
-	// Create plan for shipment
+	// Create plan for task
 	plan := &secondary.PlanRecord{
 		ID:           "PLAN-001",
 		CommissionID: "COMM-001",
-		ShipmentID:   "SHIP-001",
+		TaskID:       "TASK-001",
 		Title:        "Implementation Plan",
 		Content:      "Plan content...",
 	}
@@ -122,10 +121,10 @@ func TestIntegration_ShipmentWithPlanAndTasks(t *testing.T) {
 		t.Fatalf("Create plan failed: %v", err)
 	}
 
-	// Verify active plan exists (HasActivePlanForShipment checks for draft status)
-	hasActive, _ := planRepo.HasActivePlanForShipment(ctx, "SHIP-001")
+	// Verify active plan exists (HasActivePlanForTask checks for draft status)
+	hasActive, _ := planRepo.HasActivePlanForTask(ctx, "TASK-001")
 	if !hasActive {
-		t.Error("expected shipment to have active (draft) plan")
+		t.Error("expected task to have active (draft) plan")
 	}
 
 	// Approve plan
@@ -134,26 +133,9 @@ func TestIntegration_ShipmentWithPlanAndTasks(t *testing.T) {
 	}
 
 	// After approval, no more draft plans
-	hasActive, _ = planRepo.HasActivePlanForShipment(ctx, "SHIP-001")
+	hasActive, _ = planRepo.HasActivePlanForTask(ctx, "TASK-001")
 	if hasActive {
 		t.Error("expected no draft plan after approval")
-	}
-
-	// Create tasks for shipment
-	task := &secondary.TaskRecord{
-		ID:           "TASK-001",
-		CommissionID: "COMM-001",
-		ShipmentID:   "SHIP-001",
-		Title:        "Implementation Task",
-	}
-	if err := taskRepo.Create(ctx, task); err != nil {
-		t.Fatalf("Create task failed: %v", err)
-	}
-
-	// Verify tasks by shipment
-	tasks, _ := taskRepo.GetByShipment(ctx, "SHIP-001")
-	if len(tasks) != 1 {
-		t.Errorf("expected 1 task, got %d", len(tasks))
 	}
 }
 
@@ -280,7 +262,7 @@ func TestIntegration_ConclaveWithTasksQuestionsPlans(t *testing.T) {
 	seedCommission(t, db, "COMM-001", "Test Commission")
 
 	// Create a shipment for the conclave
-	_, _ = db.Exec(`INSERT INTO shipments (id, commission_id, title, status) VALUES ('SHIP-001', 'COMM-001', 'Test Shipment', 'open')`)
+	seedShipment(t, db, "SHIP-001", "COMM-001", "Test Shipment")
 
 	conclaveRepo := sqlite.NewConclaveRepository(db)
 
@@ -295,9 +277,11 @@ func TestIntegration_ConclaveWithTasksQuestionsPlans(t *testing.T) {
 		t.Fatalf("Create conclave failed: %v", err)
 	}
 
-	// Tasks and plans link via shipment
-	_, _ = db.Exec(`INSERT INTO tasks (id, shipment_id, commission_id, title, status) VALUES ('TASK-001', 'SHIP-001', 'COMM-001', 'Review Task', 'ready')`)
-	_, _ = db.Exec(`INSERT INTO plans (id, shipment_id, commission_id, title, status) VALUES ('PLAN-001', 'SHIP-001', 'COMM-001', 'Review Plan', 'draft')`)
+	// Task linked to conclave (task-first model)
+	_, _ = db.Exec(`INSERT INTO tasks (id, commission_id, conclave_id, title, status) VALUES ('TASK-001', 'COMM-001', 'CON-001', 'Review Task', 'ready')`)
+
+	// Plan linked to task (task-first model)
+	_, _ = db.Exec(`INSERT INTO plans (id, task_id, commission_id, title, status) VALUES ('PLAN-001', 'TASK-001', 'COMM-001', 'Review Plan', 'draft')`)
 
 	// Verify entities linked to conclave
 	tasks, _ := conclaveRepo.GetTasksByConclave(ctx, "CON-001")
@@ -473,34 +457,29 @@ func TestIntegration_MessageConversations(t *testing.T) {
 	db := setupTestDB(t)
 	ctx := context.Background()
 
-	seedCommission(t, db, "COMM-001", "Test Commission")
-
 	messageRepo := sqlite.NewMessageRepository(db)
 
 	// Create conversation between ORC and IMP
 	msg1 := &secondary.MessageRecord{
-		ID:           "MSG-001",
-		CommissionID: "COMM-001",
-		Sender:       "ORC",
-		Recipient:    "IMP-001",
-		Subject:      "Task Assignment",
-		Body:         "Please work on...",
+		ID:        "MSG-001",
+		Sender:    "ORC",
+		Recipient: "IMP-001",
+		Subject:   "Task Assignment",
+		Body:      "Please work on...",
 	}
 	msg2 := &secondary.MessageRecord{
-		ID:           "MSG-002",
-		CommissionID: "COMM-001",
-		Sender:       "IMP-001",
-		Recipient:    "ORC",
-		Subject:      "Re: Task Assignment",
-		Body:         "I'm on it",
+		ID:        "MSG-002",
+		Sender:    "IMP-001",
+		Recipient: "ORC",
+		Subject:   "Re: Task Assignment",
+		Body:      "I'm on it",
 	}
 	msg3 := &secondary.MessageRecord{
-		ID:           "MSG-003",
-		CommissionID: "COMM-001",
-		Sender:       "ORC",
-		Recipient:    "IMP-002",
-		Subject:      "Different IMP",
-		Body:         "Different conversation",
+		ID:        "MSG-003",
+		Sender:    "ORC",
+		Recipient: "IMP-002",
+		Subject:   "Different IMP",
+		Body:      "Different conversation",
 	}
 
 	_ = messageRepo.Create(ctx, msg1)
@@ -557,8 +536,8 @@ func TestIntegration_EntityStatusWorkflows(t *testing.T) {
 
 	// Verify initial status (defaults from table schema)
 	s, _ := shipmentRepo.GetByID(ctx, "SHIP-001")
-	if s.Status != "active" {
-		t.Errorf("expected shipment status 'active', got '%s'", s.Status)
+	if s.Status != "draft" {
+		t.Errorf("expected shipment status 'draft', got '%s'", s.Status)
 	}
 
 	tsk, _ := taskRepo.GetByID(ctx, "TASK-001")

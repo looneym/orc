@@ -28,7 +28,8 @@ var planCreateCmd = &cobra.Command{
 		commissionID, _ := cmd.Flags().GetString("commission")
 		description, _ := cmd.Flags().GetString("description")
 		content, _ := cmd.Flags().GetString("content")
-		shipmentID, _ := cmd.Flags().GetString("shipment")
+		taskID, _ := cmd.Flags().GetString("task")
+		supersedesPlanID, _ := cmd.Flags().GetString("supersedes")
 
 		// Get commission from context or require explicit flag
 		if commissionID == "" {
@@ -40,11 +41,12 @@ var planCreateCmd = &cobra.Command{
 
 		ctx := context.Background()
 		resp, err := wire.PlanService().CreatePlan(ctx, primary.CreatePlanRequest{
-			CommissionID: commissionID,
-			ShipmentID:   shipmentID,
-			Title:        title,
-			Description:  description,
-			Content:      content,
+			CommissionID:     commissionID,
+			TaskID:           taskID,
+			Title:            title,
+			Description:      description,
+			Content:          content,
+			SupersedesPlanID: supersedesPlanID,
 		})
 		if err != nil {
 			return fmt.Errorf("failed to create plan: %w", err)
@@ -52,8 +54,8 @@ var planCreateCmd = &cobra.Command{
 
 		plan := resp.Plan
 		fmt.Printf("✓ Created plan %s: %s\n", plan.ID, plan.Title)
-		if plan.ShipmentID != "" {
-			fmt.Printf("  Shipment: %s\n", plan.ShipmentID)
+		if plan.TaskID != "" {
+			fmt.Printf("  Task: %s\n", plan.TaskID)
 		}
 		fmt.Printf("  Commission: %s\n", plan.CommissionID)
 		fmt.Printf("  Status: %s\n", plan.Status)
@@ -70,7 +72,7 @@ var planListCmd = &cobra.Command{
 	Short: "List plans",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		commissionID, _ := cmd.Flags().GetString("commission")
-		shipmentID, _ := cmd.Flags().GetString("shipment")
+		taskID, _ := cmd.Flags().GetString("task")
 		status, _ := cmd.Flags().GetString("status")
 
 		// Get commission from context if not specified
@@ -81,7 +83,7 @@ var planListCmd = &cobra.Command{
 		ctx := context.Background()
 		plans, err := wire.PlanService().ListPlans(ctx, primary.PlanFilters{
 			CommissionID: commissionID,
-			ShipmentID:   shipmentID,
+			TaskID:       taskID,
 			Status:       status,
 		})
 		if err != nil {
@@ -94,8 +96,8 @@ var planListCmd = &cobra.Command{
 		}
 
 		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-		fmt.Fprintln(w, "ID\tTITLE\tSTATUS\tSHIPMENT")
-		fmt.Fprintln(w, "--\t-----\t------\t--------")
+		fmt.Fprintln(w, "ID\tTITLE\tSTATUS\tTASK")
+		fmt.Fprintln(w, "--\t-----\t------\t----")
 		for _, p := range plans {
 			pinnedMark := ""
 			if p.Pinned {
@@ -105,11 +107,11 @@ var planListCmd = &cobra.Command{
 			if p.Status == "approved" {
 				statusIcon = "✅"
 			}
-			ship := "-"
-			if p.ShipmentID != "" {
-				ship = p.ShipmentID
+			task := "-"
+			if p.TaskID != "" {
+				task = p.TaskID
 			}
-			fmt.Fprintf(w, "%s\t%s%s\t%s %s\t%s\n", p.ID, p.Title, pinnedMark, statusIcon, p.Status, ship)
+			fmt.Fprintf(w, "%s\t%s%s\t%s %s\t%s\n", p.ID, p.Title, pinnedMark, statusIcon, p.Status, task)
 		}
 		w.Flush()
 		return nil
@@ -139,8 +141,8 @@ var planShowCmd = &cobra.Command{
 			fmt.Printf("\nContent:\n%s\n", plan.Content)
 		}
 		fmt.Printf("\nCommission: %s\n", plan.CommissionID)
-		if plan.ShipmentID != "" {
-			fmt.Printf("Shipment: %s\n", plan.ShipmentID)
+		if plan.TaskID != "" {
+			fmt.Printf("Task: %s\n", plan.TaskID)
 		}
 		if plan.ConclaveID != "" {
 			fmt.Printf("Conclave: %s\n", plan.ConclaveID)
@@ -150,6 +152,9 @@ var planShowCmd = &cobra.Command{
 		}
 		if plan.PromotedFromID != "" {
 			fmt.Printf("Promoted from: %s (%s)\n", plan.PromotedFromID, plan.PromotedFromType)
+		}
+		if plan.SupersedesPlanID != "" {
+			fmt.Printf("Supersedes: %s\n", plan.SupersedesPlanID)
 		}
 		fmt.Printf("Created: %s\n", plan.CreatedAt)
 		if plan.ApprovedAt != "" {
@@ -267,12 +272,13 @@ func init() {
 	planCreateCmd.Flags().StringP("commission", "c", "", "Commission ID (defaults to context)")
 	planCreateCmd.Flags().StringP("description", "d", "", "Plan description")
 	planCreateCmd.Flags().String("content", "", "Plan content")
-	planCreateCmd.Flags().String("shipment", "", "Shipment ID to attach plan to")
+	planCreateCmd.Flags().String("task", "", "Task ID to attach plan to")
+	planCreateCmd.Flags().String("supersedes", "", "Plan ID this supersedes")
 
 	// plan list flags
 	planListCmd.Flags().StringP("commission", "c", "", "Filter by commission")
-	planListCmd.Flags().String("shipment", "", "Filter by shipment")
-	planListCmd.Flags().StringP("status", "s", "", "Filter by status (draft, approved)")
+	planListCmd.Flags().String("task", "", "Filter by task")
+	planListCmd.Flags().StringP("status", "s", "", "Filter by status (draft, pending_review, approved, escalated, superseded)")
 
 	// plan update flags
 	planUpdateCmd.Flags().String("title", "", "New title")

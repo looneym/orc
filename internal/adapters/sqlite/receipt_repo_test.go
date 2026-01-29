@@ -13,14 +13,14 @@ func TestReceiptRepository_Create(t *testing.T) {
 	repo := sqlite.NewReceiptRepository(db)
 	ctx := context.Background()
 
-	// Create test fixtures: commission -> shipment
+	// Create test fixtures: commission -> task
 	db.ExecContext(ctx, "INSERT OR IGNORE INTO commissions (id, title, status) VALUES (?, ?, ?)", "COMM-001", "Test", "active")
-	db.ExecContext(ctx, "INSERT INTO shipments (id, commission_id, title, status) VALUES (?, ?, ?, ?)", "SHIP-001", "COMM-001", "Test Shipment", "active")
+	db.ExecContext(ctx, "INSERT INTO tasks (id, commission_id, title, status) VALUES (?, ?, ?, ?)", "TASK-001", "COMM-001", "Test Task", "ready")
 
 	t.Run("creates receipt successfully", func(t *testing.T) {
 		record := &secondary.ReceiptRecord{
 			ID:               "REC-001",
-			ShipmentID:       "SHIP-001",
+			TaskID:           "TASK-001",
 			DeliveredOutcome: "Delivered feature X",
 			Status:           "submitted",
 		}
@@ -44,11 +44,11 @@ func TestReceiptRepository_Create(t *testing.T) {
 	})
 
 	t.Run("creates receipt with evidence", func(t *testing.T) {
-		db.ExecContext(ctx, "INSERT INTO shipments (id, commission_id, title, status) VALUES (?, ?, ?, ?)", "SHIP-002", "COMM-001", "Test 2", "active")
+		db.ExecContext(ctx, "INSERT INTO tasks (id, commission_id, title, status) VALUES (?, ?, ?, ?)", "TASK-002", "COMM-001", "Task 2", "ready")
 
 		record := &secondary.ReceiptRecord{
 			ID:                "REC-002",
-			ShipmentID:        "SHIP-002",
+			TaskID:            "TASK-002",
 			DeliveredOutcome:  "Delivered feature Y",
 			Evidence:          "commit: abc123",
 			VerificationNotes: "All tests pass",
@@ -73,17 +73,17 @@ func TestReceiptRepository_Create(t *testing.T) {
 		}
 	})
 
-	t.Run("enforces unique shipment constraint", func(t *testing.T) {
+	t.Run("enforces unique task constraint", func(t *testing.T) {
 		record := &secondary.ReceiptRecord{
 			ID:               "REC-003",
-			ShipmentID:       "SHIP-001", // Same shipment as REC-001
+			TaskID:           "TASK-001", // Same task as REC-001
 			DeliveredOutcome: "Duplicate",
 			Status:           "submitted",
 		}
 
 		err := repo.Create(ctx, record)
 		if err == nil {
-			t.Fatal("Expected error for duplicate shipment, got nil")
+			t.Fatal("Expected error for duplicate task, got nil")
 		}
 	})
 }
@@ -95,11 +95,11 @@ func TestReceiptRepository_GetByID(t *testing.T) {
 
 	// Setup
 	db.ExecContext(ctx, "INSERT OR IGNORE INTO commissions (id, title, status) VALUES (?, ?, ?)", "COMM-001", "Test", "active")
-	db.ExecContext(ctx, "INSERT INTO shipments (id, commission_id, title, status) VALUES (?, ?, ?, ?)", "SHIP-001", "COMM-001", "Test", "active")
+	db.ExecContext(ctx, "INSERT INTO tasks (id, commission_id, title, status) VALUES (?, ?, ?, ?)", "TASK-001", "COMM-001", "Test", "ready")
 
 	repo.Create(ctx, &secondary.ReceiptRecord{
 		ID:               "REC-001",
-		ShipmentID:       "SHIP-001",
+		TaskID:           "TASK-001",
 		DeliveredOutcome: "Test outcome",
 		Status:           "submitted",
 	})
@@ -122,26 +122,26 @@ func TestReceiptRepository_GetByID(t *testing.T) {
 	})
 }
 
-func TestReceiptRepository_GetByShipment(t *testing.T) {
+func TestReceiptRepository_GetByTask(t *testing.T) {
 	db := setupTestDB(t)
 	repo := sqlite.NewReceiptRepository(db)
 	ctx := context.Background()
 
 	// Setup
 	db.ExecContext(ctx, "INSERT OR IGNORE INTO commissions (id, title, status) VALUES (?, ?, ?)", "COMM-001", "Test", "active")
-	db.ExecContext(ctx, "INSERT INTO shipments (id, commission_id, title, status) VALUES (?, ?, ?, ?)", "SHIP-001", "COMM-001", "Test", "active")
+	db.ExecContext(ctx, "INSERT INTO tasks (id, commission_id, title, status) VALUES (?, ?, ?, ?)", "TASK-001", "COMM-001", "Test", "ready")
 
 	repo.Create(ctx, &secondary.ReceiptRecord{
 		ID:               "REC-001",
-		ShipmentID:       "SHIP-001",
+		TaskID:           "TASK-001",
 		DeliveredOutcome: "Test outcome",
 		Status:           "submitted",
 	})
 
-	t.Run("finds receipt by shipment", func(t *testing.T) {
-		got, err := repo.GetByShipment(ctx, "SHIP-001")
+	t.Run("finds receipt by task", func(t *testing.T) {
+		got, err := repo.GetByTask(ctx, "TASK-001")
 		if err != nil {
-			t.Fatalf("GetByShipment failed: %v", err)
+			t.Fatalf("GetByTask failed: %v", err)
 		}
 		if got == nil {
 			t.Fatal("expected receipt, got nil")
@@ -151,8 +151,8 @@ func TestReceiptRepository_GetByShipment(t *testing.T) {
 		}
 	})
 
-	t.Run("returns error for shipment without receipt", func(t *testing.T) {
-		_, err := repo.GetByShipment(ctx, "SHIP-999")
+	t.Run("returns error for task without receipt", func(t *testing.T) {
+		_, err := repo.GetByTask(ctx, "TASK-999")
 		if err == nil {
 			t.Error("expected error, got nil")
 		}
@@ -166,11 +166,11 @@ func TestReceiptRepository_List(t *testing.T) {
 
 	// Setup
 	db.ExecContext(ctx, "INSERT OR IGNORE INTO commissions (id, title, status) VALUES (?, ?, ?)", "COMM-001", "Test", "active")
-	db.ExecContext(ctx, "INSERT INTO shipments (id, commission_id, title, status) VALUES (?, ?, ?, ?)", "SHIP-001", "COMM-001", "Test 1", "active")
-	db.ExecContext(ctx, "INSERT INTO shipments (id, commission_id, title, status) VALUES (?, ?, ?, ?)", "SHIP-002", "COMM-001", "Test 2", "active")
+	db.ExecContext(ctx, "INSERT INTO tasks (id, commission_id, title, status) VALUES (?, ?, ?, ?)", "TASK-001", "COMM-001", "Task 1", "ready")
+	db.ExecContext(ctx, "INSERT INTO tasks (id, commission_id, title, status) VALUES (?, ?, ?, ?)", "TASK-002", "COMM-001", "Task 2", "ready")
 
-	repo.Create(ctx, &secondary.ReceiptRecord{ID: "REC-001", ShipmentID: "SHIP-001", DeliveredOutcome: "Test 1", Status: "submitted"})
-	repo.Create(ctx, &secondary.ReceiptRecord{ID: "REC-002", ShipmentID: "SHIP-002", DeliveredOutcome: "Test 2", Status: "verified"})
+	repo.Create(ctx, &secondary.ReceiptRecord{ID: "REC-001", TaskID: "TASK-001", DeliveredOutcome: "Test 1", Status: "submitted"})
+	repo.Create(ctx, &secondary.ReceiptRecord{ID: "REC-002", TaskID: "TASK-002", DeliveredOutcome: "Test 2", Status: "verified"})
 
 	t.Run("lists all receipts", func(t *testing.T) {
 		list, err := repo.List(ctx, secondary.ReceiptFilters{})
@@ -182,8 +182,8 @@ func TestReceiptRepository_List(t *testing.T) {
 		}
 	})
 
-	t.Run("filters by shipment_id", func(t *testing.T) {
-		list, err := repo.List(ctx, secondary.ReceiptFilters{ShipmentID: "SHIP-002"})
+	t.Run("filters by task_id", func(t *testing.T) {
+		list, err := repo.List(ctx, secondary.ReceiptFilters{TaskID: "TASK-002"})
 		if err != nil {
 			t.Fatalf("List failed: %v", err)
 		}
@@ -216,11 +216,11 @@ func TestReceiptRepository_Update(t *testing.T) {
 
 	// Setup
 	db.ExecContext(ctx, "INSERT OR IGNORE INTO commissions (id, title, status) VALUES (?, ?, ?)", "COMM-001", "Test", "active")
-	db.ExecContext(ctx, "INSERT INTO shipments (id, commission_id, title, status) VALUES (?, ?, ?, ?)", "SHIP-001", "COMM-001", "Test", "active")
+	db.ExecContext(ctx, "INSERT INTO tasks (id, commission_id, title, status) VALUES (?, ?, ?, ?)", "TASK-001", "COMM-001", "Test", "ready")
 
 	repo.Create(ctx, &secondary.ReceiptRecord{
 		ID:               "REC-001",
-		ShipmentID:       "SHIP-001",
+		TaskID:           "TASK-001",
 		DeliveredOutcome: "Original outcome",
 		Status:           "submitted",
 	})
@@ -258,9 +258,9 @@ func TestReceiptRepository_Delete(t *testing.T) {
 
 	// Setup
 	db.ExecContext(ctx, "INSERT OR IGNORE INTO commissions (id, title, status) VALUES (?, ?, ?)", "COMM-001", "Test", "active")
-	db.ExecContext(ctx, "INSERT INTO shipments (id, commission_id, title, status) VALUES (?, ?, ?, ?)", "SHIP-001", "COMM-001", "Test", "active")
+	db.ExecContext(ctx, "INSERT INTO tasks (id, commission_id, title, status) VALUES (?, ?, ?, ?)", "TASK-001", "COMM-001", "Test", "ready")
 
-	repo.Create(ctx, &secondary.ReceiptRecord{ID: "REC-001", ShipmentID: "SHIP-001", DeliveredOutcome: "Test", Status: "submitted"})
+	repo.Create(ctx, &secondary.ReceiptRecord{ID: "REC-001", TaskID: "TASK-001", DeliveredOutcome: "Test", Status: "submitted"})
 
 	t.Run("deletes receipt", func(t *testing.T) {
 		err := repo.Delete(ctx, "REC-001")
@@ -305,11 +305,11 @@ func TestReceiptRepository_UpdateStatus(t *testing.T) {
 
 	// Setup
 	db.ExecContext(ctx, "INSERT OR IGNORE INTO commissions (id, title, status) VALUES (?, ?, ?)", "COMM-001", "Test", "active")
-	db.ExecContext(ctx, "INSERT INTO shipments (id, commission_id, title, status) VALUES (?, ?, ?, ?)", "SHIP-001", "COMM-001", "Test", "active")
+	db.ExecContext(ctx, "INSERT INTO tasks (id, commission_id, title, status) VALUES (?, ?, ?, ?)", "TASK-001", "COMM-001", "Test", "ready")
 
 	repo.Create(ctx, &secondary.ReceiptRecord{
 		ID:               "REC-001",
-		ShipmentID:       "SHIP-001",
+		TaskID:           "TASK-001",
 		DeliveredOutcome: "Test",
 		Status:           "submitted",
 	})
@@ -349,29 +349,29 @@ func TestReceiptRepository_UpdateStatus(t *testing.T) {
 	})
 }
 
-func TestReceiptRepository_ShipmentExists(t *testing.T) {
+func TestReceiptRepository_TaskExists(t *testing.T) {
 	db := setupTestDB(t)
 	repo := sqlite.NewReceiptRepository(db)
 	ctx := context.Background()
 
 	// Setup
 	db.ExecContext(ctx, "INSERT OR IGNORE INTO commissions (id, title, status) VALUES (?, ?, ?)", "COMM-001", "Test", "active")
-	db.ExecContext(ctx, "INSERT INTO shipments (id, commission_id, title, status) VALUES (?, ?, ?, ?)", "SHIP-001", "COMM-001", "Test", "active")
+	db.ExecContext(ctx, "INSERT INTO tasks (id, commission_id, title, status) VALUES (?, ?, ?, ?)", "TASK-001", "COMM-001", "Test", "ready")
 
-	t.Run("returns true for existing shipment", func(t *testing.T) {
-		exists, err := repo.ShipmentExists(ctx, "SHIP-001")
+	t.Run("returns true for existing task", func(t *testing.T) {
+		exists, err := repo.TaskExists(ctx, "TASK-001")
 		if err != nil {
-			t.Fatalf("ShipmentExists failed: %v", err)
+			t.Fatalf("TaskExists failed: %v", err)
 		}
 		if !exists {
 			t.Error("expected true, got false")
 		}
 	})
 
-	t.Run("returns false for non-existent shipment", func(t *testing.T) {
-		exists, err := repo.ShipmentExists(ctx, "SHIP-999")
+	t.Run("returns false for non-existent task", func(t *testing.T) {
+		exists, err := repo.TaskExists(ctx, "TASK-999")
 		if err != nil {
-			t.Fatalf("ShipmentExists failed: %v", err)
+			t.Fatalf("TaskExists failed: %v", err)
 		}
 		if exists {
 			t.Error("expected false, got true")
@@ -379,37 +379,37 @@ func TestReceiptRepository_ShipmentExists(t *testing.T) {
 	})
 }
 
-func TestReceiptRepository_ShipmentHasREC(t *testing.T) {
+func TestReceiptRepository_TaskHasReceipt(t *testing.T) {
 	db := setupTestDB(t)
 	repo := sqlite.NewReceiptRepository(db)
 	ctx := context.Background()
 
 	// Setup
 	db.ExecContext(ctx, "INSERT OR IGNORE INTO commissions (id, title, status) VALUES (?, ?, ?)", "COMM-001", "Test", "active")
-	db.ExecContext(ctx, "INSERT INTO shipments (id, commission_id, title, status) VALUES (?, ?, ?, ?)", "SHIP-001", "COMM-001", "Test 1", "active")
-	db.ExecContext(ctx, "INSERT INTO shipments (id, commission_id, title, status) VALUES (?, ?, ?, ?)", "SHIP-002", "COMM-001", "Test 2", "active")
+	db.ExecContext(ctx, "INSERT INTO tasks (id, commission_id, title, status) VALUES (?, ?, ?, ?)", "TASK-001", "COMM-001", "Task 1", "ready")
+	db.ExecContext(ctx, "INSERT INTO tasks (id, commission_id, title, status) VALUES (?, ?, ?, ?)", "TASK-002", "COMM-001", "Task 2", "ready")
 
 	repo.Create(ctx, &secondary.ReceiptRecord{
 		ID:               "REC-001",
-		ShipmentID:       "SHIP-001",
+		TaskID:           "TASK-001",
 		DeliveredOutcome: "Test",
 		Status:           "submitted",
 	})
 
-	t.Run("returns true when shipment has REC", func(t *testing.T) {
-		has, err := repo.ShipmentHasREC(ctx, "SHIP-001")
+	t.Run("returns true when task has receipt", func(t *testing.T) {
+		has, err := repo.TaskHasReceipt(ctx, "TASK-001")
 		if err != nil {
-			t.Fatalf("ShipmentHasREC failed: %v", err)
+			t.Fatalf("TaskHasReceipt failed: %v", err)
 		}
 		if !has {
 			t.Error("expected true, got false")
 		}
 	})
 
-	t.Run("returns false when shipment has no REC", func(t *testing.T) {
-		has, err := repo.ShipmentHasREC(ctx, "SHIP-002")
+	t.Run("returns false when task has no receipt", func(t *testing.T) {
+		has, err := repo.TaskHasReceipt(ctx, "TASK-002")
 		if err != nil {
-			t.Fatalf("ShipmentHasREC failed: %v", err)
+			t.Fatalf("TaskHasReceipt failed: %v", err)
 		}
 		if has {
 			t.Error("expected false, got true")

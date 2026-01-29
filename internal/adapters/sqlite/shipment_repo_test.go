@@ -66,8 +66,8 @@ func TestShipmentRepository_Create(t *testing.T) {
 	if retrieved.Title != "Test Shipment" {
 		t.Errorf("expected title 'Test Shipment', got '%s'", retrieved.Title)
 	}
-	if retrieved.Status != "active" {
-		t.Errorf("expected status 'active', got '%s'", retrieved.Status)
+	if retrieved.Status != "draft" {
+		t.Errorf("expected status 'draft', got '%s'", retrieved.Status)
 	}
 }
 
@@ -93,8 +93,8 @@ func TestShipmentRepository_GetByID(t *testing.T) {
 		t.Errorf("expected description 'Description', got '%s'", retrieved.Description)
 	}
 
-	if retrieved.Status != "active" {
-		t.Errorf("expected status 'active', got '%s'", retrieved.Status)
+	if retrieved.Status != "draft" {
+		t.Errorf("expected status 'draft', got '%s'", retrieved.Status)
 	}
 }
 
@@ -165,7 +165,7 @@ func TestShipmentRepository_List_FilterByStatus(t *testing.T) {
 	_ = repo.UpdateStatus(ctx, s2.ID, "complete", true)
 
 	// List only active
-	shipments, err := repo.List(ctx, secondary.ShipmentFilters{Status: "active"})
+	shipments, err := repo.List(ctx, secondary.ShipmentFilters{Status: "draft"})
 	if err != nil {
 		t.Fatalf("List failed: %v", err)
 	}

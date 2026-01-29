@@ -373,13 +373,10 @@ func TestConclaveRepository_GetTasksByConclave(t *testing.T) {
 
 	conclave := createTestConclave(t, repo, ctx, "COMM-001", "Conclave with Tasks", "")
 
-	// Link conclave to shipment SHIP-001
-	_, _ = db.Exec("UPDATE conclaves SET shipment_id = 'SHIP-001' WHERE id = ?", conclave.ID)
-
-	// Insert tasks for the shipment (tasks link to shipments, not conclaves directly)
-	_, _ = db.Exec(`INSERT INTO tasks (id, shipment_id, commission_id, title, status) VALUES ('TASK-001', 'SHIP-001', 'COMM-001', 'Task 1', 'ready')`)
-	_, _ = db.Exec(`INSERT INTO tasks (id, shipment_id, commission_id, title, status) VALUES ('TASK-002', 'SHIP-001', 'COMM-001', 'Task 2', 'ready')`)
-	_, _ = db.Exec(`INSERT INTO tasks (id, commission_id, title, status) VALUES ('TASK-003', 'COMM-001', 'Task 3 (no shipment)', 'ready')`)
+	// Insert tasks linked directly to the conclave via conclave_id
+	_, _ = db.Exec(`INSERT INTO tasks (id, commission_id, conclave_id, title, status) VALUES ('TASK-001', 'COMM-001', ?, 'Task 1', 'ready')`, conclave.ID)
+	_, _ = db.Exec(`INSERT INTO tasks (id, commission_id, conclave_id, title, status) VALUES ('TASK-002', 'COMM-001', ?, 'Task 2', 'ready')`, conclave.ID)
+	_, _ = db.Exec(`INSERT INTO tasks (id, commission_id, title, status) VALUES ('TASK-003', 'COMM-001', 'Task 3 (no conclave)', 'ready')`)
 
 	tasks, err := repo.GetTasksByConclave(ctx, conclave.ID)
 	if err != nil {
@@ -403,13 +400,13 @@ func TestConclaveRepository_GetPlansByConclave(t *testing.T) {
 
 	conclave := createTestConclave(t, repo, ctx, "COMM-001", "Conclave with Plans", "")
 
-	// Link conclave to shipment SHIP-001
-	_, _ = db.Exec("UPDATE conclaves SET shipment_id = 'SHIP-001' WHERE id = ?", conclave.ID)
+	// Insert tasks for the conclave (tasks now link to conclaves via conclave_id)
+	_, _ = db.Exec(`INSERT INTO tasks (id, commission_id, conclave_id, title, status) VALUES ('TASK-CON-001', 'COMM-001', ?, 'Task for Plan 1', 'ready')`, conclave.ID)
+	_, _ = db.Exec(`INSERT INTO tasks (id, commission_id, conclave_id, title, status) VALUES ('TASK-CON-002', 'COMM-001', ?, 'Task for Plan 2', 'ready')`, conclave.ID)
 
-	// Insert plans for the shipment (plans link to shipments, not conclaves directly)
-	_, _ = db.Exec(`INSERT INTO plans (id, shipment_id, commission_id, title, status) VALUES ('PLAN-001', 'SHIP-001', 'COMM-001', 'Plan 1', 'draft')`)
-	_, _ = db.Exec(`INSERT INTO plans (id, shipment_id, commission_id, title, status) VALUES ('PLAN-002', 'SHIP-001', 'COMM-001', 'Plan 2', 'draft')`)
-	_, _ = db.Exec(`INSERT INTO plans (id, commission_id, title, status) VALUES ('PLAN-003', 'COMM-001', 'Plan 3 (no shipment)', 'draft')`)
+	// Insert plans for the tasks (plans now link to tasks via task_id)
+	_, _ = db.Exec(`INSERT INTO plans (id, task_id, commission_id, title, status) VALUES ('PLAN-001', 'TASK-CON-001', 'COMM-001', 'Plan 1', 'draft')`)
+	_, _ = db.Exec(`INSERT INTO plans (id, task_id, commission_id, title, status) VALUES ('PLAN-002', 'TASK-CON-002', 'COMM-001', 'Plan 2', 'draft')`)
 
 	plans, err := repo.GetPlansByConclave(ctx, conclave.ID)
 	if err != nil {

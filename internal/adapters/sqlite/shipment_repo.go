@@ -45,7 +45,7 @@ func (r *ShipmentRepository) Create(ctx context.Context, shipment *secondary.Shi
 
 	_, err := r.db.ExecContext(ctx,
 		"INSERT INTO shipments (id, commission_id, title, description, status, repo_id, branch, container_id, container_type) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-		shipment.ID, shipment.CommissionID, shipment.Title, desc, "active", repoID, branch, containerID, containerType,
+		shipment.ID, shipment.CommissionID, shipment.Title, desc, "draft", repoID, branch, containerID, containerType,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create shipment: %w", err)

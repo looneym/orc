@@ -22,29 +22,19 @@ func NewMessageService(messageRepo secondary.MessageRepository) *MessageServiceI
 
 // CreateMessage creates a new message.
 func (s *MessageServiceImpl) CreateMessage(ctx context.Context, req primary.CreateMessageRequest) (*primary.CreateMessageResponse, error) {
-	// Validate commission exists
-	exists, err := s.messageRepo.CommissionExists(ctx, req.CommissionID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to validate commission: %w", err)
-	}
-	if !exists {
-		return nil, fmt.Errorf("commission %s not found", req.CommissionID)
-	}
-
 	// Get next ID
-	nextID, err := s.messageRepo.GetNextID(ctx, req.CommissionID)
+	nextID, err := s.messageRepo.GetNextID(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate message ID: %w", err)
 	}
 
 	// Create record
 	record := &secondary.MessageRecord{
-		ID:           nextID,
-		Sender:       req.Sender,
-		Recipient:    req.Recipient,
-		Subject:      req.Subject,
-		Body:         req.Body,
-		CommissionID: req.CommissionID,
+		ID:        nextID,
+		Sender:    req.Sender,
+		Recipient: req.Recipient,
+		Subject:   req.Subject,
+		Body:      req.Body,
 	}
 
 	if err := s.messageRepo.Create(ctx, record); err != nil {
@@ -94,9 +84,9 @@ func (s *MessageServiceImpl) MarkRead(ctx context.Context, messageID string) err
 	return s.messageRepo.MarkRead(ctx, messageID)
 }
 
-// GetConversation retrieves all messages between two agents.
-func (s *MessageServiceImpl) GetConversation(ctx context.Context, agent1, agent2 string) ([]*primary.Message, error) {
-	records, err := s.messageRepo.GetConversation(ctx, agent1, agent2)
+// GetConversation retrieves all messages between two actors.
+func (s *MessageServiceImpl) GetConversation(ctx context.Context, actor1, actor2 string) ([]*primary.Message, error) {
+	records, err := s.messageRepo.GetConversation(ctx, actor1, actor2)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get conversation: %w", err)
 	}
@@ -117,14 +107,13 @@ func (s *MessageServiceImpl) GetUnreadCount(ctx context.Context, recipient strin
 
 func (s *MessageServiceImpl) recordToMessage(r *secondary.MessageRecord) *primary.Message {
 	return &primary.Message{
-		ID:           r.ID,
-		Sender:       r.Sender,
-		Recipient:    r.Recipient,
-		Subject:      r.Subject,
-		Body:         r.Body,
-		Timestamp:    r.Timestamp,
-		Read:         r.Read,
-		CommissionID: r.CommissionID,
+		ID:        r.ID,
+		Sender:    r.Sender,
+		Recipient: r.Recipient,
+		Subject:   r.Subject,
+		Body:      r.Body,
+		Timestamp: r.Timestamp,
+		Read:      r.Read,
 	}
 }
 

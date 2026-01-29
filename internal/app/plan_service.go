@@ -31,24 +31,22 @@ func (s *PlanServiceImpl) CreatePlan(ctx context.Context, req primary.CreatePlan
 		return nil, fmt.Errorf("commission %s not found", req.CommissionID)
 	}
 
-	// Validate shipment exists if provided
-	if req.ShipmentID != "" {
-		shipExists, err := s.planRepo.ShipmentExists(ctx, req.ShipmentID)
-		if err != nil {
-			return nil, fmt.Errorf("failed to validate shipment: %w", err)
-		}
-		if !shipExists {
-			return nil, fmt.Errorf("shipment %s not found", req.ShipmentID)
-		}
+	// Validate task exists
+	taskExists, err := s.planRepo.TaskExists(ctx, req.TaskID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to validate task: %w", err)
+	}
+	if !taskExists {
+		return nil, fmt.Errorf("task %s not found", req.TaskID)
+	}
 
-		// Check if shipment already has an active plan
-		hasActive, err := s.planRepo.HasActivePlanForShipment(ctx, req.ShipmentID)
-		if err != nil {
-			return nil, fmt.Errorf("failed to check active plan: %w", err)
-		}
-		if hasActive {
-			return nil, fmt.Errorf("shipment %s already has an active plan", req.ShipmentID)
-		}
+	// Check if task already has an active plan
+	hasActive, err := s.planRepo.HasActivePlanForTask(ctx, req.TaskID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check active plan: %w", err)
+	}
+	if hasActive {
+		return nil, fmt.Errorf("task %s already has an active plan", req.TaskID)
 	}
 
 	// Get next ID
@@ -59,13 +57,14 @@ func (s *PlanServiceImpl) CreatePlan(ctx context.Context, req primary.CreatePlan
 
 	// Create record
 	record := &secondary.PlanRecord{
-		ID:           nextID,
-		CommissionID: req.CommissionID,
-		ShipmentID:   req.ShipmentID,
-		Title:        req.Title,
-		Description:  req.Description,
-		Content:      req.Content,
-		Status:       "draft",
+		ID:               nextID,
+		CommissionID:     req.CommissionID,
+		TaskID:           req.TaskID,
+		Title:            req.Title,
+		Description:      req.Description,
+		Content:          req.Content,
+		Status:           "draft",
+		SupersedesPlanID: req.SupersedesPlanID,
 	}
 
 	if err := s.planRepo.Create(ctx, record); err != nil {
@@ -96,7 +95,7 @@ func (s *PlanServiceImpl) GetPlan(ctx context.Context, planID string) (*primary.
 // ListPlans lists plans with optional filters.
 func (s *PlanServiceImpl) ListPlans(ctx context.Context, filters primary.PlanFilters) ([]*primary.Plan, error) {
 	records, err := s.planRepo.List(ctx, secondary.PlanFilters{
-		ShipmentID:   filters.ShipmentID,
+		TaskID:       filters.TaskID,
 		CommissionID: filters.CommissionID,
 		Status:       filters.Status,
 	})
@@ -142,9 +141,9 @@ func (s *PlanServiceImpl) DeletePlan(ctx context.Context, planID string) error {
 	return s.planRepo.Delete(ctx, planID)
 }
 
-// GetShipmentActivePlan retrieves the active (draft) plan for a shipment.
-func (s *PlanServiceImpl) GetShipmentActivePlan(ctx context.Context, shipmentID string) (*primary.Plan, error) {
-	record, err := s.planRepo.GetActivePlanForShipment(ctx, shipmentID)
+// GetTaskActivePlan retrieves the active (draft) plan for a task.
+func (s *PlanServiceImpl) GetTaskActivePlan(ctx context.Context, taskID string) (*primary.Plan, error) {
+	record, err := s.planRepo.GetActivePlanForTask(ctx, taskID)
 	if err != nil {
 		return nil, err
 	}
@@ -159,7 +158,7 @@ func (s *PlanServiceImpl) GetShipmentActivePlan(ctx context.Context, shipmentID 
 func (s *PlanServiceImpl) recordToPlan(r *secondary.PlanRecord) *primary.Plan {
 	return &primary.Plan{
 		ID:               r.ID,
-		ShipmentID:       r.ShipmentID,
+		TaskID:           r.TaskID,
 		CommissionID:     r.CommissionID,
 		Title:            r.Title,
 		Description:      r.Description,
@@ -172,6 +171,7 @@ func (s *PlanServiceImpl) recordToPlan(r *secondary.PlanRecord) *primary.Plan {
 		ConclaveID:       r.ConclaveID,
 		PromotedFromID:   r.PromotedFromID,
 		PromotedFromType: r.PromotedFromType,
+		SupersedesPlanID: r.SupersedesPlanID,
 	}
 }
 

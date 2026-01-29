@@ -26,7 +26,7 @@ func TestPRRepository_Create(t *testing.T) {
 	// Create a test shipment (assuming shipments table exists)
 	_, err := db.ExecContext(ctx,
 		"INSERT INTO shipments (id, commission_id, title, status) VALUES (?, ?, ?, ?)",
-		"SHIP-001", "COMM-001", "Test Shipment", "active",
+		"SHIP-001", "COMM-001", "Test Shipment", "draft",
 	)
 	if err != nil {
 		t.Fatalf("Failed to create shipment: %v", err)
@@ -75,7 +75,7 @@ func TestPRRepository_Create(t *testing.T) {
 		// Create another shipment for this test
 		_, err := db.ExecContext(ctx,
 			"INSERT INTO shipments (id, commission_id, title, status) VALUES (?, ?, ?, ?)",
-			"SHIP-002", "COMM-001", "Test Shipment 2", "active",
+			"SHIP-002", "COMM-001", "Test Shipment 2", "draft",
 		)
 		if err != nil {
 			t.Fatalf("Failed to create shipment: %v", err)
@@ -116,7 +116,7 @@ func TestPRRepository_GetByShipment(t *testing.T) {
 	// Setup
 	repoRepo.Create(ctx, &secondary.RepoRecord{ID: "REPO-001", Name: "test-repo"})
 	db.ExecContext(ctx, "INSERT OR IGNORE INTO commissions (id, title, status) VALUES (?, ?, ?)", "COMM-001", "Test", "active")
-	db.ExecContext(ctx, "INSERT INTO shipments (id, commission_id, title, status) VALUES (?, ?, ?, ?)", "SHIP-001", "COMM-001", "Test", "active")
+	db.ExecContext(ctx, "INSERT INTO shipments (id, commission_id, title, status) VALUES (?, ?, ?, ?)", "SHIP-001", "COMM-001", "Test", "draft")
 
 	prRepo.Create(ctx, &secondary.PRRecord{
 		ID:           "PR-001",
@@ -160,7 +160,7 @@ func TestPRRepository_UpdateStatus(t *testing.T) {
 	// Setup
 	repoRepo.Create(ctx, &secondary.RepoRecord{ID: "REPO-001", Name: "test-repo"})
 	db.ExecContext(ctx, "INSERT OR IGNORE INTO commissions (id, title, status) VALUES (?, ?, ?)", "COMM-001", "Test", "active")
-	db.ExecContext(ctx, "INSERT INTO shipments (id, commission_id, title, status) VALUES (?, ?, ?, ?)", "SHIP-001", "COMM-001", "Test", "active")
+	db.ExecContext(ctx, "INSERT INTO shipments (id, commission_id, title, status) VALUES (?, ?, ?, ?)", "SHIP-001", "COMM-001", "Test", "draft")
 
 	prRepo.Create(ctx, &secondary.PRRecord{
 		ID:           "PR-001",
@@ -209,8 +209,8 @@ func TestPRRepository_ShipmentHasPR(t *testing.T) {
 	// Setup
 	repoRepo.Create(ctx, &secondary.RepoRecord{ID: "REPO-001", Name: "test-repo"})
 	db.ExecContext(ctx, "INSERT OR IGNORE INTO commissions (id, title, status) VALUES (?, ?, ?)", "COMM-001", "Test", "active")
-	db.ExecContext(ctx, "INSERT INTO shipments (id, commission_id, title, status) VALUES (?, ?, ?, ?)", "SHIP-001", "COMM-001", "Test 1", "active")
-	db.ExecContext(ctx, "INSERT INTO shipments (id, commission_id, title, status) VALUES (?, ?, ?, ?)", "SHIP-002", "COMM-001", "Test 2", "active")
+	db.ExecContext(ctx, "INSERT INTO shipments (id, commission_id, title, status) VALUES (?, ?, ?, ?)", "SHIP-001", "COMM-001", "Test 1", "draft")
+	db.ExecContext(ctx, "INSERT INTO shipments (id, commission_id, title, status) VALUES (?, ?, ?, ?)", "SHIP-002", "COMM-001", "Test 2", "draft")
 
 	prRepo.Create(ctx, &secondary.PRRecord{
 		ID:           "PR-001",

@@ -14,12 +14,12 @@ func setupPlanTestDB(t *testing.T) *sql.DB {
 	t.Helper()
 	testDB := setupTestDB(t)
 	seedCommission(t, testDB, "COMM-001", "Test Commission")
-	seedShipment(t, testDB, "SHIP-001", "COMM-001", "Test Shipment")
+	seedTask(t, testDB, "TASK-001", "COMM-001", "Test Task")
 	return testDB
 }
 
 // createTestPlan is a helper that creates a plan with a generated ID.
-func createTestPlan(t *testing.T, repo *sqlite.PlanRepository, ctx context.Context, commissionID, shipmentID, title string) *secondary.PlanRecord {
+func createTestPlan(t *testing.T, repo *sqlite.PlanRepository, ctx context.Context, commissionID, taskID, title string) *secondary.PlanRecord {
 	t.Helper()
 
 	nextID, err := repo.GetNextID(ctx)
@@ -30,7 +30,7 @@ func createTestPlan(t *testing.T, repo *sqlite.PlanRepository, ctx context.Conte
 	plan := &secondary.PlanRecord{
 		ID:           nextID,
 		CommissionID: commissionID,
-		ShipmentID:   shipmentID,
+		TaskID:       taskID,
 		Title:        title,
 	}
 
@@ -50,7 +50,7 @@ func TestPlanRepository_Create(t *testing.T) {
 	plan := &secondary.PlanRecord{
 		ID:           "PLAN-001",
 		CommissionID: "COMM-001",
-		ShipmentID:   "SHIP-001",
+		TaskID:       "TASK-001",
 		Title:        "Test Plan",
 		Description:  "A test plan description",
 		Content:      "## Plan Content\n\n1. Step one\n2. Step two",
@@ -77,7 +77,7 @@ func TestPlanRepository_Create(t *testing.T) {
 	}
 }
 
-func TestPlanRepository_Create_WithoutShipment(t *testing.T) {
+func TestPlanRepository_Create_WithoutTask(t *testing.T) {
 	db := setupPlanTestDB(t)
 	repo := sqlite.NewPlanRepository(db)
 	ctx := context.Background()
@@ -94,8 +94,8 @@ func TestPlanRepository_Create_WithoutShipment(t *testing.T) {
 	}
 
 	retrieved, _ := repo.GetByID(ctx, "PLAN-001")
-	if retrieved.ShipmentID != "" {
-		t.Errorf("expected empty shipment ID, got '%s'", retrieved.ShipmentID)
+	if retrieved.TaskID != "" {
+		t.Errorf("expected empty task ID, got '%s'", retrieved.TaskID)
 	}
 }
 
@@ -104,7 +104,7 @@ func TestPlanRepository_GetByID(t *testing.T) {
 	repo := sqlite.NewPlanRepository(db)
 	ctx := context.Background()
 
-	plan := createTestPlan(t, repo, ctx, "COMM-001", "SHIP-001", "Test Plan")
+	plan := createTestPlan(t, repo, ctx, "COMM-001", "TASK-001", "Test Plan")
 
 	retrieved, err := repo.GetByID(ctx, plan.ID)
 	if err != nil {
@@ -149,24 +149,24 @@ func TestPlanRepository_List(t *testing.T) {
 	}
 }
 
-func TestPlanRepository_List_FilterByShipment(t *testing.T) {
+func TestPlanRepository_List_FilterByTask(t *testing.T) {
 	db := setupPlanTestDB(t)
 	repo := sqlite.NewPlanRepository(db)
 	ctx := context.Background()
 
-	// Add another shipment
-	_, _ = db.Exec("INSERT INTO shipments (id, commission_id, title) VALUES ('SHIP-002', 'COMM-001', 'Ship 2')")
+	// Add another task
+	seedTask(t, db, "TASK-002", "COMM-001", "Task 2")
 
-	createTestPlan(t, repo, ctx, "COMM-001", "SHIP-001", "Plan 1")
-	createTestPlan(t, repo, ctx, "COMM-001", "SHIP-002", "Plan 2")
+	createTestPlan(t, repo, ctx, "COMM-001", "TASK-001", "Plan 1")
+	createTestPlan(t, repo, ctx, "COMM-001", "TASK-002", "Plan 2")
 
-	plans, err := repo.List(ctx, secondary.PlanFilters{ShipmentID: "SHIP-001"})
+	plans, err := repo.List(ctx, secondary.PlanFilters{TaskID: "TASK-001"})
 	if err != nil {
 		t.Fatalf("List failed: %v", err)
 	}
 
 	if len(plans) != 1 {
-		t.Errorf("expected 1 plan for SHIP-001, got %d", len(plans))
+		t.Errorf("expected 1 plan for TASK-001, got %d", len(plans))
 	}
 }
 
@@ -377,18 +377,18 @@ func TestPlanRepository_Approve_NotFound(t *testing.T) {
 	}
 }
 
-func TestPlanRepository_GetActivePlanForShipment(t *testing.T) {
+func TestPlanRepository_GetActivePlanForTask(t *testing.T) {
 	db := setupPlanTestDB(t)
 	repo := sqlite.NewPlanRepository(db)
 	ctx := context.Background()
 
-	// Create a draft plan for shipment
-	plan := createTestPlan(t, repo, ctx, "COMM-001", "SHIP-001", "Active Plan")
+	// Create a draft plan for task
+	plan := createTestPlan(t, repo, ctx, "COMM-001", "TASK-001", "Active Plan")
 
 	// Get active plan
-	active, err := repo.GetActivePlanForShipment(ctx, "SHIP-001")
+	active, err := repo.GetActivePlanForTask(ctx, "TASK-001")
 	if err != nil {
-		t.Fatalf("GetActivePlanForShipment failed: %v", err)
+		t.Fatalf("GetActivePlanForTask failed: %v", err)
 	}
 	if active == nil {
 		t.Fatal("expected active plan to be returned")
@@ -401,49 +401,49 @@ func TestPlanRepository_GetActivePlanForShipment(t *testing.T) {
 	_ = repo.Approve(ctx, plan.ID)
 
 	// Should return nil when no draft plan exists
-	active, err = repo.GetActivePlanForShipment(ctx, "SHIP-001")
+	active, err = repo.GetActivePlanForTask(ctx, "TASK-001")
 	if err != nil {
-		t.Fatalf("GetActivePlanForShipment failed: %v", err)
+		t.Fatalf("GetActivePlanForTask failed: %v", err)
 	}
 	if active != nil {
 		t.Error("expected no active plan after approval")
 	}
 }
 
-func TestPlanRepository_GetActivePlanForShipment_NoPlan(t *testing.T) {
+func TestPlanRepository_GetActivePlanForTask_NoPlan(t *testing.T) {
 	db := setupPlanTestDB(t)
 	repo := sqlite.NewPlanRepository(db)
 	ctx := context.Background()
 
-	active, err := repo.GetActivePlanForShipment(ctx, "SHIP-001")
+	active, err := repo.GetActivePlanForTask(ctx, "TASK-001")
 	if err != nil {
-		t.Fatalf("GetActivePlanForShipment failed: %v", err)
+		t.Fatalf("GetActivePlanForTask failed: %v", err)
 	}
 	if active != nil {
 		t.Error("expected no active plan")
 	}
 }
 
-func TestPlanRepository_HasActivePlanForShipment(t *testing.T) {
+func TestPlanRepository_HasActivePlanForTask(t *testing.T) {
 	db := setupPlanTestDB(t)
 	repo := sqlite.NewPlanRepository(db)
 	ctx := context.Background()
 
 	// Initially no active plan
-	has, err := repo.HasActivePlanForShipment(ctx, "SHIP-001")
+	has, err := repo.HasActivePlanForTask(ctx, "TASK-001")
 	if err != nil {
-		t.Fatalf("HasActivePlanForShipment failed: %v", err)
+		t.Fatalf("HasActivePlanForTask failed: %v", err)
 	}
 	if has {
 		t.Error("expected no active plan")
 	}
 
 	// Create a draft plan
-	plan := createTestPlan(t, repo, ctx, "COMM-001", "SHIP-001", "Draft Plan")
+	plan := createTestPlan(t, repo, ctx, "COMM-001", "TASK-001", "Draft Plan")
 
-	has, err = repo.HasActivePlanForShipment(ctx, "SHIP-001")
+	has, err = repo.HasActivePlanForTask(ctx, "TASK-001")
 	if err != nil {
-		t.Fatalf("HasActivePlanForShipment failed: %v", err)
+		t.Fatalf("HasActivePlanForTask failed: %v", err)
 	}
 	if !has {
 		t.Error("expected active plan to exist")
@@ -452,9 +452,9 @@ func TestPlanRepository_HasActivePlanForShipment(t *testing.T) {
 	// Approve the plan
 	_ = repo.Approve(ctx, plan.ID)
 
-	has, err = repo.HasActivePlanForShipment(ctx, "SHIP-001")
+	has, err = repo.HasActivePlanForTask(ctx, "TASK-001")
 	if err != nil {
-		t.Fatalf("HasActivePlanForShipment failed: %v", err)
+		t.Fatalf("HasActivePlanForTask failed: %v", err)
 	}
 	if has {
 		t.Error("expected no active plan after approval")
@@ -483,24 +483,24 @@ func TestPlanRepository_CommissionExists(t *testing.T) {
 	}
 }
 
-func TestPlanRepository_ShipmentExists(t *testing.T) {
+func TestPlanRepository_TaskExists(t *testing.T) {
 	db := setupPlanTestDB(t)
 	repo := sqlite.NewPlanRepository(db)
 	ctx := context.Background()
 
-	exists, err := repo.ShipmentExists(ctx, "SHIP-001")
+	exists, err := repo.TaskExists(ctx, "TASK-001")
 	if err != nil {
-		t.Fatalf("ShipmentExists failed: %v", err)
+		t.Fatalf("TaskExists failed: %v", err)
 	}
 	if !exists {
-		t.Error("expected shipment to exist")
+		t.Error("expected task to exist")
 	}
 
-	exists, err = repo.ShipmentExists(ctx, "SHIP-999")
+	exists, err = repo.TaskExists(ctx, "TASK-999")
 	if err != nil {
-		t.Fatalf("ShipmentExists failed: %v", err)
+		t.Fatalf("TaskExists failed: %v", err)
 	}
 	if exists {
-		t.Error("expected shipment to not exist")
+		t.Error("expected task to not exist")
 	}
 }

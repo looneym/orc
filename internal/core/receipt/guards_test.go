@@ -10,43 +10,43 @@ func TestCanCreateREC(t *testing.T) {
 		wantReason  string
 	}{
 		{
-			name: "can create REC when shipment exists and has no REC",
+			name: "can create REC when task exists and has no receipt",
 			ctx: CreateRECContext{
-				ShipmentID:       "SHIP-001",
-				ShipmentExists:   true,
-				ShipmentHasREC:   false,
+				TaskID:           "TASK-001",
+				TaskExists:       true,
+				TaskHasReceipt:   false,
 				DeliveredOutcome: "Delivered complete feature set",
 			},
 			wantAllowed: true,
 		},
 		{
-			name: "cannot create REC when shipment not found",
+			name: "cannot create REC when task not found",
 			ctx: CreateRECContext{
-				ShipmentID:       "SHIP-999",
-				ShipmentExists:   false,
-				ShipmentHasREC:   false,
+				TaskID:           "TASK-999",
+				TaskExists:       false,
+				TaskHasReceipt:   false,
 				DeliveredOutcome: "Delivered complete feature set",
 			},
 			wantAllowed: false,
-			wantReason:  "shipment SHIP-999 not found",
+			wantReason:  "task TASK-999 not found",
 		},
 		{
-			name: "cannot create REC when shipment already has REC",
+			name: "cannot create REC when task already has receipt",
 			ctx: CreateRECContext{
-				ShipmentID:       "SHIP-001",
-				ShipmentExists:   true,
-				ShipmentHasREC:   true,
+				TaskID:           "TASK-001",
+				TaskExists:       true,
+				TaskHasReceipt:   true,
 				DeliveredOutcome: "Delivered complete feature set",
 			},
 			wantAllowed: false,
-			wantReason:  "shipment SHIP-001 already has a REC",
+			wantReason:  "task TASK-001 already has a receipt",
 		},
 		{
 			name: "cannot create REC with empty delivered outcome",
 			ctx: CreateRECContext{
-				ShipmentID:       "SHIP-001",
-				ShipmentExists:   true,
-				ShipmentHasREC:   false,
+				TaskID:           "TASK-001",
+				TaskExists:       true,
+				TaskHasReceipt:   false,
 				DeliveredOutcome: "",
 			},
 			wantAllowed: false,
@@ -55,9 +55,9 @@ func TestCanCreateREC(t *testing.T) {
 		{
 			name: "cannot create REC with whitespace-only delivered outcome",
 			ctx: CreateRECContext{
-				ShipmentID:       "SHIP-001",
-				ShipmentExists:   true,
-				ShipmentHasREC:   false,
+				TaskID:           "TASK-001",
+				TaskExists:       true,
+				TaskHasReceipt:   false,
 				DeliveredOutcome: "   ",
 			},
 			wantAllowed: false,

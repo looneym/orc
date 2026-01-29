@@ -32,14 +32,14 @@ func (r *PlanRepository) Create(ctx context.Context, plan *secondary.PlanRecord)
 		content = sql.NullString{String: plan.Content, Valid: true}
 	}
 
-	var shipmentID sql.NullString
-	if plan.ShipmentID != "" {
-		shipmentID = sql.NullString{String: plan.ShipmentID, Valid: true}
+	var supersedesPlanID sql.NullString
+	if plan.SupersedesPlanID != "" {
+		supersedesPlanID = sql.NullString{String: plan.SupersedesPlanID, Valid: true}
 	}
 
 	_, err := r.db.ExecContext(ctx,
-		"INSERT INTO plans (id, shipment_id, commission_id, title, description, content, status) VALUES (?, ?, ?, ?, ?, ?, ?)",
-		plan.ID, shipmentID, plan.CommissionID, plan.Title, desc, content, "draft",
+		"INSERT INTO plans (id, task_id, commission_id, title, description, content, status, supersedes_plan_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+		plan.ID, plan.TaskID, plan.CommissionID, plan.Title, desc, content, "draft", supersedesPlanID,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create plan: %w", err)
@@ -51,7 +51,6 @@ func (r *PlanRepository) Create(ctx context.Context, plan *secondary.PlanRecord)
 // GetByID retrieves a plan by its ID.
 func (r *PlanRepository) GetByID(ctx context.Context, id string) (*secondary.PlanRecord, error) {
 	var (
-		shipmentID       sql.NullString
 		desc             sql.NullString
 		content          sql.NullString
 		pinned           bool
@@ -61,16 +60,17 @@ func (r *PlanRepository) GetByID(ctx context.Context, id string) (*secondary.Pla
 		conclaveID       sql.NullString
 		promotedFromID   sql.NullString
 		promotedFromType sql.NullString
+		supersedesPlanID sql.NullString
 	)
 
 	record := &secondary.PlanRecord{}
 	err := r.db.QueryRowContext(ctx,
-		`SELECT id, shipment_id, commission_id, title, description, status, content, pinned,
-			created_at, updated_at, approved_at, conclave_id, promoted_from_id, promoted_from_type
+		`SELECT id, task_id, commission_id, title, description, status, content, pinned,
+			created_at, updated_at, approved_at, conclave_id, promoted_from_id, promoted_from_type, supersedes_plan_id
 		FROM plans WHERE id = ?`,
 		id,
-	).Scan(&record.ID, &shipmentID, &record.CommissionID, &record.Title, &desc, &record.Status, &content, &pinned,
-		&createdAt, &updatedAt, &approvedAt, &conclaveID, &promotedFromID, &promotedFromType)
+	).Scan(&record.ID, &record.TaskID, &record.CommissionID, &record.Title, &desc, &record.Status, &content, &pinned,
+		&createdAt, &updatedAt, &approvedAt, &conclaveID, &promotedFromID, &promotedFromType, &supersedesPlanID)
 
 	if err == sql.ErrNoRows {
 		return nil, fmt.Errorf("plan %s not found", id)
@@ -79,7 +79,6 @@ func (r *PlanRepository) GetByID(ctx context.Context, id string) (*secondary.Pla
 		return nil, fmt.Errorf("failed to get plan: %w", err)
 	}
 
-	record.ShipmentID = shipmentID.String
 	record.Description = desc.String
 	record.Content = content.String
 	record.Pinned = pinned
@@ -91,20 +90,21 @@ func (r *PlanRepository) GetByID(ctx context.Context, id string) (*secondary.Pla
 	record.ConclaveID = conclaveID.String
 	record.PromotedFromID = promotedFromID.String
 	record.PromotedFromType = promotedFromType.String
+	record.SupersedesPlanID = supersedesPlanID.String
 
 	return record, nil
 }
 
 // List retrieves plans matching the given filters.
 func (r *PlanRepository) List(ctx context.Context, filters secondary.PlanFilters) ([]*secondary.PlanRecord, error) {
-	query := `SELECT id, shipment_id, commission_id, title, description, status, content, pinned,
-		created_at, updated_at, approved_at, conclave_id, promoted_from_id, promoted_from_type
+	query := `SELECT id, task_id, commission_id, title, description, status, content, pinned,
+		created_at, updated_at, approved_at, conclave_id, promoted_from_id, promoted_from_type, supersedes_plan_id
 		FROM plans WHERE 1=1`
 	args := []any{}
 
-	if filters.ShipmentID != "" {
-		query += " AND shipment_id = ?"
-		args = append(args, filters.ShipmentID)
+	if filters.TaskID != "" {
+		query += " AND task_id = ?"
+		args = append(args, filters.TaskID)
 	}
 
 	if filters.CommissionID != "" {
@@ -128,7 +128,6 @@ func (r *PlanRepository) List(ctx context.Context, filters secondary.PlanFilters
 	var plans []*secondary.PlanRecord
 	for rows.Next() {
 		var (
-			shipmentID       sql.NullString
 			desc             sql.NullString
 			content          sql.NullString
 			pinned           bool
@@ -138,16 +137,16 @@ func (r *PlanRepository) List(ctx context.Context, filters secondary.PlanFilters
 			conclaveID       sql.NullString
 			promotedFromID   sql.NullString
 			promotedFromType sql.NullString
+			supersedesPlanID sql.NullString
 		)
 
 		record := &secondary.PlanRecord{}
-		err := rows.Scan(&record.ID, &shipmentID, &record.CommissionID, &record.Title, &desc, &record.Status, &content, &pinned,
-			&createdAt, &updatedAt, &approvedAt, &conclaveID, &promotedFromID, &promotedFromType)
+		err := rows.Scan(&record.ID, &record.TaskID, &record.CommissionID, &record.Title, &desc, &record.Status, &content, &pinned,
+			&createdAt, &updatedAt, &approvedAt, &conclaveID, &promotedFromID, &promotedFromType, &supersedesPlanID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan plan: %w", err)
 		}
 
-		record.ShipmentID = shipmentID.String
 		record.Description = desc.String
 		record.Content = content.String
 		record.Pinned = pinned
@@ -159,6 +158,7 @@ func (r *PlanRepository) List(ctx context.Context, filters secondary.PlanFilters
 		record.ConclaveID = conclaveID.String
 		record.PromotedFromID = promotedFromID.String
 		record.PromotedFromType = promotedFromType.String
+		record.SupersedesPlanID = supersedesPlanID.String
 
 		plans = append(plans, record)
 	}
@@ -284,10 +284,27 @@ func (r *PlanRepository) Approve(ctx context.Context, id string) error {
 	return nil
 }
 
-// GetActivePlanForShipment retrieves the active (draft) plan for a shipment.
-func (r *PlanRepository) GetActivePlanForShipment(ctx context.Context, shipmentID string) (*secondary.PlanRecord, error) {
+// UpdateStatus updates the plan status.
+func (r *PlanRepository) UpdateStatus(ctx context.Context, id, status string) error {
+	result, err := r.db.ExecContext(ctx,
+		"UPDATE plans SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+		status, id,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to update plan status: %w", err)
+	}
+
+	rowsAffected, _ := result.RowsAffected()
+	if rowsAffected == 0 {
+		return fmt.Errorf("plan %s not found", id)
+	}
+
+	return nil
+}
+
+// GetActivePlanForTask retrieves the active (draft) plan for a task.
+func (r *PlanRepository) GetActivePlanForTask(ctx context.Context, taskID string) (*secondary.PlanRecord, error) {
 	var (
-		shipmentIDCol    sql.NullString
 		desc             sql.NullString
 		content          sql.NullString
 		pinned           bool
@@ -297,25 +314,25 @@ func (r *PlanRepository) GetActivePlanForShipment(ctx context.Context, shipmentI
 		conclaveID       sql.NullString
 		promotedFromID   sql.NullString
 		promotedFromType sql.NullString
+		supersedesPlanID sql.NullString
 	)
 
 	record := &secondary.PlanRecord{}
 	err := r.db.QueryRowContext(ctx,
-		`SELECT id, shipment_id, commission_id, title, description, status, content, pinned,
-			created_at, updated_at, approved_at, conclave_id, promoted_from_id, promoted_from_type
-		FROM plans WHERE shipment_id = ? AND status = 'draft' LIMIT 1`,
-		shipmentID,
-	).Scan(&record.ID, &shipmentIDCol, &record.CommissionID, &record.Title, &desc, &record.Status, &content, &pinned,
-		&createdAt, &updatedAt, &approvedAt, &conclaveID, &promotedFromID, &promotedFromType)
+		`SELECT id, task_id, commission_id, title, description, status, content, pinned,
+			created_at, updated_at, approved_at, conclave_id, promoted_from_id, promoted_from_type, supersedes_plan_id
+		FROM plans WHERE task_id = ? AND status = 'draft' LIMIT 1`,
+		taskID,
+	).Scan(&record.ID, &record.TaskID, &record.CommissionID, &record.Title, &desc, &record.Status, &content, &pinned,
+		&createdAt, &updatedAt, &approvedAt, &conclaveID, &promotedFromID, &promotedFromType, &supersedesPlanID)
 
 	if err == sql.ErrNoRows {
 		return nil, nil // No active plan is not an error
 	}
 	if err != nil {
-		return nil, fmt.Errorf("failed to get active plan for shipment: %w", err)
+		return nil, fmt.Errorf("failed to get active plan for task: %w", err)
 	}
 
-	record.ShipmentID = shipmentIDCol.String
 	record.Description = desc.String
 	record.Content = content.String
 	record.Pinned = pinned
@@ -327,19 +344,20 @@ func (r *PlanRepository) GetActivePlanForShipment(ctx context.Context, shipmentI
 	record.ConclaveID = conclaveID.String
 	record.PromotedFromID = promotedFromID.String
 	record.PromotedFromType = promotedFromType.String
+	record.SupersedesPlanID = supersedesPlanID.String
 
 	return record, nil
 }
 
-// HasActivePlanForShipment checks if a shipment has an active (draft) plan.
-func (r *PlanRepository) HasActivePlanForShipment(ctx context.Context, shipmentID string) (bool, error) {
+// HasActivePlanForTask checks if a task has an active (draft) plan.
+func (r *PlanRepository) HasActivePlanForTask(ctx context.Context, taskID string) (bool, error) {
 	var count int
 	err := r.db.QueryRowContext(ctx,
-		"SELECT COUNT(*) FROM plans WHERE shipment_id = ? AND status = 'draft'",
-		shipmentID,
+		"SELECT COUNT(*) FROM plans WHERE task_id = ? AND status = 'draft'",
+		taskID,
 	).Scan(&count)
 	if err != nil {
-		return false, fmt.Errorf("failed to check active plan for shipment: %w", err)
+		return false, fmt.Errorf("failed to check active plan for task: %w", err)
 	}
 	return count > 0, nil
 }
@@ -354,12 +372,12 @@ func (r *PlanRepository) CommissionExists(ctx context.Context, commissionID stri
 	return count > 0, nil
 }
 
-// ShipmentExists checks if a shipment exists.
-func (r *PlanRepository) ShipmentExists(ctx context.Context, shipmentID string) (bool, error) {
+// TaskExists checks if a task exists.
+func (r *PlanRepository) TaskExists(ctx context.Context, taskID string) (bool, error) {
 	var count int
-	err := r.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM shipments WHERE id = ?", shipmentID).Scan(&count)
+	err := r.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM tasks WHERE id = ?", taskID).Scan(&count)
 	if err != nil {
-		return false, fmt.Errorf("failed to check shipment existence: %w", err)
+		return false, fmt.Errorf("failed to check task existence: %w", err)
 	}
 	return count > 0, nil
 }

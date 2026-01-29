@@ -16,7 +16,7 @@ import (
 // mockPlanRepository implements secondary.PlanRepository for testing.
 type mockPlanRepository struct {
 	plans                  map[string]*secondary.PlanRecord
-	activePlanForShipment  map[string]string // shipmentID -> planID
+	activePlanForTask      map[string]string // taskID -> planID
 	createErr              error
 	getErr                 error
 	updateErr              error
@@ -25,8 +25,8 @@ type mockPlanRepository struct {
 	approveErr             error
 	commissionExistsResult bool
 	commissionExistsErr    error
-	shipmentExistsResult   bool
-	shipmentExistsErr      error
+	taskExistsResult       bool
+	taskExistsErr          error
 	hasActivePlanResult    bool
 	hasActivePlanErr       error
 }
@@ -34,9 +34,9 @@ type mockPlanRepository struct {
 func newMockPlanRepository() *mockPlanRepository {
 	return &mockPlanRepository{
 		plans:                  make(map[string]*secondary.PlanRecord),
-		activePlanForShipment:  make(map[string]string),
+		activePlanForTask:      make(map[string]string),
 		commissionExistsResult: true,
-		shipmentExistsResult:   true,
+		taskExistsResult:       true,
 		hasActivePlanResult:    false,
 	}
 }
@@ -46,8 +46,8 @@ func (m *mockPlanRepository) Create(ctx context.Context, plan *secondary.PlanRec
 		return m.createErr
 	}
 	m.plans[plan.ID] = plan
-	if plan.ShipmentID != "" && plan.Status == "draft" {
-		m.activePlanForShipment[plan.ShipmentID] = plan.ID
+	if plan.TaskID != "" && plan.Status == "draft" {
+		m.activePlanForTask[plan.TaskID] = plan.ID
 	}
 	return nil
 }
@@ -71,7 +71,7 @@ func (m *mockPlanRepository) List(ctx context.Context, filters secondary.PlanFil
 		if filters.CommissionID != "" && p.CommissionID != filters.CommissionID {
 			continue
 		}
-		if filters.ShipmentID != "" && p.ShipmentID != filters.ShipmentID {
+		if filters.TaskID != "" && p.TaskID != filters.TaskID {
 			continue
 		}
 		if filters.Status != "" && p.Status != filters.Status {
@@ -105,8 +105,8 @@ func (m *mockPlanRepository) Delete(ctx context.Context, id string) error {
 		return m.deleteErr
 	}
 	if plan, ok := m.plans[id]; ok {
-		if plan.ShipmentID != "" {
-			delete(m.activePlanForShipment, plan.ShipmentID)
+		if plan.TaskID != "" {
+			delete(m.activePlanForTask, plan.TaskID)
 		}
 	}
 	delete(m.plans, id)
@@ -139,15 +139,22 @@ func (m *mockPlanRepository) Approve(ctx context.Context, id string) error {
 		plan.Status = "approved"
 		plan.ApprovedAt = "2026-01-20T10:00:00Z"
 		// Remove from active plan tracking
-		if plan.ShipmentID != "" {
-			delete(m.activePlanForShipment, plan.ShipmentID)
+		if plan.TaskID != "" {
+			delete(m.activePlanForTask, plan.TaskID)
 		}
 	}
 	return nil
 }
 
-func (m *mockPlanRepository) GetActivePlanForShipment(ctx context.Context, shipmentID string) (*secondary.PlanRecord, error) {
-	if planID, ok := m.activePlanForShipment[shipmentID]; ok {
+func (m *mockPlanRepository) UpdateStatus(ctx context.Context, id, status string) error {
+	if plan, ok := m.plans[id]; ok {
+		plan.Status = status
+	}
+	return nil
+}
+
+func (m *mockPlanRepository) GetActivePlanForTask(ctx context.Context, taskID string) (*secondary.PlanRecord, error) {
+	if planID, ok := m.activePlanForTask[taskID]; ok {
 		if plan, ok := m.plans[planID]; ok {
 			return plan, nil
 		}
@@ -155,11 +162,11 @@ func (m *mockPlanRepository) GetActivePlanForShipment(ctx context.Context, shipm
 	return nil, nil
 }
 
-func (m *mockPlanRepository) HasActivePlanForShipment(ctx context.Context, shipmentID string) (bool, error) {
+func (m *mockPlanRepository) HasActivePlanForTask(ctx context.Context, taskID string) (bool, error) {
 	if m.hasActivePlanErr != nil {
 		return false, m.hasActivePlanErr
 	}
-	_, exists := m.activePlanForShipment[shipmentID]
+	_, exists := m.activePlanForTask[taskID]
 	return exists || m.hasActivePlanResult, nil
 }
 
@@ -170,11 +177,11 @@ func (m *mockPlanRepository) CommissionExists(ctx context.Context, commissionID 
 	return m.commissionExistsResult, nil
 }
 
-func (m *mockPlanRepository) ShipmentExists(ctx context.Context, shipmentID string) (bool, error) {
-	if m.shipmentExistsErr != nil {
-		return false, m.shipmentExistsErr
+func (m *mockPlanRepository) TaskExists(ctx context.Context, taskID string) (bool, error) {
+	if m.taskExistsErr != nil {
+		return false, m.taskExistsErr
 	}
-	return m.shipmentExistsResult, nil
+	return m.taskExistsResult, nil
 }
 
 // ============================================================================
@@ -197,6 +204,7 @@ func TestCreatePlan_Success(t *testing.T) {
 
 	resp, err := service.CreatePlan(ctx, primary.CreatePlanRequest{
 		CommissionID: "COMM-001",
+		TaskID:       "TASK-001",
 		Title:        "Test Plan",
 		Description:  "A test plan",
 		Content:      "## Plan Content\n\n- Step 1\n- Step 2",
@@ -216,22 +224,22 @@ func TestCreatePlan_Success(t *testing.T) {
 	}
 }
 
-func TestCreatePlan_WithShipment(t *testing.T) {
+func TestCreatePlan_WithTask(t *testing.T) {
 	service, _ := newTestPlanService()
 	ctx := context.Background()
 
 	resp, err := service.CreatePlan(ctx, primary.CreatePlanRequest{
 		CommissionID: "COMM-001",
-		ShipmentID:   "SHIPMENT-001",
-		Title:        "Shipment Plan",
-		Description:  "A plan for a shipment",
+		TaskID:       "TASK-001",
+		Title:        "Task Plan",
+		Description:  "A plan for a task",
 	})
 
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-	if resp.Plan.ShipmentID != "SHIPMENT-001" {
-		t.Errorf("expected shipment ID 'SHIPMENT-001', got '%s'", resp.Plan.ShipmentID)
+	if resp.Plan.TaskID != "TASK-001" {
+		t.Errorf("expected task ID 'TASK-001', got '%s'", resp.Plan.TaskID)
 	}
 }
 
@@ -243,6 +251,7 @@ func TestCreatePlan_CommissionNotFound(t *testing.T) {
 
 	_, err := service.CreatePlan(ctx, primary.CreatePlanRequest{
 		CommissionID: "COMM-NONEXISTENT",
+		TaskID:       "TASK-001",
 		Title:        "Test Plan",
 		Description:  "A test plan",
 	})
@@ -252,25 +261,25 @@ func TestCreatePlan_CommissionNotFound(t *testing.T) {
 	}
 }
 
-func TestCreatePlan_ShipmentNotFound(t *testing.T) {
+func TestCreatePlan_TaskNotFound(t *testing.T) {
 	service, planRepo := newTestPlanService()
 	ctx := context.Background()
 
-	planRepo.shipmentExistsResult = false
+	planRepo.taskExistsResult = false
 
 	_, err := service.CreatePlan(ctx, primary.CreatePlanRequest{
 		CommissionID: "COMM-001",
-		ShipmentID:   "SHIPMENT-NONEXISTENT",
+		TaskID:       "TASK-NONEXISTENT",
 		Title:        "Test Plan",
 		Description:  "A test plan",
 	})
 
 	if err == nil {
-		t.Fatal("expected error for non-existent shipment, got nil")
+		t.Fatal("expected error for non-existent task, got nil")
 	}
 }
 
-func TestCreatePlan_ShipmentAlreadyHasActivePlan(t *testing.T) {
+func TestCreatePlan_TaskAlreadyHasActivePlan(t *testing.T) {
 	service, planRepo := newTestPlanService()
 	ctx := context.Background()
 
@@ -278,21 +287,21 @@ func TestCreatePlan_ShipmentAlreadyHasActivePlan(t *testing.T) {
 	planRepo.plans["PLAN-001"] = &secondary.PlanRecord{
 		ID:           "PLAN-001",
 		CommissionID: "COMM-001",
-		ShipmentID:   "SHIPMENT-001",
+		TaskID:       "TASK-001",
 		Title:        "Existing Plan",
 		Status:       "draft",
 	}
-	planRepo.activePlanForShipment["SHIPMENT-001"] = "PLAN-001"
+	planRepo.activePlanForTask["TASK-001"] = "PLAN-001"
 
 	_, err := service.CreatePlan(ctx, primary.CreatePlanRequest{
 		CommissionID: "COMM-001",
-		ShipmentID:   "SHIPMENT-001",
+		TaskID:       "TASK-001",
 		Title:        "New Plan",
 		Description:  "Should fail",
 	})
 
 	if err == nil {
-		t.Fatal("expected error for shipment with existing active plan, got nil")
+		t.Fatal("expected error for task with existing active plan, got nil")
 	}
 }
 
@@ -307,6 +316,7 @@ func TestGetPlan_Found(t *testing.T) {
 	planRepo.plans["PLAN-001"] = &secondary.PlanRecord{
 		ID:           "PLAN-001",
 		CommissionID: "COMM-001",
+		TaskID:       "TASK-001",
 		Title:        "Test Plan",
 		Status:       "draft",
 	}
@@ -343,12 +353,14 @@ func TestListPlans_FilterByCommission(t *testing.T) {
 	planRepo.plans["PLAN-001"] = &secondary.PlanRecord{
 		ID:           "PLAN-001",
 		CommissionID: "COMM-001",
+		TaskID:       "TASK-001",
 		Title:        "Plan 1",
 		Status:       "draft",
 	}
 	planRepo.plans["PLAN-002"] = &secondary.PlanRecord{
 		ID:           "PLAN-002",
 		CommissionID: "COMM-002",
+		TaskID:       "TASK-002",
 		Title:        "Plan 2",
 		Status:       "draft",
 	}
@@ -363,31 +375,32 @@ func TestListPlans_FilterByCommission(t *testing.T) {
 	}
 }
 
-func TestListPlans_FilterByShipment(t *testing.T) {
+func TestListPlans_FilterByTask(t *testing.T) {
 	service, planRepo := newTestPlanService()
 	ctx := context.Background()
 
 	planRepo.plans["PLAN-001"] = &secondary.PlanRecord{
 		ID:           "PLAN-001",
 		CommissionID: "COMM-001",
-		ShipmentID:   "SHIPMENT-001",
-		Title:        "Shipment Plan",
+		TaskID:       "TASK-001",
+		Title:        "Task Plan",
 		Status:       "draft",
 	}
 	planRepo.plans["PLAN-002"] = &secondary.PlanRecord{
 		ID:           "PLAN-002",
 		CommissionID: "COMM-001",
-		Title:        "Commission Plan",
+		TaskID:       "TASK-002",
+		Title:        "Another Plan",
 		Status:       "draft",
 	}
 
-	plans, err := service.ListPlans(ctx, primary.PlanFilters{ShipmentID: "SHIPMENT-001"})
+	plans, err := service.ListPlans(ctx, primary.PlanFilters{TaskID: "TASK-001"})
 
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 	if len(plans) != 1 {
-		t.Errorf("expected 1 shipment plan, got %d", len(plans))
+		t.Errorf("expected 1 task plan, got %d", len(plans))
 	}
 }
 
@@ -398,12 +411,14 @@ func TestListPlans_FilterByStatus(t *testing.T) {
 	planRepo.plans["PLAN-001"] = &secondary.PlanRecord{
 		ID:           "PLAN-001",
 		CommissionID: "COMM-001",
+		TaskID:       "TASK-001",
 		Title:        "Draft Plan",
 		Status:       "draft",
 	}
 	planRepo.plans["PLAN-002"] = &secondary.PlanRecord{
 		ID:           "PLAN-002",
 		CommissionID: "COMM-001",
+		TaskID:       "TASK-002",
 		Title:        "Approved Plan",
 		Status:       "approved",
 	}
@@ -429,6 +444,7 @@ func TestApprovePlan_Success(t *testing.T) {
 	planRepo.plans["PLAN-001"] = &secondary.PlanRecord{
 		ID:           "PLAN-001",
 		CommissionID: "COMM-001",
+		TaskID:       "TASK-001",
 		Title:        "Test Plan",
 		Status:       "draft",
 	}
@@ -454,6 +470,7 @@ func TestPinPlan(t *testing.T) {
 	planRepo.plans["PLAN-001"] = &secondary.PlanRecord{
 		ID:           "PLAN-001",
 		CommissionID: "COMM-001",
+		TaskID:       "TASK-001",
 		Title:        "Test Plan",
 		Status:       "draft",
 		Pinned:       false,
@@ -476,6 +493,7 @@ func TestUnpinPlan(t *testing.T) {
 	planRepo.plans["PLAN-001"] = &secondary.PlanRecord{
 		ID:           "PLAN-001",
 		CommissionID: "COMM-001",
+		TaskID:       "TASK-001",
 		Title:        "Pinned Plan",
 		Status:       "draft",
 		Pinned:       true,
@@ -502,6 +520,7 @@ func TestUpdatePlan_Title(t *testing.T) {
 	planRepo.plans["PLAN-001"] = &secondary.PlanRecord{
 		ID:           "PLAN-001",
 		CommissionID: "COMM-001",
+		TaskID:       "TASK-001",
 		Title:        "Old Title",
 		Description:  "Original description",
 		Status:       "draft",
@@ -527,6 +546,7 @@ func TestUpdatePlan_Content(t *testing.T) {
 	planRepo.plans["PLAN-001"] = &secondary.PlanRecord{
 		ID:           "PLAN-001",
 		CommissionID: "COMM-001",
+		TaskID:       "TASK-001",
 		Title:        "Test Plan",
 		Content:      "Original content",
 		Status:       "draft",
@@ -556,6 +576,7 @@ func TestDeletePlan_Success(t *testing.T) {
 	planRepo.plans["PLAN-001"] = &secondary.PlanRecord{
 		ID:           "PLAN-001",
 		CommissionID: "COMM-001",
+		TaskID:       "TASK-001",
 		Title:        "Test Plan",
 		Status:       "draft",
 	}
@@ -571,23 +592,23 @@ func TestDeletePlan_Success(t *testing.T) {
 }
 
 // ============================================================================
-// GetShipmentActivePlan Tests
+// GetTaskActivePlan Tests
 // ============================================================================
 
-func TestGetShipmentActivePlan_Found(t *testing.T) {
+func TestGetTaskActivePlan_Found(t *testing.T) {
 	service, planRepo := newTestPlanService()
 	ctx := context.Background()
 
 	planRepo.plans["PLAN-001"] = &secondary.PlanRecord{
 		ID:           "PLAN-001",
 		CommissionID: "COMM-001",
-		ShipmentID:   "SHIPMENT-001",
+		TaskID:       "TASK-001",
 		Title:        "Active Plan",
 		Status:       "draft",
 	}
-	planRepo.activePlanForShipment["SHIPMENT-001"] = "PLAN-001"
+	planRepo.activePlanForTask["TASK-001"] = "PLAN-001"
 
-	plan, err := service.GetShipmentActivePlan(ctx, "SHIPMENT-001")
+	plan, err := service.GetTaskActivePlan(ctx, "TASK-001")
 
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
@@ -600,16 +621,16 @@ func TestGetShipmentActivePlan_Found(t *testing.T) {
 	}
 }
 
-func TestGetShipmentActivePlan_NotFound(t *testing.T) {
+func TestGetTaskActivePlan_NotFound(t *testing.T) {
 	service, _ := newTestPlanService()
 	ctx := context.Background()
 
-	plan, err := service.GetShipmentActivePlan(ctx, "SHIPMENT-NONEXISTENT")
+	plan, err := service.GetTaskActivePlan(ctx, "TASK-NONEXISTENT")
 
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 	if plan != nil {
-		t.Error("expected nil plan for shipment without active plan")
+		t.Error("expected nil plan for task without active plan")
 	}
 }

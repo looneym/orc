@@ -276,7 +276,7 @@ func (r *ConclaveRepository) CommissionExists(ctx context.Context, commissionID 
 func (r *ConclaveRepository) GetTasksByConclave(ctx context.Context, conclaveID string) ([]*secondary.ConclaveTaskRecord, error) {
 	query := `SELECT id, shipment_id, commission_id, title, description, type, status, priority,
 		assigned_workbench_id, pinned, created_at, updated_at, claimed_at, completed_at
-		FROM tasks WHERE shipment_id IN (SELECT shipment_id FROM conclaves WHERE id = ?) ORDER BY created_at ASC`
+		FROM tasks WHERE conclave_id = ? ORDER BY created_at ASC`
 
 	rows, err := r.db.QueryContext(ctx, query, conclaveID)
 	if err != nil {
@@ -329,9 +329,12 @@ func (r *ConclaveRepository) GetTasksByConclave(ctx context.Context, conclaveID 
 
 // GetPlansByConclave retrieves plans belonging to a conclave.
 func (r *ConclaveRepository) GetPlansByConclave(ctx context.Context, conclaveID string) ([]*secondary.ConclavePlanRecord, error) {
-	query := `SELECT id, commission_id, shipment_id, title, description, content, status, pinned,
-		created_at, updated_at, approved_at
-		FROM plans WHERE shipment_id IN (SELECT shipment_id FROM conclaves WHERE id = ?) ORDER BY created_at ASC`
+	query := `SELECT p.id, p.commission_id, p.task_id, p.title, p.description, p.content, p.status, p.pinned,
+		p.created_at, p.updated_at, p.approved_at
+		FROM plans p
+		INNER JOIN tasks t ON p.task_id = t.id
+		WHERE t.conclave_id = ?
+		ORDER BY p.created_at ASC`
 
 	rows, err := r.db.QueryContext(ctx, query, conclaveID)
 	if err != nil {
@@ -342,7 +345,7 @@ func (r *ConclaveRepository) GetPlansByConclave(ctx context.Context, conclaveID 
 	var plans []*secondary.ConclavePlanRecord
 	for rows.Next() {
 		var (
-			shipmentID sql.NullString
+			taskID     sql.NullString
 			desc       sql.NullString
 			content    sql.NullString
 			pinned     bool
@@ -352,13 +355,13 @@ func (r *ConclaveRepository) GetPlansByConclave(ctx context.Context, conclaveID 
 		)
 
 		record := &secondary.ConclavePlanRecord{}
-		err := rows.Scan(&record.ID, &record.CommissionID, &shipmentID, &record.Title, &desc, &content, &record.Status, &pinned,
+		err := rows.Scan(&record.ID, &record.CommissionID, &taskID, &record.Title, &desc, &content, &record.Status, &pinned,
 			&createdAt, &updatedAt, &approvedAt)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan plan: %w", err)
 		}
 
-		record.ShipmentID = shipmentID.String
+		record.TaskID = taskID.String
 		record.Description = desc.String
 		record.Content = content.String
 		record.Pinned = pinned

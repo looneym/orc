@@ -24,16 +24,16 @@ var recCreateCmd = &cobra.Command{
 	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
-		shipmentID, _ := cmd.Flags().GetString("shipment-id")
+		taskID, _ := cmd.Flags().GetString("task")
 		evidence, _ := cmd.Flags().GetString("evidence")
 		notes, _ := cmd.Flags().GetString("notes")
 
-		if shipmentID == "" {
-			return fmt.Errorf("--shipment-id flag is required")
+		if taskID == "" {
+			return fmt.Errorf("--task flag is required")
 		}
 
 		req := primary.CreateReceiptRequest{
-			ShipmentID:        shipmentID,
+			TaskID:            taskID,
 			DeliveredOutcome:  args[0],
 			Evidence:          evidence,
 			VerificationNotes: notes,
@@ -47,7 +47,7 @@ var recCreateCmd = &cobra.Command{
 		rec := resp.Receipt
 		fmt.Printf("✓ Created receipt %s\n", rec.ID)
 		fmt.Printf("  Delivered Outcome: %s\n", rec.DeliveredOutcome)
-		fmt.Printf("  Shipment: %s\n", rec.ShipmentID)
+		fmt.Printf("  Task: %s\n", rec.TaskID)
 		fmt.Printf("  Status: %s\n", rec.Status)
 		return nil
 	},
@@ -58,12 +58,12 @@ var recListCmd = &cobra.Command{
 	Short: "List receipts",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
-		shipmentID, _ := cmd.Flags().GetString("shipment-id")
+		taskID, _ := cmd.Flags().GetString("task")
 		status, _ := cmd.Flags().GetString("status")
 
 		recs, err := wire.ReceiptService().ListReceipts(ctx, primary.ReceiptFilters{
-			ShipmentID: shipmentID,
-			Status:     status,
+			TaskID: taskID,
+			Status: status,
 		})
 		if err != nil {
 			return fmt.Errorf("failed to list RECs: %w", err)
@@ -75,8 +75,8 @@ var recListCmd = &cobra.Command{
 		}
 
 		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-		fmt.Fprintln(w, "ID\tSHIPMENT\tDELIVERED OUTCOME\tSTATUS")
-		fmt.Fprintln(w, "--\t--------\t-----------------\t------")
+		fmt.Fprintln(w, "ID\tTASK\tDELIVERED OUTCOME\tSTATUS")
+		fmt.Fprintln(w, "--\t----\t-----------------\t------")
 		for _, item := range recs {
 			// Truncate outcome for display
 			outcome := item.DeliveredOutcome
@@ -85,7 +85,7 @@ var recListCmd = &cobra.Command{
 			}
 			fmt.Fprintf(w, "%s\t%s\t%s\t%s\n",
 				item.ID,
-				item.ShipmentID,
+				item.TaskID,
 				outcome,
 				item.Status,
 			)
@@ -109,7 +109,7 @@ var recShowCmd = &cobra.Command{
 		}
 
 		fmt.Printf("Receipt: %s\n", rec.ID)
-		fmt.Printf("Shipment: %s\n", rec.ShipmentID)
+		fmt.Printf("Task: %s\n", rec.TaskID)
 		fmt.Printf("Delivered Outcome: %s\n", rec.DeliveredOutcome)
 		if rec.Evidence != "" {
 			fmt.Printf("Evidence: %s\n", rec.Evidence)
@@ -210,13 +210,13 @@ var recDeleteCmd = &cobra.Command{
 
 func init() {
 	// rec create flags
-	recCreateCmd.Flags().String("shipment-id", "", "Shipment ID (required)")
+	recCreateCmd.Flags().String("task", "", "Task ID (required)")
 	recCreateCmd.Flags().String("evidence", "", "Evidence supporting the delivery")
 	recCreateCmd.Flags().String("notes", "", "Verification notes")
-	recCreateCmd.MarkFlagRequired("shipment-id")
+	recCreateCmd.MarkFlagRequired("task")
 
 	// rec list flags
-	recListCmd.Flags().String("shipment-id", "", "Filter by shipment")
+	recListCmd.Flags().String("task", "", "Filter by task")
 	recListCmd.Flags().StringP("status", "s", "", "Filter by status")
 
 	// rec update flags

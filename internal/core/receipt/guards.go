@@ -23,9 +23,9 @@ func (r GuardResult) Error() error {
 
 // CreateRECContext provides context for REC creation guards.
 type CreateRECContext struct {
-	ShipmentID       string
-	ShipmentExists   bool
-	ShipmentHasREC   bool
+	TaskID           string
+	TaskExists       bool
+	TaskHasReceipt   bool
 	DeliveredOutcome string
 }
 
@@ -37,23 +37,23 @@ type StatusTransitionContext struct {
 
 // CanCreateREC evaluates whether a REC can be created.
 // Rules:
-// - Shipment must exist
-// - Shipment must not already have a REC (1:1 constraint)
+// - Task must exist
+// - Task must not already have a REC (1:1 constraint)
 // - DeliveredOutcome must not be empty
 func CanCreateREC(ctx CreateRECContext) GuardResult {
-	// Rule 1: Shipment must exist
-	if !ctx.ShipmentExists {
+	// Rule 1: Task must exist
+	if !ctx.TaskExists {
 		return GuardResult{
 			Allowed: false,
-			Reason:  fmt.Sprintf("shipment %s not found", ctx.ShipmentID),
+			Reason:  fmt.Sprintf("task %s not found", ctx.TaskID),
 		}
 	}
 
-	// Rule 2: Shipment must not already have a REC
-	if ctx.ShipmentHasREC {
+	// Rule 2: Task must not already have a REC
+	if ctx.TaskHasReceipt {
 		return GuardResult{
 			Allowed: false,
-			Reason:  fmt.Sprintf("shipment %s already has a REC", ctx.ShipmentID),
+			Reason:  fmt.Sprintf("task %s already has a receipt", ctx.TaskID),
 		}
 	}
 

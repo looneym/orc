@@ -130,7 +130,7 @@ CREATE TABLE IF NOT EXISTS commissions (
 	FOREIGN KEY (factory_id) REFERENCES factories(id)
 );
 
--- Messages (Agent mail system)
+-- Messages (Agent mail system - actor-to-actor)
 CREATE TABLE IF NOT EXISTS messages (
 	id TEXT PRIMARY KEY,
 	sender TEXT NOT NULL,
@@ -138,9 +138,7 @@ CREATE TABLE IF NOT EXISTS messages (
 	subject TEXT NOT NULL,
 	body TEXT NOT NULL,
 	timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-	read INTEGER DEFAULT 0,
-	commission_id TEXT NOT NULL,
-	FOREIGN KEY (commission_id) REFERENCES commissions(id)
+	read INTEGER DEFAULT 0
 );
 
 -- Shipments (Work containers)
@@ -149,13 +147,14 @@ CREATE TABLE IF NOT EXISTS shipments (
 	commission_id TEXT NOT NULL,
 	title TEXT NOT NULL,
 	description TEXT,
-	status TEXT NOT NULL CHECK(status IN ('active', 'in_progress', 'paused', 'complete')) DEFAULT 'active',
+	status TEXT NOT NULL CHECK(status IN ('draft', 'launched', 'assigned', 'in_progress', 'blocked', 'complete', 'merged')) DEFAULT 'draft',
 	assigned_workbench_id TEXT,
 	repo_id TEXT,
 	branch TEXT,
 	pinned INTEGER DEFAULT 0,
 	container_id TEXT,
 	container_type TEXT CHECK(container_type IN ('conclave', 'shipyard')),
+	autorun INTEGER DEFAULT 0,
 	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 	updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 	completed_at DATETIME,
@@ -199,6 +198,7 @@ CREATE TABLE IF NOT EXISTS tasks (
 	assigned_workbench_id TEXT,
 	context_ref TEXT,
 	pinned INTEGER DEFAULT 0,
+	depends_on TEXT,
 	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 	updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 	claimed_at DATETIME,
@@ -256,15 +256,15 @@ CREATE TABLE IF NOT EXISTS prs (
 	FOREIGN KEY (commission_id) REFERENCES commissions(id)
 );
 
--- Plans (Implementation plans)
+-- Plans (Implementation plans - 1:many with Task)
 CREATE TABLE IF NOT EXISTS plans (
 	id TEXT PRIMARY KEY,
 	commission_id TEXT NOT NULL,
-	shipment_id TEXT,
+	task_id TEXT NOT NULL,
 	title TEXT NOT NULL,
 	description TEXT,
 	content TEXT,
-	status TEXT NOT NULL CHECK(status IN ('draft', 'approved', 'superseded')) DEFAULT 'draft',
+	status TEXT NOT NULL CHECK(status IN ('draft', 'pending_review', 'approved', 'escalated', 'superseded')) DEFAULT 'draft',
 	pinned INTEGER DEFAULT 0,
 	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 	updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -272,9 +272,11 @@ CREATE TABLE IF NOT EXISTS plans (
 	conclave_id TEXT,
 	promoted_from_id TEXT,
 	promoted_from_type TEXT,
+	supersedes_plan_id TEXT,
 	FOREIGN KEY (commission_id) REFERENCES commissions(id),
-	FOREIGN KEY (shipment_id) REFERENCES shipments(id) ON DELETE SET NULL,
-	FOREIGN KEY (conclave_id) REFERENCES conclaves(id) ON DELETE SET NULL
+	FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,
+	FOREIGN KEY (conclave_id) REFERENCES conclaves(id) ON DELETE SET NULL,
+	FOREIGN KEY (supersedes_plan_id) REFERENCES plans(id) ON DELETE SET NULL
 );
 
 -- Conclaves (Decision containers)
@@ -335,7 +337,7 @@ CREATE INDEX IF NOT EXISTS idx_workbenches_repo ON workbenches(repo_id);
 CREATE INDEX IF NOT EXISTS idx_commissions_factory ON commissions(factory_id);
 CREATE INDEX IF NOT EXISTS idx_commissions_status ON commissions(status);
 CREATE INDEX IF NOT EXISTS idx_messages_recipient ON messages(recipient, read);
-CREATE INDEX IF NOT EXISTS idx_messages_commission ON messages(commission_id);
+CREATE INDEX IF NOT EXISTS idx_messages_sender ON messages(sender);
 CREATE INDEX IF NOT EXISTS idx_messages_timestamp ON messages(timestamp DESC);
 CREATE INDEX IF NOT EXISTS idx_shipments_commission ON shipments(commission_id);
 CREATE INDEX IF NOT EXISTS idx_shipments_status ON shipments(status);
@@ -355,7 +357,9 @@ CREATE INDEX IF NOT EXISTS idx_prs_repo ON prs(repo_id);
 CREATE INDEX IF NOT EXISTS idx_prs_commission ON prs(commission_id);
 CREATE INDEX IF NOT EXISTS idx_prs_status ON prs(status);
 CREATE INDEX IF NOT EXISTS idx_plans_commission ON plans(commission_id);
+CREATE INDEX IF NOT EXISTS idx_plans_task ON plans(task_id);
 CREATE INDEX IF NOT EXISTS idx_plans_status ON plans(status);
+CREATE INDEX IF NOT EXISTS idx_plans_supersedes ON plans(supersedes_plan_id);
 CREATE INDEX IF NOT EXISTS idx_conclaves_commission ON conclaves(commission_id);
 CREATE INDEX IF NOT EXISTS idx_conclaves_status ON conclaves(status);
 CREATE INDEX IF NOT EXISTS idx_notes_commission ON notes(commission_id);
@@ -365,20 +369,20 @@ CREATE INDEX IF NOT EXISTS idx_shipyards_commission ON shipyards(commission_id);
 CREATE INDEX IF NOT EXISTS idx_tomes_container ON tomes(container_id);
 CREATE INDEX IF NOT EXISTS idx_shipments_container ON shipments(container_id);
 
--- Receipts (1:1 with Shipment)
+-- Receipts (1:1 with Task)
 CREATE TABLE IF NOT EXISTS receipts (
 	id TEXT PRIMARY KEY,
-	shipment_id TEXT NOT NULL UNIQUE,
+	task_id TEXT NOT NULL UNIQUE,
 	delivered_outcome TEXT NOT NULL,
 	evidence TEXT,
 	verification_notes TEXT,
 	status TEXT NOT NULL CHECK(status IN ('draft', 'submitted', 'verified')) DEFAULT 'draft',
 	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 	updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-	FOREIGN KEY (shipment_id) REFERENCES shipments(id) ON DELETE CASCADE
+	FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE
 );
 
-CREATE INDEX IF NOT EXISTS idx_receipts_shipment ON receipts(shipment_id);
+CREATE INDEX IF NOT EXISTS idx_receipts_task ON receipts(task_id);
 CREATE INDEX IF NOT EXISTS idx_receipts_status ON receipts(status);
 
 -- Gatehouses (1:1 with Workshop - Goblin seat)

@@ -15,7 +15,7 @@ func TestManifestRepository_Create(t *testing.T) {
 
 	// Create test fixtures: commission -> shipment
 	db.ExecContext(ctx, "INSERT INTO commissions (id, title, status) VALUES (?, ?, ?)", "COMM-001", "Test", "active")
-	db.ExecContext(ctx, "INSERT INTO shipments (id, commission_id, title, status) VALUES (?, ?, ?, ?)", "SHIP-001", "COMM-001", "Test Shipment", "active")
+	db.ExecContext(ctx, "INSERT INTO shipments (id, commission_id, title, status) VALUES (?, ?, ?, ?)", "SHIP-001", "COMM-001", "Test Shipment", "draft")
 
 	t.Run("creates manifest successfully", func(t *testing.T) {
 		record := &secondary.ManifestRecord{
@@ -47,7 +47,7 @@ func TestManifestRepository_Create(t *testing.T) {
 	})
 
 	t.Run("creates manifest with optional fields", func(t *testing.T) {
-		db.ExecContext(ctx, "INSERT INTO shipments (id, commission_id, title, status) VALUES (?, ?, ?, ?)", "SHIP-002", "COMM-001", "Test 2", "active")
+		db.ExecContext(ctx, "INSERT INTO shipments (id, commission_id, title, status) VALUES (?, ?, ?, ?)", "SHIP-002", "COMM-001", "Test 2", "draft")
 
 		record := &secondary.ManifestRecord{
 			ID:            "MAN-002",
@@ -102,7 +102,7 @@ func TestManifestRepository_GetByID(t *testing.T) {
 
 	// Setup
 	db.ExecContext(ctx, "INSERT INTO commissions (id, title, status) VALUES (?, ?, ?)", "COMM-001", "Test", "active")
-	db.ExecContext(ctx, "INSERT INTO shipments (id, commission_id, title, status) VALUES (?, ?, ?, ?)", "SHIP-001", "COMM-001", "Test", "active")
+	db.ExecContext(ctx, "INSERT INTO shipments (id, commission_id, title, status) VALUES (?, ?, ?, ?)", "SHIP-001", "COMM-001", "Test", "draft")
 
 	repo.Create(ctx, &secondary.ManifestRecord{
 		ID:         "MAN-001",
@@ -136,7 +136,7 @@ func TestManifestRepository_GetByShipment(t *testing.T) {
 
 	// Setup
 	db.ExecContext(ctx, "INSERT INTO commissions (id, title, status) VALUES (?, ?, ?)", "COMM-001", "Test", "active")
-	db.ExecContext(ctx, "INSERT INTO shipments (id, commission_id, title, status) VALUES (?, ?, ?, ?)", "SHIP-001", "COMM-001", "Test", "active")
+	db.ExecContext(ctx, "INSERT INTO shipments (id, commission_id, title, status) VALUES (?, ?, ?, ?)", "SHIP-001", "COMM-001", "Test", "draft")
 
 	repo.Create(ctx, &secondary.ManifestRecord{
 		ID:         "MAN-001",
@@ -173,8 +173,8 @@ func TestManifestRepository_List(t *testing.T) {
 
 	// Setup
 	db.ExecContext(ctx, "INSERT INTO commissions (id, title, status) VALUES (?, ?, ?)", "COMM-001", "Test", "active")
-	db.ExecContext(ctx, "INSERT INTO shipments (id, commission_id, title, status) VALUES (?, ?, ?, ?)", "SHIP-001", "COMM-001", "Test 1", "active")
-	db.ExecContext(ctx, "INSERT INTO shipments (id, commission_id, title, status) VALUES (?, ?, ?, ?)", "SHIP-002", "COMM-001", "Test 2", "active")
+	db.ExecContext(ctx, "INSERT INTO shipments (id, commission_id, title, status) VALUES (?, ?, ?, ?)", "SHIP-001", "COMM-001", "Test 1", "draft")
+	db.ExecContext(ctx, "INSERT INTO shipments (id, commission_id, title, status) VALUES (?, ?, ?, ?)", "SHIP-002", "COMM-001", "Test 2", "draft")
 
 	repo.Create(ctx, &secondary.ManifestRecord{ID: "MAN-001", ShipmentID: "SHIP-001", CreatedBy: "ORC", Status: "draft"})
 	repo.Create(ctx, &secondary.ManifestRecord{ID: "MAN-002", ShipmentID: "SHIP-002", CreatedBy: "ORC", Status: "launched"})
@@ -223,7 +223,7 @@ func TestManifestRepository_Update(t *testing.T) {
 
 	// Setup
 	db.ExecContext(ctx, "INSERT INTO commissions (id, title, status) VALUES (?, ?, ?)", "COMM-001", "Test", "active")
-	db.ExecContext(ctx, "INSERT INTO shipments (id, commission_id, title, status) VALUES (?, ?, ?, ?)", "SHIP-001", "COMM-001", "Test", "active")
+	db.ExecContext(ctx, "INSERT INTO shipments (id, commission_id, title, status) VALUES (?, ?, ?, ?)", "SHIP-001", "COMM-001", "Test", "draft")
 
 	repo.Create(ctx, &secondary.ManifestRecord{
 		ID:         "MAN-001",
@@ -265,7 +265,7 @@ func TestManifestRepository_Delete(t *testing.T) {
 
 	// Setup
 	db.ExecContext(ctx, "INSERT INTO commissions (id, title, status) VALUES (?, ?, ?)", "COMM-001", "Test", "active")
-	db.ExecContext(ctx, "INSERT INTO shipments (id, commission_id, title, status) VALUES (?, ?, ?, ?)", "SHIP-001", "COMM-001", "Test", "active")
+	db.ExecContext(ctx, "INSERT INTO shipments (id, commission_id, title, status) VALUES (?, ?, ?, ?)", "SHIP-001", "COMM-001", "Test", "draft")
 
 	repo.Create(ctx, &secondary.ManifestRecord{ID: "MAN-001", ShipmentID: "SHIP-001", CreatedBy: "ORC", Status: "draft"})
 
@@ -312,7 +312,7 @@ func TestManifestRepository_UpdateStatus(t *testing.T) {
 
 	// Setup
 	db.ExecContext(ctx, "INSERT INTO commissions (id, title, status) VALUES (?, ?, ?)", "COMM-001", "Test", "active")
-	db.ExecContext(ctx, "INSERT INTO shipments (id, commission_id, title, status) VALUES (?, ?, ?, ?)", "SHIP-001", "COMM-001", "Test", "active")
+	db.ExecContext(ctx, "INSERT INTO shipments (id, commission_id, title, status) VALUES (?, ?, ?, ?)", "SHIP-001", "COMM-001", "Test", "draft")
 
 	repo.Create(ctx, &secondary.ManifestRecord{
 		ID:         "MAN-001",
@@ -348,7 +348,7 @@ func TestManifestRepository_ShipmentExists(t *testing.T) {
 
 	// Setup
 	db.ExecContext(ctx, "INSERT INTO commissions (id, title, status) VALUES (?, ?, ?)", "COMM-001", "Test", "active")
-	db.ExecContext(ctx, "INSERT INTO shipments (id, commission_id, title, status) VALUES (?, ?, ?, ?)", "SHIP-001", "COMM-001", "Test", "active")
+	db.ExecContext(ctx, "INSERT INTO shipments (id, commission_id, title, status) VALUES (?, ?, ?, ?)", "SHIP-001", "COMM-001", "Test", "draft")
 
 	t.Run("returns true for existing shipment", func(t *testing.T) {
 		exists, err := repo.ShipmentExists(ctx, "SHIP-001")
@@ -378,8 +378,8 @@ func TestManifestRepository_ShipmentHasManifest(t *testing.T) {
 
 	// Setup
 	db.ExecContext(ctx, "INSERT INTO commissions (id, title, status) VALUES (?, ?, ?)", "COMM-001", "Test", "active")
-	db.ExecContext(ctx, "INSERT INTO shipments (id, commission_id, title, status) VALUES (?, ?, ?, ?)", "SHIP-001", "COMM-001", "Test 1", "active")
-	db.ExecContext(ctx, "INSERT INTO shipments (id, commission_id, title, status) VALUES (?, ?, ?, ?)", "SHIP-002", "COMM-001", "Test 2", "active")
+	db.ExecContext(ctx, "INSERT INTO shipments (id, commission_id, title, status) VALUES (?, ?, ?, ?)", "SHIP-001", "COMM-001", "Test 1", "draft")
+	db.ExecContext(ctx, "INSERT INTO shipments (id, commission_id, title, status) VALUES (?, ?, ?, ?)", "SHIP-002", "COMM-001", "Test 2", "draft")
 
 	repo.Create(ctx, &secondary.ManifestRecord{
 		ID:         "MAN-001",
