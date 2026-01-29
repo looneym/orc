@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"strings"
@@ -10,9 +9,7 @@ import (
 
 	"github.com/example/orc/internal/config"
 	ctx "github.com/example/orc/internal/context"
-	"github.com/example/orc/internal/ports/primary"
 	"github.com/example/orc/internal/templates"
-	"github.com/example/orc/internal/wire"
 )
 
 // PrimeCmd returns the prime command
@@ -111,7 +108,7 @@ func truncateOutput(output, format string, maxLines int) string {
 }
 
 // buildGoblinPrimeOutput creates Goblin orchestrator context output
-func buildGoblinPrimeOutput(cwd string, cfg *config.Config) string {
+func buildGoblinPrimeOutput(cwd string, _ *config.Config) string {
 	var output strings.Builder
 
 	output.WriteString("# Goblin Context (Session Prime)\n\n")
@@ -124,13 +121,6 @@ func buildGoblinPrimeOutput(cwd string, cfg *config.Config) string {
 	// Git context
 	output.WriteString(getGitInstructions())
 
-	// Goblin context (global orchestrator)
-	output.WriteString("**Context**: Master orchestrator (global)\n\n")
-	output.WriteString("Run `orc commission list` to see available commissions.\n\n")
-
-	// Cross-workshop summary
-	output.WriteString(getCrossWorkshopSummary())
-
 	// Core rules (shared)
 	output.WriteString(getCoreRules())
 
@@ -141,6 +131,9 @@ func buildGoblinPrimeOutput(cwd string, cfg *config.Config) string {
 	} else {
 		output.WriteString("---\nYou are a Goblin - Orchestrator coordinating commissions and IMPs.\n")
 	}
+
+	// Call to action - run summary for dynamic context
+	output.WriteString("\n---\n\n**Run `orc summary` now to see active commissions and work.**\n")
 
 	return output.String()
 }
@@ -160,54 +153,7 @@ func buildIMPPrimeOutput(workbenchCtx *ctx.WorkbenchContext, cwd string) string 
 	// Git context
 	output.WriteString(getGitInstructions())
 
-	// Section 2: Assignment - All containers assigned to this workbench
-	output.WriteString("## Assignment\n\n")
-
-	hasAssignments := false
-
-	// Shipments
-	shipments, _ := wire.ShipmentService().GetShipmentsByWorkbench(context.Background(), workbenchCtx.WorkbenchID)
-	for i, shipment := range shipments {
-		hasAssignments = true
-		output.WriteString(fmt.Sprintf("### Shipment %d: %s\n\n", i+1, shipment.ID))
-		output.WriteString(fmt.Sprintf("**%s** [%s]\n\n", shipment.Title, shipment.Status))
-
-		if shipment.Description != "" {
-			descLines := strings.Split(shipment.Description, "\n")
-			if len(descLines) > 5 {
-				output.WriteString(strings.Join(descLines[:5], "\n"))
-				output.WriteString("\n\n*(Description truncated)*\n\n")
-			} else {
-				output.WriteString(shipment.Description)
-				output.WriteString("\n\n")
-			}
-		}
-
-		// Show ready tasks for this shipment
-		tasks, err := wire.ShipmentService().GetShipmentTasks(context.Background(), shipment.ID)
-		if err == nil {
-			var readyTasks []*primary.Task
-			for _, t := range tasks {
-				if t.Status == "ready" {
-					readyTasks = append(readyTasks, t)
-				}
-			}
-			if len(readyTasks) > 0 {
-				output.WriteString("**Ready Tasks**:\n")
-				for _, task := range readyTasks {
-					output.WriteString(fmt.Sprintf("- %s - %s\n", task.ID, task.Title))
-				}
-				output.WriteString("\n")
-			}
-		}
-	}
-
-	if !hasAssignments {
-		output.WriteString("*No containers currently assigned to this workbench.*\n\n")
-		output.WriteString("Run `orc summary` to see the full commission tree.\n\n")
-	}
-
-	// Section 3: ORC CLI Primer
+	// Section 2: ORC CLI Primer
 	output.WriteString("## ORC CLI Primer\n\n")
 	output.WriteString("**Core Commands**:\n")
 	output.WriteString("- `orc summary` - View commission tree with all containers\n")
@@ -216,7 +162,7 @@ func buildIMPPrimeOutput(workbenchCtx *ctx.WorkbenchContext, cwd string) string 
 	output.WriteString("- `orc note list --tome TOME-ID` - List notes for a tome\n")
 	output.WriteString("- `orc task complete TASK-ID` - Mark task as completed\n\n")
 
-	// Section 4: Core Rules (shared across all session types)
+	// Section 3: Core Rules (shared across all session types)
 	output.WriteString(getCoreRules())
 	output.WriteString("- **Stay in workbench territory** - Work within assigned containers only\n\n")
 
@@ -227,6 +173,9 @@ func buildIMPPrimeOutput(workbenchCtx *ctx.WorkbenchContext, cwd string) string 
 	} else {
 		output.WriteString("---\nYou are an IMP - Implementation agent working within a workbench on assigned shipments.\n")
 	}
+
+	// Call to action - run summary for dynamic context
+	output.WriteString("\n---\n\n**Run `orc summary` now to see your current assignments and context.**\n")
 
 	return output.String()
 }
@@ -251,49 +200,4 @@ func getCoreRules() string {
 		return "## Core Rules\n\n- Track all work in ORC ledger\n- TodoWrite tool is NOT ALLOWED\n\n"
 	}
 	return content
-}
-
-// getCrossWorkshopSummary returns a summary of active workshops for Goblin context
-func getCrossWorkshopSummary() string {
-	var output strings.Builder
-
-	// Get all active commissions
-	commissions, err := wire.CommissionService().ListCommissions(context.Background(), primary.CommissionFilters{})
-	if err != nil || len(commissions) == 0 {
-		return ""
-	}
-
-	// Filter to active commissions
-	var activeCommissions []*primary.Commission
-	for _, c := range commissions {
-		if c.Status == "active" || c.Status == "in_progress" {
-			activeCommissions = append(activeCommissions, c)
-		}
-	}
-
-	if len(activeCommissions) == 0 {
-		return ""
-	}
-
-	output.WriteString("## Workshop Floor Summary\n\n")
-
-	for _, comm := range activeCommissions {
-		// Get shipments for this commission to count work
-		shipments, _ := wire.ShipmentService().ListShipments(context.Background(), primary.ShipmentFilters{CommissionID: comm.ID})
-		activeCount := 0
-		for _, s := range shipments {
-			if s.Status == "active" || s.Status == "in_progress" {
-				activeCount++
-			}
-		}
-
-		if activeCount > 0 {
-			output.WriteString(fmt.Sprintf("- **%s**: %s (%d active shipments)\n", comm.ID, comm.Title, activeCount))
-		} else {
-			output.WriteString(fmt.Sprintf("- **%s**: %s (idle)\n", comm.ID, comm.Title))
-		}
-	}
-
-	output.WriteString("\n")
-	return output.String()
 }
