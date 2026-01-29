@@ -198,15 +198,27 @@ func (s *SummaryServiceImpl) buildTomeSummary(ctx context.Context, tome *primary
 
 // buildShipmentSummary creates a ShipmentSummary with task progress.
 func (s *SummaryServiceImpl) buildShipmentSummary(ctx context.Context, ship *primary.Shipment, focusID string) (*primary.ShipmentSummary, error) {
-	// Count tasks for this shipment
+	// Get tasks for this shipment
 	tasks, err := s.shipmentService.GetShipmentTasks(ctx, ship.ID)
 	tasksDone := 0
 	tasksTotal := 0
+	var taskSummaries []primary.TaskSummary
+
+	isFocused := ship.ID == focusID
+
 	if err == nil {
 		for _, t := range tasks {
 			tasksTotal++
 			if t.Status == "complete" {
 				tasksDone++
+			}
+			// Include non-complete tasks for focused shipment
+			if isFocused && t.Status != "complete" {
+				taskSummaries = append(taskSummaries, primary.TaskSummary{
+					ID:     t.ID,
+					Title:  t.Title,
+					Status: t.Status,
+				})
 			}
 		}
 	}
@@ -224,12 +236,13 @@ func (s *SummaryServiceImpl) buildShipmentSummary(ctx context.Context, ship *pri
 		ID:         ship.ID,
 		Title:      ship.Title,
 		Status:     ship.Status,
-		IsFocused:  ship.ID == focusID,
+		IsFocused:  isFocused,
 		Pinned:     ship.Pinned,
 		BenchID:    ship.AssignedWorkbenchID,
 		BenchName:  benchName,
 		TasksDone:  tasksDone,
 		TasksTotal: tasksTotal,
+		Tasks:      taskSummaries,
 	}, nil
 }
 

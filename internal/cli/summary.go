@@ -235,16 +235,15 @@ func renderHeader(role, workbenchID, workshopID, focusID, commissionID string) {
 func renderGoblinSummary(summary *primary.CommissionSummary, _ string) {
 	// Commission header
 	fmt.Printf("%s - %s\n", colorizeID(summary.ID), summary.Title)
-
-	totalItems := len(summary.Conclaves) + 2 // +2 for Library and Shipyard
+	fmt.Println("│")
 
 	// Conclaves
 	for i, con := range summary.Conclaves {
-		isLastConclave := i == len(summary.Conclaves)-1 && summary.Library.TomeCount == 0 && summary.Shipyard.ShipmentCount == 0
+		isLastConclave := i == len(summary.Conclaves)-1
 
 		prefix := "├── "
 		childPrefix := "│   "
-		if isLastConclave && totalItems == len(summary.Conclaves) {
+		if isLastConclave && summary.Library.TomeCount == 0 && summary.Shipyard.ShipmentCount == 0 {
 			prefix = "└── "
 			childPrefix = "    "
 		}
@@ -288,8 +287,10 @@ func renderGoblinSummary(summary *primary.CommissionSummary, _ string) {
 		for _, ship := range con.Shipments {
 			isLast := childIdx == totalChildren-1
 			shipPrefix := childPrefix + "├── "
+			taskPrefix := childPrefix + "│   "
 			if isLast {
 				shipPrefix = childPrefix + "└── "
+				taskPrefix = childPrefix + "    "
 			}
 
 			benchMarker := ""
@@ -307,7 +308,29 @@ func renderGoblinSummary(summary *primary.CommissionSummary, _ string) {
 			}
 
 			fmt.Printf("%s%s%s%s%s - %s%s\n", shipPrefix, colorizeID(ship.ID), benchMarker, focusMark, pinnedMark, ship.Title, taskInfo)
+
+			// Expand tasks for focused shipment
+			if ship.IsFocused && len(ship.Tasks) > 0 {
+				for j, task := range ship.Tasks {
+					isLastTask := j == len(ship.Tasks)-1
+					tPrefix := taskPrefix + "├── "
+					if isLastTask {
+						tPrefix = taskPrefix + "└── "
+					}
+					statusMark := ""
+					if task.Status != "" && task.Status != "ready" {
+						statusMark = colorizeStatus(task.Status) + " - "
+					}
+					fmt.Printf("%s%s - %s%s\n", tPrefix, colorizeID(task.ID), statusMark, task.Title)
+				}
+			}
+
 			childIdx++
+		}
+
+		// Add spacing between conclaves
+		if i < len(summary.Conclaves)-1 || summary.Library.TomeCount > 0 || summary.Shipyard.ShipmentCount > 0 {
+			fmt.Println("│")
 		}
 	}
 
@@ -326,14 +349,15 @@ func renderGoblinSummary(summary *primary.CommissionSummary, _ string) {
 func renderIMPSummary(summary *primary.CommissionSummary, _ string, showAll bool) {
 	// Commission header
 	fmt.Printf("%s - %s\n", colorizeID(summary.ID), summary.Title)
+	fmt.Println("│")
 
 	// Conclaves
 	for i, con := range summary.Conclaves {
-		isLastConclave := i == len(summary.Conclaves)-1 && summary.Library.TomeCount == 0 && summary.Shipyard.ShipmentCount == 0
+		isLastConclave := i == len(summary.Conclaves)-1
 
 		prefix := "├── "
 		childPrefix := "│   "
-		if isLastConclave {
+		if isLastConclave && summary.Library.TomeCount == 0 && summary.Shipyard.ShipmentCount == 0 && summary.HiddenShipmentCount == 0 {
 			prefix = "└── "
 			childPrefix = "    "
 		}
@@ -373,8 +397,10 @@ func renderIMPSummary(summary *primary.CommissionSummary, _ string, showAll bool
 		for _, ship := range con.Shipments {
 			isLast := childIdx == totalChildren-1
 			shipPrefix := childPrefix + "├── "
+			taskPrefix := childPrefix + "│   "
 			if isLast {
 				shipPrefix = childPrefix + "└── "
+				taskPrefix = childPrefix + "    "
 			}
 
 			// IMP sees [FOCUSED] for their focused shipment instead of bench ID
@@ -389,7 +415,29 @@ func renderIMPSummary(summary *primary.CommissionSummary, _ string, showAll bool
 			}
 
 			fmt.Printf("%s%s%s%s - %s%s\n", shipPrefix, colorizeID(ship.ID), focusMark, pinnedMark, ship.Title, taskInfo)
+
+			// Expand tasks for focused shipment
+			if ship.IsFocused && len(ship.Tasks) > 0 {
+				for j, task := range ship.Tasks {
+					isLastTask := j == len(ship.Tasks)-1
+					tPrefix := taskPrefix + "├── "
+					if isLastTask {
+						tPrefix = taskPrefix + "└── "
+					}
+					statusMark := ""
+					if task.Status != "" && task.Status != "ready" {
+						statusMark = colorizeStatus(task.Status) + " - "
+					}
+					fmt.Printf("%s%s - %s%s\n", tPrefix, colorizeID(task.ID), statusMark, task.Title)
+				}
+			}
+
 			childIdx++
+		}
+
+		// Add spacing between conclaves
+		if i < len(summary.Conclaves)-1 || summary.Library.TomeCount > 0 || summary.Shipyard.ShipmentCount > 0 || summary.HiddenShipmentCount > 0 {
+			fmt.Println("│")
 		}
 	}
 
@@ -442,5 +490,26 @@ func getIDColor(idType string) *color.Color {
 		return color.New(color.FgHiWhite)
 	default:
 		return color.New(color.FgWhite)
+	}
+}
+
+// colorizeStatus formats status with semantic color
+func colorizeStatus(status string) string {
+	if status == "" || status == "ready" {
+		return ""
+	}
+	upper := strings.ToUpper(status)
+
+	switch status {
+	case "in_progress":
+		return color.New(color.FgHiBlue).Sprint(upper)
+	case "paused":
+		return color.New(color.FgYellow).Sprint(upper)
+	case "blocked":
+		return color.New(color.FgRed).Sprint(upper)
+	case "complete":
+		return color.New(color.FgHiGreen).Sprint(upper)
+	default:
+		return color.New(color.FgWhite).Sprint(upper)
 	}
 }
