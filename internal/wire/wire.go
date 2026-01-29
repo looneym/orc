@@ -41,6 +41,7 @@ var (
 	cycleWorkOrderService          primary.CycleWorkOrderService
 	cycleReceiptService            primary.CycleReceiptService
 	receiptService                 primary.ReceiptService
+	summaryService                 primary.SummaryService
 	commissionOrchestrationService *app.CommissionOrchestrationService
 	tmuxService                    secondary.TMuxAdapter
 	libraryRepo                    secondary.LibraryRepository
@@ -174,6 +175,12 @@ func ReceiptService() primary.ReceiptService {
 	return receiptService
 }
 
+// SummaryService returns the singleton SummaryService instance.
+func SummaryService() primary.SummaryService {
+	once.Do(initServices)
+	return summaryService
+}
+
 // CommissionOrchestrationService returns the singleton CommissionOrchestrationService instance.
 func CommissionOrchestrationService() *app.CommissionOrchestrationService {
 	once.Do(initServices)
@@ -294,6 +301,17 @@ func initServices() {
 
 	// Create orchestration services
 	commissionOrchestrationService = app.NewCommissionOrchestrationService(commissionService, agentProvider)
+
+	// Create summary service (depends on most other services)
+	summaryService = app.NewSummaryService(
+		commissionService,
+		conclaveService,
+		tomeService,
+		shipmentService,
+		taskService,
+		noteService,
+		workbenchService,
+	)
 }
 
 // ApplyGlobalTMuxBindings sets up ORC's global tmux key bindings.
