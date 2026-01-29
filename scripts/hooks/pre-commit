@@ -2,4 +2,5 @@
 set -e
 echo "Running pre-commit checks..."
 make lint
+make test
 echo "✓ Pre-commit checks passed"
