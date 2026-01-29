@@ -1,0 +1,13 @@
+#!/bin/bash
+set -e
+
+# Get current branch name
+BRANCH=$(git rev-parse --abbrev-ref HEAD)
+
+# Only run on master or main
+if [[ "$BRANCH" == "master" || "$BRANCH" == "main" ]]; then
+    echo "Post-merge on $BRANCH: rebuilding and installing..."
+    make install
+    make clean
+    echo "✓ Post-merge rebuild complete"
+fi

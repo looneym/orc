@@ -1,4 +1,4 @@
-.PHONY: install install-binary install-shim uninstall-shim dev build test lint lint-fix schema-check clean help
+.PHONY: install install-binary install-shim uninstall-shim dev build test lint lint-fix schema-check check-test-presence check-coverage init install-hooks clean help
 
 # Go binary location (handles empty GOBIN)
 GOBIN := $(shell go env GOPATH)/bin
@@ -82,8 +82,8 @@ test:
 # Linting
 #---------------------------------------------------------------------------
 
-# Run all linters (golangci-lint + architecture + schema-check)
-lint: schema-check
+# Run all linters (golangci-lint + architecture + schema-check + test checks)
+lint: schema-check check-test-presence check-coverage
 	@echo "Running golangci-lint..."
 	@command -v golangci-lint >/dev/null 2>&1 || { echo "golangci-lint not installed. Run: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest"; exit 1; }
 	@golangci-lint run ./...
@@ -113,12 +113,38 @@ schema-check:
 	fi
 	@echo "✓ Test setup uses authoritative schema"
 
+# Check that all source files have corresponding test files
+check-test-presence:
+	@./scripts/check-test-presence.sh
+
+# Check coverage thresholds per package
+check-coverage:
+	@./scripts/check-coverage.sh
+
 # Run golangci-lint with auto-fix
 lint-fix:
 	@echo "Running golangci-lint with --fix..."
 	@command -v golangci-lint >/dev/null 2>&1 || { echo "golangci-lint not installed. Run: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest"; exit 1; }
 	@golangci-lint run --fix ./...
 	@echo "✓ Lint fixes applied"
+
+#---------------------------------------------------------------------------
+# Development Environment Setup
+#---------------------------------------------------------------------------
+
+# Install git hooks (handles both regular repos and worktrees)
+install-hooks:
+	@HOOKS_DIR=$$(git rev-parse --git-common-dir)/hooks; \
+	mkdir -p "$$HOOKS_DIR"; \
+	cp scripts/hooks/pre-commit "$$HOOKS_DIR/pre-commit"; \
+	chmod +x "$$HOOKS_DIR/pre-commit"; \
+	cp scripts/hooks/post-merge "$$HOOKS_DIR/post-merge"; \
+	chmod +x "$$HOOKS_DIR/post-merge"; \
+	echo "✓ Git hooks installed to $$HOOKS_DIR"
+
+# Initialize development environment
+init: install-hooks
+	@echo "✓ ORC development environment initialized"
 
 # Clean build artifacts
 clean:

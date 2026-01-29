@@ -2,6 +2,23 @@
 
 This file contains essential workflow rules for agents working on the ORC codebase.
 
+## Development Setup
+
+Run `make init` after cloning to install git hooks.
+
+## Pre-Commit Checks (Enforced by Hook)
+
+All commits must pass `make lint`, which runs:
+- **check-test-presence**: Every service/repo/guard needs a test file
+- **check-coverage**: Per-package coverage thresholds
+- **schema-check**: Prevents hardcoded test schemas
+- **golangci-lint**: Code quality
+- **go-arch-lint**: Hex architecture boundaries
+
+To bypass in emergencies: `git commit --no-verify` (will be audited)
+
+---
+
 ## Build & Development
 
 **ALWAYS use the Makefile for building and installing ORC:**
@@ -68,7 +85,7 @@ adapters/ implements ports/ and performs I/O (SQLite, tmux, filesystem, etc.)
 ### Architecture Principles
 
 1. **Core is pure**  
-   `internal/core/` contains domain logic (guards, FSM logic, planners). It must not import other ORC packages (stdlib only, plus other `core/` packages).
+   `internal/core/` contains domain logic (guards, planners). It must not import other ORC packages (stdlib only, plus other `core/` packages).
 
 2. **Ports are contracts**  
    `internal/ports/` contains interfaces only (stdlib only).
@@ -90,21 +107,6 @@ Run `make lint` to verify architecture compliance.
 ---
 
 ## Testing Rules
-
-### FSM-First Development (for stateful entities)
-
-Any entity with states/transitions (guards + lifecycle) requires an FSM spec in `specs/`.
-
-**Workflow:**
-1. Write/update the FSM spec (YAML) first
-2. Derive/update the test matrix from the spec (manual until generators land)
-3. Implement guards in `internal/core/<entity>/guards.go`
-4. Implement service orchestration in `internal/app/<entity>_service.go`
-5. Add repository tests for persistence correctness in `internal/adapters/sqlite/*_repo_test.go`
-
-**Hard rule:**  
-**Any new state-changing CLI/service method must map to an existing FSM transition or add one.**  
-If you can’t point to a transition in `specs/<entity>-workflow.yaml`, the change is incomplete.
 
 ### Table-Driven Tests (Default Pattern)
 
@@ -230,7 +232,6 @@ If you add new container types or display features, add corresponding test data 
 When adding a new field to an existing entity (e.g., adding `priority` to Task):
 
 - [ ] Update model struct in `internal/models/<entity>.go`
-- [ ] Update FSM spec if field affects state transitions (`specs/<entity>-workflow.yaml`)
 - [ ] Update SQL schema in `internal/db/schema.sql`
 - [ ] Create migration in `internal/db/migrations/`
 - [ ] Update repository:
@@ -242,15 +243,10 @@ When adding a new field to an existing entity (e.g., adding `priority` to Task):
 - [ ] Update CLI if field is user-facing
 - [ ] Run: `make test && make lint`
 
-### Add State/Transition to FSM
+### Add State/Transition
 
-When adding a new state or transition to an entity’s state machine:
+When adding a new state or transition to an entity's state machine:
 
-- [ ] Update FSM spec (`specs/<entity>-workflow.yaml`):
-  - [ ] Add new state (if needed)
-  - [ ] Add new event (if needed)
-  - [ ] Add transition(s)
-  - [ ] Define/adjust guards
 - [ ] Update core guards + tests:
   - [ ] `internal/core/<entity>/guards.go`
   - [ ] `internal/core/<entity>/guards_test.go`
@@ -272,7 +268,6 @@ When adding a new state or transition to an entity’s state machine:
 
 When adding a new entity that requires persistence (e.g., CycleWorkOrder, Receipt):
 
-- [ ] FSM spec in `specs/<entity>-workflow.yaml`
 - [ ] Guards in `internal/core/<entity>/guards.go`
 - [ ] Guard tests in `internal/core/<entity>/guards_test.go`
 - [ ] Schema in `internal/db/schema.go`
@@ -378,9 +373,6 @@ You just declare the end state. Atlas figures out the migration path.
 
 ❌ Calling tmux directly from app
 ✅ Use a port (adapter executes tmux)
-
-❌ Skipping FSM spec for new stateful behavior
-✅ Spec → tests → implementation
 
 ❌ Claiming checks passed without running them
 ✅ Run them and report explicitly
