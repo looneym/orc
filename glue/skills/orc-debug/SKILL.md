@@ -11,16 +11,23 @@ Show recent tool calls from the debug log.
 
 `/orc-debug` - show last 30 entries
 `/orc-debug 50` - show last 50 entries
+`/orc-debug follow` - live stream new entries (tail -f)
 
 ## Action
 
-If user provides a number, use that as the tail count. Otherwise default to 30.
+Parse the argument:
+- If "follow" or "f": run `tail -f ~/.claude/orc-debug.log` in background
+- If a number: use as tail count
+- Otherwise: default to 30
 
-Run:
+For follow mode, run in background so user can continue working:
+```bash
+tail -f ~/.claude/orc-debug.log
+```
+
+For count mode:
 ```bash
 tail -N ~/.claude/orc-debug.log
 ```
-
-Where N is the count (default 30).
 
 Display the output to the user.
