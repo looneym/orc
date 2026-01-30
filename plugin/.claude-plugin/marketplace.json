@@ -10,7 +10,7 @@
       "description": "ORC workflow skills",
       "strict": false,
       "skills": [
-        "./skills/orc-ping"
+        "./skills/ping"
       ]
     }
   ]
