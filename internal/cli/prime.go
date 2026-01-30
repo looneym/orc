@@ -63,13 +63,13 @@ func runPrime(cmd *cobra.Command, args []string) error {
 	// Detect workbench context (IMP territory)
 	workbenchCtx, _ := ctx.DetectWorkbenchContext()
 
-	// Load config to check role
+	// Load config to determine role from place_id
 	cfg, _ := config.LoadConfig(cwd)
 
-	// Determine role from config
+	// Determine role from place_id
 	var role string
-	if cfg != nil {
-		role = cfg.Role
+	if cfg != nil && cfg.PlaceID != "" {
+		role = config.GetRoleFromPlaceID(cfg.PlaceID)
 	}
 
 	// Route based on role
@@ -82,8 +82,8 @@ func runPrime(cmd *cobra.Command, args []string) error {
 			// IMP role but no workbench context - show Goblin fallback
 			fullOutput = buildGoblinPrimeOutput(cwd, cfg)
 		}
-	case config.IsGoblinRole(role):
-		// Explicit Goblin role (or backwards-compat "ORC")
+	case role == config.RoleGoblin:
+		// Explicit Goblin role from gatehouse
 		fullOutput = buildGoblinPrimeOutput(cwd, cfg)
 	default:
 		// No config = Goblin context (default behavior)

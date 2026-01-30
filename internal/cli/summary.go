@@ -102,12 +102,17 @@ Examples:
 			workbenchID := ""
 			workshopID := ""
 
-			if cfg != nil {
-				if cfg.Role == config.RoleIMP {
-					role = config.RoleIMP
+			if cfg != nil && cfg.PlaceID != "" {
+				role = config.GetRoleFromPlaceID(cfg.PlaceID)
+				if config.IsWorkbench(cfg.PlaceID) {
+					workbenchID = cfg.PlaceID
+				} else if config.IsGatehouse(cfg.PlaceID) {
+					// Look up workshop from gatehouse
+					gatehouse, err := wire.GatehouseService().GetGatehouse(cmd.Context(), cfg.PlaceID)
+					if err == nil {
+						workshopID = gatehouse.WorkshopID
+					}
 				}
-				workbenchID = cfg.WorkbenchID
-				workshopID = cfg.WorkshopID
 			}
 
 			// Get current focus

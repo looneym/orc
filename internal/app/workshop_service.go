@@ -21,6 +21,7 @@ type WorkshopServiceImpl struct {
 	workshopRepo     secondary.WorkshopRepository
 	workbenchRepo    secondary.WorkbenchRepository
 	repoRepo         secondary.RepoRepository
+	gatehouseRepo    secondary.GatehouseRepository
 	tmuxAdapter      secondary.TMuxAdapter
 	workspaceAdapter secondary.WorkspaceAdapter
 	executor         EffectExecutor
@@ -32,6 +33,7 @@ func NewWorkshopService(
 	workshopRepo secondary.WorkshopRepository,
 	workbenchRepo secondary.WorkbenchRepository,
 	repoRepo secondary.RepoRepository,
+	gatehouseRepo secondary.GatehouseRepository,
 	tmuxAdapter secondary.TMuxAdapter,
 	workspaceAdapter secondary.WorkspaceAdapter,
 	executor EffectExecutor,
@@ -41,6 +43,7 @@ func NewWorkshopService(
 		workshopRepo:     workshopRepo,
 		workbenchRepo:    workbenchRepo,
 		repoRepo:         repoRepo,
+		gatehouseRepo:    gatehouseRepo,
 		tmuxAdapter:      tmuxAdapter,
 		workspaceAdapter: workspaceAdapter,
 		executor:         executor,
@@ -277,11 +280,17 @@ func (s *WorkshopServiceImpl) ApplyOpenWorkshop(ctx context.Context, plan *prima
 		}, nil
 	}
 
-	// 1. Create gatehouse if needed (check Exists flag since GatehouseOp is always set)
+	// 1. Ensure gatehouse exists in DB (auto-create if needed)
+	gatehouse, err := s.ensureGatehouseExists(ctx, plan.WorkshopID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to ensure gatehouse: %w", err)
+	}
+
+	// 2. Create gatehouse directory if needed
 	home, _ := os.UserHomeDir()
 	gatehouseDir := coreworkshop.GatehousePath(home, plan.WorkshopID, plan.WorkshopName)
 	if plan.GatehouseOp != nil && (!plan.GatehouseOp.Exists || !plan.GatehouseOp.ConfigExists) {
-		gatehouseDir = s.createGatehouseDir(plan.WorkshopID, plan.WorkshopName)
+		gatehouseDir = s.createGatehouseDir(plan.WorkshopID, plan.WorkshopName, gatehouse.ID)
 	}
 
 	// 2. Create workbenches if needed
@@ -390,9 +399,8 @@ func (s *WorkshopServiceImpl) ensureWorktreeExists(ctx context.Context, wb *seco
 	orcDir := filepath.Join(wb.WorktreePath, ".orc")
 	configPath := filepath.Join(orcDir, "config.json")
 	cfg := &config.Config{
-		Version:     "1.0",
-		Role:        config.RoleIMP,
-		WorkbenchID: wb.ID,
+		Version: "1.0",
+		PlaceID: wb.ID, // BENCH-XXX
 	}
 	configJSON, err := json.MarshalIndent(cfg, "", "  ")
 	if err != nil {
@@ -423,9 +431,36 @@ func (s *WorkshopServiceImpl) CloseWorkshop(ctx context.Context, workshopID stri
 	return nil
 }
 
+// ensureGatehouseExists returns the gatehouse for a workshop, creating it if needed.
+// This implements the 1:1 gatehouse auto-creation on workshop open.
+func (s *WorkshopServiceImpl) ensureGatehouseExists(ctx context.Context, workshopID string) (*secondary.GatehouseRecord, error) {
+	// Check if gatehouse already exists
+	existing, err := s.gatehouseRepo.GetByWorkshop(ctx, workshopID)
+	if err == nil {
+		return existing, nil
+	}
+
+	// Create new gatehouse
+	id, err := s.gatehouseRepo.GetNextID(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate gatehouse ID: %w", err)
+	}
+
+	gatehouse := &secondary.GatehouseRecord{
+		ID:         id,
+		WorkshopID: workshopID,
+		Status:     "active",
+	}
+	if err := s.gatehouseRepo.Create(ctx, gatehouse); err != nil {
+		return nil, fmt.Errorf("failed to create gatehouse: %w", err)
+	}
+
+	return gatehouse, nil
+}
+
 // createGatehouseDir creates the Gatehouse directory for a workshop
-// at ~/.orc/ws/{workshop-id}-{slug}/ with a Goblin config
-func (s *WorkshopServiceImpl) createGatehouseDir(workshopID, workshopName string) string {
+// at ~/.orc/ws/{workshop-id}-{slug}/ with a Goblin config containing the gatehouse ID
+func (s *WorkshopServiceImpl) createGatehouseDir(workshopID, workshopName, gatehouseID string) string {
 	home, _ := os.UserHomeDir()
 	slug := slugify(workshopName)
 	dirName := fmt.Sprintf("%s-%s", workshopID, slug)
@@ -436,10 +471,10 @@ func (s *WorkshopServiceImpl) createGatehouseDir(workshopID, workshopName string
 	orcDir := filepath.Join(dir, ".orc")
 	_ = os.MkdirAll(orcDir, 0755)
 
-	// Create config.json with Goblin role
+	// Create config.json with gatehouse place_id
 	cfg := &config.Config{
 		Version: "1.0",
-		Role:    config.RoleGoblin,
+		PlaceID: gatehouseID, // GATE-XXX
 	}
 	_ = config.SaveConfig(dir, cfg)
 

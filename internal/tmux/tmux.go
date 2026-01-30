@@ -111,13 +111,13 @@ func (s *Session) CreateOrcWindow(workingDir string) error {
 	}
 
 	// Now we have 3 panes:
-	// Pane 1 (left): claude (orchestrator via orc connect)
+	// Pane 1 (left): claude (orchestrator via orc connect --role goblin)
 	// Pane 2 (top right): vim
 	// Pane 3 (bottom right): shell
 
-	// Launch orc connect in pane 1 (left) - uses respawn-pane so it's the root command
+	// Launch orc connect --role goblin in pane 1 (left) - uses respawn-pane so it's the root command
 	pane1 := fmt.Sprintf("%s.1", target)
-	connectCmd := exec.Command("tmux", "respawn-pane", "-t", pane1, "-k", "orc", "connect")
+	connectCmd := exec.Command("tmux", "respawn-pane", "-t", pane1, "-k", "orc", "connect", "--role", "goblin")
 	if err := connectCmd.Run(); err != nil {
 		return fmt.Errorf("failed to launch orc connect: %w", err)
 	}

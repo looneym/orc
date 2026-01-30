@@ -27,11 +27,11 @@ func DetectWorkbenchContext() (*WorkbenchContext, error) {
 		return nil, nil //nolint:nilerr // No config found is not an error, just no context
 	}
 
-	// Only return context if this is an IMP config with workbench
-	if cfg.Role == config.RoleIMP && cfg.WorkbenchID != "" {
+	// Only return context if this is a workbench (BENCH-XXX place_id)
+	if config.IsWorkbench(cfg.PlaceID) {
 		return &WorkbenchContext{
-			WorkbenchID: cfg.WorkbenchID,
-			Role:        cfg.Role,
+			WorkbenchID: cfg.PlaceID,
+			Role:        config.RoleIMP,
 			ConfigPath:  filepath.Join(dir, ".orc", "config.json"),
 		}, nil
 	}
@@ -53,9 +53,9 @@ func GetContextCommissionID() string {
 		return ""
 	}
 
-	// For IMP role, look up commission through workbench chain
-	if cfg.Role == config.RoleIMP && cfg.WorkbenchID != "" {
-		return getCommissionFromWorkbench(cfg.WorkbenchID)
+	// For workbench place, look up commission through workbench chain
+	if config.IsWorkbench(cfg.PlaceID) {
+		return getCommissionFromWorkbench(cfg.PlaceID)
 	}
 
 	return ""
@@ -69,14 +69,22 @@ func getCommissionFromWorkbench(_ string) string {
 	return ""
 }
 
-// WriteCommissionContext creates a .orc/config.json file for a commission workspace.
-// Uses Goblin role by default since commission workspaces are for orchestration.
-// If the path matches a workshop pattern, sets WorkshopID.
+// WriteGatehouseContext creates a .orc/config.json file for a gatehouse (Goblin territory)
+func WriteGatehouseContext(gatehousePath, gatehouseID string) error {
+	cfg := &config.Config{
+		Version: "1.0",
+		PlaceID: gatehouseID, // GATE-XXX
+	}
+	return config.SaveConfig(gatehousePath, cfg)
+}
+
+// WriteCommissionContext creates a minimal .orc/config.json for legacy commission workspaces.
+// These are not associated with a gatehouse, so place_id is empty.
+// This is deprecated - new workflows should use workshops with gatehouses.
 func WriteCommissionContext(workspacePath string) error {
 	cfg := &config.Config{
-		Version:    "1.0",
-		Role:       config.RoleGoblin,
-		WorkshopID: config.ParseWorkshopIDFromPath(workspacePath),
+		Version: "1.0",
+		// No place_id - this is a legacy commission workspace without a gatehouse
 	}
 	return config.SaveConfig(workspacePath, cfg)
 }
@@ -84,9 +92,8 @@ func WriteCommissionContext(workspacePath string) error {
 // WriteWorkbenchContext creates a .orc/config.json file for a workbench (IMP territory)
 func WriteWorkbenchContext(workbenchPath, workbenchID string) error {
 	cfg := &config.Config{
-		Version:     "1.0",
-		Role:        config.RoleIMP,
-		WorkbenchID: workbenchID,
+		Version: "1.0",
+		PlaceID: workbenchID, // BENCH-XXX
 	}
 	return config.SaveConfig(workbenchPath, cfg)
 }

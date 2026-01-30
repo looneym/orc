@@ -43,14 +43,22 @@ This provides a focused view of "where am I right now?"`,
 				return nil //nolint:nilerr // Missing config is intentionally not an error
 			}
 
+			// Determine role from place_id
+			role := config.GetRoleFromPlaceID(cfg.PlaceID)
+			if role == "" {
+				role = config.RoleGoblin // default
+			}
+
 			// Show status based on role
-			role := cfg.Role
-			if config.IsGoblinRole(role) || role == "" {
+			if role == config.RoleGoblin {
 				fmt.Println("ORC Status - Goblin Context")
+				if config.IsGatehouse(cfg.PlaceID) {
+					fmt.Printf("  Gatehouse: %s\n", cfg.PlaceID)
+				}
 			} else if role == config.RoleIMP {
 				fmt.Println("ORC Status - IMP Context")
-				if cfg.WorkbenchID != "" {
-					fmt.Printf("  Workbench: %s\n", cfg.WorkbenchID)
+				if config.IsWorkbench(cfg.PlaceID) {
+					fmt.Printf("  Workbench: %s\n", cfg.PlaceID)
 				}
 			}
 			fmt.Println()
@@ -69,9 +77,9 @@ This provides a focused view of "where am I right now?"`,
 			}
 
 			// If IMP, show workbench-specific info
-			if role == config.RoleIMP && cfg.WorkbenchID != "" {
+			if role == config.RoleIMP && config.IsWorkbench(cfg.PlaceID) {
 				// Show shipments assigned to this workbench
-				shipments, err := wire.ShipmentService().GetShipmentsByWorkbench(context.Background(), cfg.WorkbenchID)
+				shipments, err := wire.ShipmentService().GetShipmentsByWorkbench(context.Background(), cfg.PlaceID)
 				if err == nil && len(shipments) > 0 {
 					fmt.Println("Assigned Shipments:")
 					for _, s := range shipments {

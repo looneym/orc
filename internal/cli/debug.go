@@ -60,12 +60,14 @@ Examples:
 			if err == nil {
 				configPath := filepath.Join(cwd, ".orc", "config.json")
 				fmt.Printf("  Found: %s\n", configPath)
-				fmt.Printf("  Role: %s\n", cfg.Role)
-				if cfg.WorkbenchID != "" {
-					fmt.Printf("  Workbench ID: %s\n", cfg.WorkbenchID)
+				fmt.Printf("  Place ID: %s\n", cfg.PlaceID)
+				role := config.GetRoleFromPlaceID(cfg.PlaceID)
+				if role != "" {
+					fmt.Printf("  Role: %s (derived from place_id)\n", role)
 				}
-				if cfg.WorkshopID != "" {
-					fmt.Printf("  Workshop ID: %s\n", cfg.WorkshopID)
+				placeType := config.GetPlaceType(cfg.PlaceID)
+				if placeType != "" {
+					fmt.Printf("  Place Type: %s\n", placeType)
 				}
 				fmt.Println()
 
@@ -111,8 +113,8 @@ Examples:
 				fmt.Printf("  Workbench: %s\n", workbenchCtx.WorkbenchID)
 			} else {
 				fmt.Printf("  Context: Goblin (orchestrator)\n")
-				if cfg != nil && cfg.WorkshopID != "" {
-					fmt.Printf("  Workshop: %s\n", cfg.WorkshopID)
+				if cfg != nil && config.IsGatehouse(cfg.PlaceID) {
+					fmt.Printf("  Gatehouse: %s\n", cfg.PlaceID)
 				}
 			}
 
@@ -186,26 +188,19 @@ Examples:
 				if err := json.Unmarshal(data, &cfg); err == nil {
 					fmt.Printf("   OK: Valid JSON\n")
 
-					// Check role
-					if cfg.Role != "" {
-						fmt.Printf("   OK: Role: %s\n", cfg.Role)
+					// Check place_id
+					if cfg.PlaceID != "" {
+						fmt.Printf("   OK: Place ID: %s\n", cfg.PlaceID)
+						placeType := config.GetPlaceType(cfg.PlaceID)
+						role := config.GetRoleFromPlaceID(cfg.PlaceID)
+						if placeType != "" {
+							fmt.Printf("   OK: Place Type: %s\n", placeType)
+						}
+						if role != "" {
+							fmt.Printf("   OK: Role: %s (derived from place_id)\n", role)
+						}
 					} else {
-						fmt.Printf("   INFO: No role set (defaults to Goblin)\n")
-					}
-
-					// Check identity fields based on role
-					if cfg.Role == config.RoleIMP {
-						if cfg.WorkbenchID != "" {
-							fmt.Printf("   OK: Workbench ID: %s\n", cfg.WorkbenchID)
-						} else {
-							fmt.Printf("   WARN: IMP role but no workbench_id set\n")
-						}
-					} else if config.IsGoblinRole(cfg.Role) {
-						if cfg.WorkshopID != "" {
-							fmt.Printf("   OK: Workshop ID: %s\n", cfg.WorkshopID)
-						} else {
-							fmt.Printf("   INFO: No workshop_id set (global Goblin context)\n")
-						}
+						fmt.Printf("   INFO: No place_id set (may be legacy format or global Goblin context)\n")
 					}
 				} else {
 					fmt.Printf("   FAIL: Invalid JSON: %v\n", err)

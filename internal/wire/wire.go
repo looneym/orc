@@ -285,8 +285,9 @@ func initServices() {
 	factoryRepo := sqlite.NewFactoryRepository(database)
 	workshopRepo := sqlite.NewWorkshopRepository(database)
 	workbenchRepo := sqlite.NewWorkbenchRepository(database)
+	gatehouseRepo := sqlite.NewGatehouseRepository(database) // needed by workshop service for auto-creation
 	factoryService = app.NewFactoryService(factoryRepo)
-	workshopService = app.NewWorkshopService(factoryRepo, workshopRepo, workbenchRepo, repoRepo, tmuxService, workspaceAdapter, executor)
+	workshopService = app.NewWorkshopService(factoryRepo, workshopRepo, workbenchRepo, repoRepo, gatehouseRepo, tmuxService, workspaceAdapter, executor)
 	workbenchService = app.NewWorkbenchService(workbenchRepo, workshopRepo, agentProvider, executor)
 
 	// Create plan service
@@ -297,8 +298,8 @@ func initServices() {
 	receiptService = app.NewReceiptService(receiptRepo)
 
 	// Create new entity services (gatehouses, watchdogs, approvals, escalations, manifests)
-	gatehouseRepo := sqlite.NewGatehouseRepository(database)
-	gatehouseService = app.NewGatehouseService(gatehouseRepo)
+	// Pass workshop repo to gatehouse service for EnsureAllWorkshopsHaveGatehouses
+	gatehouseService = app.NewGatehouseService(gatehouseRepo, workshopRepo)
 
 	watchdogRepo := sqlite.NewWatchdogRepository(database)
 	watchdogService = app.NewWatchdogService(watchdogRepo)

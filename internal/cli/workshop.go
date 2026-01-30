@@ -419,12 +419,17 @@ func runSetCommission(args []string, clearFlag bool) error {
 		return fmt.Errorf("no ORC config found in current directory")
 	}
 
-	// Must be Goblin context
-	if !config.IsGoblinRole(cfg.Role) || cfg.WorkshopID == "" {
-		return fmt.Errorf("set-commission requires Goblin context (workshop directory)")
+	// Must be Goblin context (gatehouse)
+	if !config.IsGatehouse(cfg.PlaceID) {
+		return fmt.Errorf("set-commission requires Goblin context (gatehouse directory)")
 	}
 
-	workshopID := cfg.WorkshopID
+	// Look up workshop from gatehouse
+	gatehouse, err := wire.GatehouseService().GetGatehouse(ctx, cfg.PlaceID)
+	if err != nil {
+		return fmt.Errorf("failed to get gatehouse: %w", err)
+	}
+	workshopID := gatehouse.WorkshopID
 
 	if clearFlag {
 		if err := wire.WorkshopService().SetActiveCommission(ctx, workshopID, ""); err != nil {

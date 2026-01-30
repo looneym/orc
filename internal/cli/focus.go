@@ -60,29 +60,31 @@ func runFocus(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("no ORC config found in current directory")
 	}
 
-	// IMP role - use workbench focus
-	if cfg.Role == config.RoleIMP && cfg.WorkbenchID != "" {
+	// Route based on place_id type
+	placeType := config.GetPlaceType(cfg.PlaceID)
+	switch placeType {
+	case config.PlaceTypeWorkbench:
+		// IMP role - use workbench focus
 		return runIMPFocus(cmd, args, cfg, showOnly, clearFlag)
-	}
-
-	// Goblin role - use workshop focus
-	if config.IsGoblinRole(cfg.Role) && cfg.WorkshopID != "" {
+	case config.PlaceTypeGatehouse:
+		// Goblin role - need to look up workshop from gatehouse
 		return runGoblinFocus(cmd, args, cfg, showOnly, clearFlag)
+	default:
+		return fmt.Errorf("focus requires workbench (IMP) or gatehouse (Goblin) context")
 	}
-
-	// No valid context
-	return fmt.Errorf("focus requires workbench (IMP) or workshop (Goblin) context")
 }
 
 // runIMPFocus handles focus for IMP role (workbench context)
 // IMP can focus on CON-xxx or SHIP-xxx
 func runIMPFocus(_ *cobra.Command, args []string, cfg *config.Config, showOnly, clearFlag bool) error {
+	workbenchID := cfg.PlaceID // BENCH-XXX
+
 	if showOnly {
-		return showIMPFocus(cfg.WorkbenchID)
+		return showIMPFocus(workbenchID)
 	}
 
 	if clearFlag {
-		return clearIMPFocus(cfg.WorkbenchID)
+		return clearIMPFocus(workbenchID)
 	}
 
 	if len(args) == 0 {
@@ -102,18 +104,29 @@ func runIMPFocus(_ *cobra.Command, args []string, cfg *config.Config, showOnly, 
 		return err
 	}
 
-	return setIMPFocus(cfg, containerID, containerType, title)
+	return setIMPFocus(workbenchID, containerID, containerType, title)
 }
 
-// runGoblinFocus handles focus for Goblin role (workshop context)
+// runGoblinFocus handles focus for Goblin role (gatehouse context)
 // Goblin can ONLY focus on CON-xxx
+// Gatehouse place_id is GATE-XXX, need to look up workshop
 func runGoblinFocus(_ *cobra.Command, args []string, cfg *config.Config, showOnly, clearFlag bool) error {
+	gatehouseID := cfg.PlaceID // GATE-XXX
+
+	// Look up workshop from gatehouse
+	ctx := context.Background()
+	gatehouse, err := wire.GatehouseService().GetGatehouse(ctx, gatehouseID)
+	if err != nil {
+		return fmt.Errorf("failed to get gatehouse: %w", err)
+	}
+	workshopID := gatehouse.WorkshopID
+
 	if showOnly {
-		return showGoblinFocus(cfg.WorkshopID)
+		return showGoblinFocus(workshopID)
 	}
 
 	if clearFlag {
-		return clearGoblinFocus(cfg.WorkshopID)
+		return clearGoblinFocus(workshopID)
 	}
 
 	if len(args) == 0 {
@@ -132,7 +145,7 @@ func runGoblinFocus(_ *cobra.Command, args []string, cfg *config.Config, showOnl
 		return err
 	}
 
-	return setGoblinFocus(cfg, containerID, containerType, title)
+	return setGoblinFocus(workshopID, containerID, containerType, title)
 }
 
 // validateAndGetInfo validates the container ID exists and returns its type and title
@@ -213,11 +226,11 @@ func showGoblinFocus(workshopID string) error {
 }
 
 // setIMPFocus sets the IMP focus in the DB
-func setIMPFocus(cfg *config.Config, containerID, containerType, title string) error {
+func setIMPFocus(workbenchID, containerID, containerType, title string) error {
 	ctx := context.Background()
 
 	// Update focus in DB
-	if err := wire.WorkbenchService().UpdateFocusedID(ctx, cfg.WorkbenchID, containerID); err != nil {
+	if err := wire.WorkbenchService().UpdateFocusedID(ctx, workbenchID, containerID); err != nil {
 		return fmt.Errorf("failed to set focus: %w", err)
 	}
 
@@ -225,8 +238,8 @@ func setIMPFocus(cfg *config.Config, containerID, containerType, title string) e
 	fmt.Printf("  %s\n", title)
 
 	// Auto-checkout branch for shipments when in a workbench
-	if strings.HasPrefix(containerID, "SHIP-") && cfg.WorkbenchID != "" {
-		if err := autoCheckoutShipmentBranch(cfg.WorkbenchID, containerID); err != nil {
+	if strings.HasPrefix(containerID, "SHIP-") {
+		if err := autoCheckoutShipmentBranch(workbenchID, containerID); err != nil {
 			fmt.Printf("  (branch checkout skipped: %v)\n", err)
 		} else {
 			fmt.Println("  ✓ Branch checked out")
@@ -235,7 +248,7 @@ func setIMPFocus(cfg *config.Config, containerID, containerType, title string) e
 
 	// Auto-rename tmux session for any focused container
 	if os.Getenv("TMUX") != "" {
-		if err := autoRenameTmuxSession(cfg, containerID, title); err != nil {
+		if err := autoRenameTmuxSession(workbenchID, containerID, title); err != nil {
 			fmt.Printf("  (tmux session rename skipped: %v)\n", err)
 		}
 	}
@@ -245,11 +258,11 @@ func setIMPFocus(cfg *config.Config, containerID, containerType, title string) e
 }
 
 // setGoblinFocus sets the Goblin focus in the DB
-func setGoblinFocus(cfg *config.Config, containerID, containerType, title string) error {
+func setGoblinFocus(workshopID, containerID, containerType, title string) error {
 	ctx := context.Background()
 
 	// Update focus in DB
-	if err := wire.WorkshopService().UpdateFocusedConclaveID(ctx, cfg.WorkshopID, containerID); err != nil {
+	if err := wire.WorkshopService().UpdateFocusedConclaveID(ctx, workshopID, containerID); err != nil {
 		return fmt.Errorf("failed to set focus: %w", err)
 	}
 
@@ -262,7 +275,7 @@ func setGoblinFocus(cfg *config.Config, containerID, containerType, title string
 
 // autoRenameTmuxSession renames the tmux session to reflect the focused container.
 // Format: "Workshop Name - COMM-XXX/SHIP-XXX - Title" (includes commission context)
-func autoRenameTmuxSession(cfg *config.Config, containerID, title string) error {
+func autoRenameTmuxSession(workbenchID, containerID, title string) error {
 	ctx := context.Background()
 
 	// Get current session name
@@ -273,8 +286,8 @@ func autoRenameTmuxSession(cfg *config.Config, containerID, title string) error 
 
 	// Get workshop name from workbench context if available
 	workshopName := "Workshop"
-	if cfg.WorkbenchID != "" {
-		wb, err := wire.WorkbenchService().GetWorkbench(ctx, cfg.WorkbenchID)
+	if workbenchID != "" {
+		wb, err := wire.WorkbenchService().GetWorkbench(ctx, workbenchID)
 		if err == nil && wb.WorkshopID != "" {
 			ws, err := wire.WorkshopService().GetWorkshop(ctx, wb.WorkshopID)
 			if err == nil {
@@ -350,26 +363,30 @@ func clearGoblinFocus(workshopID string) error {
 }
 
 // GetCurrentFocus is exported for use by other commands (e.g., prime)
-// Returns the focused ID from DB based on role context
+// Returns the focused ID from DB based on place_id context
 func GetCurrentFocus(cfg *config.Config) string {
-	if cfg == nil {
+	if cfg == nil || cfg.PlaceID == "" {
 		return ""
 	}
 
 	ctx := context.Background()
 
-	// IMP context
-	if cfg.WorkbenchID != "" {
-		focusID, err := wire.WorkbenchService().GetFocusedID(ctx, cfg.WorkbenchID)
+	placeType := config.GetPlaceType(cfg.PlaceID)
+	switch placeType {
+	case config.PlaceTypeWorkbench:
+		// IMP context - use workbench focus
+		focusID, err := wire.WorkbenchService().GetFocusedID(ctx, cfg.PlaceID)
 		if err != nil {
 			return ""
 		}
 		return focusID
-	}
-
-	// Goblin context
-	if cfg.WorkshopID != "" {
-		focusID, err := wire.WorkshopService().GetFocusedConclaveID(ctx, cfg.WorkshopID)
+	case config.PlaceTypeGatehouse:
+		// Goblin context - look up workshop from gatehouse
+		gatehouse, err := wire.GatehouseService().GetGatehouse(ctx, cfg.PlaceID)
+		if err != nil {
+			return ""
+		}
+		focusID, err := wire.WorkshopService().GetFocusedConclaveID(ctx, gatehouse.WorkshopID)
 		if err != nil {
 			return ""
 		}

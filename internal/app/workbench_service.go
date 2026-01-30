@@ -257,9 +257,8 @@ func (s *WorkbenchServiceImpl) buildConfigEffects(workbenchPath, workbenchID str
 	configPath := filepath.Join(orcDir, "config.json")
 
 	cfg := &config.Config{
-		Version:     "1.0",
-		Role:        config.RoleIMP,
-		WorkbenchID: workbenchID,
+		Version: "1.0",
+		PlaceID: workbenchID, // BENCH-XXX
 	}
 	configJSON, _ := json.MarshalIndent(cfg, "", "  ")
 

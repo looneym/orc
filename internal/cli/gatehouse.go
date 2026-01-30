@@ -78,6 +78,36 @@ var gatehouseShowCmd = &cobra.Command{
 	},
 }
 
+var gatehouseEnsureAllCmd = &cobra.Command{
+	Use:   "ensure-all",
+	Short: "Create gatehouses for all workshops missing them",
+	Long: `Create a gatehouse for each workshop that doesn't have one.
+
+This is a data migration command used when introducing the gatehouse entity.
+Each workshop should have exactly one gatehouse (1:1 relationship).
+
+This command is idempotent - running it multiple times is safe.`,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		ctx := context.Background()
+
+		created, err := wire.GatehouseService().EnsureAllWorkshopsHaveGatehouses(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to ensure gatehouses: %w", err)
+		}
+
+		if len(created) == 0 {
+			fmt.Println("All workshops already have gatehouses.")
+			return nil
+		}
+
+		fmt.Printf("Created %d gatehouse(s):\n", len(created))
+		for _, id := range created {
+			fmt.Printf("  - %s\n", id)
+		}
+		return nil
+	},
+}
+
 func init() {
 	// gatehouse list flags
 	gatehouseListCmd.Flags().String("workshop", "", "Filter by workshop ID")
@@ -86,6 +116,7 @@ func init() {
 	// Register subcommands
 	gatehouseCmd.AddCommand(gatehouseListCmd)
 	gatehouseCmd.AddCommand(gatehouseShowCmd)
+	gatehouseCmd.AddCommand(gatehouseEnsureAllCmd)
 }
 
 // GatehouseCmd returns the gatehouse command
