@@ -3,11 +3,19 @@
   "owner": {
     "name": "El Presidente"
   },
+  "metadata": {
+    "description": "ORC workflow skills",
+    "version": "0.1.0"
+  },
   "plugins": [
     {
       "name": "orc",
+      "description": "ORC orchestration workflow skills for task management and plugin verification",
       "source": "./",
-      "description": "ORC workflow skills"
+      "strict": false,
+      "skills": [
+        "./skills/ping"
+      ]
     }
   ]
 }
