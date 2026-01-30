@@ -33,6 +33,7 @@ Agent identity is auto-detected from context (ORC repo or workbench).`,
 
 func mailSendCmd() *cobra.Command {
 	var to, subject string
+	var nudge bool
 
 	cmd := &cobra.Command{
 		Use:   "send <body>",
@@ -84,12 +85,23 @@ Examples:
 			fmt.Printf("  To: %s\n", recipientIdentity.FullID)
 			fmt.Printf("  Subject: %s\n", subject)
 
+			// If --nudge flag is set, also send a real-time nudge to the recipient
+			if nudge {
+				if err := sendNudgeToAgent(ctx, recipientIdentity, fmt.Sprintf("You have new mail: %s", subject)); err != nil {
+					// Don't fail the command if nudge fails - mail was still sent
+					fmt.Printf("  ⚠ Nudge failed: %v\n", err)
+				} else {
+					fmt.Printf("  ✓ Nudge sent\n")
+				}
+			}
+
 			return nil
 		},
 	}
 
 	cmd.Flags().StringVar(&to, "to", "", "Recipient agent ID (e.g., IMP-WB-001)")
 	cmd.Flags().StringVar(&subject, "subject", "", "Message subject")
+	cmd.Flags().BoolVar(&nudge, "nudge", false, "Also send real-time nudge to recipient")
 	cmd.MarkFlagRequired("to")
 
 	return cmd
@@ -269,4 +281,53 @@ func truncate(s string, maxLen int) string {
 		return s
 	}
 	return s[:maxLen-3] + "..."
+}
+
+// sendNudgeToAgent sends a real-time nudge to an agent via tmux
+func sendNudgeToAgent(ctx context.Context, identity *agent.AgentIdentity, message string) error {
+	tmuxAdapter := wire.TMuxAdapter()
+
+	var target string
+
+	if identity.Type == agent.AgentTypeGoblin {
+		if identity.ID == "GOBLIN" {
+			// Legacy generic GOBLIN address - check for ORC session
+			sessionName := "ORC"
+			if !tmuxAdapter.SessionExists(ctx, sessionName) {
+				return fmt.Errorf("tmux session %s not running", sessionName)
+			}
+			target = "ORC:1.1"
+		} else {
+			// GOBLIN-GATE-XXX: lookup gatehouse → workshop → session
+			gatehouse, err := wire.GatehouseService().GetGatehouse(ctx, identity.ID)
+			if err != nil {
+				return fmt.Errorf("failed to get gatehouse info: %w", err)
+			}
+
+			sessionName := tmuxAdapter.FindSessionByWorkshopID(ctx, gatehouse.WorkshopID)
+			if sessionName == "" {
+				return fmt.Errorf("no tmux session found for workshop %s", gatehouse.WorkshopID)
+			}
+
+			// Gatehouse is window 1, pane 1 (Claude)
+			target = fmt.Sprintf("%s:1.1", sessionName)
+		}
+	} else {
+		// IMP: lookup workbench and find session by workshop ID
+		workbench, err := wire.WorkbenchService().GetWorkbench(ctx, identity.ID)
+		if err != nil {
+			return fmt.Errorf("failed to get workbench info: %w", err)
+		}
+
+		// Find session by workshop ID (runtime lookup)
+		sessionName := tmuxAdapter.FindSessionByWorkshopID(ctx, workbench.WorkshopID)
+		if sessionName == "" {
+			return fmt.Errorf("no tmux session found for workshop %s", workbench.WorkshopID)
+		}
+
+		// Window named by workbench, pane 2 is Claude
+		target = fmt.Sprintf("%s:%s.2", sessionName, workbench.Name)
+	}
+
+	return tmuxAdapter.NudgeSession(ctx, target, message)
 }
