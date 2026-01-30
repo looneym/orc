@@ -34,49 +34,34 @@ Examples:
 				return fmt.Errorf("invalid agent ID: %w", err)
 			}
 
-			// For IMP agents, we need to look up workbench info and commission
-			var target string
-			var commissionID string
 			ctx := context.Background()
+			tmuxAdapter := wire.TMuxAdapter()
 
-			if identity.Type == agent.AgentTypeIMP {
-				// Extract workbench ID and resolve commission via workshop chain
+			var sessionName string
+			var target string
+
+			if identity.Type == agent.AgentTypeGoblin {
+				// Goblin always in ORC session, window 1, pane 1
+				sessionName = "ORC"
+				if !tmuxAdapter.SessionExists(ctx, sessionName) {
+					return fmt.Errorf("tmux session %s not running - agent may not be active", sessionName)
+				}
+				target = "ORC:1.1"
+			} else {
+				// IMP: lookup workbench and find session by workshop ID
 				workbench, err := wire.WorkbenchService().GetWorkbench(ctx, identity.ID)
 				if err != nil {
 					return fmt.Errorf("failed to get workbench info: %w", err)
 				}
 
-				// Get workshop to find factory/commission context
-				workshop, err := wire.WorkshopService().GetWorkshop(ctx, workbench.WorkshopID)
-				if err != nil {
-					return fmt.Errorf("failed to get workshop info: %w", err)
+				// Find session by workshop ID (runtime lookup)
+				sessionName = tmuxAdapter.FindSessionByWorkshopID(ctx, workbench.WorkshopID)
+				if sessionName == "" {
+					return fmt.Errorf("no tmux session found for workshop %s - agent may not be active", workbench.WorkshopID)
 				}
 
-				// For now, use workshop name as part of session name
-				// TODO: Resolve commission through factory if needed
-				commissionID = workshop.Name
-
-				// Resolve tmux target
-				target, err = agent.ResolveTMuxTarget(agentID, workbench.Name, commissionID)
-				if err != nil {
-					return fmt.Errorf("failed to resolve target: %w", err)
-				}
-			} else {
-				// Goblin
-				target, err = agent.ResolveTMuxTarget(agentID, "", "")
-				if err != nil {
-					return fmt.Errorf("failed to resolve target: %w", err)
-				}
-			}
-
-			// Check if session exists
-			tmuxAdapter := wire.TMuxAdapter()
-			sessionName := fmt.Sprintf("orc-%s", commissionID)
-			if commissionID == "" {
-				sessionName = "ORC" // Goblin session
-			}
-			if !tmuxAdapter.SessionExists(ctx, sessionName) {
-				return fmt.Errorf("tmux session %s not running - agent may not be active", sessionName)
+				// Window named by workbench, pane 2 is Claude
+				target = fmt.Sprintf("%s:%s.2", sessionName, workbench.Name)
 			}
 
 			// Send nudge

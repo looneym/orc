@@ -94,25 +94,3 @@ func ParseAgentID(agentID string) (*AgentIdentity, error) {
 		return nil, fmt.Errorf("unknown agent type: %s (expected GOBLIN or IMP)", agentType)
 	}
 }
-
-// ResolveTMuxTarget converts an agent ID to a tmux target string.
-// For IMP targets, commissionID must be provided (looked up via DB by caller).
-func ResolveTMuxTarget(agentID string, workbenchName string, commissionID string) (string, error) {
-	identity, err := ParseAgentID(agentID)
-	if err != nil {
-		return "", err
-	}
-
-	if identity.Type == AgentTypeGoblin {
-		// Goblin always in ORC session, window 1, pane 1
-		return "ORC:1.1", nil
-	}
-
-	// For IMP, need workbench name and commission ID
-	if commissionID == "" || workbenchName == "" {
-		return "", fmt.Errorf("IMP target requires commission ID and workbench name")
-	}
-
-	// Window named by workbench, pane 2 is Claude
-	return fmt.Sprintf("orc-%s:%s.2", commissionID, workbenchName), nil
-}
