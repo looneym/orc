@@ -1,4 +1,4 @@
-.PHONY: install install-binary install-shim uninstall-shim dev build test lint lint-fix schema-check check-test-presence check-coverage init install-hooks clean help
+.PHONY: install install-binary install-shim uninstall-shim dev build test lint lint-fix schema-check check-test-presence check-coverage init install-hooks clean help deploy-glue
 
 # Go binary location (handles empty GOBIN)
 GOBIN := $(shell go env GOPATH)/bin
@@ -153,6 +153,21 @@ clean:
 	@echo "✓ Cleaned local build artifacts"
 
 #---------------------------------------------------------------------------
+# Claude Code Integration (Glue)
+#---------------------------------------------------------------------------
+
+# Deploy skills to Claude Code
+deploy-glue:
+	@echo "Deploying Claude Code skills..."
+	@for dir in glue/skills/*/; do \
+		name=$$(basename "$$dir"); \
+		echo "  → $$name"; \
+		rm -rf ~/.claude/skills/$$name; \
+		cp -r "$$dir" ~/.claude/skills/$$name; \
+	done
+	@echo "✓ Skills deployed to ~/.claude/skills/"
+
+#---------------------------------------------------------------------------
 # Help
 #---------------------------------------------------------------------------
 
@@ -172,3 +187,6 @@ help:
 	@echo "  make uninstall-shim  Remove shim, restore direct binary"
 	@echo ""
 	@echo "The shim prefers ./orc when present, falls back to orc-bin."
+	@echo ""
+	@echo "Claude Code Integration:"
+	@echo "  make deploy-glue   Deploy skills to ~/.claude/skills/"
