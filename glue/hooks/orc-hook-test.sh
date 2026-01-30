@@ -1,4 +1,5 @@
 #!/bin/bash
 # ORC test hook - confirms hook deployment works
 
-echo "ORC hook test: ✓ Hook is working"
+LOG_FILE="$HOME/.claude/orc-hook.log"
+echo "$(date '+%Y-%m-%d %H:%M:%S') - ORC hook fired" >> "$LOG_FILE"
