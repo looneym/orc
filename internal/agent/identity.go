@@ -90,6 +90,13 @@ func ParseAgentID(agentID string) (*AgentIdentity, error) {
 			ID:     id,
 			FullID: agentID,
 		}, nil
+	case AgentTypeGoblin:
+		// For GOBLIN, gatehouse IDs are like GATE-003
+		return &AgentIdentity{
+			Type:   AgentTypeGoblin,
+			ID:     id,
+			FullID: agentID,
+		}, nil
 	default:
 		return nil, fmt.Errorf("unknown agent type: %s (expected GOBLIN or IMP)", agentType)
 	}
