@@ -1,0 +1,13 @@
+{
+  "name": "orc-local",
+  "owner": {
+    "name": "El Presidente"
+  },
+  "plugins": [
+    {
+      "name": "orc",
+      "source": "./",
+      "description": "ORC workflow skills"
+    }
+  ]
+}
