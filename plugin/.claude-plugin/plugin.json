@@ -1,0 +1,7 @@
+{
+  "name": "orc",
+  "description": "ORC workflow skills",
+  "version": "0.1.0",
+  "author": { "name": "El Presidente" },
+  "skills": "./skills/"
+}
