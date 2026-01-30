@@ -156,7 +156,7 @@ clean:
 # Claude Code Integration (Glue)
 #---------------------------------------------------------------------------
 
-# Deploy skills to Claude Code
+# Deploy skills and hooks to Claude Code
 deploy-glue:
 	@echo "Deploying Claude Code skills..."
 	@for dir in glue/skills/*/; do \
@@ -166,6 +166,16 @@ deploy-glue:
 		cp -r "$$dir" ~/.claude/skills/$$name; \
 	done
 	@echo "✓ Skills deployed to ~/.claude/skills/"
+	@if [ -d "glue/hooks" ] && [ "$$(ls -A glue/hooks 2>/dev/null)" ]; then \
+		echo "Deploying Claude Code hooks..."; \
+		for hook in glue/hooks/*; do \
+			name=$$(basename "$$hook"); \
+			echo "  → $$name"; \
+			cp "$$hook" ~/.claude/hooks/$$name; \
+			chmod +x ~/.claude/hooks/$$name; \
+		done; \
+		echo "✓ Hooks deployed to ~/.claude/hooks/"; \
+	fi
 
 #---------------------------------------------------------------------------
 # Help
