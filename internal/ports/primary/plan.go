@@ -13,8 +13,11 @@ type PlanService interface {
 	// ListPlans lists plans with optional filters.
 	ListPlans(ctx context.Context, filters PlanFilters) ([]*Plan, error)
 
-	// ApprovePlan approves a plan (marks it as approved).
-	ApprovePlan(ctx context.Context, planID string) error
+	// SubmitPlan submits a plan for review (draft → pending_review).
+	SubmitPlan(ctx context.Context, planID string) error
+
+	// ApprovePlan approves a plan (pending_review → approved), creating an approval record.
+	ApprovePlan(ctx context.Context, planID string) (*Approval, error)
 
 	// UpdatePlan updates a plan's title, description, and/or content.
 	UpdatePlan(ctx context.Context, req UpdatePlanRequest) error

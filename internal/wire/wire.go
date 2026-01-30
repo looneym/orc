@@ -290,8 +290,11 @@ func initServices() {
 	workshopService = app.NewWorkshopService(factoryRepo, workshopRepo, workbenchRepo, repoRepo, gatehouseRepo, tmuxService, workspaceAdapter, executor)
 	workbenchService = app.NewWorkbenchService(workbenchRepo, workshopRepo, agentProvider, executor)
 
+	// Create approval repository early (needed by plan service)
+	approvalRepo := sqlite.NewApprovalRepository(database)
+
 	// Create plan service
-	planService = app.NewPlanService(planRepo)
+	planService = app.NewPlanService(planRepo, approvalRepo)
 
 	// Create receipt service
 	receiptRepo := sqlite.NewReceiptRepository(database)
@@ -304,7 +307,6 @@ func initServices() {
 	watchdogRepo := sqlite.NewWatchdogRepository(database)
 	watchdogService = app.NewWatchdogService(watchdogRepo)
 
-	approvalRepo := sqlite.NewApprovalRepository(database)
 	approvalService = app.NewApprovalService(approvalRepo)
 
 	escalationRepo := sqlite.NewEscalationRepository(database)

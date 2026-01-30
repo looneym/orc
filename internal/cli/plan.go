@@ -104,7 +104,9 @@ var planListCmd = &cobra.Command{
 				pinnedMark = " [pinned]"
 			}
 			statusIcon := "📝"
-			if p.Status == "approved" {
+			if p.Status == "pending_review" {
+				statusIcon = "🔍"
+			} else if p.Status == "approved" {
 				statusIcon = "✅"
 			}
 			task := "-"
@@ -165,6 +167,24 @@ var planShowCmd = &cobra.Command{
 	},
 }
 
+var planSubmitCmd = &cobra.Command{
+	Use:   "submit [plan-id]",
+	Short: "Submit a plan for review",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		planID := args[0]
+
+		ctx := context.Background()
+		err := wire.PlanService().SubmitPlan(ctx, planID)
+		if err != nil {
+			return fmt.Errorf("failed to submit plan: %w", err)
+		}
+
+		fmt.Printf("✓ Plan %s submitted for review\n", planID)
+		return nil
+	},
+}
+
 var planApproveCmd = &cobra.Command{
 	Use:   "approve [plan-id]",
 	Short: "Approve a plan",
@@ -173,12 +193,12 @@ var planApproveCmd = &cobra.Command{
 		planID := args[0]
 
 		ctx := context.Background()
-		err := wire.PlanService().ApprovePlan(ctx, planID)
+		approval, err := wire.PlanService().ApprovePlan(ctx, planID)
 		if err != nil {
 			return fmt.Errorf("failed to approve plan: %w", err)
 		}
 
-		fmt.Printf("✓ Plan %s approved\n", planID)
+		fmt.Printf("✓ Plan %s approved (approval: %s)\n", planID, approval.ID)
 		return nil
 	},
 }
@@ -289,6 +309,7 @@ func init() {
 	planCmd.AddCommand(planCreateCmd)
 	planCmd.AddCommand(planListCmd)
 	planCmd.AddCommand(planShowCmd)
+	planCmd.AddCommand(planSubmitCmd)
 	planCmd.AddCommand(planApproveCmd)
 	planCmd.AddCommand(planUpdateCmd)
 	planCmd.AddCommand(planPinCmd)

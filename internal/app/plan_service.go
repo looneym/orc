@@ -4,19 +4,23 @@ import (
 	"context"
 	"fmt"
 
+	plancore "github.com/example/orc/internal/core/plan"
+	"github.com/example/orc/internal/models"
 	"github.com/example/orc/internal/ports/primary"
 	"github.com/example/orc/internal/ports/secondary"
 )
 
 // PlanServiceImpl implements the PlanService interface.
 type PlanServiceImpl struct {
-	planRepo secondary.PlanRepository
+	planRepo     secondary.PlanRepository
+	approvalRepo secondary.ApprovalRepository
 }
 
 // NewPlanService creates a new PlanService with injected dependencies.
-func NewPlanService(planRepo secondary.PlanRepository) *PlanServiceImpl {
+func NewPlanService(planRepo secondary.PlanRepository, approvalRepo secondary.ApprovalRepository) *PlanServiceImpl {
 	return &PlanServiceImpl{
-		planRepo: planRepo,
+		planRepo:     planRepo,
+		approvalRepo: approvalRepo,
 	}
 }
 
@@ -110,9 +114,70 @@ func (s *PlanServiceImpl) ListPlans(ctx context.Context, filters primary.PlanFil
 	return plans, nil
 }
 
-// ApprovePlan approves a plan (marks it as approved).
-func (s *PlanServiceImpl) ApprovePlan(ctx context.Context, planID string) error {
-	return s.planRepo.Approve(ctx, planID)
+// SubmitPlan submits a plan for review (draft → pending_review).
+func (s *PlanServiceImpl) SubmitPlan(ctx context.Context, planID string) error {
+	plan, err := s.planRepo.GetByID(ctx, planID)
+	if err != nil {
+		return err
+	}
+
+	guardResult := plancore.CanSubmitPlan(plancore.SubmitPlanContext{
+		PlanID:     planID,
+		Status:     plan.Status,
+		HasContent: plan.Content != "",
+	})
+	if err := guardResult.Error(); err != nil {
+		return err
+	}
+
+	return s.planRepo.UpdateStatus(ctx, planID, models.PlanStatusPendingReview)
+}
+
+// ApprovePlan approves a plan (pending_review → approved), creating an approval record.
+func (s *PlanServiceImpl) ApprovePlan(ctx context.Context, planID string) (*primary.Approval, error) {
+	plan, err := s.planRepo.GetByID(ctx, planID)
+	if err != nil {
+		return nil, err
+	}
+
+	guardResult := plancore.CanApprovePlan(plancore.ApprovePlanContext{
+		PlanID:   planID,
+		Status:   plan.Status,
+		IsPinned: plan.Pinned,
+	})
+	if err := guardResult.Error(); err != nil {
+		return nil, err
+	}
+
+	// Create approval record
+	approvalID, err := s.approvalRepo.GetNextID(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate approval ID: %w", err)
+	}
+
+	approvalRecord := &secondary.ApprovalRecord{
+		ID:        approvalID,
+		PlanID:    planID,
+		TaskID:    plan.TaskID,
+		Mechanism: primary.ApprovalMechanismManual,
+		Outcome:   primary.ApprovalOutcomeApproved,
+	}
+	if err := s.approvalRepo.Create(ctx, approvalRecord); err != nil {
+		return nil, fmt.Errorf("failed to create approval: %w", err)
+	}
+
+	// Update plan status
+	if err := s.planRepo.Approve(ctx, planID); err != nil {
+		return nil, fmt.Errorf("failed to approve plan: %w", err)
+	}
+
+	return &primary.Approval{
+		ID:        approvalID,
+		PlanID:    planID,
+		TaskID:    plan.TaskID,
+		Mechanism: primary.ApprovalMechanismManual,
+		Outcome:   primary.ApprovalOutcomeApproved,
+	}, nil
 }
 
 // UpdatePlan updates a plan's title, description, and/or content.

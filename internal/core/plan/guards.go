@@ -30,8 +30,15 @@ type CreatePlanContext struct {
 // ApprovePlanContext provides context for plan approval guards.
 type ApprovePlanContext struct {
 	PlanID   string
-	Status   string // "draft", "approved"
+	Status   string // "draft", "pending_review", "approved"
 	IsPinned bool
+}
+
+// SubmitPlanContext provides context for plan submission guards.
+type SubmitPlanContext struct {
+	PlanID     string
+	Status     string
+	HasContent bool
 }
 
 // DeletePlanContext provides context for plan deletion guards.
@@ -73,16 +80,36 @@ func CanCreatePlan(ctx CreatePlanContext) GuardResult {
 	return GuardResult{Allowed: true}
 }
 
-// CanApprovePlan evaluates whether a plan can be approved.
+// CanSubmitPlan evaluates whether a plan can be submitted for review.
 // Rules:
-// - Status must be "draft" (cannot re-approve)
-// - Plan must not be pinned
-func CanApprovePlan(ctx ApprovePlanContext) GuardResult {
-	// Check status is draft (must check first - approved plans can't be approved regardless of pinned)
+// - Status must be "draft"
+// - Plan must have content
+func CanSubmitPlan(ctx SubmitPlanContext) GuardResult {
 	if ctx.Status != "draft" {
 		return GuardResult{
 			Allowed: false,
-			Reason:  fmt.Sprintf("can only approve draft plans (current status: %s)", ctx.Status),
+			Reason:  fmt.Sprintf("can only submit draft plans (current status: %s)", ctx.Status),
+		}
+	}
+	if !ctx.HasContent {
+		return GuardResult{
+			Allowed: false,
+			Reason:  "cannot submit plan without content",
+		}
+	}
+	return GuardResult{Allowed: true}
+}
+
+// CanApprovePlan evaluates whether a plan can be approved.
+// Rules:
+// - Status must be "pending_review"
+// - Plan must not be pinned
+func CanApprovePlan(ctx ApprovePlanContext) GuardResult {
+	// Check status is pending_review (must check first - other statuses can't be approved regardless of pinned)
+	if ctx.Status != "pending_review" {
+		return GuardResult{
+			Allowed: false,
+			Reason:  fmt.Sprintf("can only approve plans pending review (current status: %s)", ctx.Status),
 		}
 	}
 
