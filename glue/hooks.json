@@ -5,7 +5,7 @@
       "hooks": [
         {
           "type": "command",
-          "command": "~/.claude/hooks/orc-hook-test.sh",
+          "command": "~/.claude/hooks/orc-debug-log.sh",
           "timeout": 5000
         }
       ]
