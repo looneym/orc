@@ -8,8 +8,10 @@ Glue between ORC and Claude Code - skills, hooks, and other integrations.
 glue/
 ├── skills/           # Claude Code skills
 │   ├── orc-ping/     # Health check skill
-│   └── orc-test/     # Test skill
-└── hooks/            # Claude Code hooks (future)
+│   └── orc-debug/    # Debug log viewer
+├── hooks/            # Claude Code hooks
+│   └── orc-debug-log.sh  # Logs all tool calls
+└── hooks.json        # Hook configuration
 ```
 
 ## Deployment

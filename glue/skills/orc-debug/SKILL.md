@@ -16,16 +16,17 @@ Show recent tool calls from the debug log.
 ## Action
 
 Parse the argument:
-- If "follow" or "f": run `tail -f ~/.claude/orc-debug.log` in background
+- If "follow" or "f": run `tail -f` as a **background task**
 - If a number: use as tail count
 - Otherwise: default to 30
 
-For follow mode, run in background so user can continue working:
+For follow mode, use the Bash tool with `run_in_background: true`:
 ```bash
 tail -f ~/.claude/orc-debug.log
 ```
+This streams new entries live. User can check output with TaskOutput or stop with TaskStop.
 
-For count mode:
+For count mode (default):
 ```bash
 tail -N ~/.claude/orc-debug.log
 ```
