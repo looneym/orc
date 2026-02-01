@@ -59,9 +59,14 @@ var noteCreateCmd = &cobra.Command{
 			"finding":  true,
 			"frq":      true,
 			"bug":      true,
+			"spec":     true,
+			"roadmap":  true,
+			"decision": true,
+			"question": true,
+			"vision":   true,
 		}
 		if noteType != "" && !validTypes[noteType] {
-			return fmt.Errorf("invalid note type: %s\nValid types: learning, concern, finding, frq, bug", noteType)
+			return fmt.Errorf("invalid note type: %s\nValid types: learning, concern, finding, frq, bug, spec, roadmap, decision, question, vision", noteType)
 		}
 
 		// Determine container
@@ -232,22 +237,43 @@ var noteShowCmd = &cobra.Command{
 
 var noteUpdateCmd = &cobra.Command{
 	Use:   "update [note-id]",
-	Short: "Update note title and/or content",
+	Short: "Update note title, content, and/or type",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
 		noteID := args[0]
 		title, _ := cmd.Flags().GetString("title")
 		content, _ := cmd.Flags().GetString("content")
+		noteType, _ := cmd.Flags().GetString("type")
 
-		if title == "" && content == "" {
-			return fmt.Errorf("must specify --title and/or --content")
+		if title == "" && content == "" && noteType == "" {
+			return fmt.Errorf("must specify --title, --content, and/or --type")
+		}
+
+		// Validate note type if specified
+		if noteType != "" {
+			validTypes := map[string]bool{
+				"learning": true,
+				"concern":  true,
+				"finding":  true,
+				"frq":      true,
+				"bug":      true,
+				"spec":     true,
+				"roadmap":  true,
+				"decision": true,
+				"question": true,
+				"vision":   true,
+			}
+			if !validTypes[noteType] {
+				return fmt.Errorf("invalid note type: %s\nValid types: learning, concern, finding, frq, bug, spec, roadmap, decision, question, vision", noteType)
+			}
 		}
 
 		err := wire.NoteService().UpdateNote(ctx, primary.UpdateNoteRequest{
 			NoteID:  noteID,
 			Title:   title,
 			Content: content,
+			Type:    noteType,
 		})
 		if err != nil {
 			return fmt.Errorf("failed to update note: %w", err)
@@ -406,7 +432,7 @@ func init() {
 	// note create flags
 	noteCreateCmd.Flags().StringP("commission", "c", "", "Commission ID (defaults to context)")
 	noteCreateCmd.Flags().String("content", "", "Note content")
-	noteCreateCmd.Flags().StringP("type", "t", "", "Note type (learning, concern, finding, frq, bug)")
+	noteCreateCmd.Flags().StringP("type", "t", "", "Note type (learning, concern, finding, frq, bug, spec, roadmap, decision, question, vision)")
 	noteCreateCmd.Flags().String("shipment", "", "Shipment ID to attach note to")
 	noteCreateCmd.Flags().String("conclave", "", "Conclave ID to attach note to")
 	noteCreateCmd.Flags().String("tome", "", "Tome ID to attach note to")
@@ -420,6 +446,7 @@ func init() {
 	// note update flags
 	noteUpdateCmd.Flags().String("title", "", "New title")
 	noteUpdateCmd.Flags().String("content", "", "New content")
+	noteUpdateCmd.Flags().String("type", "", "Note type (learning, concern, finding, frq, bug, spec, roadmap, decision, question, vision)")
 
 	// note move flags
 	noteMoveCmd.Flags().String("to-tome", "", "Move to tome")

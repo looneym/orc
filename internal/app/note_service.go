@@ -100,12 +100,13 @@ func (s *NoteServiceImpl) ListNotes(ctx context.Context, filters primary.NoteFil
 	return notes, nil
 }
 
-// UpdateNote updates a note's title and/or content.
+// UpdateNote updates a note's title, content, and/or type.
 func (s *NoteServiceImpl) UpdateNote(ctx context.Context, req primary.UpdateNoteRequest) error {
 	record := &secondary.NoteRecord{
 		ID:      req.NoteID,
 		Title:   req.Title,
 		Content: req.Content,
+		Type:    req.Type,
 	}
 	return s.noteRepo.Update(ctx, record)
 }

@@ -59,6 +59,7 @@ type UpdateNoteRequest struct {
 	NoteID  string
 	Title   string
 	Content string
+	Type    string
 }
 
 // MoveNoteRequest contains parameters for moving a note to a different container.
@@ -102,6 +103,11 @@ const (
 	NoteTypeFinding  = "finding"
 	NoteTypeFRQ      = "frq"
 	NoteTypeBug      = "bug"
+	NoteTypeSpec     = "spec"
+	NoteTypeRoadmap  = "roadmap"
+	NoteTypeDecision = "decision"
+	NoteTypeQuestion = "question"
+	NoteTypeVision   = "vision"
 )
 
 // Note status constants

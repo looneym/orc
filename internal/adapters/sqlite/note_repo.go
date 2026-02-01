@@ -187,6 +187,11 @@ func (r *NoteRepository) Update(ctx context.Context, note *secondary.NoteRecord)
 		args = append(args, sql.NullString{String: note.Content, Valid: true})
 	}
 
+	if note.Type != "" {
+		query += ", type = ?"
+		args = append(args, note.Type)
+	}
+
 	// Container move: when moving to a new container, clear all other container IDs
 	// to maintain mutual exclusivity (a note can only belong to one container)
 	if note.ShipmentID != "" {

@@ -30,6 +30,11 @@ const (
 	NoteTypeFinding  = "finding"
 	NoteTypeFRQ      = "frq"
 	NoteTypeBug      = "bug"
+	NoteTypeSpec     = "spec"
+	NoteTypeRoadmap  = "roadmap"
+	NoteTypeDecision = "decision"
+	NoteTypeQuestion = "question"
+	NoteTypeVision   = "vision"
 )
 
 // Note statuses
