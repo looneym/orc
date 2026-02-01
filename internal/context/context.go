@@ -1,10 +1,12 @@
 package context
 
 import (
+	gocontext "context"
 	"os"
 	"path/filepath"
 
 	"github.com/example/orc/internal/config"
+	"github.com/example/orc/internal/wire"
 )
 
 // WorkbenchContext represents workbench context information (IMP territory)
@@ -50,8 +52,9 @@ func GetContextWorkbenchID() string {
 }
 
 // GetContextCommissionID returns the commission ID from workbench context.
-// For IMP contexts, looks up commission via workbench → workshop → factory → commission chain.
-// Returns empty string if no context found - caller should handle this.
+// For IMP contexts, looks up commission via workbench → workshop → goblin's focused conclave.
+// The Goblin's focus determines the active commission for all IMPs in the workshop.
+// Returns empty string if no context found (e.g., goblin has nothing focused).
 func GetContextCommissionID() string {
 	dir, err := os.Getwd()
 	if err != nil {
@@ -71,12 +74,30 @@ func GetContextCommissionID() string {
 	return ""
 }
 
-// getCommissionFromWorkbench looks up commission ID via workbench → workshop → factory chain.
-// This is a placeholder that returns empty - requires DB access which is wired elsewhere.
-func getCommissionFromWorkbench(_ string) string {
-	// Note: Full implementation requires DB lookup through wire.
-	// For now, commission context comes from focused containers.
-	return ""
+// getCommissionFromWorkbench looks up commission ID via workbench → workshop → goblin focus chain.
+// Returns the commission that the Goblin has focused (via their focused conclave).
+func getCommissionFromWorkbench(workbenchID string) string {
+	ctx := gocontext.Background()
+
+	// 1. Get workbench to find workshop
+	bench, err := wire.WorkbenchService().GetWorkbench(ctx, workbenchID)
+	if err != nil || bench.WorkshopID == "" {
+		return ""
+	}
+
+	// 2. Get goblin's focused conclave
+	focusedConclaveID, err := wire.WorkshopService().GetFocusedConclaveID(ctx, bench.WorkshopID)
+	if err != nil || focusedConclaveID == "" {
+		return ""
+	}
+
+	// 3. Get conclave to find commission
+	conclave, err := wire.ConclaveService().GetConclave(ctx, focusedConclaveID)
+	if err != nil {
+		return ""
+	}
+
+	return conclave.CommissionID
 }
 
 // WriteGatehouseContext creates a .orc/config.json file for a gatehouse (Goblin territory)
