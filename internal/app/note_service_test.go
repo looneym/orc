@@ -156,6 +156,16 @@ func (m *mockNoteRepository) UpdateStatus(ctx context.Context, id string, status
 	return errors.New("note not found")
 }
 
+func (m *mockNoteRepository) CloseWithMerge(ctx context.Context, sourceID, targetID string) error {
+	if note, ok := m.notes[sourceID]; ok {
+		note.Status = "closed"
+		note.PromotedFromID = targetID
+		note.PromotedFromType = "merged"
+		return nil
+	}
+	return errors.New("note not found")
+}
+
 // ============================================================================
 // Test Helper
 // ============================================================================

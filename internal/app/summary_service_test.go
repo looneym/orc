@@ -441,6 +441,10 @@ func (m *mockNoteServiceForSummary) MoveNote(_ context.Context, _ primary.MoveNo
 	return nil
 }
 
+func (m *mockNoteServiceForSummary) MergeNotes(_ context.Context, _ primary.MergeNoteRequest) error {
+	return nil
+}
+
 // mockWorkbenchServiceForSummary implements primary.WorkbenchService for testing.
 type mockWorkbenchServiceForSummary struct {
 	workbenches map[string]*primary.Workbench

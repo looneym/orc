@@ -64,9 +64,11 @@ var noteCreateCmd = &cobra.Command{
 			"decision": true,
 			"question": true,
 			"vision":   true,
+			"idea":     true,
+			"exorcism": true,
 		}
 		if noteType != "" && !validTypes[noteType] {
-			return fmt.Errorf("invalid note type: %s\nValid types: learning, concern, finding, frq, bug, spec, roadmap, decision, question, vision", noteType)
+			return fmt.Errorf("invalid note type: %s\nValid types: learning, concern, finding, frq, bug, spec, roadmap, decision, question, vision, idea, exorcism", noteType)
 		}
 
 		// Determine container
@@ -263,9 +265,11 @@ var noteUpdateCmd = &cobra.Command{
 				"decision": true,
 				"question": true,
 				"vision":   true,
+				"idea":     true,
+				"exorcism": true,
 			}
 			if !validTypes[noteType] {
-				return fmt.Errorf("invalid note type: %s\nValid types: learning, concern, finding, frq, bug, spec, roadmap, decision, question, vision", noteType)
+				return fmt.Errorf("invalid note type: %s\nValid types: learning, concern, finding, frq, bug, spec, roadmap, decision, question, vision, idea, exorcism", noteType)
 			}
 		}
 
@@ -428,11 +432,35 @@ var noteMoveCmd = &cobra.Command{
 	},
 }
 
+var noteMergeCmd = &cobra.Command{
+	Use:   "merge [source-id] [target-id]",
+	Short: "Merge source note into target note",
+	Long:  "Merges content from source note into target note, then closes source with a merge reference",
+	Args:  cobra.ExactArgs(2),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		ctx := context.Background()
+		sourceID := args[0]
+		targetID := args[1]
+
+		err := wire.NoteService().MergeNotes(ctx, primary.MergeNoteRequest{
+			SourceNoteID: sourceID,
+			TargetNoteID: targetID,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to merge notes: %w", err)
+		}
+
+		fmt.Printf("✓ Merged %s into %s\n", sourceID, targetID)
+		fmt.Printf("  Source %s is now closed\n", sourceID)
+		return nil
+	},
+}
+
 func init() {
 	// note create flags
 	noteCreateCmd.Flags().StringP("commission", "c", "", "Commission ID (defaults to context)")
 	noteCreateCmd.Flags().String("content", "", "Note content")
-	noteCreateCmd.Flags().StringP("type", "t", "", "Note type (learning, concern, finding, frq, bug, spec, roadmap, decision, question, vision)")
+	noteCreateCmd.Flags().StringP("type", "t", "", "Note type (learning, concern, finding, frq, bug, spec, roadmap, decision, question, vision, idea, exorcism)")
 	noteCreateCmd.Flags().String("shipment", "", "Shipment ID to attach note to")
 	noteCreateCmd.Flags().String("conclave", "", "Conclave ID to attach note to")
 	noteCreateCmd.Flags().String("tome", "", "Tome ID to attach note to")
@@ -446,7 +474,7 @@ func init() {
 	// note update flags
 	noteUpdateCmd.Flags().String("title", "", "New title")
 	noteUpdateCmd.Flags().String("content", "", "New content")
-	noteUpdateCmd.Flags().String("type", "", "Note type (learning, concern, finding, frq, bug, spec, roadmap, decision, question, vision)")
+	noteUpdateCmd.Flags().String("type", "", "Note type (learning, concern, finding, frq, bug, spec, roadmap, decision, question, vision, idea, exorcism)")
 
 	// note move flags
 	noteMoveCmd.Flags().String("to-tome", "", "Move to tome")
@@ -464,6 +492,7 @@ func init() {
 	noteCmd.AddCommand(noteCloseCmd)
 	noteCmd.AddCommand(noteReopenCmd)
 	noteCmd.AddCommand(noteMoveCmd)
+	noteCmd.AddCommand(noteMergeCmd)
 }
 
 // NoteCmd returns the note command

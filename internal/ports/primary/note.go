@@ -36,6 +36,9 @@ type NoteService interface {
 
 	// MoveNote moves a note to a different container.
 	MoveNote(ctx context.Context, req MoveNoteRequest) error
+
+	// MergeNotes merges source note into target and closes source.
+	MergeNotes(ctx context.Context, req MergeNoteRequest) error
 }
 
 // CreateNoteRequest contains parameters for creating a note.
@@ -69,6 +72,12 @@ type MoveNoteRequest struct {
 	ToTomeID     string
 	ToShipmentID string
 	ToConclaveID string
+}
+
+// MergeNoteRequest contains parameters for merging one note into another.
+type MergeNoteRequest struct {
+	SourceNoteID string
+	TargetNoteID string
 }
 
 // Note represents a note entity at the port boundary.
@@ -108,6 +117,8 @@ const (
 	NoteTypeDecision = "decision"
 	NoteTypeQuestion = "question"
 	NoteTypeVision   = "vision"
+	NoteTypeIdea     = "idea"
+	NoteTypeExorcism = "exorcism"
 )
 
 // Note status constants

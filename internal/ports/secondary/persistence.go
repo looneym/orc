@@ -321,6 +321,9 @@ type NoteRepository interface {
 
 	// UpdateStatus updates the status of a note (open/closed).
 	UpdateStatus(ctx context.Context, id string, status string) error
+
+	// CloseWithMerge closes a note and records it was merged into another note.
+	CloseWithMerge(ctx context.Context, sourceID, targetID string) error
 }
 
 // NoteRecord represents a note as stored in persistence.

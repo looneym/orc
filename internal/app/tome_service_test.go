@@ -234,6 +234,10 @@ func (m *mockNoteServiceForTome) MoveNote(ctx context.Context, req primary.MoveN
 	return nil
 }
 
+func (m *mockNoteServiceForTome) MergeNotes(ctx context.Context, req primary.MergeNoteRequest) error {
+	return nil
+}
+
 // mockLibraryRepository implements secondary.LibraryRepository for testing.
 type mockLibraryRepository struct {
 	libraries map[string]*secondary.LibraryRecord

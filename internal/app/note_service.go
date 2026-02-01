@@ -258,5 +258,49 @@ func (s *NoteServiceImpl) recordToNote(r *secondary.NoteRecord) *primary.Note {
 	}
 }
 
+// MergeNotes merges source note into target and closes source.
+func (s *NoteServiceImpl) MergeNotes(ctx context.Context, req primary.MergeNoteRequest) error {
+	// Validate source != target
+	if req.SourceNoteID == req.TargetNoteID {
+		return fmt.Errorf("cannot merge a note into itself")
+	}
+
+	// Get source note (validate exists, not closed)
+	source, err := s.noteRepo.GetByID(ctx, req.SourceNoteID)
+	if err != nil {
+		return fmt.Errorf("source note not found: %w", err)
+	}
+	if source.Status == "closed" {
+		return fmt.Errorf("source note %s is already closed", req.SourceNoteID)
+	}
+
+	// Get target note (validate exists)
+	target, err := s.noteRepo.GetByID(ctx, req.TargetNoteID)
+	if err != nil {
+		return fmt.Errorf("target note not found: %w", err)
+	}
+
+	// Merge content: prepend source content to target with separator
+	mergedContent := fmt.Sprintf("--- Merged from %s ---\n%s\n\n--- Original ---\n%s",
+		req.SourceNoteID, source.Content, target.Content)
+
+	// Update target with merged content
+	err = s.noteRepo.Update(ctx, &secondary.NoteRecord{
+		ID:      req.TargetNoteID,
+		Content: mergedContent,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to update target note: %w", err)
+	}
+
+	// Close source with merge reference
+	err = s.noteRepo.CloseWithMerge(ctx, req.SourceNoteID, req.TargetNoteID)
+	if err != nil {
+		return fmt.Errorf("failed to close source note: %w", err)
+	}
+
+	return nil
+}
+
 // Ensure NoteServiceImpl implements the interface
 var _ primary.NoteService = (*NoteServiceImpl)(nil)

@@ -412,5 +412,28 @@ func (r *NoteRepository) UpdateStatus(ctx context.Context, id string, status str
 	return nil
 }
 
+// CloseWithMerge closes a note and records it was merged into another note.
+func (r *NoteRepository) CloseWithMerge(ctx context.Context, sourceID, targetID string) error {
+	query := `UPDATE notes SET
+		status = 'closed',
+		closed_at = CURRENT_TIMESTAMP,
+		updated_at = CURRENT_TIMESTAMP,
+		promoted_from_id = ?,
+		promoted_from_type = 'merged'
+		WHERE id = ?`
+
+	result, err := r.db.ExecContext(ctx, query, targetID, sourceID)
+	if err != nil {
+		return fmt.Errorf("failed to close note with merge: %w", err)
+	}
+
+	rowsAffected, _ := result.RowsAffected()
+	if rowsAffected == 0 {
+		return fmt.Errorf("note %s not found", sourceID)
+	}
+
+	return nil
+}
+
 // Ensure NoteRepository implements the interface
 var _ secondary.NoteRepository = (*NoteRepository)(nil)
