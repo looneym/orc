@@ -30,21 +30,111 @@ Agent: Surveyed CON-018. State: Chaotic.
        [c]lean / [s]hip / [b]oth sequentially
 ```
 
-## Workflow
+## Survey Flow
 
-### 1. Discovery
+When `/exorcism` is invoked, follow these steps:
 
-- Analyze current focus (conclave, tome, or shipment)
-- Produce high-level summary
-- Identify themes (areas to dig into)
-- Present to human with objective recommendation
+### Step 1: Identify Target
 
-### 2. Theme Selection
+If argument provided (e.g., `/exorcism CON-018`):
+- Use the provided container ID
 
-- Human picks a theme
-- Agent enters interview mode
+If no argument:
+```bash
+orc status
+```
+- Use the focused container from output
+- If no focus: "No target specified. Which container should I survey? (CON-xxx, SHIP-xxx, or TOME-xxx)"
 
-### 3. Interview (per theme)
+### Step 2: Collect Data
+
+For conclave:
+```bash
+orc conclave show CON-xxx
+orc note list --conclave CON-xxx
+```
+
+For shipment:
+```bash
+orc shipment show SHIP-xxx
+orc note list --shipment SHIP-xxx
+```
+
+For tome:
+```bash
+orc tome show TOME-xxx
+orc note list --tome TOME-xxx
+```
+
+### Step 3: Analyze
+
+From the collected data, compute:
+- Total note count
+- Notes grouped by type (idea, question, concern, etc.)
+- Notes grouped by status (open vs closed)
+- Open questions (type=question, status=open)
+- Unaddressed concerns (type=concern, status=open)
+- Potential duplicates (notes with very similar titles)
+- Stale notes (status=open but old created_at, no recent updated_at)
+
+### Step 4: Assess State
+
+**Chaotic** if any of:
+- 3+ open questions
+- 2+ unaddressed concerns
+- Multiple potential duplicates
+- High ratio of ideas to decisions/specs
+
+**Orderly** if:
+- Questions mostly answered
+- Concerns addressed
+- Ideas synthesized into decisions/specs
+
+### Step 5: Present Survey
+
+Output format:
+```
+## Survey: [CONTAINER-ID] ([Container Title])
+
+### Summary
+- X tomes (if conclave), Y notes total
+- Z open questions, W unaddressed concerns
+
+### Notes by Type
+| Type     | Open | Closed |
+|----------|------|--------|
+| idea     | X    | Y      |
+| question | X    | Y      |
+| concern  | X    | Y      |
+| spec     | X    | Y      |
+| decision | X    | Y      |
+
+### State: [Chaotic/Orderly]
+Signals: [list specific signals that led to assessment]
+
+### Recommendation
+**[Clean/Ship]** - [rationale based on state]
+
+Select objective: [c]lean / [s]hip / [b]oth sequentially
+```
+
+### Step 6: Await Selection
+
+Wait for user to choose c, s, or b.
+- If clean: proceed to theme selection for clean patterns
+- If ship: proceed to theme selection for ship patterns
+- If both: clean first, then ship
+
+## Theme Selection & Interview
+
+After objective is selected:
+
+### Theme Selection
+
+- Identify 3-5 themes from the survey data (e.g., "Scattered ideas about X", "Unanswered questions about Y")
+- Present themes to human for selection
+
+### Interview (per theme)
 
 - Max 5 questions
 - Progress indicator: "2/3 questions remaining"
