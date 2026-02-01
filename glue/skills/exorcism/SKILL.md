@@ -217,7 +217,83 @@ Execute? [y]es / [n]o / [r]eview details
 | DEFER-TO-LIBRARY | Valid but not now | Park | Clean |
 | SPLIT-SCOPE | Kitchen-sink container | Split into focused pieces | Clean |
 
-## Commands
+## Clean Objective Execution
+
+When clean objective is selected, execute these patterns via CLI:
+
+### CONSOLIDATE-DUPLICATES
+
+Merge redundant notes:
+```bash
+orc note merge <source-id> <target-id>
+```
+
+After merge:
+- Source content is prepended to target
+- Source is automatically closed with merge reference
+
+### CLOSE-SUPERSEDED
+
+Close notes that are now covered elsewhere:
+```bash
+orc note close <note-id> --reason superseded --by <better-note-id>
+```
+
+### DEFER-TO-LIBRARY
+
+Park valid-but-not-now content:
+```bash
+# Create library note if needed
+orc note create "Library: [topic]" --type learning --tome TOME-xxx
+
+# Close deferred note with reference
+orc note close <note-id> --reason deferred --by <library-note-id>
+```
+
+### EXTRACT-LAYER
+
+Split notes mixing C4 levels:
+1. Create new note for extracted layer
+2. Update original to remove extracted content
+3. Close original if fully extracted, or add cross-reference
+
+```bash
+# Create note for extracted layer
+orc note create "[L1 Context]" --type vision --shipment SHIP-xxx
+
+# Update original note
+orc note update <original-id> --content "[remaining L3/L4 content]"
+```
+
+### BRIDGE-CONTEXT
+
+Add references to orphan details:
+```bash
+# Update orphan note to reference context
+orc note update <orphan-id> --content "Related to: NOTE-xxx\n\n[original content]"
+```
+
+### Execution Flow
+
+For each proposed action from interview:
+1. Show the action and affected notes
+2. Execute via CLI command
+3. Confirm success or report error
+4. Move to next action
+
+```
+Executing action 1/4: MERGE NOTE-101 into NOTE-105
+[running: orc note merge NOTE-101 NOTE-105]
+✓ Merged NOTE-101 into NOTE-105
+
+Executing action 2/4: CLOSE NOTE-102 --reason superseded --by NOTE-105
+[running: orc note close NOTE-102 --reason superseded --by NOTE-105]
+✓ Closed NOTE-102
+
+All actions complete. Container tidied.
+```
+
+## Commands Reference
 
 Pattern execution uses CLI operations:
 
