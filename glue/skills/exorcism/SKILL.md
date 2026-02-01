@@ -293,6 +293,85 @@ Executing action 2/4: CLOSE NOTE-102 --reason superseded --by NOTE-105
 All actions complete. Container tidied.
 ```
 
+## Ship Objective Execution
+
+When ship objective is selected, converge exploration into work:
+
+### Step 1: Create Draft Shipment
+
+Create a draft shipment as synthesis target:
+```bash
+orc shipment create "Shipment Title" --commission COMM-xxx --description "Synthesized from [container]"
+```
+
+### Step 2: SYNTHESIZE into Spec
+
+Combine multiple findings/ideas into a unified spec:
+```bash
+# Create spec note attached to shipment
+orc note create "Spec: [topic]" --type spec --shipment SHIP-xxx --content "[synthesized content]"
+
+# Close source notes
+orc note close <source-id> --reason synthesized --by <spec-note-id>
+```
+
+The agent:
+1. Reads source notes
+2. Synthesizes content (combines, deduplicates, structures)
+3. Creates spec note with synthesized content
+4. Closes source notes referencing the spec
+
+### Step 3: PROMOTE-TO-DECISION
+
+Extract implicit decisions into explicit decision notes:
+```bash
+# Create decision note
+orc note create "Decision: [what was decided]" --type decision --shipment SHIP-xxx --content "[rationale and outcome]"
+
+# Update source note to reference decision
+orc note update <source-id> --content "[content] (See DECISION in NOTE-xxx)"
+```
+
+### Step 4: Guide Toward Roadmap
+
+After spec exists, suggest roadmap creation:
+```
+Spec NOTE-xxx created for SHIP-xxx.
+
+Next steps:
+- Review spec for completeness
+- Create roadmap: `orc note create "Roadmap: [topic]" --type roadmap --shipment SHIP-xxx`
+- Add tasks: `orc task create "Task title" --shipment SHIP-xxx`
+
+Would you like to:
+[r] Create roadmap now
+[t] Add tasks directly
+[d] Done for now
+```
+
+### Ship Execution Flow
+
+```
+Creating draft shipment...
+[running: orc shipment create "Skill Implementation" --commission COMM-001]
+✓ Created SHIP-xxx
+
+Synthesizing 5 notes into spec...
+[reading: NOTE-101, NOTE-102, NOTE-103, NOTE-104, NOTE-105]
+[creating spec with synthesized content]
+✓ Created spec NOTE-xxx
+
+Closing source notes...
+✓ Closed NOTE-101 (synthesized)
+✓ Closed NOTE-102 (synthesized)
+...
+
+Ship objective complete:
+- Draft shipment: SHIP-xxx
+- Spec: NOTE-xxx
+- 5 notes synthesized
+```
+
 ## Commands Reference
 
 Pattern execution uses CLI operations:
