@@ -39,7 +39,7 @@ var (
 	receiptService                 primary.ReceiptService
 	summaryService                 primary.SummaryService
 	gatehouseService               primary.GatehouseService
-	watchdogService                primary.WatchdogService
+	kennelService                  primary.KennelService
 	approvalService                primary.ApprovalService
 	escalationService              primary.EscalationService
 	manifestService                primary.ManifestService
@@ -164,10 +164,10 @@ func GatehouseService() primary.GatehouseService {
 	return gatehouseService
 }
 
-// WatchdogService returns the singleton WatchdogService instance.
-func WatchdogService() primary.WatchdogService {
+// KennelService returns the singleton KennelService instance.
+func KennelService() primary.KennelService {
 	once.Do(initServices)
-	return watchdogService
+	return kennelService
 }
 
 // ApprovalService returns the singleton ApprovalService instance.
@@ -309,12 +309,13 @@ func initServices() {
 	receiptRepo := sqlite.NewReceiptRepository(database)
 	receiptService = app.NewReceiptService(receiptRepo)
 
-	// Create new entity services (gatehouses, watchdogs, approvals, escalations, manifests)
+	// Create new entity services (gatehouses, kennels, approvals, escalations, manifests)
 	// Pass workshop repo to gatehouse service for EnsureAllWorkshopsHaveGatehouses
 	gatehouseService = app.NewGatehouseService(gatehouseRepo, workshopRepo)
 
-	watchdogRepo := sqlite.NewWatchdogRepository(database)
-	watchdogService = app.NewWatchdogService(watchdogRepo)
+	// Pass workbench repo to kennel service for EnsureAllWorkbenchesHaveKennels
+	kennelRepo := sqlite.NewKennelRepository(database)
+	kennelService = app.NewKennelService(kennelRepo, workbenchRepo)
 
 	approvalService = app.NewApprovalService(approvalRepo)
 

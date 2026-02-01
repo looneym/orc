@@ -78,6 +78,11 @@ func (a *Adapter) GetPaneCommand(ctx context.Context, sessionName, windowName st
 	return tmuxpkg.GetPaneCommand(sessionName, windowName, paneNum)
 }
 
+// CapturePaneContent captures visible content from a pane.
+func (a *Adapter) CapturePaneContent(ctx context.Context, target string, lines int) (string, error) {
+	return tmuxpkg.CapturePaneContent(target, lines)
+}
+
 // NudgeSession sends a message to a running Claude session.
 func (a *Adapter) NudgeSession(ctx context.Context, target, message string) error {
 	return tmuxpkg.NudgeSession(target, message)

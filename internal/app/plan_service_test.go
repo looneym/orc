@@ -443,6 +443,9 @@ func (m *mockTMuxAdapterForPlan) GetPaneCount(ctx context.Context, sessionName, 
 func (m *mockTMuxAdapterForPlan) GetPaneCommand(ctx context.Context, sessionName, windowName string, paneNum int) string {
 	return ""
 }
+func (m *mockTMuxAdapterForPlan) CapturePaneContent(ctx context.Context, target string, lines int) (string, error) {
+	return "", nil
+}
 func (m *mockTMuxAdapterForPlan) SplitVertical(ctx context.Context, target, workingDir string) error {
 	return nil
 }

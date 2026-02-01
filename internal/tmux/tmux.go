@@ -81,6 +81,22 @@ func GetPaneCommand(sessionName, windowName string, paneNum int) string {
 	return strings.TrimSpace(string(output))
 }
 
+// CapturePaneContent captures visible content from a pane.
+// target is in format "session:window.pane" (e.g., "workshop:bench.2")
+// lines specifies how many lines to capture (0 for all visible)
+func CapturePaneContent(target string, lines int) (string, error) {
+	args := []string{"capture-pane", "-t", target, "-p"}
+	if lines > 0 {
+		args = append(args, "-S", fmt.Sprintf("-%d", lines))
+	}
+	cmd := exec.Command("tmux", args...)
+	output, err := cmd.Output()
+	if err != nil {
+		return "", fmt.Errorf("failed to capture pane content: %w", err)
+	}
+	return string(output), nil
+}
+
 // CreateOrcWindow creates the ORC orchestrator window with layout:
 // Layout:
 //
