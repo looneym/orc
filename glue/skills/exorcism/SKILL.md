@@ -448,24 +448,94 @@ orc note close <id> --reason <reason> [--by <note-id>]
 
 **Reason vocabulary:** superseded, synthesized, resolved, deferred, duplicate, stale
 
-## Exorcism Note
+## Exorcism Note Generation
 
-Each maintenance session can produce an `exorcism` note as a record:
+At the end of an exorcism session, generate a session record.
+
+### When to Generate
+
+- After completing clean objective
+- After completing ship objective
+- After both (one note covering full session)
+
+### Generation Process
+
+1. **Capture before state** (at survey start):
+   - Container ID and title
+   - Note counts by type
+   - State assessment (chaotic/orderly)
+
+2. **Capture after state** (at session end):
+   - Updated note counts
+   - New state assessment
+   - Changes made
+
+3. **Record decisions**:
+   - Each interview answer
+   - Pattern applied and why
+
+4. **Create note**:
+```bash
+orc note create "Exorcism: [Container Title]" --type exorcism --shipment SHIP-xxx --content "[generated content]"
+```
+
+### Note Content Template
 
 ```markdown
-# Exorcism: CON-018 Consolidation
+# Exorcism: [Container-ID] ([Container Title])
+
+**Date:** [timestamp]
+**Objective:** [clean/ship/both]
 
 ## Before
-- 4 tomes, 17 notes scattered
-- Multiple overlapping specs
+- [X] tomes, [Y] notes
+- [N] open questions, [M] unaddressed concerns
+- State: [Chaotic/Orderly]
 
 ## After
-- All tomes closed
-- Unified spec (NOTE-311)
+- [X'] tomes, [Y'] notes ([+/-] change)
+- [N'] open questions, [M'] unaddressed concerns
+- State: [Chaotic/Orderly]
 
-## Key decisions
-- Single command: /exorcism
-- Two objectives: clean vs ship
+## Key Decisions
+
+1. **[Theme]**: [Decision] → [Pattern applied]
+   - Affected: NOTE-xxx, NOTE-yyy
+
+2. **[Theme]**: [Decision] → [Pattern applied]
+   - Affected: NOTE-zzz
+
+## Changes Summary
+
+- Merged: [count] notes
+- Closed: [count] notes
+  - superseded: [count]
+  - synthesized: [count]
+  - deferred: [count]
+- Created: [count] notes
+  - [list new note IDs and types]
+
+## Artifacts Created
+
+- Shipment: SHIP-xxx (if ship objective)
+- Spec: NOTE-xxx (if synthesized)
+- Decisions: NOTE-yyy, NOTE-zzz
+```
+
+### Offer Generation
+
+At session end:
+```
+Session complete!
+
+Generate exorcism note as session record?
+[y]es / [n]o
+> y
+
+✓ Created NOTE-xxx (exorcism): "Exorcism: CON-018 Consolidation"
+
+This note can be referenced in future close reasons:
+  orc note close NOTE-yyy --reason superseded --by NOTE-xxx
 ```
 
 ## Reference
