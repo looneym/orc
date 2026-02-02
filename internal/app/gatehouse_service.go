@@ -141,9 +141,24 @@ func (s *GatehouseServiceImpl) recordToGatehouse(r *secondary.GatehouseRecord) *
 		ID:         r.ID,
 		WorkshopID: r.WorkshopID,
 		Status:     r.Status,
+		FocusedID:  r.FocusedID,
 		CreatedAt:  r.CreatedAt,
 		UpdatedAt:  r.UpdatedAt,
 	}
+}
+
+// UpdateFocusedID sets or clears the focused container ID for a gatehouse.
+func (s *GatehouseServiceImpl) UpdateFocusedID(ctx context.Context, gatehouseID, focusedID string) error {
+	return s.gatehouseRepo.UpdateFocusedID(ctx, gatehouseID, focusedID)
+}
+
+// GetFocusedID returns the currently focused container ID for a gatehouse.
+func (s *GatehouseServiceImpl) GetFocusedID(ctx context.Context, gatehouseID string) (string, error) {
+	record, err := s.gatehouseRepo.GetByID(ctx, gatehouseID)
+	if err != nil {
+		return "", err
+	}
+	return record.FocusedID, nil
 }
 
 // Ensure GatehouseServiceImpl implements the interface

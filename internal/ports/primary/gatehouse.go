@@ -21,6 +21,13 @@ type GatehouseService interface {
 	// EnsureAllWorkshopsHaveGatehouses creates gatehouses for any workshops missing them.
 	// Used for data migration when introducing the gatehouse entity.
 	EnsureAllWorkshopsHaveGatehouses(ctx context.Context) ([]string, error)
+
+	// UpdateFocusedID sets or clears the focused container ID for a gatehouse.
+	// Pass empty string to clear focus.
+	UpdateFocusedID(ctx context.Context, gatehouseID, focusedID string) error
+
+	// GetFocusedID returns the currently focused container ID for a gatehouse.
+	GetFocusedID(ctx context.Context, gatehouseID string) (string, error)
 }
 
 // Gatehouse represents a gatehouse entity at the port boundary.
@@ -28,6 +35,7 @@ type Gatehouse struct {
 	ID         string
 	WorkshopID string
 	Status     string
+	FocusedID  string // Goblin focus (COMM-xxx, SHIP-xxx, or TOME-xxx)
 	CreatedAt  string
 	UpdatedAt  string
 }

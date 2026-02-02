@@ -314,6 +314,10 @@ func (m *mockWorkbenchRepoForPlan) UpdateFocusedID(ctx context.Context, id, focu
 	return nil
 }
 
+func (m *mockWorkbenchRepoForPlan) GetByFocusedID(ctx context.Context, focusedID string) ([]*secondary.WorkbenchRecord, error) {
+	return nil, nil
+}
+
 func (m *mockWorkbenchRepoForPlan) WorkshopExists(ctx context.Context, workshopID string) (bool, error) {
 	return true, nil
 }
@@ -371,6 +375,16 @@ func (m *mockGatehouseRepoForPlan) WorkshopExists(ctx context.Context, workshopI
 func (m *mockGatehouseRepoForPlan) WorkshopHasGatehouse(ctx context.Context, workshopID string) (bool, error) {
 	_, ok := m.gatehousesByWorkshop[workshopID]
 	return ok, nil
+}
+
+func (m *mockGatehouseRepoForPlan) UpdateFocusedID(ctx context.Context, id, focusedID string) error {
+	for _, g := range m.gatehousesByWorkshop {
+		if g.ID == id {
+			g.FocusedID = focusedID
+			return nil
+		}
+	}
+	return fmt.Errorf("gatehouse %s not found", id)
 }
 
 // mockMessageServiceForPlan is a minimal mock for testing PlanService.

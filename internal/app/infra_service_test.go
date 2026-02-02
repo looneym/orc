@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/example/orc/internal/core/effects"
@@ -102,6 +103,10 @@ func (m *mockInfraWorkshopRepo) SetActiveCommissionID(ctx context.Context, works
 	return nil
 }
 
+func (m *mockInfraWorkshopRepo) GetActiveCommissions(ctx context.Context, workshopID string) ([]string, error) {
+	return nil, nil
+}
+
 func (m *mockInfraWorkshopRepo) CountByFactory(ctx context.Context, factoryID string) (int, error) {
 	return 0, nil
 }
@@ -170,6 +175,10 @@ func (m *mockInfraWorkbenchRepo) UpdatePath(ctx context.Context, id, newPath str
 
 func (m *mockInfraWorkbenchRepo) UpdateFocusedID(ctx context.Context, id, focusedID string) error {
 	return nil
+}
+
+func (m *mockInfraWorkbenchRepo) GetByFocusedID(ctx context.Context, focusedID string) ([]*secondary.WorkbenchRecord, error) {
+	return nil, nil
 }
 
 // mockInfraRepoRepo implements secondary.RepoRepository for infra tests.
@@ -255,6 +264,16 @@ func (m *mockInfraGatehouseRepo) WorkshopExists(ctx context.Context, workshopID 
 func (m *mockInfraGatehouseRepo) WorkshopHasGatehouse(ctx context.Context, workshopID string) (bool, error) {
 	_, ok := m.gatehouses[workshopID]
 	return ok, nil
+}
+
+func (m *mockInfraGatehouseRepo) UpdateFocusedID(ctx context.Context, id, focusedID string) error {
+	for _, g := range m.gatehouses {
+		if g.ID == id {
+			g.FocusedID = focusedID
+			return nil
+		}
+	}
+	return fmt.Errorf("gatehouse %s not found", id)
 }
 
 func (m *mockInfraGatehouseRepo) Delete(ctx context.Context, id string) error {

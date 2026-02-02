@@ -314,5 +314,117 @@ func (r *WorkshopRepository) SetActiveCommissionID(ctx context.Context, workshop
 	return nil
 }
 
+// GetActiveCommissions returns commission IDs derived from focus:
+// - Gatehouse focused_id (resolved to commission)
+// - All workbench focused_ids in workshop (resolved to commission)
+// Returns deduplicated commission IDs.
+func (r *WorkshopRepository) GetActiveCommissions(ctx context.Context, workshopID string) ([]string, error) {
+	// Collect all focused_ids from gatehouse and workbenches
+	focusedIDs := make(map[string]bool)
+
+	// Get gatehouse focused_id for this workshop
+	var gatehouseFocusedID sql.NullString
+	err := r.db.QueryRowContext(ctx,
+		"SELECT focused_id FROM gatehouses WHERE workshop_id = ?",
+		workshopID,
+	).Scan(&gatehouseFocusedID)
+	if err != nil && err != sql.ErrNoRows {
+		return nil, fmt.Errorf("failed to get gatehouse focus: %w", err)
+	}
+	if gatehouseFocusedID.Valid && gatehouseFocusedID.String != "" {
+		focusedIDs[gatehouseFocusedID.String] = true
+	}
+
+	// Get all workbench focused_ids for this workshop
+	rows, err := r.db.QueryContext(ctx,
+		"SELECT focused_id FROM workbenches WHERE workshop_id = ? AND status = 'active' AND focused_id IS NOT NULL AND focused_id != ''",
+		workshopID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get workbench focuses: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var focusedID string
+		if err := rows.Scan(&focusedID); err != nil {
+			return nil, fmt.Errorf("failed to scan workbench focused_id: %w", err)
+		}
+		if focusedID != "" {
+			focusedIDs[focusedID] = true
+		}
+	}
+
+	if len(focusedIDs) == 0 {
+		return nil, nil
+	}
+
+	// Resolve focused_ids to commission IDs
+	commissionIDs := make(map[string]bool)
+
+	for focusedID := range focusedIDs {
+		commissionID, err := r.resolveToCommission(ctx, focusedID)
+		if err != nil {
+			// Skip unresolvable focuses (entity might have been deleted)
+			continue
+		}
+		if commissionID != "" {
+			commissionIDs[commissionID] = true
+		}
+	}
+
+	// Convert to slice
+	result := make([]string, 0, len(commissionIDs))
+	for id := range commissionIDs {
+		result = append(result, id)
+	}
+
+	return result, nil
+}
+
+// resolveToCommission resolves a focused_id to its commission ID.
+// - COMM-xxx: returns directly
+// - SHIP-xxx: returns shipment.commission_id
+// - TOME-xxx: returns tome.commission_id
+func (r *WorkshopRepository) resolveToCommission(ctx context.Context, focusedID string) (string, error) {
+	if len(focusedID) < 5 {
+		return "", nil
+	}
+
+	prefix := focusedID[:5]
+	switch prefix {
+	case "COMM-":
+		// Direct commission reference
+		return focusedID, nil
+
+	case "SHIP-":
+		// Resolve via shipment
+		var commissionID sql.NullString
+		err := r.db.QueryRowContext(ctx,
+			"SELECT commission_id FROM shipments WHERE id = ?",
+			focusedID,
+		).Scan(&commissionID)
+		if err != nil {
+			return "", err
+		}
+		return commissionID.String, nil
+
+	case "TOME-":
+		// Resolve via tome
+		var commissionID sql.NullString
+		err := r.db.QueryRowContext(ctx,
+			"SELECT commission_id FROM tomes WHERE id = ?",
+			focusedID,
+		).Scan(&commissionID)
+		if err != nil {
+			return "", err
+		}
+		return commissionID.String, nil
+
+	default:
+		return "", nil
+	}
+}
+
 // Ensure WorkshopRepository implements the interface
 var _ secondary.WorkshopRepository = (*WorkshopRepository)(nil)

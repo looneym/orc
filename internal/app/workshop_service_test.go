@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/example/orc/internal/ports/primary"
@@ -136,6 +137,10 @@ func (m *mockWorkshopRepository) SetActiveCommissionID(ctx context.Context, work
 		return nil
 	}
 	return errors.New("workshop not found")
+}
+
+func (m *mockWorkshopRepository) GetActiveCommissions(ctx context.Context, workshopID string) ([]string, error) {
+	return nil, nil
 }
 
 // mockFactoryRepository implements secondary.FactoryRepository for testing.
@@ -284,6 +289,14 @@ func (m *mockGatehouseRepositoryForWorkshop) WorkshopHasGatehouse(ctx context.Co
 	return false, nil
 }
 
+func (m *mockGatehouseRepositoryForWorkshop) UpdateFocusedID(ctx context.Context, id, focusedID string) error {
+	if g, ok := m.gatehouses[id]; ok {
+		g.FocusedID = focusedID
+		return nil
+	}
+	return fmt.Errorf("gatehouse %s not found", id)
+}
+
 // mockWorkbenchRepositoryForWorkshop implements secondary.WorkbenchRepository minimally.
 type mockWorkbenchRepositoryForWorkshop struct {
 	workbenches map[string]*secondary.WorkbenchRecord
@@ -363,6 +376,19 @@ func (m *mockWorkbenchRepositoryForWorkshop) UpdateFocusedID(ctx context.Context
 		return nil
 	}
 	return errors.New("workbench not found")
+}
+
+func (m *mockWorkbenchRepositoryForWorkshop) GetByFocusedID(ctx context.Context, focusedID string) ([]*secondary.WorkbenchRecord, error) {
+	if focusedID == "" {
+		return nil, nil
+	}
+	var result []*secondary.WorkbenchRecord
+	for _, wb := range m.workbenches {
+		if wb.FocusedID == focusedID && wb.Status == "active" {
+			result = append(result, wb)
+		}
+	}
+	return result, nil
 }
 
 // mockRepoRepositoryForWorkshop implements secondary.RepoRepository minimally.

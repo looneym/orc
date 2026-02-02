@@ -104,6 +104,14 @@ func (m *mockGatehouseRepository) WorkshopHasGatehouse(ctx context.Context, work
 	return m.workshopHasGatehouse[workshopID], nil
 }
 
+func (m *mockGatehouseRepository) UpdateFocusedID(ctx context.Context, id, focusedID string) error {
+	if g, ok := m.gatehouses[id]; ok {
+		g.FocusedID = focusedID
+		return nil
+	}
+	return fmt.Errorf("gatehouse %s not found", id)
+}
+
 func newTestGatehouseService() (*GatehouseServiceImpl, *mockGatehouseRepository) {
 	repo := newMockGatehouseRepository()
 	service := NewGatehouseService(repo)

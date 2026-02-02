@@ -39,6 +39,12 @@ type WorkshopService interface {
 	// GetActiveCommission returns the active commission ID for a workshop.
 	GetActiveCommission(ctx context.Context, workshopID string) (string, error)
 
+	// GetActiveCommissions returns commission IDs derived from focus:
+	// - Gatehouse focused_id (resolved to commission)
+	// - All workbench focused_ids in workshop (resolved to commission)
+	// Returns deduplicated commission IDs.
+	GetActiveCommissions(ctx context.Context, workshopID string) ([]string, error)
+
 	// ArchiveWorkshop soft-deletes a workshop by setting status to 'archived'.
 	// Requires all workbenches to be archived first.
 	ArchiveWorkshop(ctx context.Context, workshopID string) error

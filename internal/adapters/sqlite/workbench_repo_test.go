@@ -450,3 +450,108 @@ func TestWorkbenchRepository_WorkshopExists(t *testing.T) {
 		t.Error("expected workshop to exist")
 	}
 }
+
+func TestWorkbenchRepository_UpdateFocusedID(t *testing.T) {
+	db := setupTestDB(t)
+	repo := sqlite.NewWorkbenchRepository(db)
+	ctx := context.Background()
+
+	// Seed workbench
+	seedWorkbench(t, db, "BENCH-001", "", "test")
+
+	// Set focus
+	err := repo.UpdateFocusedID(ctx, "BENCH-001", "SHIP-001")
+	if err != nil {
+		t.Fatalf("UpdateFocusedID failed: %v", err)
+	}
+
+	// Verify focus was set
+	got, _ := repo.GetByID(ctx, "BENCH-001")
+	if got.FocusedID != "SHIP-001" {
+		t.Errorf("expected FocusedID 'SHIP-001', got %q", got.FocusedID)
+	}
+
+	// Clear focus
+	err = repo.UpdateFocusedID(ctx, "BENCH-001", "")
+	if err != nil {
+		t.Fatalf("UpdateFocusedID (clear) failed: %v", err)
+	}
+
+	// Verify focus was cleared
+	got, _ = repo.GetByID(ctx, "BENCH-001")
+	if got.FocusedID != "" {
+		t.Errorf("expected empty FocusedID, got %q", got.FocusedID)
+	}
+}
+
+func TestWorkbenchRepository_UpdateFocusedID_NotFound(t *testing.T) {
+	db := setupTestDB(t)
+	repo := sqlite.NewWorkbenchRepository(db)
+	ctx := context.Background()
+
+	err := repo.UpdateFocusedID(ctx, "BENCH-999", "SHIP-001")
+	if err == nil {
+		t.Error("expected error for non-existent workbench")
+	}
+}
+
+func TestWorkbenchRepository_GetByFocusedID(t *testing.T) {
+	db := setupTestDB(t)
+	repo := sqlite.NewWorkbenchRepository(db)
+	ctx := context.Background()
+
+	// Seed factory, workshop, and workbenches
+	seedFactory(t, db, "FACT-001", "test-factory")
+	seedWorkshop(t, db, "SHOP-001", "FACT-001", "test-workshop")
+	_, _ = db.Exec("INSERT INTO workbenches (id, workshop_id, name, path, status, focused_id) VALUES (?, ?, ?, ?, 'active', ?)",
+		"BENCH-001", "SHOP-001", "bench-1", "/tmp/bench-1", "SHIP-001")
+	_, _ = db.Exec("INSERT INTO workbenches (id, workshop_id, name, path, status, focused_id) VALUES (?, ?, ?, ?, 'active', ?)",
+		"BENCH-002", "SHOP-001", "bench-2", "/tmp/bench-2", "SHIP-002")
+	_, _ = db.Exec("INSERT INTO workbenches (id, workshop_id, name, path, status, focused_id) VALUES (?, ?, ?, ?, 'archived', ?)",
+		"BENCH-003", "SHOP-001", "bench-3", "/tmp/bench-3", "SHIP-001") // Archived, should not be returned
+
+	// Find workbenches focused on SHIP-001
+	workbenches, err := repo.GetByFocusedID(ctx, "SHIP-001")
+	if err != nil {
+		t.Fatalf("GetByFocusedID failed: %v", err)
+	}
+	if len(workbenches) != 1 {
+		t.Errorf("expected 1 workbench focused on SHIP-001, got %d", len(workbenches))
+	}
+	if len(workbenches) > 0 && workbenches[0].ID != "BENCH-001" {
+		t.Errorf("expected BENCH-001, got %s", workbenches[0].ID)
+	}
+
+	// Find workbenches focused on SHIP-002
+	workbenches, err = repo.GetByFocusedID(ctx, "SHIP-002")
+	if err != nil {
+		t.Fatalf("GetByFocusedID failed: %v", err)
+	}
+	if len(workbenches) != 1 {
+		t.Errorf("expected 1 workbench focused on SHIP-002, got %d", len(workbenches))
+	}
+
+	// No workbenches focused on SHIP-999
+	workbenches, err = repo.GetByFocusedID(ctx, "SHIP-999")
+	if err != nil {
+		t.Fatalf("GetByFocusedID failed: %v", err)
+	}
+	if len(workbenches) != 0 {
+		t.Errorf("expected 0 workbenches focused on SHIP-999, got %d", len(workbenches))
+	}
+}
+
+func TestWorkbenchRepository_GetByFocusedID_EmptyString(t *testing.T) {
+	db := setupTestDB(t)
+	repo := sqlite.NewWorkbenchRepository(db)
+	ctx := context.Background()
+
+	// Empty string should return nil, nil
+	workbenches, err := repo.GetByFocusedID(ctx, "")
+	if err != nil {
+		t.Fatalf("GetByFocusedID failed: %v", err)
+	}
+	if workbenches != nil {
+		t.Errorf("expected nil for empty focusedID, got %v", workbenches)
+	}
+}

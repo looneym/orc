@@ -154,6 +154,22 @@ func seedWorkbench(t *testing.T, db *sql.DB, id, _ /* commissionID */, name stri
 	return id
 }
 
+// seedGatehouse inserts a test gatehouse and returns its ID.
+func seedGatehouse(t *testing.T, db *sql.DB, id, workshopID string) string {
+	t.Helper()
+	if id == "" {
+		id = "GATE-001"
+	}
+	if workshopID == "" {
+		workshopID = "SHOP-001"
+	}
+	_, err := db.Exec("INSERT INTO gatehouses (id, workshop_id, status) VALUES (?, ?, 'active')", id, workshopID)
+	if err != nil {
+		t.Fatalf("failed to seed gatehouse: %v", err)
+	}
+	return id
+}
+
 // seedTag inserts a test tag and returns its ID.
 func seedTag(t *testing.T, db *sql.DB, id, name string) string {
 	t.Helper()

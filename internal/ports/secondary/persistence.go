@@ -927,6 +927,12 @@ type WorkshopRepository interface {
 	// SetActiveCommissionID updates the active commission for a workshop (Goblin context).
 	// Pass empty string to clear.
 	SetActiveCommissionID(ctx context.Context, workshopID, commissionID string) error
+
+	// GetActiveCommissions returns commission IDs derived from focus:
+	// - Gatehouse focused_id (resolved to commission)
+	// - All workbench focused_ids in workshop (resolved to commission)
+	// Returns deduplicated commission IDs.
+	GetActiveCommissions(ctx context.Context, workshopID string) ([]string, error)
 }
 
 // WorkshopRecord represents a workshop as stored in persistence.
@@ -981,6 +987,10 @@ type WorkbenchRepository interface {
 	// UpdateFocusedID updates the focused container ID for a workbench.
 	// Pass empty string to clear focus.
 	UpdateFocusedID(ctx context.Context, id, focusedID string) error
+
+	// GetByFocusedID retrieves all active workbenches focusing a specific container.
+	// Used to check for focus exclusivity conflicts.
+	GetByFocusedID(ctx context.Context, focusedID string) ([]*WorkbenchRecord, error)
 
 	// GetNextID returns the next available workbench ID.
 	GetNextID(ctx context.Context) (string, error)
@@ -1089,6 +1099,10 @@ type GatehouseRepository interface {
 
 	// WorkshopHasGatehouse checks if a workshop already has a gatehouse (for 1:1 constraint).
 	WorkshopHasGatehouse(ctx context.Context, workshopID string) (bool, error)
+
+	// UpdateFocusedID updates the focused container ID for a gatehouse.
+	// Pass empty string to clear focus.
+	UpdateFocusedID(ctx context.Context, id, focusedID string) error
 }
 
 // GatehouseRecord represents a gatehouse as stored in persistence.
@@ -1096,6 +1110,7 @@ type GatehouseRecord struct {
 	ID         string
 	WorkshopID string
 	Status     string
+	FocusedID  string // Empty string means null - Goblin focus (COMM-xxx, SHIP-xxx, or TOME-xxx)
 	CreatedAt  string
 	UpdatedAt  string
 }

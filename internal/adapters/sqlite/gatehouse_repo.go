@@ -40,13 +40,14 @@ func (r *GatehouseRepository) GetByID(ctx context.Context, id string) (*secondar
 	var (
 		createdAt time.Time
 		updatedAt time.Time
+		focusedID sql.NullString
 	)
 
 	record := &secondary.GatehouseRecord{}
 	err := r.db.QueryRowContext(ctx,
-		`SELECT id, workshop_id, status, created_at, updated_at FROM gatehouses WHERE id = ?`,
+		`SELECT id, workshop_id, status, focused_id, created_at, updated_at FROM gatehouses WHERE id = ?`,
 		id,
-	).Scan(&record.ID, &record.WorkshopID, &record.Status, &createdAt, &updatedAt)
+	).Scan(&record.ID, &record.WorkshopID, &record.Status, &focusedID, &createdAt, &updatedAt)
 
 	if err == sql.ErrNoRows {
 		return nil, fmt.Errorf("gatehouse %s not found", id)
@@ -54,6 +55,7 @@ func (r *GatehouseRepository) GetByID(ctx context.Context, id string) (*secondar
 	if err != nil {
 		return nil, fmt.Errorf("failed to get gatehouse: %w", err)
 	}
+	record.FocusedID = focusedID.String
 	record.CreatedAt = createdAt.Format(time.RFC3339)
 	record.UpdatedAt = updatedAt.Format(time.RFC3339)
 
@@ -65,13 +67,14 @@ func (r *GatehouseRepository) GetByWorkshop(ctx context.Context, workshopID stri
 	var (
 		createdAt time.Time
 		updatedAt time.Time
+		focusedID sql.NullString
 	)
 
 	record := &secondary.GatehouseRecord{}
 	err := r.db.QueryRowContext(ctx,
-		`SELECT id, workshop_id, status, created_at, updated_at FROM gatehouses WHERE workshop_id = ?`,
+		`SELECT id, workshop_id, status, focused_id, created_at, updated_at FROM gatehouses WHERE workshop_id = ?`,
 		workshopID,
-	).Scan(&record.ID, &record.WorkshopID, &record.Status, &createdAt, &updatedAt)
+	).Scan(&record.ID, &record.WorkshopID, &record.Status, &focusedID, &createdAt, &updatedAt)
 
 	if err == sql.ErrNoRows {
 		return nil, fmt.Errorf("gatehouse for workshop %s not found", workshopID)
@@ -79,6 +82,7 @@ func (r *GatehouseRepository) GetByWorkshop(ctx context.Context, workshopID stri
 	if err != nil {
 		return nil, fmt.Errorf("failed to get gatehouse: %w", err)
 	}
+	record.FocusedID = focusedID.String
 	record.CreatedAt = createdAt.Format(time.RFC3339)
 	record.UpdatedAt = updatedAt.Format(time.RFC3339)
 
@@ -87,7 +91,7 @@ func (r *GatehouseRepository) GetByWorkshop(ctx context.Context, workshopID stri
 
 // List retrieves gatehouses matching the given filters.
 func (r *GatehouseRepository) List(ctx context.Context, filters secondary.GatehouseFilters) ([]*secondary.GatehouseRecord, error) {
-	query := `SELECT id, workshop_id, status, created_at, updated_at FROM gatehouses WHERE 1=1`
+	query := `SELECT id, workshop_id, status, focused_id, created_at, updated_at FROM gatehouses WHERE 1=1`
 	args := []any{}
 
 	if filters.WorkshopID != "" {
@@ -113,13 +117,15 @@ func (r *GatehouseRepository) List(ctx context.Context, filters secondary.Gateho
 		var (
 			createdAt time.Time
 			updatedAt time.Time
+			focusedID sql.NullString
 		)
 
 		record := &secondary.GatehouseRecord{}
-		err := rows.Scan(&record.ID, &record.WorkshopID, &record.Status, &createdAt, &updatedAt)
+		err := rows.Scan(&record.ID, &record.WorkshopID, &record.Status, &focusedID, &createdAt, &updatedAt)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan gatehouse: %w", err)
 		}
+		record.FocusedID = focusedID.String
 		record.CreatedAt = createdAt.Format(time.RFC3339)
 		record.UpdatedAt = updatedAt.Format(time.RFC3339)
 
@@ -220,6 +226,32 @@ func (r *GatehouseRepository) WorkshopHasGatehouse(ctx context.Context, workshop
 		return false, fmt.Errorf("failed to check existing gatehouse: %w", err)
 	}
 	return count > 0, nil
+}
+
+// UpdateFocusedID updates the focused container ID for a gatehouse.
+// Pass empty string to clear focus.
+func (r *GatehouseRepository) UpdateFocusedID(ctx context.Context, id, focusedID string) error {
+	var focusedValue any
+	if focusedID == "" {
+		focusedValue = nil
+	} else {
+		focusedValue = focusedID
+	}
+
+	result, err := r.db.ExecContext(ctx,
+		"UPDATE gatehouses SET focused_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+		focusedValue, id,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to update gatehouse focus: %w", err)
+	}
+
+	rowsAffected, _ := result.RowsAffected()
+	if rowsAffected == 0 {
+		return fmt.Errorf("gatehouse %s not found", id)
+	}
+
+	return nil
 }
 
 // Ensure GatehouseRepository implements the interface

@@ -310,3 +310,54 @@ func TestGatehouseRepository_WorkshopHasGatehouse(t *testing.T) {
 		}
 	})
 }
+
+func TestGatehouseRepository_UpdateFocusedID(t *testing.T) {
+	db := setupTestDB(t)
+	repo := sqlite.NewGatehouseRepository(db)
+	ctx := context.Background()
+
+	// Setup
+	db.ExecContext(ctx, "INSERT INTO factories (id, name, status) VALUES (?, ?, ?)", "FACT-001", "Test", "active")
+	db.ExecContext(ctx, "INSERT INTO workshops (id, factory_id, name, status) VALUES (?, ?, ?, ?)", "WORK-001", "FACT-001", "Test", "active")
+
+	repo.Create(ctx, &secondary.GatehouseRecord{
+		ID:         "GATE-001",
+		WorkshopID: "WORK-001",
+		Status:     "active",
+	})
+
+	t.Run("sets focused ID", func(t *testing.T) {
+		err := repo.UpdateFocusedID(ctx, "GATE-001", "SHIP-042")
+		if err != nil {
+			t.Fatalf("UpdateFocusedID failed: %v", err)
+		}
+
+		got, _ := repo.GetByID(ctx, "GATE-001")
+		if got.FocusedID != "SHIP-042" {
+			t.Errorf("FocusedID = %q, want %q", got.FocusedID, "SHIP-042")
+		}
+	})
+
+	t.Run("clears focused ID with empty string", func(t *testing.T) {
+		// First set it
+		repo.UpdateFocusedID(ctx, "GATE-001", "COMM-001")
+
+		// Then clear it
+		err := repo.UpdateFocusedID(ctx, "GATE-001", "")
+		if err != nil {
+			t.Fatalf("UpdateFocusedID failed: %v", err)
+		}
+
+		got, _ := repo.GetByID(ctx, "GATE-001")
+		if got.FocusedID != "" {
+			t.Errorf("FocusedID = %q, want empty", got.FocusedID)
+		}
+	})
+
+	t.Run("returns error for non-existent gatehouse", func(t *testing.T) {
+		err := repo.UpdateFocusedID(ctx, "GATE-999", "SHIP-001")
+		if err == nil {
+			t.Error("expected error, got nil")
+		}
+	})
+}

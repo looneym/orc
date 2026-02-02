@@ -376,6 +376,56 @@ func (r *WorkbenchRepository) UpdateFocusedID(ctx context.Context, id, focusedID
 	return nil
 }
 
+// GetByFocusedID retrieves all active workbenches focusing a specific container.
+func (r *WorkbenchRepository) GetByFocusedID(ctx context.Context, focusedID string) ([]*secondary.WorkbenchRecord, error) {
+	if focusedID == "" {
+		return nil, nil
+	}
+
+	rows, err := r.db.QueryContext(ctx,
+		`SELECT id, workshop_id, name, path, repo_id, status, home_branch, current_branch, focused_id, created_at, updated_at
+		FROM workbenches WHERE focused_id = ? AND status = 'active'`,
+		focusedID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query workbenches by focused_id: %w", err)
+	}
+	defer rows.Close()
+
+	var workbenches []*secondary.WorkbenchRecord
+	for rows.Next() {
+		var (
+			repoID        sql.NullString
+			homeBranch    sql.NullString
+			currentBranch sql.NullString
+			focusedIDVal  sql.NullString
+			createdAt     time.Time
+			updatedAt     time.Time
+		)
+
+		record := &secondary.WorkbenchRecord{}
+		err := rows.Scan(
+			&record.ID, &record.WorkshopID, &record.Name, &record.WorktreePath,
+			&repoID, &record.Status, &homeBranch, &currentBranch, &focusedIDVal,
+			&createdAt, &updatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan workbench: %w", err)
+		}
+
+		record.RepoID = repoID.String
+		record.HomeBranch = homeBranch.String
+		record.CurrentBranch = currentBranch.String
+		record.FocusedID = focusedIDVal.String
+		record.CreatedAt = createdAt.Format(time.RFC3339)
+		record.UpdatedAt = updatedAt.Format(time.RFC3339)
+
+		workbenches = append(workbenches, record)
+	}
+
+	return workbenches, nil
+}
+
 // GetNextID returns the next available workbench ID.
 func (r *WorkbenchRepository) GetNextID(ctx context.Context) (string, error) {
 	var maxID int

@@ -136,9 +136,13 @@ Examples:
 					return fmt.Errorf("commission %q not found", commissionFilter)
 				}
 				filterCommissionID = resolved
-			} else if focusID != "" && !expandAll {
-				// DEFAULT BEHAVIOR: When focused (and not --all), scope to focused commission
-				filterCommissionID = resolveContainerCommission(focusID)
+			}
+
+			// DEFAULT BEHAVIOR: When not --all, scope to active commissions derived from focus
+			// Active commissions = commissions with focused shipments/tomes/direct focus
+			var activeCommissionIDs []string
+			if !expandAll && filterCommissionID == "" && workshopID != "" {
+				activeCommissionIDs, _ = wire.WorkshopService().GetActiveCommissions(cmd.Context(), workshopID)
 			}
 
 			// Get list of commissions to display
@@ -147,13 +151,24 @@ Examples:
 				return fmt.Errorf("failed to list commissions: %w", err)
 			}
 
+			// Build set of active commission IDs for efficient lookup
+			activeSet := make(map[string]bool)
+			for _, id := range activeCommissionIDs {
+				activeSet[id] = true
+			}
+
 			// Filter to open commissions
 			var openCommissions []*primary.Commission
 			for _, m := range commissions {
 				if m.Status == "complete" || m.Status == "archived" {
 					continue
 				}
+				// Apply explicit filter if specified
 				if filterCommissionID != "" && m.ID != filterCommissionID {
+					continue
+				}
+				// Apply active commissions filter if derived from focus
+				if len(activeCommissionIDs) > 0 && !activeSet[m.ID] {
 					continue
 				}
 				openCommissions = append(openCommissions, m)

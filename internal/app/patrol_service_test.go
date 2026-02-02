@@ -178,6 +178,10 @@ func (m *mockWorkbenchRepoForPatrol) UpdateFocusedID(ctx context.Context, id, fo
 	return nil
 }
 
+func (m *mockWorkbenchRepoForPatrol) GetByFocusedID(ctx context.Context, focusedID string) ([]*secondary.WorkbenchRecord, error) {
+	return nil, nil
+}
+
 // mockKennelRepoForPatrol implements secondary.KennelRepository for testing.
 type mockKennelRepoForPatrol struct {
 	kennels            map[string]*secondary.KennelRecord

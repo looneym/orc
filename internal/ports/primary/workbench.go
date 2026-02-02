@@ -39,6 +39,10 @@ type WorkbenchService interface {
 	// GetFocusedID returns the currently focused container ID for a workbench.
 	GetFocusedID(ctx context.Context, workbenchID string) (string, error)
 
+	// GetWorkbenchesByFocusedID returns all active workbenches focused on a given container.
+	// Used for focus exclusivity checks (IMP cannot focus on container already focused by another IMP).
+	GetWorkbenchesByFocusedID(ctx context.Context, focusedID string) ([]*Workbench, error)
+
 	// ArchiveWorkbench soft-deletes a workbench by setting status to 'archived'.
 	// The record remains in DB so infra plan can detect it as a DELETE target.
 	ArchiveWorkbench(ctx context.Context, workbenchID string) error

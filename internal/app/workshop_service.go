@@ -636,6 +636,14 @@ func (s *WorkshopServiceImpl) GetActiveCommission(ctx context.Context, workshopI
 	return record.ActiveCommissionID, nil
 }
 
+// GetActiveCommissions returns commission IDs derived from focus:
+// - Gatehouse focused_id (resolved to commission)
+// - All workbench focused_ids in workshop (resolved to commission)
+// Returns deduplicated commission IDs.
+func (s *WorkshopServiceImpl) GetActiveCommissions(ctx context.Context, workshopID string) ([]string, error) {
+	return s.workshopRepo.GetActiveCommissions(ctx, workshopID)
+}
+
 // ArchiveWorkshop soft-deletes a workshop by setting status to 'archived'.
 func (s *WorkshopServiceImpl) ArchiveWorkshop(ctx context.Context, workshopID string) error {
 	record, err := s.workshopRepo.GetByID(ctx, workshopID)

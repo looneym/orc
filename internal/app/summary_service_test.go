@@ -437,6 +437,10 @@ func (m *mockWorkbenchServiceForSummary) ArchiveWorkbench(_ context.Context, _ s
 	return nil
 }
 
+func (m *mockWorkbenchServiceForSummary) GetWorkbenchesByFocusedID(_ context.Context, _ string) ([]*primary.Workbench, error) {
+	return nil, nil
+}
+
 // ============================================================================
 // Tests for Flat Summary Structure
 // ============================================================================

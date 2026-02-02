@@ -332,6 +332,21 @@ func (s *WorkbenchServiceImpl) GetFocusedID(ctx context.Context, workbenchID str
 	return record.FocusedID, nil
 }
 
+// GetWorkbenchesByFocusedID returns all active workbenches focused on a given container.
+// Used for focus exclusivity checks (IMP cannot focus on container already focused by another IMP).
+func (s *WorkbenchServiceImpl) GetWorkbenchesByFocusedID(ctx context.Context, focusedID string) ([]*primary.Workbench, error) {
+	records, err := s.workbenchRepo.GetByFocusedID(ctx, focusedID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get workbenches by focused ID: %w", err)
+	}
+
+	workbenches := make([]*primary.Workbench, len(records))
+	for i, r := range records {
+		workbenches[i] = s.recordToWorkbench(r)
+	}
+	return workbenches, nil
+}
+
 // ArchiveWorkbench soft-deletes a workbench by setting status to 'archived'.
 func (s *WorkbenchServiceImpl) ArchiveWorkbench(ctx context.Context, workbenchID string) error {
 	record, err := s.workbenchRepo.GetByID(ctx, workbenchID)

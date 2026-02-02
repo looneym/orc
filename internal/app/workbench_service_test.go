@@ -153,6 +153,19 @@ func (m *mockWorkbenchRepository) UpdateFocusedID(ctx context.Context, id, focus
 	return errors.New("workbench not found")
 }
 
+func (m *mockWorkbenchRepository) GetByFocusedID(ctx context.Context, focusedID string) ([]*secondary.WorkbenchRecord, error) {
+	if focusedID == "" {
+		return nil, nil
+	}
+	var result []*secondary.WorkbenchRecord
+	for _, wb := range m.workbenches {
+		if wb.FocusedID == focusedID && wb.Status == "active" {
+			result = append(result, wb)
+		}
+	}
+	return result, nil
+}
+
 // mockWorkshopRepositoryForWorkbench implements secondary.WorkshopRepository minimally.
 type mockWorkshopRepositoryForWorkbench struct {
 	workshops map[string]*secondary.WorkshopRecord
@@ -224,6 +237,10 @@ func (m *mockWorkshopRepositoryForWorkbench) SetActiveCommissionID(ctx context.C
 		return nil
 	}
 	return errors.New("workshop not found")
+}
+
+func (m *mockWorkshopRepositoryForWorkbench) GetActiveCommissions(ctx context.Context, workshopID string) ([]string, error) {
+	return nil, nil
 }
 
 // ============================================================================
