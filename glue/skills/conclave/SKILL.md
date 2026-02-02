@@ -1,118 +1,57 @@
 ---
 name: conclave
-description: Quick ideation setup. Creates a conclave and exploration tome, focuses it, ready for ideation. Use when user says /conclave or wants to spin up a design discussion space.
+description: "DEPRECATED: Use /ship-new instead. Conclaves are being replaced by shipments."
 ---
 
-# Conclave Skill
+# Conclave Skill (DEPRECATED)
 
-Quick setup for ideation and design exploration.
+**This skill is deprecated.** Conclaves are being replaced by shipments.
 
-## Usage
+## Migration
+
+Use `/ship-new` instead:
 
 ```
-/conclave "Topic Name"
-/conclave              (will prompt for topic)
+/ship-new "Topic Name"
 ```
 
-## Flow
+Shipments replace conclaves with a unified lifecycle:
+- **draft** → **exploring** → **specced** → **tasked** → **in_progress** → **complete**
 
-### Step 1: Get Topic
+## What Changed
 
-If argument provided:
-- Use it as the conclave title
+| Old (Conclave) | New (Shipment) |
+|----------------|----------------|
+| `orc conclave create` | `orc shipment create` |
+| `/conclave` | `/ship-new` |
+| `/exorcism` | `/ship-plan` then `/ship-complete` |
+| CON-xxx | SHIP-xxx |
 
-If no argument:
-- Ask: "What topic should this conclave explore?"
+## Existing Conclaves
 
-### Step 2: Detect Context
+Existing conclaves remain accessible:
+- `orc conclave list` - View existing conclaves
+- `orc conclave show CON-xxx` - View conclave details
+- `orc conclave migrate CON-xxx` - Migrate to shipment
 
+To migrate all open conclaves:
 ```bash
-orc status
+orc conclave migrate --all
 ```
 
-From output, identify:
-- Current commission (from workbench or gatehouse context)
-- If no commission detected, ask user which commission
+## Flow (If Invoked)
 
-### Step 3: Create Conclave
-
-```bash
-orc conclave create "<Topic>" \
-  --commission <COMM-xxx> \
-  --description "Design exploration for <topic>"
-```
-
-Capture the created `CON-xxx` ID from output.
-
-### Step 4: Create Exploration Tome
-
-```bash
-orc tome create "<Topic> Exploration" \
-  --conclave <CON-xxx> \
-  --commission <COMM-xxx> \
-  --description "Capturing ideas, questions, and decisions about <topic>"
-```
-
-Capture the created `TOME-xxx` ID from output.
-
-### Step 5: Focus Conclave
-
-```bash
-orc focus <CON-xxx>
-```
-
-### Step 6: Confirm Ready
-
-Output:
-```
-Conclave ready for ideation:
-  CON-xxx: <Topic>
-  TOME-xxx: <Topic> Exploration
-
-Capture ideas:
-  orc note create "Note title" --tome TOME-xxx --type idea
-
-Or just discuss - I'll help capture notes as we go.
-
-When ready to ship: /exorcism
-```
-
-## Role Support
-
-Works for both Goblin and IMP:
-
-**IMP context** (workbench):
-- Detects commission from workbench assignment or asks
-
-**Goblin context** (gatehouse):
-- Uses workshop context or asks
-
-## Example Session
+If user says `/conclave`, respond:
 
 ```
-User: /conclave "API Rate Limiting"
+The /conclave skill is deprecated. Use /ship-new instead:
 
-Agent: [runs orc status, detects COMM-001]
-       [runs orc conclave create "API Rate Limiting" --commission COMM-001]
-       [runs orc tome create "API Rate Limiting Exploration" --conclave CON-025]
-       [runs orc focus CON-025]
+  /ship-new "Topic Name"
 
-Agent: Conclave ready for ideation:
-         CON-025: API Rate Limiting
-         TOME-052: API Rate Limiting Exploration
+Shipments provide a complete lifecycle from exploration through completion.
 
-       Capture ideas:
-         orc note create "Note title" --tome TOME-052 --type idea
-
-       Or just discuss - I'll help capture notes as we go.
-
-       When ready to ship: /exorcism
+To migrate existing conclaves:
+  orc conclave migrate --all
 ```
 
-## Ideation Mode
-
-After setup, the agent should:
-- Help capture ideas as notes during discussion
-- Use appropriate note types (idea, question, concern, decision)
-- Periodically summarize captured notes
-- Suggest `/exorcism` when discussion converges
+Then offer to run `/ship-new` with their topic.

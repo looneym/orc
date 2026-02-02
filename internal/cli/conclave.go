@@ -20,10 +20,17 @@ var conclaveCmd = &cobra.Command{
 }
 
 var conclaveCreateCmd = &cobra.Command{
-	Use:   "create [title]",
-	Short: "Create a new conclave",
-	Args:  cobra.MinimumNArgs(1),
+	Use:        "create [title]",
+	Short:      "Create a new conclave (DEPRECATED: use 'orc shipment create' instead)",
+	Deprecated: "Conclaves are being replaced by shipments. Use 'orc shipment create' for new work.",
+	Args:       cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		// Show deprecation warning
+		fmt.Println("⚠️  DEPRECATED: 'orc conclave create' is deprecated.")
+		fmt.Println("   Use 'orc shipment create' for implementation work.")
+		fmt.Println("   Existing conclaves remain accessible via 'orc conclave show/list'.")
+		fmt.Println()
+
 		title := args[0]
 		commissionID, _ := cmd.Flags().GetString("commission")
 		description, _ := cmd.Flags().GetString("description")
@@ -49,8 +56,8 @@ var conclaveCreateCmd = &cobra.Command{
 		fmt.Printf("  Commission: %s\n", resp.Conclave.CommissionID)
 		fmt.Printf("  Status: %s\n", resp.Conclave.Status)
 		fmt.Println()
-		fmt.Println("Next steps:")
-		fmt.Println("   Conclaves collect tasks, questions, and plans generated during ideation")
+		fmt.Println("💡 Consider migrating to shipments:")
+		fmt.Println("   orc conclave migrate " + resp.Conclave.ID)
 		return nil
 	},
 }
