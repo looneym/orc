@@ -75,6 +75,7 @@ type ShipmentSummary struct {
 	TasksDone  int
 	TasksTotal int
 	Tasks      []TaskSummary // Populated only for focused shipment
+	Priority   *int          // Shipyard priority (nil = no priority, 1 = highest)
 }
 
 // TaskSummary represents a task in the summary view.

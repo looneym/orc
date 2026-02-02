@@ -309,6 +309,21 @@ func (s *SummaryServiceImpl) buildLibrarySummaryWithDebug(ctx context.Context, t
 func (s *SummaryServiceImpl) buildShipyardSummaryWithDebug(ctx context.Context, shipments []*primary.Shipment, expand bool, focusID string, addDebug func(string)) primary.ShipyardSummary {
 	var yardShipments []primary.ShipmentSummary
 	count := 0
+
+	// Build priority map from shipyard queue
+	priorityMap := make(map[string]*int)
+	for _, ship := range shipments {
+		if ship.ContainerType == "shipyard" && ship.CommissionID != "" {
+			queue, err := s.shipmentService.ListShipyardQueue(ctx, ship.CommissionID)
+			if err == nil {
+				for _, entry := range queue {
+					priorityMap[entry.ID] = entry.Priority
+				}
+			}
+			break // Only need to fetch once per commission
+		}
+	}
+
 	for _, ship := range shipments {
 		if ship.ContainerType == "shipyard" {
 			if ship.Status == "complete" {
@@ -319,6 +334,10 @@ func (s *SummaryServiceImpl) buildShipyardSummaryWithDebug(ctx context.Context, 
 			if expand {
 				shipSummary, err := s.buildShipmentSummary(ctx, ship, focusID)
 				if err == nil {
+					// Add priority from shipyard queue
+					if priority, ok := priorityMap[ship.ID]; ok {
+						shipSummary.Priority = priority
+					}
 					yardShipments = append(yardShipments, *shipSummary)
 				}
 			}

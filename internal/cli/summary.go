@@ -301,6 +301,12 @@ func buildWorkshopFocusMap(ctx context.Context, workshopID, currentWorkbenchID, 
 		}
 	}
 
+	// If no workbench but gatehouse exists, we're running as Goblin
+	if info.myName == "" && gatehouseID != "" {
+		info.myName = "goblin"
+		info.myID = gatehouseID
+	}
+
 	// Get Goblin's focus (workshop-level focus)
 	goblinFocusID, err := wire.WorkshopService().GetFocusedConclaveID(ctx, workshopID)
 	if err == nil && goblinFocusID != "" {
@@ -374,7 +380,7 @@ func renderSummary(summary *primary.CommissionSummary, _ string, workshopFocus w
 
 		focusMarker := ""
 		if con.IsFocused {
-			focusMarker = color.New(color.FgHiMagenta).Sprintf(" [focused by %s@%s (you)]", workshopFocus.myName, workshopFocus.myID)
+			focusMarker = color.New(color.FgHiMagenta).Sprint(" [focused by you]")
 		} else if who := workshopFocus.containerToWorkbench[con.ID]; who != "" {
 			focusMarker = color.New(color.FgCyan).Sprintf(" [focused by %s]", who)
 		}
@@ -422,7 +428,7 @@ func renderSummary(summary *primary.CommissionSummary, _ string, workshopFocus w
 			}
 			focusMark := ""
 			if tome.IsFocused {
-				focusMark = color.New(color.FgHiMagenta).Sprintf(" [focused by %s@%s (you)]", workshopFocus.myName, workshopFocus.myID)
+				focusMark = color.New(color.FgHiMagenta).Sprint(" [focused by you]")
 			} else if who := workshopFocus.containerToWorkbench[tome.ID]; who != "" {
 				focusMark = color.New(color.FgCyan).Sprintf(" [focused by %s]", who)
 			}
@@ -473,7 +479,7 @@ func renderSummary(summary *primary.CommissionSummary, _ string, workshopFocus w
 			}
 			focusMark := ""
 			if ship.IsFocused {
-				focusMark = color.New(color.FgHiMagenta).Sprintf(" [focused by %s@%s (you)]", workshopFocus.myName, workshopFocus.myID)
+				focusMark = color.New(color.FgHiMagenta).Sprint(" [focused by you]")
 			} else if who := workshopFocus.containerToWorkbench[ship.ID]; who != "" {
 				focusMark = color.New(color.FgCyan).Sprintf(" [focused by %s]", who)
 			}
@@ -536,7 +542,7 @@ func renderSummary(summary *primary.CommissionSummary, _ string, workshopFocus w
 			}
 			focusMark := ""
 			if tome.IsFocused {
-				focusMark = color.New(color.FgHiMagenta).Sprintf(" [focused by %s@%s (you)]", workshopFocus.myName, workshopFocus.myID)
+				focusMark = color.New(color.FgHiMagenta).Sprint(" [focused by you]")
 			} else if who := workshopFocus.containerToWorkbench[tome.ID]; who != "" {
 				focusMark = color.New(color.FgCyan).Sprintf(" [focused by %s]", who)
 			}
@@ -570,11 +576,15 @@ func renderSummary(summary *primary.CommissionSummary, _ string, workshopFocus w
 			}
 			focusMark := ""
 			if ship.IsFocused {
-				focusMark = color.New(color.FgHiMagenta).Sprintf(" [focused by %s@%s (you)]", workshopFocus.myName, workshopFocus.myID)
+				focusMark = color.New(color.FgHiMagenta).Sprint(" [focused by you]")
 			} else if who := workshopFocus.containerToWorkbench[ship.ID]; who != "" {
 				focusMark = color.New(color.FgCyan).Sprintf(" [focused by %s]", who)
 			}
-			fmt.Printf("%s%s%s%s%s - %s%s\n", shipPrefix, colorizeID(ship.ID), benchMarker, focusMark, pinnedMark, ship.Title, taskInfo)
+			priorityMark := ""
+			if ship.Priority != nil {
+				priorityMark = color.New(color.FgYellow).Sprintf(" [P%d]", *ship.Priority)
+			}
+			fmt.Printf("%s%s%s%s%s%s - %s%s\n", shipPrefix, colorizeID(ship.ID), priorityMark, benchMarker, focusMark, pinnedMark, ship.Title, taskInfo)
 		}
 	}
 }
