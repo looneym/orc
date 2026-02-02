@@ -623,18 +623,88 @@ make lint
 
 ---
 
-## Creating Containers
+## Shipment Lifecycle
+
+Shipments represent units of work and follow a unified status lifecycle:
+
+```
+draft → exploring → specced → tasked → in_progress → complete
+```
+
+### Status Definitions
+
+| Status | Description | Auto-Transition |
+|--------|-------------|-----------------|
+| `draft` | Just created, not yet started | → `exploring` on focus |
+| `exploring` | Active ideation/research phase | → `tasked` when first task created |
+| `specced` | Has spec, ready for tasks | → `tasked` when first task created |
+| `tasked` | Has tasks defined | → `in_progress` when task claimed |
+| `in_progress` | Active implementation | → `complete` when all tasks done |
+| `complete` | All work finished | Terminal state |
+
+### Auto-Transitions
+
+Status changes automatically based on ledger events:
+
+| Event | Trigger | Status Change |
+|-------|---------|---------------|
+| Focus shipment | `orc focus SHIP-xxx` | draft → exploring |
+| Create task | `orc task create` | draft/exploring/specced → tasked |
+| Claim task | `orc task claim` | tasked → in_progress |
+| Complete all tasks | `orc task complete` | in_progress → complete |
+
+### /ship-* Skills
+
+Skills for shipment workflow:
+
+| Skill | Description |
+|-------|-------------|
+| `/ship-new "Title"` | Create new shipment and focus it |
+| `/ship-plan` | Break down shipment into tasks |
+| `/ship-queue` | View and manage shipyard queue |
+| `/ship-tidy` | Review and organize shipment tasks |
+| `/ship-complete` | Mark shipment as complete |
+
+### CLI Commands
+
+```bash
+orc shipment create "Title" --commission COMM-xxx  # Create shipment
+orc shipment show SHIP-xxx                          # View details
+orc shipment list                                   # List all
+orc focus SHIP-xxx                                  # Focus shipment
+orc task create "Task" --shipment SHIP-xxx          # Add task
+```
+
+---
+
+## Deprecated: Conclaves
+
+**Conclaves are deprecated.** Use shipments instead.
+
+### Migration Path
+
+| Old (Conclave) | New (Shipment) |
+|----------------|----------------|
+| `orc conclave create` | `orc shipment create` |
+| `/conclave` | `/ship-new` |
+| `/exorcism` | `/ship-plan` then `/ship-complete` |
+
+### Existing Conclaves
+
+Existing conclaves remain accessible for reference:
+
+```bash
+orc conclave list              # View existing conclaves
+orc conclave show CON-xxx      # View details
+orc conclave migrate CON-xxx   # Migrate to shipment
+orc conclave migrate --all     # Migrate all open conclaves
+```
 
 ### Tomes
-- Use `--conclave CON-xxx` to create in a specific conclave
-- Tomes without a conclave exist at commission root (orphan tomes)
-- `orc tome unpark TOME-xxx --conclave CON-xxx` moves tome to a Conclave
 
-### Shipments
-- Use `--conclave CON-xxx` to create in a specific conclave
-- Use `--shipyard` to create in the commission's Shipyard
-- `orc shipment park SHIP-xxx` moves to Shipyard
-- `orc shipment unpark SHIP-xxx --conclave CON-xxx` moves to Conclave
+Tomes remain valid but are no longer tied to conclaves:
+- Create tomes directly on commissions: `orc tome create "Title" --commission COMM-xxx`
+- Link tomes to shipments if needed for exploration notes
 
 ---
 
