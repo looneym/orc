@@ -131,10 +131,18 @@ func TestCanPauseShipment(t *testing.T) {
 		wantReason  string
 	}{
 		{
-			name: "can pause in_progress shipment",
+			name: "can pause implementing shipment",
 			ctx: StatusTransitionContext{
 				ShipmentID: "SHIP-001",
-				Status:     "in_progress",
+				Status:     "implementing",
+			},
+			wantAllowed: true,
+		},
+		{
+			name: "can pause auto_implementing shipment",
+			ctx: StatusTransitionContext{
+				ShipmentID: "SHIP-001",
+				Status:     "auto_implementing",
 			},
 			wantAllowed: true,
 		},
@@ -145,7 +153,7 @@ func TestCanPauseShipment(t *testing.T) {
 				Status:     "paused",
 			},
 			wantAllowed: false,
-			wantReason:  "can only pause in_progress shipments (current status: paused)",
+			wantReason:  "can only pause implementing shipments (current status: paused)",
 		},
 		{
 			name: "cannot pause complete shipment",
@@ -154,7 +162,7 @@ func TestCanPauseShipment(t *testing.T) {
 				Status:     "complete",
 			},
 			wantAllowed: false,
-			wantReason:  "can only pause in_progress shipments (current status: complete)",
+			wantReason:  "can only pause implementing shipments (current status: complete)",
 		},
 		{
 			name: "cannot pause draft shipment",
@@ -163,7 +171,7 @@ func TestCanPauseShipment(t *testing.T) {
 				Status:     "draft",
 			},
 			wantAllowed: false,
-			wantReason:  "can only pause in_progress shipments (current status: draft)",
+			wantReason:  "can only pause implementing shipments (current status: draft)",
 		},
 	}
 
@@ -196,13 +204,13 @@ func TestCanResumeShipment(t *testing.T) {
 			wantAllowed: true,
 		},
 		{
-			name: "cannot resume in_progress shipment",
+			name: "cannot resume implementing shipment",
 			ctx: StatusTransitionContext{
 				ShipmentID: "SHIP-001",
-				Status:     "in_progress",
+				Status:     "implementing",
 			},
 			wantAllowed: false,
-			wantReason:  "can only resume paused shipments (current status: in_progress)",
+			wantReason:  "can only resume paused shipments (current status: implementing)",
 		},
 		{
 			name: "cannot resume complete shipment",
@@ -270,17 +278,25 @@ func TestGetAutoTransitionStatus(t *testing.T) {
 		},
 		// Task claimed transitions
 		{
-			name: "task claimed on tasked shipment transitions to in_progress",
+			name: "task claimed on tasked shipment transitions to implementing",
 			ctx: AutoTransitionContext{
 				CurrentStatus: "tasked",
 				TriggerEvent:  "task_claimed",
 			},
-			wantStatus: "in_progress",
+			wantStatus: "implementing",
 		},
 		{
-			name: "task claimed on in_progress shipment does not transition",
+			name: "task claimed on ready_for_imp shipment transitions to implementing",
 			ctx: AutoTransitionContext{
-				CurrentStatus: "in_progress",
+				CurrentStatus: "ready_for_imp",
+				TriggerEvent:  "task_claimed",
+			},
+			wantStatus: "implementing",
+		},
+		{
+			name: "task claimed on implementing shipment does not transition",
+			ctx: AutoTransitionContext{
+				CurrentStatus: "implementing",
 				TriggerEvent:  "task_claimed",
 			},
 			wantStatus: "",
@@ -289,7 +305,7 @@ func TestGetAutoTransitionStatus(t *testing.T) {
 		{
 			name: "last task completed transitions to complete",
 			ctx: AutoTransitionContext{
-				CurrentStatus:      "in_progress",
+				CurrentStatus:      "implementing",
 				TriggerEvent:       "task_completed",
 				TaskCount:          3,
 				CompletedTaskCount: 3,
@@ -299,7 +315,7 @@ func TestGetAutoTransitionStatus(t *testing.T) {
 		{
 			name: "task completed but not all done does not transition",
 			ctx: AutoTransitionContext{
-				CurrentStatus:      "in_progress",
+				CurrentStatus:      "implementing",
 				TriggerEvent:       "task_completed",
 				TaskCount:          3,
 				CompletedTaskCount: 2,

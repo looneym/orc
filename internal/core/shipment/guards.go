@@ -103,12 +103,12 @@ func CanCompleteShipment(ctx CompleteShipmentContext) GuardResult {
 
 // CanPauseShipment evaluates whether a shipment can be paused.
 // Rules:
-// - Status must be "in_progress"
+// - Status must be "implementing" or "auto_implementing"
 func CanPauseShipment(ctx StatusTransitionContext) GuardResult {
-	if ctx.Status != "in_progress" {
+	if ctx.Status != "implementing" && ctx.Status != "auto_implementing" {
 		return GuardResult{
 			Allowed: false,
-			Reason:  fmt.Sprintf("can only pause in_progress shipments (current status: %s)", ctx.Status),
+			Reason:  fmt.Sprintf("can only pause implementing shipments (current status: %s)", ctx.Status),
 		}
 	}
 
@@ -150,8 +150,8 @@ func GetAutoTransitionStatus(ctx AutoTransitionContext) string {
 			return "tasked"
 		}
 	case "task_claimed":
-		if ctx.CurrentStatus == "tasked" || ctx.CurrentStatus == "exploring" || ctx.CurrentStatus == "specced" {
-			return "in_progress"
+		if ctx.CurrentStatus == "tasked" || ctx.CurrentStatus == "ready_for_imp" || ctx.CurrentStatus == "exploring" || ctx.CurrentStatus == "specced" {
+			return "implementing"
 		}
 	case "task_completed":
 		if ctx.TaskCount > 0 && ctx.TaskCount == ctx.CompletedTaskCount {

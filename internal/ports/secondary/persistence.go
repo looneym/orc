@@ -127,7 +127,7 @@ type ShipmentRecord struct {
 	CommissionID        string
 	Title               string
 	Description         string // Empty string means null
-	Status              string // draft, exploring, specced, tasked, in_progress, paused, complete
+	Status              string // draft, exploring, specced, tasked, ready_for_imp, implementing, auto_implementing, complete
 	AssignedWorkbenchID string // Empty string means null
 	RepoID              string // Empty string means null - FK to repos table
 	Branch              string // Empty string means null - owned branch (e.g., ml/SHIP-001-feature-name)

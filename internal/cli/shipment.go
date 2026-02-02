@@ -69,6 +69,12 @@ var shipmentListCmd = &cobra.Command{
 		ctx := context.Background()
 		commissionID, _ := cmd.Flags().GetString("commission")
 		status, _ := cmd.Flags().GetString("status")
+		available, _ := cmd.Flags().GetBool("available")
+
+		// --available is shorthand for --status ready_for_imp
+		if available {
+			status = "ready_for_imp"
+		}
 
 		// Get commission from context if not specified
 		if commissionID == "" {
@@ -84,19 +90,34 @@ var shipmentListCmd = &cobra.Command{
 		}
 
 		if len(shipments) == 0 {
-			fmt.Println("No shipments found.")
+			if available {
+				fmt.Println("No shipments available for IMP pickup.")
+			} else {
+				fmt.Println("No shipments found.")
+			}
 			return nil
 		}
 
 		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-		fmt.Fprintln(w, "ID\tTITLE\tSTATUS\tCOMMISSION")
-		fmt.Fprintln(w, "--\t-----\t------\t-------")
-		for _, s := range shipments {
-			pinnedMark := ""
-			if s.Pinned {
-				pinnedMark = " [pinned]"
+		if available {
+			fmt.Fprintln(w, "ID\tTITLE\tTASKS\tCOMMISSION")
+			fmt.Fprintln(w, "--\t-----\t-----\t----------")
+			for _, s := range shipments {
+				// Get task count for this shipment
+				tasks, _ := wire.ShipmentService().GetShipmentTasks(ctx, s.ID)
+				taskCount := len(tasks)
+				fmt.Fprintf(w, "%s\t%s\t%d\t%s\n", s.ID, s.Title, taskCount, s.CommissionID)
 			}
-			fmt.Fprintf(w, "%s\t%s%s\t%s\t%s\n", s.ID, s.Title, pinnedMark, s.Status, s.CommissionID)
+		} else {
+			fmt.Fprintln(w, "ID\tTITLE\tSTATUS\tCOMMISSION")
+			fmt.Fprintln(w, "--\t-----\t------\t-------")
+			for _, s := range shipments {
+				pinnedMark := ""
+				if s.Pinned {
+					pinnedMark = " [pinned]"
+				}
+				fmt.Fprintf(w, "%s\t%s%s\t%s\t%s\n", s.ID, s.Title, pinnedMark, s.Status, s.CommissionID)
+			}
 		}
 		w.Flush()
 		return nil
@@ -296,6 +317,76 @@ var shipmentAssignCmd = &cobra.Command{
 	},
 }
 
+var shipmentReadyCmd = &cobra.Command{
+	Use:   "ready [shipment-id]",
+	Short: "Mark shipment as ready for IMP (Goblin→IMP handoff)",
+	Long: `Mark a shipment as ready_for_imp, signaling Goblin→IMP handoff.
+
+This status indicates the shipment is ready to be picked up by an IMP.
+The IMP will transition it to 'implementing' or 'auto_implementing' when work begins.`,
+	Args: cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		ctx := context.Background()
+		shipmentID := args[0]
+
+		err := wire.ShipmentService().UpdateStatus(ctx, shipmentID, "ready_for_imp")
+		if err != nil {
+			return fmt.Errorf("failed to update shipment status: %w", err)
+		}
+
+		fmt.Printf("✓ Shipment %s marked as ready_for_imp\n", shipmentID)
+		fmt.Println("  IMP can now claim tasks from this shipment")
+		return nil
+	},
+}
+
+var shipmentAutoCmd = &cobra.Command{
+	Use:   "auto [shipment-id]",
+	Short: "Enable auto mode (hook-propelled autonomous implementation)",
+	Long: `Set shipment to auto_implementing mode.
+
+In this mode, the Stop hook will block the IMP from stopping until all tasks
+are complete. The IMP will be propelled forward automatically through the
+/imp-* workflow commands.`,
+	Args: cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		ctx := context.Background()
+		shipmentID := args[0]
+
+		err := wire.ShipmentService().UpdateStatus(ctx, shipmentID, "auto_implementing")
+		if err != nil {
+			return fmt.Errorf("failed to update shipment status: %w", err)
+		}
+
+		fmt.Printf("✓ Shipment %s set to auto_implementing\n", shipmentID)
+		fmt.Println("  Stop hook will block until shipment is complete")
+		return nil
+	},
+}
+
+var shipmentManualCmd = &cobra.Command{
+	Use:   "manual [shipment-id]",
+	Short: "Enable manual mode (IMP can stop freely)",
+	Long: `Set shipment to implementing (manual) mode.
+
+In this mode, the IMP can stop at any time. The Stop hook will not block.
+Use this when you want human oversight or interactive development.`,
+	Args: cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		ctx := context.Background()
+		shipmentID := args[0]
+
+		err := wire.ShipmentService().UpdateStatus(ctx, shipmentID, "implementing")
+		if err != nil {
+			return fmt.Errorf("failed to update shipment status: %w", err)
+		}
+
+		fmt.Printf("✓ Shipment %s set to implementing (manual mode)\n", shipmentID)
+		fmt.Println("  IMP can stop at any time")
+		return nil
+	},
+}
+
 func init() {
 	// shipment create flags
 	shipmentCreateCmd.Flags().StringP("commission", "c", "", "Commission ID (defaults to context)")
@@ -306,6 +397,7 @@ func init() {
 	// shipment list flags
 	shipmentListCmd.Flags().StringP("commission", "c", "", "Filter by commission")
 	shipmentListCmd.Flags().StringP("status", "s", "", "Filter by status")
+	shipmentListCmd.Flags().BoolP("available", "a", false, "Show only shipments ready for IMP pickup (ready_for_imp status)")
 
 	// shipment update flags
 	shipmentUpdateCmd.Flags().String("title", "", "New title")
@@ -325,6 +417,9 @@ func init() {
 	shipmentCmd.AddCommand(shipmentPinCmd)
 	shipmentCmd.AddCommand(shipmentUnpinCmd)
 	shipmentCmd.AddCommand(shipmentAssignCmd)
+	shipmentCmd.AddCommand(shipmentReadyCmd)
+	shipmentCmd.AddCommand(shipmentAutoCmd)
+	shipmentCmd.AddCommand(shipmentManualCmd)
 }
 
 // ShipmentCmd returns the shipment command

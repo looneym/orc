@@ -120,6 +120,18 @@ func runHookStop() error {
 		return nil
 	}
 
+	// 8a. Get shipment to check status
+	shipment, err := wire.ShipmentService().GetShipment(ctx, focusID)
+	if err != nil {
+		// Can't get shipment - allow stop (fail open)
+		return nil //nolint:nilerr // intentional fail-open design
+	}
+
+	// 8b. Only block in auto_implementing mode - implementing (manual) mode allows stop
+	if shipment.Status != "auto_implementing" {
+		return nil
+	}
+
 	// 9. Get tasks for the focused shipment
 	tasks, err := wire.ShipmentService().GetShipmentTasks(ctx, focusID)
 	if err != nil {

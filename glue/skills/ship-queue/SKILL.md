@@ -5,13 +5,13 @@ description: View and manage the shipyard queue. Use when user says /ship-queue 
 
 # Ship Queue Skill
 
-View and manage shipments in the shipyard queue.
+View and manage shipments available for IMP pickup.
 
 ## Usage
 
 ```
-/ship-queue                     (view queue)
-/ship-queue claim               (claim next shipment)
+/ship-queue                     (view available shipments)
+/ship-queue SHIP-xxx            (mark shipment ready for IMP)
 /ship-queue priority SHIP-xxx N (set priority)
 ```
 
@@ -19,8 +19,8 @@ View and manage shipments in the shipyard queue.
 
 ### Step 1: Determine Action
 
-If "claim" argument:
-- Go to Claim flow
+If SHIP-xxx argument (without priority):
+- Go to Ready flow (mark shipment ready_for_imp)
 
 If "priority SHIP-xxx N" arguments:
 - Go to Priority flow
@@ -32,69 +32,51 @@ Otherwise:
 
 ## View Flow
 
-### Step 2: Get Queue
+### Step 2: Get Available Shipments
 
 ```bash
-orc shipyard queue
+orc shipment list --available
 ```
 
-Display queue with:
-- Position
-- Shipment ID and title
-- Task counts (done/total)
-- Priority if set
-- Assignment status
+This shows shipments in `ready_for_imp` status.
 
 ### Step 3: Show Options
 
 Output:
 ```
-Shipyard Queue:
-  1. SHIP-xxx: Title (0/5 tasks) [P1]
-  2. SHIP-yyy: Title (2/4 tasks)
-  3. SHIP-zzz: Title (0/3 tasks)
+Available Shipments:
+  SHIP-xxx: Title (5 tasks) - COMM-001
+  SHIP-yyy: Title (4 tasks) - COMM-001
+  SHIP-zzz: Title (3 tasks) - COMM-002
 
 Actions:
-  /ship-queue claim              - Claim next available
+  orc focus SHIP-xxx             - Focus and start work
+  /ship-queue SHIP-xxx           - Mark another shipment ready
   /ship-queue priority SHIP-xxx 1 - Set priority
-  orc shipment show SHIP-xxx     - View details
 ```
 
 ---
 
-## Claim Flow
+## Ready Flow
 
-### Step 2: Check Current Assignment
+Mark a shipment as ready for IMP pickup.
 
-```bash
-orc status
-```
-
-If already working on a shipment:
-- Warn user about current assignment
-- Ask to confirm switching
-
-### Step 3: Claim from Queue
+### Step 2: Mark Ready
 
 ```bash
-orc shipyard claim
+orc shipment ready SHIP-xxx
 ```
 
-This:
-- Assigns top shipment to current workbench
-- Focuses the shipment
-- Transitions status if needed
+This sets status to `ready_for_imp`, signaling the shipment is ready for IMP work.
 
-### Step 4: Confirm
+### Step 3: Confirm
 
 Output:
 ```
-Claimed from queue:
-  SHIP-xxx: <Title>
-  Tasks: X total (Y ready)
+Shipment SHIP-xxx marked ready_for_imp
 
-Start work:
-  orc task list --shipment SHIP-xxx
+IMP can now claim this shipment:
+  orc focus SHIP-xxx
   orc task claim TASK-yyy
 ```
 
@@ -105,7 +87,7 @@ Start work:
 ### Step 2: Set Priority
 
 ```bash
-orc shipment priority <SHIP-xxx> --priority <N>
+orc shipment update SHIP-xxx --priority N
 ```
 
 Priority 1 = highest, NULL = default FIFO
@@ -116,8 +98,6 @@ Output:
 ```
 Priority set:
   SHIP-xxx now at priority N
-
-Updated queue position: #1
 ```
 
 ## Example Session
@@ -125,16 +105,25 @@ Updated queue position: #1
 ```
 User: /ship-queue
 
-Agent: [runs orc shipyard queue]
+Agent: [runs orc shipment list --available]
 
-Agent: Shipyard Queue (3 shipments):
+Agent: Available Shipments (2):
 
-       #  ID        Title                    Tasks   Priority
-       1  SHIP-248  Test Shipyard Badge      0/0     [P1]
-       2  SHIP-247  Exorcism/Shipment Split  0/2     -
-       3  SHIP-229  Bugfixes Batch           3/10    -
+       ID        Title                    Tasks   Commission
+       SHIP-248  Test Feature             5       COMM-001
+       SHIP-247  Bugfix Batch             2       COMM-001
 
        Actions:
-         /ship-queue claim - Claim #1
-         /ship-queue priority SHIP-247 1 - Bump priority
+         orc focus SHIP-248 - Start work on first
+         /ship-queue SHIP-249 - Mark another shipment ready
+
+User: /ship-queue SHIP-249
+
+Agent: [runs orc shipment ready SHIP-249]
+
+Agent: ✓ Shipment SHIP-249 marked ready_for_imp
+
+       IMP can now pick up this shipment:
+         orc focus SHIP-249
+         orc task list --shipment SHIP-249
 ```

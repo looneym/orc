@@ -76,13 +76,13 @@ type UpdateShipmentRequest struct {
 }
 
 // Shipment represents a shipment entity at the port boundary.
-// Status lifecycle: draft → exploring → specced → tasked → in_progress → complete
+// Status lifecycle: draft → exploring → specced → tasked → ready_for_imp → implementing/auto_implementing → complete
 type Shipment struct {
 	ID                  string
 	CommissionID        string
 	Title               string
 	Description         string
-	Status              string // draft, exploring, specced, tasked, in_progress, complete
+	Status              string // draft, exploring, specced, tasked, ready_for_imp, implementing, auto_implementing, complete
 	AssignedWorkbenchID string
 	RepoID              string // Linked repository for branch ownership
 	Branch              string // Owned branch (e.g., ml/SHIP-001-feature-name)

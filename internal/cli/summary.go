@@ -500,7 +500,7 @@ func colorizeStatus(status string) string {
 	upper := strings.ToUpper(status)
 
 	switch status {
-	case "in_progress":
+	case "in_progress", "implementing", "auto_implementing":
 		return color.New(color.FgHiBlue).Sprint(upper)
 	case "paused":
 		return color.New(color.FgYellow).Sprint(upper)
@@ -524,8 +524,12 @@ func colorizeShipmentStatus(status string) string {
 		return color.New(color.FgHiMagenta).Sprint("[specced]")
 	case "tasked":
 		return color.New(color.FgHiYellow).Sprint("[tasked]")
-	case "in_progress":
-		return color.New(color.FgHiBlue).Sprint("[in_progress]")
+	case "ready_for_imp":
+		return color.New(color.FgHiYellow).Sprint("[ready_for_imp]")
+	case "implementing":
+		return color.New(color.FgHiBlue).Sprint("[implementing]")
+	case "auto_implementing":
+		return color.New(color.FgHiBlue).Sprint("[auto_implementing]")
 	case "paused":
 		return color.New(color.FgYellow).Sprint("[paused]")
 	case "complete":

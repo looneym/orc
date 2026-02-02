@@ -5,13 +5,13 @@ description: Check shipyard queue and claim work. IMP uses this to find availabl
 
 # IMP Poll
 
-Check the shipyard queue for available work and optionally claim a shipment.
+Check for available shipments (ready_for_imp status) and claim work.
 
 ## When to Use
 
 - IMP has no current shipment assigned
 - IMP completed a shipment and needs new work
-- IMP wants to see what's queued
+- IMP wants to see what's available
 
 ## Flow
 
@@ -22,27 +22,28 @@ orc status
 ```
 
 Verify:
-- Is there already a shipment assigned to this workbench? If yes, suggest `/imp-start` instead.
-- Get the commission context for filtering the queue.
+- Is there already a shipment focused for this workbench? If yes, suggest `/imp-start` instead.
+- Get the commission context for filtering.
 
-### Step 2: Display Queue
+### Step 2: Display Available Shipments
 
 ```bash
-orc shipyard list
+orc shipment list --available
 ```
 
-Show the queue with this format:
+Show available shipments with this format:
 ```
-Checking shipyard queue...
+Checking for available shipments...
 
- #  SHIP        TITLE                           PRI   TASKS
- 1  SHIP-240    Critical hotfix                 1     3/3
- 2  SHIP-237    Plan/Apply Refactor             -     0/11
+ID        TITLE                           TASKS   COMMISSION
+--        -----                           -----   ----------
+SHIP-240  Critical hotfix                 3       COMM-001
+SHIP-237  Plan/Apply Refactor             11      COMM-001
 
 Options:
-[c] Claim #1 (top of queue)
+[c] Claim #1 (top of list)
 [n] Claim specific shipment
-[r] Refresh queue
+[r] Refresh
 [q] Quit
 ```
 
@@ -50,8 +51,10 @@ Options:
 
 **[c] Claim top shipment:**
 ```bash
-orc shipyard claim
+orc focus SHIP-xxx
 ```
+
+This focuses the shipment and transitions it to `implementing` status.
 
 Output: "Claimed SHIP-xxx. Run `/imp-start` to begin work."
 
@@ -62,13 +65,11 @@ If number: Map to shipment ID from displayed list
 If ID: Use directly
 
 ```bash
-orc shipment assign SHIP-xxx BENCH-yyy
+orc focus SHIP-xxx
 ```
 
-Where BENCH-yyy is the current workbench from context.
-
 **[r] Refresh:**
-Re-run `orc shipyard list` and display updated queue.
+Re-run `orc shipment list --available` and display updated list.
 
 **[q] Quit:**
 Exit without claiming.
@@ -78,7 +79,7 @@ Exit without claiming.
 After successful claim:
 ```
 ✓ Claimed SHIP-xxx: [title]
-  Assigned to: BENCH-yyy
+  Status: implementing
   Tasks: X ready
 
 Run /imp-start to begin work on the first task.
@@ -86,23 +87,21 @@ Run /imp-start to begin work on the first task.
 
 ## Error Handling
 
-- Empty queue → "Shipyard queue is empty. No work available."
-- Already has shipment → "Workbench already has SHIP-xxx assigned. Run /imp-start or /imp-nudge."
-- Claim fails → "Failed to claim shipment: [error]"
+- No available shipments → "No shipments available. Queue is empty."
+- Already has shipment → "Already focused on SHIP-xxx. Run /imp-start or /imp-nudge."
+- Claim fails → "Failed to focus shipment: [error]"
 
 ## Example Session
 
 ```
 > /imp-poll
 
-Checking shipyard queue...
+Checking for available shipments...
 
-YARD-001 (COMM-001) - 2 shipments queued
-
- #  SHIP      TITLE                    PRI  TASKS   QUEUED
---  ----      -----                    ---  -----   ------
- 1  SHIP-240  Critical hotfix          1    0/3     2h ago
- 2  SHIP-237  Plan/Apply Refactor      -    0/11    1d ago
+ID        TITLE                    TASKS   COMMISSION
+--        -----                    -----   ----------
+SHIP-240  Critical hotfix          3       COMM-001
+SHIP-237  Plan/Apply Refactor      11      COMM-001
 
 [c] Claim #1 (SHIP-240)
 [n] Claim specific
@@ -111,8 +110,10 @@ YARD-001 (COMM-001) - 2 shipments queued
 
 > c
 
+[runs orc focus SHIP-240]
+
 ✓ Claimed SHIP-240: Critical hotfix
-  Assigned to: BENCH-014
+  Status: implementing
   Tasks: 3 ready
 
 Run /imp-start to begin work on the first task.

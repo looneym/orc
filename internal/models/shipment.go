@@ -28,10 +28,12 @@ type Shipment struct {
 
 // Shipment status constants - work state lifecycle
 const (
-	ShipmentStatusDraft      = "draft"
-	ShipmentStatusExploring  = "exploring"
-	ShipmentStatusSpecced    = "specced"
-	ShipmentStatusTasked     = "tasked"
-	ShipmentStatusInProgress = "in_progress"
-	ShipmentStatusComplete   = "complete"
+	ShipmentStatusDraft            = "draft"
+	ShipmentStatusExploring        = "exploring"
+	ShipmentStatusSpecced          = "specced"
+	ShipmentStatusTasked           = "tasked"
+	ShipmentStatusReadyForImp      = "ready_for_imp"
+	ShipmentStatusImplementing     = "implementing"
+	ShipmentStatusAutoImplementing = "auto_implementing"
+	ShipmentStatusComplete         = "complete"
 )
