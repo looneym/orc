@@ -1,4 +1,4 @@
-.PHONY: install install-binary install-shim uninstall-shim dev build test lint lint-fix schema-check check-test-presence check-coverage init install-hooks clean help deploy-glue schema-diff schema-apply schema-inspect setup-workbench schema-diff-workbench schema-apply-workbench
+.PHONY: install install-orc install-dev-shim dev build test lint lint-fix schema-check check-test-presence check-coverage init install-hooks clean help deploy-glue schema-diff schema-apply schema-inspect setup-workbench schema-diff-workbench schema-apply-workbench
 
 # Go binary location (handles empty GOBIN)
 GOBIN := $(shell go env GOPATH)/bin
@@ -15,62 +15,35 @@ LDFLAGS := -X 'github.com/example/orc/internal/version.Version=$(VERSION)' \
 .DEFAULT_GOAL := help
 
 #---------------------------------------------------------------------------
-# Installation (global binary + shim)
+# Installation (global binary + dev shim)
 #---------------------------------------------------------------------------
 
-# Full install: binary + shim
-install: install-binary install-shim install-dev-shim
+# Full install: binary + dev shim
+install: install-orc install-dev-shim
 	@echo ""
-	@echo "✓ ORC installed with local-first shim"
-	@echo "  Binary: $(GOBIN)/orc-bin"
-	@echo "  Shim:   $(GOBIN)/orc"
-	@echo ""
-	@echo "Usage:"
-	@echo "  In orc repo with ./orc  → uses local (shows '[using local ./orc]')"
-	@echo "  Elsewhere               → uses global orc-bin"
+	@echo "Installed:"
+	@echo "  orc      - global binary (production DB)"
+	@echo "  orc-dev  - workbench DB shim"
 
-# Install the actual binary as orc-bin
-install-binary:
-	@echo "Building and installing orc-bin..."
-	go build -ldflags "$(LDFLAGS)" -o $(GOBIN)/orc-bin ./cmd/orc
-
-# Install the shim script as orc
-install-shim:
-	@echo "Installing shim..."
-	@echo '#!/bin/bash' > $(GOBIN)/orc
-	@echo '# ORC local-first shim - prefers ./orc when present' >> $(GOBIN)/orc
-	@echo 'if [[ -x "./orc" ]]; then' >> $(GOBIN)/orc
-	@echo '  echo "[using local ./orc]" >&2' >> $(GOBIN)/orc
-	@echo '  exec ./orc "$$@"' >> $(GOBIN)/orc
-	@echo 'else' >> $(GOBIN)/orc
-	@echo '  exec "$$(dirname "$$0")/orc-bin" "$$@"' >> $(GOBIN)/orc
-	@echo 'fi' >> $(GOBIN)/orc
-	@chmod +x $(GOBIN)/orc
+# Install the orc binary
+install-orc:
+	@echo "Building orc..."
+	go build -ldflags "$(LDFLAGS)" -o $(GOBIN)/orc ./cmd/orc
 
 # Install orc-dev shim for development (requires workbench DB)
 install-dev-shim:
 	@echo "Installing orc-dev shim..."
 	@echo '#!/bin/bash' > $(GOBIN)/orc-dev
-	@echo '# ORC dev shim - requires workbench-local DB' >> $(GOBIN)/orc-dev
+	@echo '# ORC dev shim - uses workbench-local DB' >> $(GOBIN)/orc-dev
 	@echo 'if [[ ! -f ".orc/workbench.db" ]]; then' >> $(GOBIN)/orc-dev
 	@echo '  echo "Error: No workbench DB found at .orc/workbench.db" >&2' >> $(GOBIN)/orc-dev
 	@echo '  echo "Run: make setup-workbench" >&2' >> $(GOBIN)/orc-dev
 	@echo '  exit 1' >> $(GOBIN)/orc-dev
 	@echo 'fi' >> $(GOBIN)/orc-dev
 	@echo 'export ORC_DB_PATH=".orc/workbench.db"' >> $(GOBIN)/orc-dev
-	@echo 'exec "$$(dirname "$$0")/orc-bin" "$$@"' >> $(GOBIN)/orc-dev
+	@echo 'exec "$$(dirname "$$0")/orc" "$$@"' >> $(GOBIN)/orc-dev
 	@chmod +x $(GOBIN)/orc-dev
-	@echo "✓ orc-dev installed (requires .orc/workbench.db)"
-
-# Remove shim and restore direct binary access
-uninstall-shim:
-	@if [ -f "$(GOBIN)/orc-bin" ]; then \
-		rm -f $(GOBIN)/orc; \
-		mv $(GOBIN)/orc-bin $(GOBIN)/orc; \
-		echo "✓ Shim removed, binary restored to $(GOBIN)/orc"; \
-	else \
-		echo "No orc-bin found, nothing to restore"; \
-	fi
+	@echo "orc-dev installed"
 
 #---------------------------------------------------------------------------
 # Development (local binary)
@@ -280,10 +253,8 @@ help:
 	@echo "  make setup-workbench        Create/reset workbench-local database"
 	@echo ""
 	@echo "Installation:"
-	@echo "  make install    Install global orc-bin + local-first shim"
-	@echo "  make uninstall-shim  Remove shim, restore direct binary"
-	@echo ""
-	@echo "The shim prefers ./orc when present, falls back to orc-bin."
+	@echo "  make install       Install orc binary and orc-dev shim"
+	@echo "  make install-orc   Install only the orc binary"
 	@echo ""
 	@echo "Claude Code Integration:"
 	@echo "  make deploy-glue   Deploy skills to ~/.claude/skills/"
