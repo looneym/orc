@@ -41,29 +41,26 @@ git merge <BRANCH> --no-edit
 
 Report merge result (fast-forward or merge commit).
 
-### 3. Install Hooks
+### 3. Post-merge Build Steps
+
+The post-merge hook shows reminders but doesn't auto-execute. Run the checklist manually:
 
 ```bash
-make init
+# Initialize and rebuild
+make init          # Install dependencies and hooks
+make install       # Build and install orc binary
+make deploy-glue   # Deploy Claude Code skills/hooks
+make test          # Verify everything works
 ```
 
-Verify both hooks exist:
-```bash
-ls -la .git/hooks/{pre-commit,post-merge}
-```
+### 4. Schema Sync (if needed)
 
-### 4. Post-merge Hook Validation
-
-For fast-forward merges, the post-merge hook doesn't trigger automatically.
-Run it manually to rebuild:
+If the hook warned about schema drift:
 
 ```bash
-.git/hooks/post-merge
+make schema-diff   # Preview changes
+make schema-apply  # Apply to local DB
 ```
-
-Confirm output shows:
-- `make install` completed
-- `make clean` completed
 
 ### 5. Push to Origin
 
@@ -113,7 +110,8 @@ Include in the message:
 
 Report completion with:
 - Branch merged
-- Hooks verified
+- Build completed (init, install, deploy-glue, test)
+- Schema synced (if needed)
 - Master pushed
 - Worktree rebased
 - Shipment closed (if applicable)
