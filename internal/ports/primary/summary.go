@@ -63,7 +63,9 @@ type ShipmentSummary struct {
 	BenchName  string // Assigned workbench name (for display)
 	TasksDone  int
 	TasksTotal int
+	NoteCount  int
 	Tasks      []TaskSummary // Populated only for focused shipment
+	Notes      []NoteSummary // Populated only for focused shipment
 }
 
 // TaskSummary represents a task in the summary view.

@@ -208,6 +208,25 @@ func (s *SummaryServiceImpl) buildShipmentSummary(ctx context.Context, ship *pri
 		}
 	}
 
+	// Get notes for this shipment (count open notes, expand if focused)
+	noteCount := 0
+	var noteSummaries []primary.NoteSummary
+	notes, err := s.noteService.GetNotesByContainer(ctx, "shipment", ship.ID)
+	if err == nil {
+		for _, n := range notes {
+			if n.Status != "closed" {
+				noteCount++
+				if isFocused {
+					noteSummaries = append(noteSummaries, primary.NoteSummary{
+						ID:    n.ID,
+						Title: n.Title,
+						Type:  n.Type,
+					})
+				}
+			}
+		}
+	}
+
 	// Get workbench name if assigned
 	benchName := ""
 	if ship.AssignedWorkbenchID != "" {
@@ -227,7 +246,9 @@ func (s *SummaryServiceImpl) buildShipmentSummary(ctx context.Context, ship *pri
 		BenchName:  benchName,
 		TasksDone:  tasksDone,
 		TasksTotal: tasksTotal,
+		NoteCount:  noteCount,
 		Tasks:      taskSummaries,
+		Notes:      noteSummaries,
 	}, nil
 }
 

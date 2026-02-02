@@ -336,6 +336,14 @@ func buildWorkshopFocusMap(ctx context.Context, workshopID, currentWorkbenchID, 
 		info.containerToWorkbench[focusedID] = fmt.Sprintf("%s@%s", wb.Name, wb.ID)
 	}
 
+	// Get Goblin's focus (visible to all IMPs)
+	if gatehouseID != "" {
+		gh, err := wire.GatehouseService().GetGatehouse(ctx, gatehouseID)
+		if err == nil && gh.FocusedID != "" {
+			info.containerToWorkbench[gh.FocusedID] = "Goblin"
+		}
+	}
+
 	return info
 }
 
@@ -374,7 +382,11 @@ func renderSummary(summary *primary.CommissionSummary, _ string, workshopFocus w
 		if ship.Status != "" && ship.Status != "complete" {
 			statusBadge = " " + colorizeShipmentStatus(ship.Status)
 		}
-		taskInfo := fmt.Sprintf(" (%d/%d done)", ship.TasksDone, ship.TasksTotal)
+		taskInfo := fmt.Sprintf(" (%d/%d done", ship.TasksDone, ship.TasksTotal)
+		if ship.NoteCount > 0 {
+			taskInfo += fmt.Sprintf(", %s", pluralize(ship.NoteCount, "note", "notes"))
+		}
+		taskInfo += ")"
 		pinnedMark := ""
 		if ship.Pinned {
 			pinnedMark = " *"
@@ -388,13 +400,29 @@ func renderSummary(summary *primary.CommissionSummary, _ string, workshopFocus w
 
 		fmt.Printf("%s%s%s%s%s%s - %s%s\n", prefix, colorizeID(ship.ID), statusBadge, benchMarker, focusMark, pinnedMark, ship.Title, taskInfo)
 
-		// Expand tasks for focused shipment
-		if ship.IsFocused && len(ship.Tasks) > 0 {
-			for j, task := range ship.Tasks {
-				isLastTask := j == len(ship.Tasks)-1
+		// Expand children for focused shipment (notes first, then tasks)
+		if ship.IsFocused {
+			totalChildren := len(ship.Notes) + len(ship.Tasks)
+			childIdx := 0
+
+			// Render notes first (context)
+			for _, note := range ship.Notes {
+				isLastChild := childIdx == totalChildren-1
+				nPrefix := taskPrefix + "├── "
+				if isLastChild {
+					nPrefix = taskPrefix + "└── "
+				}
+				typeMarker := color.New(color.FgYellow).Sprintf("[%s] ", note.Type)
+				fmt.Printf("%s%s %s- %s\n", nPrefix, colorizeID(note.ID), typeMarker, note.Title)
+				childIdx++
+			}
+
+			// Render tasks second (work)
+			for _, task := range ship.Tasks {
+				isLastChild := childIdx == totalChildren-1
 				tPrefix := taskPrefix + "├── "
 				taskChildPrefix := taskPrefix + "│   "
-				if isLastTask {
+				if isLastChild {
 					tPrefix = taskPrefix + "└── "
 					taskChildPrefix = taskPrefix + "    "
 				}
@@ -405,6 +433,7 @@ func renderSummary(summary *primary.CommissionSummary, _ string, workshopFocus w
 				fmt.Printf("%s%s - %s%s\n", tPrefix, colorizeID(task.ID), statusMark, task.Title)
 				// Render task children (plans, approvals, escalations, receipts)
 				renderTaskChildren(task, taskChildPrefix)
+				childIdx++
 			}
 		}
 
