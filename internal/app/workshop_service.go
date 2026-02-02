@@ -636,5 +636,34 @@ func (s *WorkshopServiceImpl) GetActiveCommission(ctx context.Context, workshopI
 	return record.ActiveCommissionID, nil
 }
 
+// ArchiveWorkshop soft-deletes a workshop by setting status to 'archived'.
+func (s *WorkshopServiceImpl) ArchiveWorkshop(ctx context.Context, workshopID string) error {
+	record, err := s.workshopRepo.GetByID(ctx, workshopID)
+	if err != nil {
+		return fmt.Errorf("workshop not found: %w", err)
+	}
+	if record.Status == "archived" {
+		return fmt.Errorf("workshop %s is already archived", workshopID)
+	}
+
+	// Check for active (non-archived) workbenches
+	workbenches, err := s.workbenchRepo.GetByWorkshop(ctx, workshopID)
+	if err != nil {
+		return fmt.Errorf("failed to check workbenches: %w", err)
+	}
+	activeCount := 0
+	for _, wb := range workbenches {
+		if wb.Status != "archived" {
+			activeCount++
+		}
+	}
+	if activeCount > 0 {
+		return fmt.Errorf("cannot archive workshop: %d active workbench(es) remaining. Archive them first with 'orc workbench archive'", activeCount)
+	}
+
+	record.Status = "archived"
+	return s.workshopRepo.Update(ctx, record)
+}
+
 // Ensure WorkshopServiceImpl implements the interface
 var _ primary.WorkshopService = (*WorkshopServiceImpl)(nil)

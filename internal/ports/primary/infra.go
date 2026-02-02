@@ -38,6 +38,9 @@ type InfraPlan struct {
 	OrphanWorkbenches []InfraWorkbenchOp
 	OrphanGatehouses  []InfraGatehouseOp
 
+	// TMux infrastructure
+	TMuxSession *InfraTMuxSessionOp
+
 	// Force deletion of dirty worktrees
 	Force bool
 
@@ -62,6 +65,21 @@ type InfraWorkbenchOp struct {
 	ConfigStatus OpStatus // EXISTS or CREATE
 	RepoName     string   // Source repo name (if linked)
 	Branch       string   // Home branch
+}
+
+// InfraTMuxSessionOp describes tmux session infrastructure state.
+type InfraTMuxSessionOp struct {
+	SessionName   string
+	Status        OpStatus // EXISTS or CREATE
+	Windows       []InfraTMuxWindowOp
+	OrphanWindows []InfraTMuxWindowOp // Windows that exist but shouldn't (DELETE)
+}
+
+// InfraTMuxWindowOp describes tmux window infrastructure state.
+type InfraTMuxWindowOp struct {
+	Name   string
+	Path   string
+	Status OpStatus // EXISTS, CREATE, or DELETE
 }
 
 // InfraApplyResponse contains the result of applying infrastructure.

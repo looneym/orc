@@ -28,6 +28,7 @@ func WorkbenchCmd() *cobra.Command {
 	cmd.AddCommand(workbenchShowCmd())
 	cmd.AddCommand(workbenchRenameCmd())
 	cmd.AddCommand(workbenchDeleteCmd())
+	cmd.AddCommand(workbenchArchiveCmd())
 	cmd.AddCommand(workbenchCheckoutCmd())
 	cmd.AddCommand(workbenchStatusCmd())
 
@@ -326,6 +327,48 @@ Examples:
 	}
 
 	cmd.Flags().BoolVarP(&force, "force", "f", false, "Force delete even with errors")
+
+	return cmd
+}
+
+func workbenchArchiveCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "archive [workbench-id]",
+		Short: "Archive a workbench (soft-delete)",
+		Long: `Archive a workbench by setting its status to 'archived'.
+
+This is a soft-delete that keeps the record in the database so
+infrastructure planning can detect it as a deletion target.
+
+To physically remove the worktree after archiving:
+  orc infra apply WORK-xxx
+
+Examples:
+  orc workbench archive BENCH-001`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			ctx := context.Background()
+			workbenchID := args[0]
+
+			// Get workbench info for display
+			workbench, err := wire.WorkbenchService().GetWorkbench(ctx, workbenchID)
+			if err != nil {
+				return err
+			}
+
+			if err := wire.WorkbenchService().ArchiveWorkbench(ctx, workbenchID); err != nil {
+				return err
+			}
+
+			fmt.Printf("✓ Workbench %s archived\n", workbenchID)
+			fmt.Printf("  Name: %s\n", workbench.Name)
+			fmt.Printf("  Path: %s\n", workbench.Path)
+			fmt.Printf("\nTo remove the worktree, run:\n")
+			fmt.Printf("  orc infra apply %s\n", workbench.WorkshopID)
+
+			return nil
+		},
+	}
 
 	return cmd
 }

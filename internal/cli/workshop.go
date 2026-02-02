@@ -27,6 +27,7 @@ func WorkshopCmd() *cobra.Command {
 	cmd.AddCommand(workshopListCmd())
 	cmd.AddCommand(workshopShowCmd())
 	cmd.AddCommand(workshopDeleteCmd())
+	cmd.AddCommand(workshopArchiveCmd())
 	cmd.AddCommand(workshopCloseCmd())
 	cmd.AddCommand(workshopSetCommissionCmd())
 
@@ -180,6 +181,50 @@ Examples:
 	}
 
 	cmd.Flags().BoolVarP(&force, "force", "f", false, "Force delete even with workbenches")
+
+	return cmd
+}
+
+func workshopArchiveCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "archive [workshop-id]",
+		Short: "Archive a workshop (soft-delete)",
+		Long: `Archive a workshop by setting its status to 'archived'.
+
+This is a soft-delete that keeps the record in the database so
+infrastructure planning can detect it as a deletion target.
+
+All workbenches must be archived first. To archive workbenches:
+  orc workbench archive BENCH-xxx
+
+After archiving, to remove physical infrastructure:
+  orc infra apply WORK-xxx
+
+Examples:
+  orc workshop archive WORK-001`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			ctx := context.Background()
+			workshopID := args[0]
+
+			// Get workshop info for display
+			workshop, err := wire.WorkshopService().GetWorkshop(ctx, workshopID)
+			if err != nil {
+				return err
+			}
+
+			if err := wire.WorkshopService().ArchiveWorkshop(ctx, workshopID); err != nil {
+				return err
+			}
+
+			fmt.Printf("✓ Workshop %s archived\n", workshopID)
+			fmt.Printf("  Name: %s\n", workshop.Name)
+			fmt.Printf("\nTo remove physical infrastructure, run:\n")
+			fmt.Printf("  orc infra apply %s\n", workshopID)
+
+			return nil
+		},
+	}
 
 	return cmd
 }

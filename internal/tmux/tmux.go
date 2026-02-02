@@ -57,6 +57,13 @@ func WindowExists(sessionName, windowName string) bool {
 	return false
 }
 
+// KillWindow kills a window in a session
+func KillWindow(sessionName, windowName string) error {
+	target := fmt.Sprintf("%s:%s", sessionName, windowName)
+	cmd := exec.Command("tmux", "kill-window", "-t", target)
+	return cmd.Run()
+}
+
 // GetPaneCount returns the number of panes in a window
 func GetPaneCount(sessionName, windowName string) int {
 	target := fmt.Sprintf("%s:%s", sessionName, windowName)
@@ -458,6 +465,7 @@ func ApplyGlobalBindings() {
 		// ORC custom options
 		{Label: "New Workbench Like This", Key: "n", Command: "run-shell 'cd #{pane_current_path} && orc workbench like'"},
 		{Label: "Show Summary", Key: "s", Command: "display-popup -E -w 100 -h 30 -T 'ORC Summary' 'cd #{pane_current_path} && CLICOLOR_FORCE=1 orc summary | less -R'"},
+		{Label: "Archive Workbench", Key: "a", Command: "display-popup -E -w 80 -h 20 -T 'Archive Workbench' 'cd #{pane_current_path} && orc infra archive-workbench'"},
 		// Separator
 		{Label: "", Key: "", Command: ""},
 		// Default tmux window options

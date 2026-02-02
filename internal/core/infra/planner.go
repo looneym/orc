@@ -21,6 +21,12 @@ type PlanInput struct {
 	// Orphan state (exist on disk but not in DB)
 	OrphanWorkbenches []WorkbenchPlanInput
 	OrphanGatehouses  []GatehousePlanInput
+
+	// TMux state
+	TMuxSessionExists     bool              // Session found by ORC_WORKSHOP_ID
+	TMuxActualSessionName string            // Actual session name (may differ after renames)
+	TMuxExistingWindows   []string          // Window names currently in session
+	TMuxExpectedWindows   []TMuxWindowInput // Windows that should exist (from workbenches)
 }
 
 // GatehousePlanInput contains pre-fetched data for a single gatehouse.
@@ -40,6 +46,12 @@ type WorkbenchPlanInput struct {
 	ConfigExists   bool
 }
 
+// TMuxWindowInput contains pre-fetched data for an expected tmux window.
+type TMuxWindowInput struct {
+	Name string // Window name (usually workbench name)
+	Path string // Working directory for the window
+}
+
 // Plan describes infrastructure state for a workshop.
 type Plan struct {
 	WorkshopID   string
@@ -53,6 +65,9 @@ type Plan struct {
 	// Orphans (exist on disk but not in DB)
 	OrphanWorkbenches []WorkbenchOp
 	OrphanGatehouses  []GatehouseOp
+
+	// TMux state
+	TMuxSession *TMuxSessionOp
 }
 
 // GatehouseOp describes gatehouse infrastructure state.
@@ -72,6 +87,21 @@ type WorkbenchOp struct {
 	ConfigExists bool
 	RepoName     string
 	Branch       string
+}
+
+// TMuxSessionOp describes tmux session infrastructure state.
+type TMuxSessionOp struct {
+	SessionName   string
+	Exists        bool
+	Windows       []TMuxWindowOp
+	OrphanWindows []TMuxWindowOp // Windows that exist but shouldn't (workbench deleted/archived)
+}
+
+// TMuxWindowOp describes tmux window infrastructure state.
+type TMuxWindowOp struct {
+	Name   string
+	Path   string
+	Exists bool
 }
 
 // GeneratePlan creates an infrastructure plan.
@@ -126,5 +156,49 @@ func GeneratePlan(input PlanInput) Plan {
 		})
 	}
 
+	// TMux session state
+	plan.TMuxSession = buildTMuxSessionOp(input)
+
 	return plan
+}
+
+// buildTMuxSessionOp creates the TMux session operation plan.
+func buildTMuxSessionOp(input PlanInput) *TMuxSessionOp {
+	sessionOp := &TMuxSessionOp{
+		SessionName: input.TMuxActualSessionName,
+		Exists:      input.TMuxSessionExists,
+	}
+
+	// Build set of existing windows for O(1) lookup
+	existingSet := make(map[string]bool)
+	for _, w := range input.TMuxExistingWindows {
+		existingSet[w] = true
+	}
+
+	// Build set of expected window names for orphan detection
+	expectedSet := make(map[string]bool)
+	for _, w := range input.TMuxExpectedWindows {
+		expectedSet[w.Name] = true
+	}
+
+	// Check each expected window
+	for _, expected := range input.TMuxExpectedWindows {
+		sessionOp.Windows = append(sessionOp.Windows, TMuxWindowOp{
+			Name:   expected.Name,
+			Path:   expected.Path,
+			Exists: existingSet[expected.Name],
+		})
+	}
+
+	// Find orphan windows (exist but not expected)
+	for _, windowName := range input.TMuxExistingWindows {
+		if !expectedSet[windowName] {
+			sessionOp.OrphanWindows = append(sessionOp.OrphanWindows, TMuxWindowOp{
+				Name:   windowName,
+				Exists: true,
+			})
+		}
+	}
+
+	return sessionOp
 }

@@ -45,6 +45,10 @@ type WorkshopService interface {
 
 	// GetActiveCommission returns the active commission ID for a workshop.
 	GetActiveCommission(ctx context.Context, workshopID string) (string, error)
+
+	// ArchiveWorkshop soft-deletes a workshop by setting status to 'archived'.
+	// Requires all workbenches to be archived first.
+	ArchiveWorkshop(ctx context.Context, workshopID string) error
 }
 
 // CreateWorkshopRequest contains parameters for creating a workshop.

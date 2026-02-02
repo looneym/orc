@@ -336,7 +336,7 @@ func newTestInfraService() *InfraServiceImpl {
 	workspaceAdapter := &mockInfraWorkspaceAdapter{}
 	executor := &mockInfraEffectExecutor{}
 
-	return NewInfraService(factoryRepo, workshopRepo, workbenchRepo, repoRepo, gatehouseRepo, workspaceAdapter, executor)
+	return NewInfraService(factoryRepo, workshopRepo, workbenchRepo, repoRepo, gatehouseRepo, workspaceAdapter, nil, executor)
 }
 
 func TestInfraService_PlanInfra(t *testing.T) {

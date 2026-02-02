@@ -332,5 +332,18 @@ func (s *WorkbenchServiceImpl) GetFocusedID(ctx context.Context, workbenchID str
 	return record.FocusedID, nil
 }
 
+// ArchiveWorkbench soft-deletes a workbench by setting status to 'archived'.
+func (s *WorkbenchServiceImpl) ArchiveWorkbench(ctx context.Context, workbenchID string) error {
+	record, err := s.workbenchRepo.GetByID(ctx, workbenchID)
+	if err != nil {
+		return fmt.Errorf("workbench not found: %w", err)
+	}
+	if record.Status == "archived" {
+		return fmt.Errorf("workbench %s is already archived", workbenchID)
+	}
+	record.Status = "archived"
+	return s.workbenchRepo.Update(ctx, record)
+}
+
 // Ensure WorkbenchServiceImpl implements the interface
 var _ primary.WorkbenchService = (*WorkbenchServiceImpl)(nil)
