@@ -251,7 +251,7 @@ func initServices() {
 	shipmentRepo = sqlite.NewShipmentRepository(database)
 	taskRepo := sqlite.NewTaskRepository(database)
 	tagRepo := sqlite.NewTagRepository(database)
-	taskService = app.NewTaskService(taskRepo, tagRepo)
+	taskService = app.NewTaskService(taskRepo, tagRepo, shipmentRepo)
 
 	// Create note, handoff, and tome services
 	noteRepo := sqlite.NewNoteRepository(database)

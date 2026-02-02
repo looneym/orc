@@ -57,6 +57,13 @@ type ShipmentService interface {
 
 	// SetShipmentPriority sets the priority for a shipment in the queue.
 	SetShipmentPriority(ctx context.Context, shipmentID string, priority *int) error
+
+	// UpdateStatus sets a shipment's status directly (used for auto-transitions).
+	UpdateStatus(ctx context.Context, shipmentID, status string) error
+
+	// TriggerAutoTransition evaluates and applies auto-transition for a shipment.
+	// Returns the new status if a transition occurred, empty string otherwise.
+	TriggerAutoTransition(ctx context.Context, shipmentID, triggerEvent string) (string, error)
 }
 
 // CreateShipmentRequest contains parameters for creating a shipment.
@@ -85,13 +92,13 @@ type UpdateShipmentRequest struct {
 }
 
 // Shipment represents a shipment entity at the port boundary.
-// Status lifecycle: draft → queued → assigned → active → complete
+// Status lifecycle: draft → exploring → specced → tasked → in_progress → complete
 type Shipment struct {
 	ID                  string
 	CommissionID        string
 	Title               string
 	Description         string
-	Status              string // draft, queued, assigned, active, complete
+	Status              string // draft, exploring, specced, tasked, in_progress, complete
 	AssignedWorkbenchID string
 	RepoID              string // Linked repository for branch ownership
 	Branch              string // Owned branch (e.g., ml/SHIP-001-feature-name)

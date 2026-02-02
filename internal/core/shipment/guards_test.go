@@ -131,10 +131,10 @@ func TestCanPauseShipment(t *testing.T) {
 		wantReason  string
 	}{
 		{
-			name: "can pause active shipment",
+			name: "can pause in_progress shipment",
 			ctx: StatusTransitionContext{
 				ShipmentID: "SHIP-001",
-				Status:     "active",
+				Status:     "in_progress",
 			},
 			wantAllowed: true,
 		},
@@ -145,7 +145,7 @@ func TestCanPauseShipment(t *testing.T) {
 				Status:     "paused",
 			},
 			wantAllowed: false,
-			wantReason:  "can only pause active shipments (current status: paused)",
+			wantReason:  "can only pause in_progress shipments (current status: paused)",
 		},
 		{
 			name: "cannot pause complete shipment",
@@ -154,7 +154,16 @@ func TestCanPauseShipment(t *testing.T) {
 				Status:     "complete",
 			},
 			wantAllowed: false,
-			wantReason:  "can only pause active shipments (current status: complete)",
+			wantReason:  "can only pause in_progress shipments (current status: complete)",
+		},
+		{
+			name: "cannot pause draft shipment",
+			ctx: StatusTransitionContext{
+				ShipmentID: "SHIP-001",
+				Status:     "draft",
+			},
+			wantAllowed: false,
+			wantReason:  "can only pause in_progress shipments (current status: draft)",
 		},
 	}
 
@@ -187,13 +196,13 @@ func TestCanResumeShipment(t *testing.T) {
 			wantAllowed: true,
 		},
 		{
-			name: "cannot resume active shipment",
+			name: "cannot resume in_progress shipment",
 			ctx: StatusTransitionContext{
 				ShipmentID: "SHIP-001",
-				Status:     "active",
+				Status:     "in_progress",
 			},
 			wantAllowed: false,
-			wantReason:  "can only resume paused shipments (current status: active)",
+			wantReason:  "can only resume paused shipments (current status: in_progress)",
 		},
 		{
 			name: "cannot resume complete shipment",
@@ -214,6 +223,96 @@ func TestCanResumeShipment(t *testing.T) {
 			}
 			if !tt.wantAllowed && result.Reason != tt.wantReason {
 				t.Errorf("Reason = %q, want %q", result.Reason, tt.wantReason)
+			}
+		})
+	}
+}
+
+func TestGetAutoTransitionStatus(t *testing.T) {
+	tests := []struct {
+		name       string
+		ctx        AutoTransitionContext
+		wantStatus string
+	}{
+		// Focus transitions
+		{
+			name: "focus on draft shipment transitions to exploring",
+			ctx: AutoTransitionContext{
+				CurrentStatus: "draft",
+				TriggerEvent:  "focus",
+			},
+			wantStatus: "exploring",
+		},
+		{
+			name: "focus on exploring shipment does not transition",
+			ctx: AutoTransitionContext{
+				CurrentStatus: "exploring",
+				TriggerEvent:  "focus",
+			},
+			wantStatus: "",
+		},
+		// Task created transitions
+		{
+			name: "first task created on exploring shipment transitions to tasked",
+			ctx: AutoTransitionContext{
+				CurrentStatus: "exploring",
+				TriggerEvent:  "task_created",
+			},
+			wantStatus: "tasked",
+		},
+		{
+			name: "task created on tasked shipment does not transition",
+			ctx: AutoTransitionContext{
+				CurrentStatus: "tasked",
+				TriggerEvent:  "task_created",
+			},
+			wantStatus: "",
+		},
+		// Task claimed transitions
+		{
+			name: "task claimed on tasked shipment transitions to in_progress",
+			ctx: AutoTransitionContext{
+				CurrentStatus: "tasked",
+				TriggerEvent:  "task_claimed",
+			},
+			wantStatus: "in_progress",
+		},
+		{
+			name: "task claimed on in_progress shipment does not transition",
+			ctx: AutoTransitionContext{
+				CurrentStatus: "in_progress",
+				TriggerEvent:  "task_claimed",
+			},
+			wantStatus: "",
+		},
+		// Task completed transitions
+		{
+			name: "last task completed transitions to complete",
+			ctx: AutoTransitionContext{
+				CurrentStatus:      "in_progress",
+				TriggerEvent:       "task_completed",
+				TaskCount:          3,
+				CompletedTaskCount: 3,
+			},
+			wantStatus: "complete",
+		},
+		{
+			name: "task completed but not all done does not transition",
+			ctx: AutoTransitionContext{
+				CurrentStatus:      "in_progress",
+				TriggerEvent:       "task_completed",
+				TaskCount:          3,
+				CompletedTaskCount: 2,
+			},
+			wantStatus: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := GetAutoTransitionStatus(tt.ctx)
+			if got != tt.wantStatus {
+				t.Errorf("GetAutoTransitionStatus() = %q, want %q", got, tt.wantStatus)
 			}
 		})
 	}

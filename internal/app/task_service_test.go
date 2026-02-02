@@ -286,7 +286,7 @@ func (m *mockTagRepositoryForTask) GetEntityTag(ctx context.Context, entityID, e
 func newTestTaskService() (*TaskServiceImpl, *mockTaskRepository, *mockTagRepositoryForTask) {
 	taskRepo := newMockTaskRepository()
 	tagRepo := newMockTagRepositoryForTask()
-	service := NewTaskService(taskRepo, tagRepo)
+	service := NewTaskService(taskRepo, tagRepo, nil) // nil shipmentRepo for basic tests
 	return service, taskRepo, tagRepo
 }
 

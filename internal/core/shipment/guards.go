@@ -103,12 +103,12 @@ func CanCompleteShipment(ctx CompleteShipmentContext) GuardResult {
 
 // CanPauseShipment evaluates whether a shipment can be paused.
 // Rules:
-// - Status must be "active"
+// - Status must be "in_progress"
 func CanPauseShipment(ctx StatusTransitionContext) GuardResult {
-	if ctx.Status != "active" {
+	if ctx.Status != "in_progress" {
 		return GuardResult{
 			Allowed: false,
-			Reason:  fmt.Sprintf("can only pause active shipments (current status: %s)", ctx.Status),
+			Reason:  fmt.Sprintf("can only pause in_progress shipments (current status: %s)", ctx.Status),
 		}
 	}
 
@@ -127,6 +127,38 @@ func CanResumeShipment(ctx StatusTransitionContext) GuardResult {
 	}
 
 	return GuardResult{Allowed: true}
+}
+
+// AutoTransitionContext provides context for automatic status transitions.
+type AutoTransitionContext struct {
+	CurrentStatus      string
+	TriggerEvent       string // "focus", "task_created", "task_claimed", "task_completed"
+	TaskCount          int
+	CompletedTaskCount int
+}
+
+// GetAutoTransitionStatus returns the new status for automatic transitions.
+// Returns empty string if no transition should occur.
+func GetAutoTransitionStatus(ctx AutoTransitionContext) string {
+	switch ctx.TriggerEvent {
+	case "focus":
+		if ctx.CurrentStatus == "draft" {
+			return "exploring"
+		}
+	case "task_created":
+		if ctx.CurrentStatus == "draft" || ctx.CurrentStatus == "exploring" || ctx.CurrentStatus == "specced" {
+			return "tasked"
+		}
+	case "task_claimed":
+		if ctx.CurrentStatus == "tasked" || ctx.CurrentStatus == "exploring" || ctx.CurrentStatus == "specced" {
+			return "in_progress"
+		}
+	case "task_completed":
+		if ctx.TaskCount > 0 && ctx.TaskCount == ctx.CompletedTaskCount {
+			return "complete"
+		}
+	}
+	return ""
 }
 
 // CanAssignWorkbench evaluates whether a workbench can be assigned to a shipment.

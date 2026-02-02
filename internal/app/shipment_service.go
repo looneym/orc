@@ -212,6 +212,32 @@ func (s *ShipmentServiceImpl) UpdateShipment(ctx context.Context, req primary.Up
 	return s.shipmentRepo.Update(ctx, record)
 }
 
+// UpdateStatus sets a shipment's status directly (used for auto-transitions).
+func (s *ShipmentServiceImpl) UpdateStatus(ctx context.Context, shipmentID, status string) error {
+	return s.shipmentRepo.UpdateStatus(ctx, shipmentID, status, false)
+}
+
+// TriggerAutoTransition evaluates and applies auto-transition for a shipment.
+func (s *ShipmentServiceImpl) TriggerAutoTransition(ctx context.Context, shipmentID, triggerEvent string) (string, error) {
+	ship, err := s.shipmentRepo.GetByID(ctx, shipmentID)
+	if err != nil {
+		return "", err
+	}
+
+	newStatus := coreshipment.GetAutoTransitionStatus(coreshipment.AutoTransitionContext{
+		CurrentStatus: ship.Status,
+		TriggerEvent:  triggerEvent,
+	})
+	if newStatus == "" {
+		return "", nil // No transition needed
+	}
+
+	if err := s.shipmentRepo.UpdateStatus(ctx, shipmentID, newStatus, false); err != nil {
+		return "", err
+	}
+	return newStatus, nil
+}
+
 // PinShipment pins a shipment.
 func (s *ShipmentServiceImpl) PinShipment(ctx context.Context, shipmentID string) error {
 	return s.shipmentRepo.Pin(ctx, shipmentID)

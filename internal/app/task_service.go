@@ -4,24 +4,28 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/example/orc/internal/core/shipment"
 	"github.com/example/orc/internal/ports/primary"
 	"github.com/example/orc/internal/ports/secondary"
 )
 
 // TaskServiceImpl implements the TaskService interface.
 type TaskServiceImpl struct {
-	taskRepo secondary.TaskRepository
-	tagRepo  secondary.TagRepository
+	taskRepo     secondary.TaskRepository
+	tagRepo      secondary.TagRepository
+	shipmentRepo secondary.ShipmentRepository
 }
 
 // NewTaskService creates a new TaskService with injected dependencies.
 func NewTaskService(
 	taskRepo secondary.TaskRepository,
 	tagRepo secondary.TagRepository,
+	shipmentRepo secondary.ShipmentRepository,
 ) *TaskServiceImpl {
 	return &TaskServiceImpl{
-		taskRepo: taskRepo,
-		tagRepo:  tagRepo,
+		taskRepo:     taskRepo,
+		tagRepo:      tagRepo,
+		shipmentRepo: shipmentRepo,
 	}
 }
 
@@ -66,6 +70,20 @@ func (s *TaskServiceImpl) CreateTask(ctx context.Context, req primary.CreateTask
 
 	if err := s.taskRepo.Create(ctx, record); err != nil {
 		return nil, fmt.Errorf("failed to create task: %w", err)
+	}
+
+	// Auto-transition shipment status when first task is created
+	if req.ShipmentID != "" && s.shipmentRepo != nil {
+		ship, err := s.shipmentRepo.GetByID(ctx, req.ShipmentID)
+		if err == nil {
+			newStatus := shipment.GetAutoTransitionStatus(shipment.AutoTransitionContext{
+				CurrentStatus: ship.Status,
+				TriggerEvent:  "task_created",
+			})
+			if newStatus != "" {
+				_ = s.shipmentRepo.UpdateStatus(ctx, req.ShipmentID, newStatus, false)
+			}
+		}
 	}
 
 	// Fetch created task
@@ -125,12 +143,30 @@ func (s *TaskServiceImpl) ListTasks(ctx context.Context, filters primary.TaskFil
 // ClaimTask claims a task for a workbench.
 func (s *TaskServiceImpl) ClaimTask(ctx context.Context, req primary.ClaimTaskRequest) error {
 	// Verify task exists
-	_, err := s.taskRepo.GetByID(ctx, req.TaskID)
+	task, err := s.taskRepo.GetByID(ctx, req.TaskID)
 	if err != nil {
 		return err
 	}
 
-	return s.taskRepo.Claim(ctx, req.TaskID, req.WorkbenchID)
+	if err := s.taskRepo.Claim(ctx, req.TaskID, req.WorkbenchID); err != nil {
+		return err
+	}
+
+	// Auto-transition shipment status when first task is claimed
+	if task.ShipmentID != "" && s.shipmentRepo != nil {
+		ship, err := s.shipmentRepo.GetByID(ctx, task.ShipmentID)
+		if err == nil {
+			newStatus := shipment.GetAutoTransitionStatus(shipment.AutoTransitionContext{
+				CurrentStatus: ship.Status,
+				TriggerEvent:  "task_claimed",
+			})
+			if newStatus != "" {
+				_ = s.shipmentRepo.UpdateStatus(ctx, task.ShipmentID, newStatus, false)
+			}
+		}
+	}
+
+	return nil
 }
 
 // CompleteTask marks a task as complete.
@@ -145,7 +181,37 @@ func (s *TaskServiceImpl) CompleteTask(ctx context.Context, taskID string) error
 		return fmt.Errorf("cannot complete pinned task %s. Unpin first with: orc task unpin %s", taskID, taskID)
 	}
 
-	return s.taskRepo.UpdateStatus(ctx, taskID, "complete", false, true)
+	if err := s.taskRepo.UpdateStatus(ctx, taskID, "complete", false, true); err != nil {
+		return err
+	}
+
+	// Auto-transition shipment status when all tasks are complete
+	if record.ShipmentID != "" && s.shipmentRepo != nil {
+		ship, err := s.shipmentRepo.GetByID(ctx, record.ShipmentID)
+		if err == nil {
+			// Get task counts for the shipment
+			tasks, err := s.taskRepo.List(ctx, secondary.TaskFilters{ShipmentID: record.ShipmentID})
+			if err == nil {
+				completedCount := 0
+				for _, t := range tasks {
+					if t.Status == "complete" {
+						completedCount++
+					}
+				}
+				newStatus := shipment.GetAutoTransitionStatus(shipment.AutoTransitionContext{
+					CurrentStatus:      ship.Status,
+					TriggerEvent:       "task_completed",
+					TaskCount:          len(tasks),
+					CompletedTaskCount: completedCount,
+				})
+				if newStatus != "" {
+					_ = s.shipmentRepo.UpdateStatus(ctx, record.ShipmentID, newStatus, false)
+				}
+			}
+		}
+	}
+
+	return nil
 }
 
 // PauseTask pauses an in_progress task.

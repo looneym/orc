@@ -245,8 +245,17 @@ func setIMPFocus(workbenchID, containerID, containerType, title string) error {
 	fmt.Printf("Focused on %s: %s\n", containerType, containerID)
 	fmt.Printf("  %s\n", title)
 
-	// Auto-checkout branch for shipments when in a workbench
+	// Auto-checkout branch and auto-transition status for shipments
 	if strings.HasPrefix(containerID, "SHIP-") {
+		// Auto-transition shipment status: draft → exploring
+		ship, err := wire.ShipmentService().GetShipment(ctx, containerID)
+		if err == nil {
+			newStatus, err := wire.ShipmentService().TriggerAutoTransition(ctx, containerID, "focus")
+			if err == nil && newStatus != "" {
+				fmt.Printf("  ✓ Status: %s → %s\n", ship.Status, newStatus)
+			}
+		}
+
 		if err := autoCheckoutShipmentBranch(workbenchID, containerID); err != nil {
 			fmt.Printf("  (branch checkout skipped: %v)\n", err)
 		} else {

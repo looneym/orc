@@ -214,6 +214,14 @@ func (m *mockShipmentServiceForPR) SetShipmentPriority(ctx context.Context, ship
 	return nil
 }
 
+func (m *mockShipmentServiceForPR) UpdateStatus(ctx context.Context, shipmentID, status string) error {
+	return nil
+}
+
+func (m *mockShipmentServiceForPR) TriggerAutoTransition(ctx context.Context, shipmentID, triggerEvent string) (string, error) {
+	return "", nil
+}
+
 func TestPRService_CreatePR(t *testing.T) {
 	ctx := context.Background()
 
