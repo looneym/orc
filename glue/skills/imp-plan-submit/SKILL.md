@@ -41,6 +41,12 @@ Submit the current plan for review. Performs self-review using a Haiku subagent.
    - BOUNDED: No scope creep, no "while we're here" additions
    - VERIFICATION CONCRETE: Specific test/lint commands included
    - CHANGES CLEAR: File paths and modifications are explicit
+   - **AGENTS.MD COMPLIANCE**: Plan follows documented process for this change type
+     - New entity? Check: schema.go + migrations/ + repo + repo_test + service
+     - Add column? Check: model + schema + migration + repo
+     - CLI command? Check: thin command + service + wire
+
+   If plan skips checklist items: ESCALATE with specific missing items.
 
    Respond with EXACTLY one of:
    - APPROVE

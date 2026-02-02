@@ -30,18 +30,30 @@ Research the codebase and create an implementation plan for the current in_progr
    Example prompt for Explore agent:
    "Research the codebase to understand how to implement: [task description]. Find relevant files, patterns, and architecture."
 
-4. **Design implementation approach**
+4. **Read AGENTS.md for change type**
+   Identify what type of change this is and read the relevant checklist:
+
+   | Change Type | AGENTS.md Section |
+   |-------------|-------------------|
+   | New entity | "Add Entity with Persistence" |
+   | Add column | "Add Column to Existing Entity" |
+   | CLI command | "Add CLI Command" |
+   | State/transition | "Add State/Transition" |
+
+   Your plan MUST follow the documented checklist.
+
+5. **Design implementation approach**
    Based on research, design a concrete approach:
    - What files to modify/create
    - What changes to make
    - How to verify (tests, lint)
 
-5. **Create plan record**
+6. **Create plan record**
    ```bash
    orc plan create --task TASK-xxx "Brief plan title"
    ```
 
-6. **Write plan content**
+7. **Write plan content**
    ```bash
    orc plan update PLAN-xxx --content "$(cat <<'EOF'
    ## Summary
@@ -59,7 +71,7 @@ Research the codebase and create an implementation plan for the current in_progr
    )"
    ```
 
-7. **Output**
+8. **Output**
    "Plan PLAN-xxx created for TASK-xxx. Review the plan and run /imp-plan-submit when ready."
 
 ## Guidelines
@@ -68,3 +80,5 @@ Research the codebase and create an implementation plan for the current in_progr
 - Be concrete about file paths and changes
 - Include specific verification steps
 - Don't over-engineer or add scope creep
+- **Follow AGENTS.md checklists** for the change type
+- Plans that skip documented steps will be rejected at review
