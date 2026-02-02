@@ -510,6 +510,10 @@ func (m *mockWorkbenchServiceForSummary) GetFocusedID(_ context.Context, _ strin
 	return "", nil
 }
 
+func (m *mockWorkbenchServiceForSummary) ArchiveWorkbench(_ context.Context, _ string) error {
+	return nil
+}
+
 // ============================================================================
 // Tests
 // ============================================================================

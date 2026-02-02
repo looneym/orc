@@ -25,6 +25,7 @@ func InfraCmd() *cobra.Command {
 
 	cmd.AddCommand(infraPlanCmd())
 	cmd.AddCommand(infraApplyCmd())
+	cmd.AddCommand(infraArchiveWorkbenchCmd())
 
 	return cmd
 }
@@ -286,4 +287,72 @@ func infraConfirmPrompt(msg string) bool {
 	}
 	response = strings.TrimSpace(strings.ToLower(response))
 	return response == "y" || response == "yes"
+}
+
+func infraArchiveWorkbenchCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "archive-workbench",
+		Short: "Archive current workbench and apply infra",
+		Long: `Archive the workbench at the current directory and apply infrastructure changes.
+
+This is a convenience command for the statusline menu that:
+1. Detects the workbench from the current directory
+2. Archives the workbench (soft-delete)
+3. Applies infrastructure to remove the worktree
+
+Examples:
+  cd ~/wb/my-workbench && orc infra archive-workbench`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			ctx := context.Background()
+
+			// 1. Get current working directory
+			cwd, err := os.Getwd()
+			if err != nil {
+				return fmt.Errorf("failed to get working directory: %w", err)
+			}
+
+			// 2. Detect workbench from path
+			workbench, err := wire.WorkbenchService().GetWorkbenchByPath(ctx, cwd)
+			if err != nil {
+				return fmt.Errorf("not in a workbench directory: %w", err)
+			}
+
+			fmt.Printf("Workbench: %s (%s)\n", workbench.ID, workbench.Name)
+			fmt.Printf("Workshop: %s\n\n", workbench.WorkshopID)
+
+			// 3. Archive the workbench
+			fmt.Println("Archiving workbench...")
+			if err := wire.WorkbenchService().ArchiveWorkbench(ctx, workbench.ID); err != nil {
+				return fmt.Errorf("failed to archive workbench: %w", err)
+			}
+			fmt.Printf("✓ Workbench %s archived\n\n", workbench.ID)
+
+			// 4. Apply infrastructure
+			fmt.Println("Applying infrastructure changes...")
+			plan, err := wire.InfraService().PlanInfra(ctx, primary.InfraPlanRequest{
+				WorkshopID: workbench.WorkshopID,
+			})
+			if err != nil {
+				return fmt.Errorf("failed to plan infrastructure: %w", err)
+			}
+
+			resp, err := wire.InfraService().ApplyInfra(ctx, plan)
+			if err != nil {
+				return fmt.Errorf("failed to apply infrastructure: %w", err)
+			}
+
+			fmt.Println("✓ Infrastructure applied")
+			if resp.OrphansDeleted > 0 {
+				fmt.Printf("  - %d orphan(s) deleted\n", resp.OrphansDeleted)
+			}
+
+			fmt.Println("\nPress Enter to close...")
+			reader := bufio.NewReader(os.Stdin)
+			_, _ = reader.ReadString('\n')
+
+			return nil
+		},
+	}
+
+	return cmd
 }

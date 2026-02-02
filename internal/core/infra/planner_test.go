@@ -175,3 +175,133 @@ func TestGeneratePlan_WorkbenchMetadata(t *testing.T) {
 		t.Errorf("expected Branch 'ml/feature-branch', got %q", wb.Branch)
 	}
 }
+
+func TestGeneratePlan_TMuxSession(t *testing.T) {
+	input := PlanInput{
+		WorkshopID:            "WORK-001",
+		WorkshopName:          "Test Workshop",
+		FactoryID:             "FACT-001",
+		FactoryName:           "default",
+		GatehouseID:           "GATE-001",
+		GatehousePath:         "/home/user/.orc/ws/WORK-001-test",
+		TMuxSessionExists:     true,
+		TMuxActualSessionName: "test-workshop",
+		TMuxExistingWindows:   []string{"bench-1", "bench-2"},
+		TMuxExpectedWindows: []TMuxWindowInput{
+			{Name: "bench-1", Path: "/home/wb/bench-1"},
+			{Name: "bench-2", Path: "/home/wb/bench-2"},
+		},
+	}
+
+	plan := GeneratePlan(input)
+
+	if plan.TMuxSession == nil {
+		t.Fatal("expected TMuxSession to be set")
+	}
+	if plan.TMuxSession.SessionName != "test-workshop" {
+		t.Errorf("expected SessionName 'test-workshop', got %q", plan.TMuxSession.SessionName)
+	}
+	if !plan.TMuxSession.Exists {
+		t.Error("expected TMuxSession.Exists to be true")
+	}
+	if len(plan.TMuxSession.Windows) != 2 {
+		t.Errorf("expected 2 windows, got %d", len(plan.TMuxSession.Windows))
+	}
+	if len(plan.TMuxSession.OrphanWindows) != 0 {
+		t.Errorf("expected 0 orphan windows, got %d", len(plan.TMuxSession.OrphanWindows))
+	}
+}
+
+func TestGeneratePlan_TMuxSession_WithMissingWindows(t *testing.T) {
+	input := PlanInput{
+		WorkshopID:            "WORK-001",
+		WorkshopName:          "Test",
+		FactoryID:             "FACT-001",
+		FactoryName:           "default",
+		GatehouseID:           "GATE-001",
+		GatehousePath:         "/home/.orc/ws/WORK-001",
+		TMuxSessionExists:     true,
+		TMuxActualSessionName: "test",
+		TMuxExistingWindows:   []string{"bench-1"}, // Only bench-1 exists
+		TMuxExpectedWindows: []TMuxWindowInput{
+			{Name: "bench-1", Path: "/home/wb/bench-1"},
+			{Name: "bench-2", Path: "/home/wb/bench-2"}, // bench-2 expected but missing
+		},
+	}
+
+	plan := GeneratePlan(input)
+
+	if len(plan.TMuxSession.Windows) != 2 {
+		t.Fatalf("expected 2 windows, got %d", len(plan.TMuxSession.Windows))
+	}
+
+	// bench-1 should exist
+	if !plan.TMuxSession.Windows[0].Exists {
+		t.Error("expected bench-1 to exist")
+	}
+	// bench-2 should not exist
+	if plan.TMuxSession.Windows[1].Exists {
+		t.Error("expected bench-2 to not exist")
+	}
+}
+
+func TestGeneratePlan_TMuxSession_WithOrphanWindows(t *testing.T) {
+	input := PlanInput{
+		WorkshopID:            "WORK-001",
+		WorkshopName:          "Test",
+		FactoryID:             "FACT-001",
+		FactoryName:           "default",
+		GatehouseID:           "GATE-001",
+		GatehousePath:         "/home/.orc/ws/WORK-001",
+		TMuxSessionExists:     true,
+		TMuxActualSessionName: "test",
+		TMuxExistingWindows:   []string{"bench-1", "old-bench"}, // old-bench exists but not expected
+		TMuxExpectedWindows: []TMuxWindowInput{
+			{Name: "bench-1", Path: "/home/wb/bench-1"},
+		},
+	}
+
+	plan := GeneratePlan(input)
+
+	if len(plan.TMuxSession.Windows) != 1 {
+		t.Errorf("expected 1 window, got %d", len(plan.TMuxSession.Windows))
+	}
+	if len(plan.TMuxSession.OrphanWindows) != 1 {
+		t.Fatalf("expected 1 orphan window, got %d", len(plan.TMuxSession.OrphanWindows))
+	}
+	if plan.TMuxSession.OrphanWindows[0].Name != "old-bench" {
+		t.Errorf("expected orphan 'old-bench', got %q", plan.TMuxSession.OrphanWindows[0].Name)
+	}
+}
+
+func TestGeneratePlan_TMuxSession_NoSession(t *testing.T) {
+	input := PlanInput{
+		WorkshopID:            "WORK-001",
+		WorkshopName:          "Test",
+		FactoryID:             "FACT-001",
+		FactoryName:           "default",
+		GatehouseID:           "GATE-001",
+		GatehousePath:         "/home/.orc/ws/WORK-001",
+		TMuxSessionExists:     false,
+		TMuxActualSessionName: "",
+		TMuxExpectedWindows: []TMuxWindowInput{
+			{Name: "bench-1", Path: "/home/wb/bench-1"},
+		},
+	}
+
+	plan := GeneratePlan(input)
+
+	if plan.TMuxSession == nil {
+		t.Fatal("expected TMuxSession to be set")
+	}
+	if plan.TMuxSession.Exists {
+		t.Error("expected TMuxSession.Exists to be false")
+	}
+	// Windows should still be listed but marked as not existing
+	if len(plan.TMuxSession.Windows) != 1 {
+		t.Fatalf("expected 1 window, got %d", len(plan.TMuxSession.Windows))
+	}
+	if plan.TMuxSession.Windows[0].Exists {
+		t.Error("expected window to not exist when session doesn't exist")
+	}
+}

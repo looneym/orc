@@ -62,6 +62,11 @@ func (a *Adapter) WindowExists(ctx context.Context, sessionName, windowName stri
 	return tmuxpkg.WindowExists(sessionName, windowName)
 }
 
+// KillWindow kills a window in a session.
+func (a *Adapter) KillWindow(ctx context.Context, sessionName, windowName string) error {
+	return tmuxpkg.KillWindow(sessionName, windowName)
+}
+
 // SendKeys sends keystrokes to a pane.
 func (a *Adapter) SendKeys(ctx context.Context, target, keys string) error {
 	session := &tmuxpkg.Session{Name: ""} // Name not needed for SendKeys

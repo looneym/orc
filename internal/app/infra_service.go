@@ -25,6 +25,7 @@ type InfraServiceImpl struct {
 	repoRepo         secondary.RepoRepository
 	gatehouseRepo    secondary.GatehouseRepository
 	workspaceAdapter secondary.WorkspaceAdapter
+	tmuxAdapter      secondary.TMuxAdapter
 	executor         EffectExecutor
 }
 
@@ -36,6 +37,7 @@ func NewInfraService(
 	repoRepo secondary.RepoRepository,
 	gatehouseRepo secondary.GatehouseRepository,
 	workspaceAdapter secondary.WorkspaceAdapter,
+	tmuxAdapter secondary.TMuxAdapter,
 	executor EffectExecutor,
 ) *InfraServiceImpl {
 	return &InfraServiceImpl{
@@ -45,6 +47,7 @@ func NewInfraService(
 		repoRepo:         repoRepo,
 		gatehouseRepo:    gatehouseRepo,
 		workspaceAdapter: workspaceAdapter,
+		tmuxAdapter:      tmuxAdapter,
 		executor:         executor,
 	}
 }
@@ -100,7 +103,28 @@ func (s *InfraServiceImpl) PlanInfra(ctx context.Context, req primary.InfraPlanR
 	// 6. Scan for orphaned configs on disk
 	orphanWbs, orphanGhs := s.scanForOrphans(ctx, workbenches, gatehouse)
 
-	// 7. Generate plan using pure function
+	// 7. Fetch TMux session state
+	tmuxSessionName := ""
+	tmuxSessionExists := false
+	var tmuxExistingWindows []string
+	var tmuxExpectedWindows []coreinfra.TMuxWindowInput
+
+	if s.tmuxAdapter != nil {
+		tmuxSessionName = s.tmuxAdapter.FindSessionByWorkshopID(ctx, req.WorkshopID)
+		tmuxSessionExists = tmuxSessionName != ""
+		if tmuxSessionExists {
+			tmuxExistingWindows, _ = s.tmuxAdapter.ListWindows(ctx, tmuxSessionName)
+		}
+		// Build expected windows from workbenches
+		for _, wb := range workbenches {
+			tmuxExpectedWindows = append(tmuxExpectedWindows, coreinfra.TMuxWindowInput{
+				Name: wb.Name,
+				Path: wb.WorktreePath,
+			})
+		}
+	}
+
+	// 8. Generate plan using pure function (all I/O already done above)
 	input := coreinfra.PlanInput{
 		WorkshopID:            req.WorkshopID,
 		WorkshopName:          workshop.Name,
@@ -113,10 +137,15 @@ func (s *InfraServiceImpl) PlanInfra(ctx context.Context, req primary.InfraPlanR
 		Workbenches:           wbInputs,
 		OrphanWorkbenches:     orphanWbs,
 		OrphanGatehouses:      orphanGhs,
+		// TMux state
+		TMuxSessionExists:     tmuxSessionExists,
+		TMuxActualSessionName: tmuxSessionName,
+		TMuxExistingWindows:   tmuxExistingWindows,
+		TMuxExpectedWindows:   tmuxExpectedWindows,
 	}
 	corePlan := coreinfra.GeneratePlan(input)
 
-	// 8. Convert core plan to primary plan
+	// 9. Convert core plan to primary plan
 	result := s.corePlanToPrimary(&corePlan)
 	result.Force = req.Force
 	result.NoDelete = req.NoDelete
@@ -309,6 +338,30 @@ func (s *InfraServiceImpl) corePlanToPrimary(core *coreinfra.Plan) *primary.Infr
 		})
 	}
 
+	// Map TMux session
+	if core.TMuxSession != nil {
+		plan.TMuxSession = &primary.InfraTMuxSessionOp{
+			SessionName: core.TMuxSession.SessionName,
+			Status:      boolToOpStatus(core.TMuxSession.Exists),
+		}
+		// Map expected windows
+		for _, w := range core.TMuxSession.Windows {
+			plan.TMuxSession.Windows = append(plan.TMuxSession.Windows, primary.InfraTMuxWindowOp{
+				Name:   w.Name,
+				Path:   w.Path,
+				Status: boolToOpStatus(w.Exists),
+			})
+		}
+		// Map orphan windows (exist but shouldn't)
+		for _, w := range core.TMuxSession.OrphanWindows {
+			plan.TMuxSession.OrphanWindows = append(plan.TMuxSession.OrphanWindows, primary.InfraTMuxWindowOp{
+				Name:   w.Name,
+				Path:   w.Path,
+				Status: primary.OpDelete,
+			})
+		}
+	}
+
 	return plan
 }
 
@@ -343,6 +396,21 @@ func (s *InfraServiceImpl) ApplyInfra(ctx context.Context, plan *primary.InfraPl
 	// Check for orphan deletions
 	if len(plan.OrphanWorkbenches) > 0 || len(plan.OrphanGatehouses) > 0 {
 		nothingToDo = false
+	}
+	// Check for TMux operations
+	if plan.TMuxSession != nil {
+		if plan.TMuxSession.Status == primary.OpCreate {
+			nothingToDo = false
+		}
+		for _, w := range plan.TMuxSession.Windows {
+			if w.Status == primary.OpCreate {
+				nothingToDo = false
+				break
+			}
+		}
+		if len(plan.TMuxSession.OrphanWindows) > 0 {
+			nothingToDo = false
+		}
 	}
 	if nothingToDo {
 		response.NothingToDo = true
@@ -427,6 +495,54 @@ func (s *InfraServiceImpl) ApplyInfra(ctx context.Context, plan *primary.InfraPl
 					return nil, fmt.Errorf("failed to delete orphan gatehouse %s: %w", gh.ID, err)
 				}
 				response.OrphansDeleted++
+			}
+		}
+	}
+
+	// 5. Handle TMux session and windows
+	if s.tmuxAdapter != nil && plan.TMuxSession != nil {
+		sessionName := plan.TMuxSession.SessionName
+		if sessionName == "" {
+			// Generate session name from workshop name if not set
+			sessionName = plan.WorkshopName
+		}
+
+		// Create session if needed
+		if plan.TMuxSession.Status == primary.OpCreate {
+			// Use gatehouse path as working directory
+			workingDir := ""
+			if plan.Gatehouse != nil {
+				workingDir = plan.Gatehouse.Path
+			}
+			if err := s.tmuxAdapter.CreateSession(ctx, sessionName, workingDir); err != nil {
+				return nil, fmt.Errorf("failed to create tmux session: %w", err)
+			}
+			// Set ORC_WORKSHOP_ID environment variable
+			if err := s.tmuxAdapter.SetEnvironment(ctx, sessionName, "ORC_WORKSHOP_ID", plan.WorkshopID); err != nil {
+				return nil, fmt.Errorf("failed to set ORC_WORKSHOP_ID: %w", err)
+			}
+		}
+
+		// Create windows for workbenches
+		windowIndex := 1 // Start at 1 since window 0 is typically the default window
+		for _, w := range plan.TMuxSession.Windows {
+			if w.Status == primary.OpCreate {
+				if err := s.tmuxAdapter.CreateWorkbenchWindowShell(ctx, sessionName, windowIndex, w.Name, w.Path); err != nil {
+					return nil, fmt.Errorf("failed to create tmux window %s: %w", w.Name, err)
+				}
+			}
+			windowIndex++
+		}
+
+		// Kill orphan windows (unless --no-delete)
+		if !plan.NoDelete {
+			for _, w := range plan.TMuxSession.OrphanWindows {
+				if w.Status == primary.OpDelete {
+					if err := s.tmuxAdapter.KillWindow(ctx, sessionName, w.Name); err != nil {
+						// Log but don't fail - window may already be gone
+						continue
+					}
+				}
 			}
 		}
 	}

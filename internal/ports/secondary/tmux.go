@@ -43,6 +43,7 @@ type TMuxAdapter interface {
 	CreateWorkbenchWindow(ctx context.Context, sessionName string, windowIndex int, windowName string, workingDir string) error
 	CreateWorkbenchWindowShell(ctx context.Context, sessionName string, windowIndex int, windowName string, workingDir string) error
 	WindowExists(ctx context.Context, sessionName string, windowName string) bool
+	KillWindow(ctx context.Context, sessionName string, windowName string) error
 
 	// Pane operations
 	SendKeys(ctx context.Context, target, keys string) error

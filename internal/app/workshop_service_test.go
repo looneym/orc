@@ -457,6 +457,10 @@ func (m *mockTMuxAdapter) WindowExists(ctx context.Context, sessionName string, 
 	return false
 }
 
+func (m *mockTMuxAdapter) KillWindow(ctx context.Context, sessionName string, windowName string) error {
+	return nil
+}
+
 func (m *mockTMuxAdapter) SendKeys(ctx context.Context, target, keys string) error {
 	return nil
 }

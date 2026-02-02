@@ -436,6 +436,9 @@ func (m *mockTMuxAdapterForPlan) CreateWorkbenchWindowShell(ctx context.Context,
 func (m *mockTMuxAdapterForPlan) WindowExists(ctx context.Context, sessionName string, windowName string) bool {
 	return false
 }
+func (m *mockTMuxAdapterForPlan) KillWindow(ctx context.Context, sessionName string, windowName string) error {
+	return nil
+}
 func (m *mockTMuxAdapterForPlan) SendKeys(ctx context.Context, target, keys string) error { return nil }
 func (m *mockTMuxAdapterForPlan) GetPaneCount(ctx context.Context, sessionName, windowName string) int {
 	return 0
