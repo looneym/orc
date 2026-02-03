@@ -241,6 +241,14 @@ func (m *mockShipmentServiceForSummary) TriggerAutoTransition(_ context.Context,
 	return "", nil
 }
 
+func (m *mockShipmentServiceForSummary) DeployShipment(_ context.Context, _ string) error {
+	return nil
+}
+
+func (m *mockShipmentServiceForSummary) VerifyShipment(_ context.Context, _ string) error {
+	return nil
+}
+
 // mockTaskServiceForSummary implements primary.TaskService for testing.
 type mockTaskServiceForSummary struct{}
 

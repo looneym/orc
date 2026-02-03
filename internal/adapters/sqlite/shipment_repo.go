@@ -367,11 +367,11 @@ func (r *ShipmentRepository) CommissionExists(ctx context.Context, commissionID 
 
 // WorkbenchAssignedToOther checks if workbench is assigned to another active shipment.
 // Returns the shipment ID if assigned to another, empty string if not.
-// Excludes completed/merged shipments since workbenches can be reassigned after completion.
+// Excludes terminal status shipments since workbenches can be reassigned after completion.
 func (r *ShipmentRepository) WorkbenchAssignedToOther(ctx context.Context, workbenchID, excludeShipmentID string) (string, error) {
 	var shipmentID string
 	err := r.db.QueryRowContext(ctx,
-		"SELECT id FROM shipments WHERE assigned_workbench_id = ? AND id != ? AND status NOT IN ('complete', 'merged') LIMIT 1",
+		"SELECT id FROM shipments WHERE assigned_workbench_id = ? AND id != ? AND status NOT IN ('complete', 'implemented', 'deployed', 'verified') LIMIT 1",
 		workbenchID, excludeShipmentID,
 	).Scan(&shipmentID)
 

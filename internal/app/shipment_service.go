@@ -196,6 +196,38 @@ func (s *ShipmentServiceImpl) ResumeShipment(ctx context.Context, shipmentID str
 	return s.shipmentRepo.UpdateStatus(ctx, shipmentID, "active", false)
 }
 
+// DeployShipment marks a shipment as deployed (merged to master or deployed to prod).
+func (s *ShipmentServiceImpl) DeployShipment(ctx context.Context, shipmentID string) error {
+	record, err := s.shipmentRepo.GetByID(ctx, shipmentID)
+	if err != nil {
+		return err
+	}
+
+	// Guard: can only deploy implemented or complete shipments
+	guardCtx := coreshipment.StatusTransitionContext{Status: record.Status}
+	if result := coreshipment.CanDeployShipment(guardCtx); !result.Allowed {
+		return result.Error()
+	}
+
+	return s.shipmentRepo.UpdateStatus(ctx, shipmentID, "deployed", false)
+}
+
+// VerifyShipment marks a shipment as verified (post-deploy verification passed).
+func (s *ShipmentServiceImpl) VerifyShipment(ctx context.Context, shipmentID string) error {
+	record, err := s.shipmentRepo.GetByID(ctx, shipmentID)
+	if err != nil {
+		return err
+	}
+
+	// Guard: can only verify deployed shipments
+	guardCtx := coreshipment.StatusTransitionContext{Status: record.Status}
+	if result := coreshipment.CanVerifyShipment(guardCtx); !result.Allowed {
+		return result.Error()
+	}
+
+	return s.shipmentRepo.UpdateStatus(ctx, shipmentID, "verified", false)
+}
+
 // UpdateShipment updates a shipment's title and/or description.
 func (s *ShipmentServiceImpl) UpdateShipment(ctx context.Context, req primary.UpdateShipmentRequest) error {
 	record := &secondary.ShipmentRecord{

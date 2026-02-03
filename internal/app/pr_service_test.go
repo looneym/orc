@@ -206,6 +206,14 @@ func (m *mockShipmentServiceForPR) TriggerAutoTransition(ctx context.Context, sh
 	return "", nil
 }
 
+func (m *mockShipmentServiceForPR) DeployShipment(ctx context.Context, shipmentID string) error {
+	return nil
+}
+
+func (m *mockShipmentServiceForPR) VerifyShipment(ctx context.Context, shipmentID string) error {
+	return nil
+}
+
 func TestPRService_CreatePR(t *testing.T) {
 	ctx := context.Background()
 

@@ -1,19 +1,29 @@
 ---
 name: ship-complete
-description: Complete a shipment after all tasks are done. Use when user says /ship-complete or wants to mark a shipment as finished.
+description: Complete a shipment after verification. Use when user says /ship-complete or wants to mark a shipment as finished.
 ---
 
 # Ship Complete Skill
 
-Mark a shipment as complete after verifying all work is done.
+Mark a shipment as complete (terminal state) after verification is done.
 
 ## Usage
 
 ```
 /ship-complete              (complete focused shipment)
 /ship-complete SHIP-xxx     (complete specific shipment)
-/ship-complete --force      (complete even with incomplete tasks)
+/ship-complete --force      (complete even from non-verified status)
 ```
+
+## Status Lifecycle
+
+This is the final step in the shipment lifecycle:
+
+```
+implementing → implemented → deployed → verified → complete
+```
+
+Shipments should normally be in "verified" status before completing.
 
 ## Flow
 
@@ -30,25 +40,23 @@ If no argument:
 
 ```bash
 orc shipment show <SHIP-xxx>
-orc task list --shipment <SHIP-xxx>
 ```
 
 Check:
-- All tasks are complete
+- Shipment status is "verified" (preferred) or "deployed"/"implemented" (with --force)
 - Shipment is not pinned
-- No blocking issues
 
 ### Step 3: Handle Issues
 
-If tasks incomplete and no --force:
+If status is not "verified" and no --force:
 ```
-Cannot complete SHIP-xxx: 2 tasks incomplete
-  - TASK-yyy: In Progress
-  - TASK-zzz: Ready
+Cannot complete SHIP-xxx: shipment is in '<status>' status
 
-Options:
-  1. Complete remaining tasks first
-  2. Use --force to complete anyway (tasks will be abandoned)
+The standard lifecycle is:
+  implemented → deployed → verified → complete
+
+If you want to skip verification, use:
+  /ship-complete SHIP-xxx --force
 ```
 
 If shipment is pinned:
@@ -82,8 +90,7 @@ Output:
 ```
 Shipment completed:
   SHIP-xxx: <Title>
-  Tasks: X/X done
-  Duration: Y days
+  Status: complete (terminal)
 
 Next steps:
   orc summary              - View remaining work
@@ -98,26 +105,20 @@ User: /ship-complete
 
 Agent: [gets focused shipment SHIP-250]
        [runs orc shipment show SHIP-250]
-       [runs orc task list --shipment SHIP-250]
 
 Agent: Completing SHIP-250: Core Model Simplification
 
-       Tasks: 7/7 complete
-       All checks passed.
+       Status: verified
+       Ready for completion.
 
        [runs orc shipment complete SHIP-250]
        [runs orc focus --clear]
 
 Agent: Shipment completed:
          SHIP-250: Core Model Simplification
-         Tasks: 7/7 done
+         Status: complete (terminal)
 
        Next steps:
          orc summary - View remaining work
          /ship-queue claim - Claim next from queue
 ```
-
-## Auto-Complete
-
-Note: Shipments can also auto-complete when the last task is marked complete,
-if all tasks are done. This skill is for manual completion or verification.

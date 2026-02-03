@@ -1,17 +1,37 @@
 ---
-name: merge-to-master
+name: ship-deploy
 description: |
   Merge current worktree branch to master at ~/src/orc with full validation.
-  Use when user says "/merge-to-master", "merge to master", "ship to master",
-  or wants to integrate their worktree changes into the main ORC repository.
+  Use when user says "/ship-deploy", "ship deploy", "deploy shipment", "merge to master", or wants to integrate their worktree changes into the main ORC repository.
   Handles pre-flight checks, merge, hook installation, and post-merge cleanup.
 ---
 
-# Merge to Master
+# Ship Deploy
 
-Merge the current worktree branch into master at `~/src/orc` with full validation.
+Merge the current worktree branch into master at `~/src/orc` with full validation, then transition the shipment to deployed status.
+
+## ORC Repository Only
+
+This skill is specific to the ORC repository (direct-to-master workflow). PR-based repositories are not yet supported.
 
 ## Workflow
+
+### 0. Verify ORC Repository
+
+Before proceeding, verify we're in the ORC repo:
+
+```bash
+# Check if we're in the ORC repository
+git remote get-url origin 2>/dev/null | grep -q "orc"
+```
+
+If not in ORC repo, stop immediately:
+```
+This skill is specific to the ORC repository.
+Current repo: [detected repo from git remote]
+
+For other repositories, use standard git merge workflow or PR-based deployment.
+```
 
 ### 1. Pre-flight Checks
 
@@ -77,15 +97,16 @@ cd <original-worktree-path>
 git rebase master
 ```
 
-### 7. Close Shipment
+### 7. Update Shipment Status
 
-If there's a focused shipment with all tasks complete, mark it complete:
+Transition the shipment to deployed status:
 
 ```bash
-orc status  # Check focused shipment
-orc task list --shipment SHIP-XXX --status ready  # Verify no remaining tasks
-orc shipment complete SHIP-XXX
+orc status  # Get focused shipment
+orc shipment deploy SHIP-XXX
 ```
+
+This marks the shipment as deployed (merged to master / deployed to prod).
 
 ### 8. Notify Goblin
 
@@ -97,7 +118,7 @@ orc workshop show  # Note the gatehouse ID (GATE-XXX)
 
 orc mail send "<summary of completed tasks and commit hash>" \
   --to GOBLIN-GATE-XXX \
-  --subject "SHIP-XXX Complete" \
+  --subject "SHIP-XXX Deployed" \
   --nudge
 ```
 
@@ -114,13 +135,14 @@ Report completion with:
 - Schema synced (if needed)
 - Master pushed
 - Worktree rebased
-- Shipment closed (if applicable)
+- Shipment status → deployed
 - Goblin notified and nudged
 
 ## Error Handling
 
 | Error | Action |
 |-------|--------|
+| Not ORC repo | Report and suggest standard git workflow |
 | Dirty working tree | List uncommitted files, ask to commit or stash |
 | Lint fails | Show failures, do not proceed |
 | Merge conflicts | Report conflicts, do not auto-resolve |

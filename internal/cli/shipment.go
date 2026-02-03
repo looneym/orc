@@ -234,6 +234,58 @@ var shipmentResumeCmd = &cobra.Command{
 	},
 }
 
+var shipmentDeployCmd = &cobra.Command{
+	Use:   "deploy [shipment-id]",
+	Short: "Mark shipment as deployed (merged to master or deployed to prod)",
+	Long: `Mark a shipment as deployed after code has been merged or deployed.
+
+This is typically called by the ship-deploy skill after a successful merge to master.
+The shipment must be in 'implemented' or 'complete' status.`,
+	Args: cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		ctx := context.Background()
+		shipmentID := args[0]
+
+		if err := validateEntityID(shipmentID, "shipment"); err != nil {
+			return err
+		}
+
+		err := wire.ShipmentService().DeployShipment(ctx, shipmentID)
+		if err != nil {
+			return fmt.Errorf("failed to deploy shipment: %w", err)
+		}
+
+		fmt.Printf("✓ Shipment %s marked as deployed\n", shipmentID)
+		return nil
+	},
+}
+
+var shipmentVerifyCmd = &cobra.Command{
+	Use:   "verify [shipment-id]",
+	Short: "Mark shipment as verified (post-deploy verification passed)",
+	Long: `Mark a shipment as verified after successful post-deploy verification.
+
+This is typically called by the ship-verify skill after validation tests pass.
+The shipment must be in 'deployed' status.`,
+	Args: cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		ctx := context.Background()
+		shipmentID := args[0]
+
+		if err := validateEntityID(shipmentID, "shipment"); err != nil {
+			return err
+		}
+
+		err := wire.ShipmentService().VerifyShipment(ctx, shipmentID)
+		if err != nil {
+			return fmt.Errorf("failed to verify shipment: %w", err)
+		}
+
+		fmt.Printf("✓ Shipment %s marked as verified\n", shipmentID)
+		return nil
+	},
+}
+
 var shipmentUpdateCmd = &cobra.Command{
 	Use:   "update [shipment-id]",
 	Short: "Update shipment title and/or description",
@@ -413,6 +465,8 @@ func init() {
 	shipmentCmd.AddCommand(shipmentCompleteCmd)
 	shipmentCmd.AddCommand(shipmentPauseCmd)
 	shipmentCmd.AddCommand(shipmentResumeCmd)
+	shipmentCmd.AddCommand(shipmentDeployCmd)
+	shipmentCmd.AddCommand(shipmentVerifyCmd)
 	shipmentCmd.AddCommand(shipmentUpdateCmd)
 	shipmentCmd.AddCommand(shipmentPinCmd)
 	shipmentCmd.AddCommand(shipmentUnpinCmd)

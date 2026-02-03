@@ -23,6 +23,12 @@ type ShipmentService interface {
 	// ResumeShipment resumes a paused shipment.
 	ResumeShipment(ctx context.Context, shipmentID string) error
 
+	// DeployShipment marks a shipment as deployed (merged to master or deployed to prod).
+	DeployShipment(ctx context.Context, shipmentID string) error
+
+	// VerifyShipment marks a shipment as verified (post-deploy verification passed).
+	VerifyShipment(ctx context.Context, shipmentID string) error
+
 	// UpdateShipment updates a shipment's title and/or description.
 	UpdateShipment(ctx context.Context, req UpdateShipmentRequest) error
 
@@ -76,7 +82,7 @@ type UpdateShipmentRequest struct {
 }
 
 // Shipment represents a shipment entity at the port boundary.
-// Status lifecycle: draft → exploring → specced → tasked → ready_for_imp → implementing/auto_implementing → complete
+// Status lifecycle: draft → exploring → specced → tasked → ready_for_imp → implementing/auto_implementing → implemented → deployed → verified → complete
 type Shipment struct {
 	ID                  string
 	CommissionID        string

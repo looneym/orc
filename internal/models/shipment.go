@@ -27,6 +27,7 @@ type Shipment struct {
 }
 
 // Shipment status constants - work state lifecycle
+// Flow: draft → exploring → specced → tasked → ready_for_imp → implementing/auto_implementing → implemented → deployed → verified → complete
 const (
 	ShipmentStatusDraft            = "draft"
 	ShipmentStatusExploring        = "exploring"
@@ -35,5 +36,8 @@ const (
 	ShipmentStatusReadyForImp      = "ready_for_imp"
 	ShipmentStatusImplementing     = "implementing"
 	ShipmentStatusAutoImplementing = "auto_implementing"
-	ShipmentStatusComplete         = "complete"
+	ShipmentStatusImplemented      = "implemented" // All tasks complete, code changes made
+	ShipmentStatusDeployed         = "deployed"    // Merged to master / deployed to prod
+	ShipmentStatusVerified         = "verified"    // Post-deploy verification passed
+	ShipmentStatusComplete         = "complete"    // Terminal state, nothing more to do
 )

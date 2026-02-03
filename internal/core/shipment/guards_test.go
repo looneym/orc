@@ -303,14 +303,14 @@ func TestGetAutoTransitionStatus(t *testing.T) {
 		},
 		// Task completed transitions
 		{
-			name: "last task completed transitions to complete",
+			name: "last task completed transitions to implemented",
 			ctx: AutoTransitionContext{
 				CurrentStatus:      "implementing",
 				TriggerEvent:       "task_completed",
 				TaskCount:          3,
 				CompletedTaskCount: 3,
 			},
-			wantStatus: "complete",
+			wantStatus: "implemented",
 		},
 		{
 			name: "task completed but not all done does not transition",
@@ -319,6 +319,48 @@ func TestGetAutoTransitionStatus(t *testing.T) {
 				TriggerEvent:       "task_completed",
 				TaskCount:          3,
 				CompletedTaskCount: 2,
+			},
+			wantStatus: "",
+		},
+		// Deploy transitions
+		{
+			name: "deploy from implemented transitions to deployed",
+			ctx: AutoTransitionContext{
+				CurrentStatus: "implemented",
+				TriggerEvent:  "deploy",
+			},
+			wantStatus: "deployed",
+		},
+		{
+			name: "deploy from complete (legacy) transitions to deployed",
+			ctx: AutoTransitionContext{
+				CurrentStatus: "complete",
+				TriggerEvent:  "deploy",
+			},
+			wantStatus: "deployed",
+		},
+		{
+			name: "deploy from implementing does not transition",
+			ctx: AutoTransitionContext{
+				CurrentStatus: "implementing",
+				TriggerEvent:  "deploy",
+			},
+			wantStatus: "",
+		},
+		// Verify transitions
+		{
+			name: "verify from deployed transitions to verified",
+			ctx: AutoTransitionContext{
+				CurrentStatus: "deployed",
+				TriggerEvent:  "verify",
+			},
+			wantStatus: "verified",
+		},
+		{
+			name: "verify from implemented does not transition",
+			ctx: AutoTransitionContext{
+				CurrentStatus: "implemented",
+				TriggerEvent:  "verify",
 			},
 			wantStatus: "",
 		},

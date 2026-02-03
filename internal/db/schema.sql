@@ -108,14 +108,14 @@ CREATE TABLE IF NOT EXISTS messages (
 );
 
 -- Shipments (Work containers)
--- Lifecycle: draft → exploring → specced → tasked → ready_for_imp → implementing/auto_implementing → complete
+-- Lifecycle: draft → exploring → specced → tasked → ready_for_imp → implementing/auto_implementing → implemented → deployed → verified → complete
 -- Location tracked by FKs: shipyard_id (queued), assigned_workbench_id (assigned)
 CREATE TABLE IF NOT EXISTS shipments (
 	id TEXT PRIMARY KEY,
 	commission_id TEXT NOT NULL,
 	title TEXT NOT NULL,
 	description TEXT,
-	status TEXT NOT NULL CHECK(status IN ('draft', 'exploring', 'specced', 'tasked', 'ready_for_imp', 'implementing', 'auto_implementing', 'complete')) DEFAULT 'draft',
+	status TEXT NOT NULL CHECK(status IN ('draft', 'exploring', 'specced', 'tasked', 'ready_for_imp', 'implementing', 'auto_implementing', 'implemented', 'deployed', 'verified', 'complete')) DEFAULT 'draft',
 	assigned_workbench_id TEXT,
 	repo_id TEXT,
 	branch TEXT,

@@ -129,10 +129,38 @@ func CanResumeShipment(ctx StatusTransitionContext) GuardResult {
 	return GuardResult{Allowed: true}
 }
 
+// CanDeployShipment evaluates whether a shipment can be marked as deployed.
+// Rules:
+// - Status must be "implemented" or "complete"
+func CanDeployShipment(ctx StatusTransitionContext) GuardResult {
+	if ctx.Status != "implemented" && ctx.Status != "complete" {
+		return GuardResult{
+			Allowed: false,
+			Reason:  fmt.Sprintf("can only deploy implemented shipments (current status: %s)", ctx.Status),
+		}
+	}
+
+	return GuardResult{Allowed: true}
+}
+
+// CanVerifyShipment evaluates whether a shipment can be marked as verified.
+// Rules:
+// - Status must be "deployed"
+func CanVerifyShipment(ctx StatusTransitionContext) GuardResult {
+	if ctx.Status != "deployed" {
+		return GuardResult{
+			Allowed: false,
+			Reason:  fmt.Sprintf("can only verify deployed shipments (current status: %s)", ctx.Status),
+		}
+	}
+
+	return GuardResult{Allowed: true}
+}
+
 // AutoTransitionContext provides context for automatic status transitions.
 type AutoTransitionContext struct {
 	CurrentStatus      string
-	TriggerEvent       string // "focus", "task_created", "task_claimed", "task_completed"
+	TriggerEvent       string // "focus", "task_created", "task_claimed", "task_completed", "deploy", "verify"
 	TaskCount          int
 	CompletedTaskCount int
 }
@@ -155,7 +183,15 @@ func GetAutoTransitionStatus(ctx AutoTransitionContext) string {
 		}
 	case "task_completed":
 		if ctx.TaskCount > 0 && ctx.TaskCount == ctx.CompletedTaskCount {
-			return "complete"
+			return "implemented" // Code changes complete, ready for deploy
+		}
+	case "deploy":
+		if ctx.CurrentStatus == "implemented" || ctx.CurrentStatus == "complete" {
+			return "deployed"
+		}
+	case "verify":
+		if ctx.CurrentStatus == "deployed" {
+			return "verified"
 		}
 	}
 	return ""
