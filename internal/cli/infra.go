@@ -297,6 +297,20 @@ func checkNothingToDoWithFlags(plan *primary.InfraPlan, noDelete bool) bool {
 	if !noDelete && (len(plan.OrphanWorkbenches) > 0 || len(plan.OrphanGatehouses) > 0) {
 		return false
 	}
+	// Check TMux state
+	if plan.TMuxSession != nil {
+		if plan.TMuxSession.Status == primary.OpCreate {
+			return false
+		}
+		for _, w := range plan.TMuxSession.Windows {
+			if w.Status == primary.OpCreate {
+				return false
+			}
+		}
+		if !noDelete && len(plan.TMuxSession.OrphanWindows) > 0 {
+			return false
+		}
+	}
 	return true
 }
 
