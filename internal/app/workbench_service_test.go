@@ -378,25 +378,23 @@ func TestWorkbenchService_GetWorkbenchByPath_NotFound(t *testing.T) {
 // UpdateWorkbenchPath Tests
 // ============================================================================
 
-func TestWorkbenchService_UpdateWorkbenchPath(t *testing.T) {
+func TestWorkbenchService_UpdateWorkbenchPath_IsNoOp(t *testing.T) {
 	service, workbenchRepo, _, _ := newTestWorkbenchService()
 	ctx := context.Background()
 
 	// Setup: create a workbench
 	workbenchRepo.workbenches["BENCH-001"] = &secondary.WorkbenchRecord{
-		ID:           "BENCH-001",
-		Name:         "test-bench",
-		WorktreePath: "/old/path",
-		Status:       "active",
+		ID:     "BENCH-001",
+		Name:   "test-bench",
+		Status: "active",
 	}
 
-	err := service.UpdateWorkbenchPath(ctx, "BENCH-001", "/new/path")
+	// UpdateWorkbenchPath is now a no-op since paths are computed dynamically.
+	// It should succeed without error for an existing workbench.
+	err := service.UpdateWorkbenchPath(ctx, "BENCH-001", "/ignored/path")
 
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
-	}
-	if workbenchRepo.workbenches["BENCH-001"].WorktreePath != "/new/path" {
-		t.Errorf("expected path '/new/path', got '%s'", workbenchRepo.workbenches["BENCH-001"].WorktreePath)
 	}
 }
 

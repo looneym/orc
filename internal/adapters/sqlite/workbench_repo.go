@@ -5,6 +5,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"path/filepath"
 	"time"
 
 	"github.com/example/orc/internal/ports/secondary"
@@ -64,8 +65,8 @@ func (r *WorkbenchRepository) Create(ctx context.Context, workbench *secondary.W
 	}
 
 	_, err = r.db.ExecContext(ctx,
-		"INSERT INTO workbenches (id, workshop_id, name, path, repo_id, status, home_branch, current_branch) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-		id, workbench.WorkshopID, workbench.Name, workbench.WorktreePath, repoID, status, homeBranch, currentBranch,
+		"INSERT INTO workbenches (id, workshop_id, name, repo_id, status, home_branch, current_branch) VALUES (?, ?, ?, ?, ?, ?, ?)",
+		id, workbench.WorkshopID, workbench.Name, repoID, status, homeBranch, currentBranch,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create workbench: %w", err)
@@ -89,9 +90,9 @@ func (r *WorkbenchRepository) GetByID(ctx context.Context, id string) (*secondar
 
 	record := &secondary.WorkbenchRecord{}
 	err := r.db.QueryRowContext(ctx,
-		"SELECT id, workshop_id, name, path, repo_id, status, home_branch, current_branch, focused_id, created_at, updated_at FROM workbenches WHERE id = ?",
+		"SELECT id, workshop_id, name, repo_id, status, home_branch, current_branch, focused_id, created_at, updated_at FROM workbenches WHERE id = ?",
 		id,
-	).Scan(&record.ID, &record.WorkshopID, &record.Name, &record.WorktreePath, &repoID, &record.Status, &homeBranch, &currentBranch, &focusedID, &createdAt, &updatedAt)
+	).Scan(&record.ID, &record.WorkshopID, &record.Name, &repoID, &record.Status, &homeBranch, &currentBranch, &focusedID, &createdAt, &updatedAt)
 
 	if err == sql.ErrNoRows {
 		return nil, fmt.Errorf("workbench %s not found", id)
@@ -116,7 +117,14 @@ func (r *WorkbenchRepository) GetByID(ctx context.Context, id string) (*secondar
 }
 
 // GetByPath retrieves a workbench by its file path.
+// Path is computed as ~/wb/{name}, so we extract name from path and query by name.
 func (r *WorkbenchRepository) GetByPath(ctx context.Context, path string) (*secondary.WorkbenchRecord, error) {
+	// Extract workbench name from path (last component)
+	name := filepath.Base(path)
+	if name == "" || name == "." || name == "/" {
+		return nil, fmt.Errorf("invalid path: %s", path)
+	}
+
 	var (
 		createdAt     time.Time
 		updatedAt     time.Time
@@ -128,9 +136,9 @@ func (r *WorkbenchRepository) GetByPath(ctx context.Context, path string) (*seco
 
 	record := &secondary.WorkbenchRecord{}
 	err := r.db.QueryRowContext(ctx,
-		"SELECT id, workshop_id, name, path, repo_id, status, home_branch, current_branch, focused_id, created_at, updated_at FROM workbenches WHERE path = ?",
-		path,
-	).Scan(&record.ID, &record.WorkshopID, &record.Name, &record.WorktreePath, &repoID, &record.Status, &homeBranch, &currentBranch, &focusedID, &createdAt, &updatedAt)
+		"SELECT id, workshop_id, name, repo_id, status, home_branch, current_branch, focused_id, created_at, updated_at FROM workbenches WHERE name = ? AND status = 'active'",
+		name,
+	).Scan(&record.ID, &record.WorkshopID, &record.Name, &repoID, &record.Status, &homeBranch, &currentBranch, &focusedID, &createdAt, &updatedAt)
 
 	if err == sql.ErrNoRows {
 		return nil, fmt.Errorf("workbench with path %s not found", path)
@@ -157,7 +165,7 @@ func (r *WorkbenchRepository) GetByPath(ctx context.Context, path string) (*seco
 // GetByWorkshop retrieves all workbenches for a workshop.
 func (r *WorkbenchRepository) GetByWorkshop(ctx context.Context, workshopID string) ([]*secondary.WorkbenchRecord, error) {
 	rows, err := r.db.QueryContext(ctx,
-		"SELECT id, workshop_id, name, path, repo_id, status, home_branch, current_branch, focused_id, created_at, updated_at FROM workbenches WHERE workshop_id = ? AND status = 'active' ORDER BY created_at DESC",
+		"SELECT id, workshop_id, name, repo_id, status, home_branch, current_branch, focused_id, created_at, updated_at FROM workbenches WHERE workshop_id = ? AND status = 'active' ORDER BY created_at DESC",
 		workshopID,
 	)
 	if err != nil {
@@ -177,7 +185,7 @@ func (r *WorkbenchRepository) GetByWorkshop(ctx context.Context, workshopID stri
 		)
 
 		record := &secondary.WorkbenchRecord{}
-		err := rows.Scan(&record.ID, &record.WorkshopID, &record.Name, &record.WorktreePath, &repoID, &record.Status, &homeBranch, &currentBranch, &focusedID, &createdAt, &updatedAt)
+		err := rows.Scan(&record.ID, &record.WorkshopID, &record.Name, &repoID, &record.Status, &homeBranch, &currentBranch, &focusedID, &createdAt, &updatedAt)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan workbench: %w", err)
 		}
@@ -202,7 +210,7 @@ func (r *WorkbenchRepository) GetByWorkshop(ctx context.Context, workshopID stri
 
 // List retrieves all workbenches, optionally filtered by workshop.
 func (r *WorkbenchRepository) List(ctx context.Context, workshopID string) ([]*secondary.WorkbenchRecord, error) {
-	query := "SELECT id, workshop_id, name, path, repo_id, status, home_branch, current_branch, focused_id, created_at, updated_at FROM workbenches WHERE 1=1"
+	query := "SELECT id, workshop_id, name, repo_id, status, home_branch, current_branch, focused_id, created_at, updated_at FROM workbenches WHERE 1=1"
 	args := []any{}
 
 	if workshopID != "" {
@@ -230,7 +238,7 @@ func (r *WorkbenchRepository) List(ctx context.Context, workshopID string) ([]*s
 		)
 
 		record := &secondary.WorkbenchRecord{}
-		err := rows.Scan(&record.ID, &record.WorkshopID, &record.Name, &record.WorktreePath, &repoID, &record.Status, &homeBranch, &currentBranch, &focusedID, &createdAt, &updatedAt)
+		err := rows.Scan(&record.ID, &record.WorkshopID, &record.Name, &repoID, &record.Status, &homeBranch, &currentBranch, &focusedID, &createdAt, &updatedAt)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan workbench: %w", err)
 		}
@@ -261,11 +269,6 @@ func (r *WorkbenchRepository) Update(ctx context.Context, workbench *secondary.W
 	if workbench.Name != "" {
 		query += ", name = ?"
 		args = append(args, workbench.Name)
-	}
-
-	if workbench.WorktreePath != "" {
-		query += ", path = ?"
-		args = append(args, workbench.WorktreePath)
 	}
 
 	if workbench.Status != "" {
@@ -332,21 +335,10 @@ func (r *WorkbenchRepository) Rename(ctx context.Context, id, newName string) er
 	return nil
 }
 
-// UpdatePath updates the path of a workbench.
+// UpdatePath is deprecated - path is now computed dynamically as ~/wb/{name}.
+// This method exists for interface compatibility but does nothing.
 func (r *WorkbenchRepository) UpdatePath(ctx context.Context, id, newPath string) error {
-	result, err := r.db.ExecContext(ctx,
-		"UPDATE workbenches SET path = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-		newPath, id,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to update workbench path: %w", err)
-	}
-
-	rowsAffected, _ := result.RowsAffected()
-	if rowsAffected == 0 {
-		return fmt.Errorf("workbench %s not found", id)
-	}
-
+	// Path is computed dynamically, not stored in DB
 	return nil
 }
 
@@ -383,7 +375,7 @@ func (r *WorkbenchRepository) GetByFocusedID(ctx context.Context, focusedID stri
 	}
 
 	rows, err := r.db.QueryContext(ctx,
-		`SELECT id, workshop_id, name, path, repo_id, status, home_branch, current_branch, focused_id, created_at, updated_at
+		`SELECT id, workshop_id, name, repo_id, status, home_branch, current_branch, focused_id, created_at, updated_at
 		FROM workbenches WHERE focused_id = ? AND status = 'active'`,
 		focusedID,
 	)
@@ -405,7 +397,7 @@ func (r *WorkbenchRepository) GetByFocusedID(ctx context.Context, focusedID stri
 
 		record := &secondary.WorkbenchRecord{}
 		err := rows.Scan(
-			&record.ID, &record.WorkshopID, &record.Name, &record.WorktreePath,
+			&record.ID, &record.WorkshopID, &record.Name,
 			&repoID, &record.Status, &homeBranch, &currentBranch, &focusedIDVal,
 			&createdAt, &updatedAt,
 		)

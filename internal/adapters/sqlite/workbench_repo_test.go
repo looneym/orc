@@ -18,9 +18,8 @@ func TestWorkbenchRepository_Create(t *testing.T) {
 	seedWorkshop(t, db, "SHOP-001", "FACT-001", "test-workshop")
 
 	workbench := &secondary.WorkbenchRecord{
-		WorkshopID:   "SHOP-001",
-		Name:         "test-workbench",
-		WorktreePath: "/tmp/test-workbench",
+		WorkshopID: "SHOP-001",
+		Name:       "test-workbench",
 	}
 
 	err := repo.Create(ctx, workbench)
@@ -52,9 +51,8 @@ func TestWorkbenchRepository_Create_WorkshopNotFound(t *testing.T) {
 	ctx := context.Background()
 
 	workbench := &secondary.WorkbenchRecord{
-		WorkshopID:   "SHOP-999",
-		Name:         "test-workbench",
-		WorktreePath: "/tmp/test",
+		WorkshopID: "SHOP-999",
+		Name:       "test-workbench",
 	}
 
 	err := repo.Create(ctx, workbench)
@@ -75,7 +73,6 @@ func TestWorkbenchRepository_Create_WithOptionalFields(t *testing.T) {
 	workbench := &secondary.WorkbenchRecord{
 		WorkshopID:    "SHOP-001",
 		Name:          "test-workbench",
-		WorktreePath:  "/tmp/test-workbench",
 		RepoID:        "REPO-001",
 		HomeBranch:    "main",
 		CurrentBranch: "feature/test",
@@ -138,10 +135,12 @@ func TestWorkbenchRepository_GetByPath(t *testing.T) {
 	repo := sqlite.NewWorkbenchRepository(db)
 	ctx := context.Background()
 
-	// Seed workbench with known path
+	// Seed workbench with known name
 	seedWorkbench(t, db, "BENCH-001", "", "test-workbench")
 
-	got, err := repo.GetByPath(ctx, "/tmp/test/BENCH-001")
+	// GetByPath extracts the name from the path using filepath.Base()
+	// so ~/wb/test-workbench -> extracts "test-workbench" -> finds BENCH-001
+	got, err := repo.GetByPath(ctx, "/any/path/test-workbench")
 	if err != nil {
 		t.Fatalf("GetByPath failed: %v", err)
 	}
@@ -170,9 +169,9 @@ func TestWorkbenchRepository_GetByWorkshop(t *testing.T) {
 	seedFactory(t, db, "FACT-001", "test-factory")
 	seedWorkshop(t, db, "SHOP-001", "FACT-001", "workshop-1")
 	seedWorkshop(t, db, "SHOP-002", "FACT-001", "workshop-2")
-	_, _ = db.Exec("INSERT INTO workbenches (id, workshop_id, name, path, status) VALUES (?, ?, ?, ?, 'active')", "BENCH-001", "SHOP-001", "bench-1", "/tmp/bench-1")
-	_, _ = db.Exec("INSERT INTO workbenches (id, workshop_id, name, path, status) VALUES (?, ?, ?, ?, 'active')", "BENCH-002", "SHOP-001", "bench-2", "/tmp/bench-2")
-	_, _ = db.Exec("INSERT INTO workbenches (id, workshop_id, name, path, status) VALUES (?, ?, ?, ?, 'active')", "BENCH-003", "SHOP-002", "bench-3", "/tmp/bench-3")
+	_, _ = db.Exec("INSERT INTO workbenches (id, workshop_id, name, status) VALUES (?, ?, ?, 'active')", "BENCH-001", "SHOP-001", "bench-1")
+	_, _ = db.Exec("INSERT INTO workbenches (id, workshop_id, name, status) VALUES (?, ?, ?, 'active')", "BENCH-002", "SHOP-001", "bench-2")
+	_, _ = db.Exec("INSERT INTO workbenches (id, workshop_id, name, status) VALUES (?, ?, ?, 'active')", "BENCH-003", "SHOP-002", "bench-3")
 
 	workbenches, err := repo.GetByWorkshop(ctx, "SHOP-001")
 	if err != nil {
@@ -191,9 +190,9 @@ func TestWorkbenchRepository_List(t *testing.T) {
 	// Seed factory, workshop, and workbenches
 	seedFactory(t, db, "FACT-001", "test-factory")
 	seedWorkshop(t, db, "SHOP-001", "FACT-001", "test-workshop")
-	_, _ = db.Exec("INSERT INTO workbenches (id, workshop_id, name, path, status) VALUES (?, ?, ?, ?, 'active')", "BENCH-001", "SHOP-001", "bench-1", "/tmp/bench-1")
-	_, _ = db.Exec("INSERT INTO workbenches (id, workshop_id, name, path, status) VALUES (?, ?, ?, ?, 'active')", "BENCH-002", "SHOP-001", "bench-2", "/tmp/bench-2")
-	_, _ = db.Exec("INSERT INTO workbenches (id, workshop_id, name, path, status) VALUES (?, ?, ?, ?, 'active')", "BENCH-003", "SHOP-001", "bench-3", "/tmp/bench-3")
+	_, _ = db.Exec("INSERT INTO workbenches (id, workshop_id, name, status) VALUES (?, ?, ?, 'active')", "BENCH-001", "SHOP-001", "bench-1")
+	_, _ = db.Exec("INSERT INTO workbenches (id, workshop_id, name, status) VALUES (?, ?, ?, 'active')", "BENCH-002", "SHOP-001", "bench-2")
+	_, _ = db.Exec("INSERT INTO workbenches (id, workshop_id, name, status) VALUES (?, ?, ?, 'active')", "BENCH-003", "SHOP-001", "bench-3")
 
 	workbenches, err := repo.List(ctx, "")
 	if err != nil {
@@ -213,9 +212,9 @@ func TestWorkbenchRepository_List_FilterByWorkshop(t *testing.T) {
 	seedFactory(t, db, "FACT-001", "test-factory")
 	seedWorkshop(t, db, "SHOP-001", "FACT-001", "workshop-1")
 	seedWorkshop(t, db, "SHOP-002", "FACT-001", "workshop-2")
-	_, _ = db.Exec("INSERT INTO workbenches (id, workshop_id, name, path, status) VALUES (?, ?, ?, ?, 'active')", "BENCH-001", "SHOP-001", "bench-1", "/tmp/bench-1")
-	_, _ = db.Exec("INSERT INTO workbenches (id, workshop_id, name, path, status) VALUES (?, ?, ?, ?, 'active')", "BENCH-002", "SHOP-001", "bench-2", "/tmp/bench-2")
-	_, _ = db.Exec("INSERT INTO workbenches (id, workshop_id, name, path, status) VALUES (?, ?, ?, ?, 'active')", "BENCH-003", "SHOP-002", "bench-3", "/tmp/bench-3")
+	_, _ = db.Exec("INSERT INTO workbenches (id, workshop_id, name, status) VALUES (?, ?, ?, 'active')", "BENCH-001", "SHOP-001", "bench-1")
+	_, _ = db.Exec("INSERT INTO workbenches (id, workshop_id, name, status) VALUES (?, ?, ?, 'active')", "BENCH-002", "SHOP-001", "bench-2")
+	_, _ = db.Exec("INSERT INTO workbenches (id, workshop_id, name, status) VALUES (?, ?, ?, 'active')", "BENCH-003", "SHOP-002", "bench-3")
 
 	workbenches, err := repo.List(ctx, "SHOP-001")
 	if err != nil {
@@ -259,9 +258,9 @@ func TestWorkbenchRepository_Update_MultipleFields(t *testing.T) {
 	seedWorkbench(t, db, "BENCH-001", "", "test")
 
 	// Update multiple fields (status must be 'active' or 'archived' per CHECK constraint)
+	// Note: WorktreePath is computed dynamically, not stored in DB
 	err := repo.Update(ctx, &secondary.WorkbenchRecord{
 		ID:            "BENCH-001",
-		WorktreePath:  "/new/path",
 		Status:        "archived",
 		HomeBranch:    "develop",
 		CurrentBranch: "feature/new",
@@ -272,9 +271,6 @@ func TestWorkbenchRepository_Update_MultipleFields(t *testing.T) {
 
 	// Verify update
 	got, _ := repo.GetByID(ctx, "BENCH-001")
-	if got.WorktreePath != "/new/path" {
-		t.Errorf("expected path '/new/path', got %q", got.WorktreePath)
-	}
 	if got.Status != "archived" {
 		t.Errorf("expected status 'archived', got %q", got.Status)
 	}
@@ -364,7 +360,7 @@ func TestWorkbenchRepository_Rename_NotFound(t *testing.T) {
 	}
 }
 
-func TestWorkbenchRepository_UpdatePath(t *testing.T) {
+func TestWorkbenchRepository_UpdatePath_IsNoOp(t *testing.T) {
 	db := setupTestDB(t)
 	repo := sqlite.NewWorkbenchRepository(db)
 	ctx := context.Background()
@@ -372,27 +368,11 @@ func TestWorkbenchRepository_UpdatePath(t *testing.T) {
 	// Seed workbench
 	seedWorkbench(t, db, "BENCH-001", "", "test")
 
-	// Update path
-	err := repo.UpdatePath(ctx, "BENCH-001", "/new/path")
+	// UpdatePath is now a no-op since paths are computed dynamically
+	// It should succeed without error
+	err := repo.UpdatePath(ctx, "BENCH-001", "/ignored/path")
 	if err != nil {
-		t.Fatalf("UpdatePath failed: %v", err)
-	}
-
-	// Verify update
-	got, _ := repo.GetByID(ctx, "BENCH-001")
-	if got.WorktreePath != "/new/path" {
-		t.Errorf("expected path '/new/path', got %q", got.WorktreePath)
-	}
-}
-
-func TestWorkbenchRepository_UpdatePath_NotFound(t *testing.T) {
-	db := setupTestDB(t)
-	repo := sqlite.NewWorkbenchRepository(db)
-	ctx := context.Background()
-
-	err := repo.UpdatePath(ctx, "BENCH-999", "/new/path")
-	if err == nil {
-		t.Error("expected error for non-existent workbench")
+		t.Fatalf("UpdatePath should succeed (as no-op): %v", err)
 	}
 }
 
@@ -503,12 +483,12 @@ func TestWorkbenchRepository_GetByFocusedID(t *testing.T) {
 	// Seed factory, workshop, and workbenches
 	seedFactory(t, db, "FACT-001", "test-factory")
 	seedWorkshop(t, db, "SHOP-001", "FACT-001", "test-workshop")
-	_, _ = db.Exec("INSERT INTO workbenches (id, workshop_id, name, path, status, focused_id) VALUES (?, ?, ?, ?, 'active', ?)",
-		"BENCH-001", "SHOP-001", "bench-1", "/tmp/bench-1", "SHIP-001")
-	_, _ = db.Exec("INSERT INTO workbenches (id, workshop_id, name, path, status, focused_id) VALUES (?, ?, ?, ?, 'active', ?)",
-		"BENCH-002", "SHOP-001", "bench-2", "/tmp/bench-2", "SHIP-002")
-	_, _ = db.Exec("INSERT INTO workbenches (id, workshop_id, name, path, status, focused_id) VALUES (?, ?, ?, ?, 'archived', ?)",
-		"BENCH-003", "SHOP-001", "bench-3", "/tmp/bench-3", "SHIP-001") // Archived, should not be returned
+	_, _ = db.Exec("INSERT INTO workbenches (id, workshop_id, name, status, focused_id) VALUES (?, ?, ?, 'active', ?)",
+		"BENCH-001", "SHOP-001", "bench-1", "SHIP-001")
+	_, _ = db.Exec("INSERT INTO workbenches (id, workshop_id, name, status, focused_id) VALUES (?, ?, ?, 'active', ?)",
+		"BENCH-002", "SHOP-001", "bench-2", "SHIP-002")
+	_, _ = db.Exec("INSERT INTO workbenches (id, workshop_id, name, status, focused_id) VALUES (?, ?, ?, 'archived', ?)",
+		"BENCH-003", "SHOP-001", "bench-3", "SHIP-001") // Archived, should not be returned
 
 	// Find workbenches focused on SHIP-001
 	workbenches, err := repo.GetByFocusedID(ctx, "SHIP-001")

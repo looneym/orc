@@ -16,7 +16,7 @@ func TestCheckRepository_Create(t *testing.T) {
 	// Create test fixtures: factory -> workshop -> workbench -> kennel -> patrol
 	db.ExecContext(ctx, "INSERT INTO factories (id, name, status) VALUES (?, ?, ?)", "FACT-001", "Test Factory", "active")
 	db.ExecContext(ctx, "INSERT INTO workshops (id, factory_id, name, status) VALUES (?, ?, ?, ?)", "WORK-001", "FACT-001", "Test Workshop", "active")
-	db.ExecContext(ctx, "INSERT INTO workbenches (id, workshop_id, name, path, status) VALUES (?, ?, ?, ?, ?)", "BENCH-001", "WORK-001", "Test Workbench", "/test/path", "active")
+	db.ExecContext(ctx, "INSERT INTO workbenches (id, workshop_id, name, status) VALUES (?, ?, ?, ?)", "BENCH-001", "WORK-001", "Test Workbench", "active")
 	db.ExecContext(ctx, "INSERT INTO kennels (id, workbench_id, status) VALUES (?, ?, ?)", "KENNEL-001", "BENCH-001", "occupied")
 	db.ExecContext(ctx, "INSERT INTO patrols (id, kennel_id, target, status) VALUES (?, ?, ?, ?)", "PATROL-001", "KENNEL-001", "workshop:bench.2", "active")
 
@@ -55,7 +55,7 @@ func TestCheckRepository_GetLatest(t *testing.T) {
 	// Setup
 	db.ExecContext(ctx, "INSERT INTO factories (id, name, status) VALUES (?, ?, ?)", "FACT-001", "Test", "active")
 	db.ExecContext(ctx, "INSERT INTO workshops (id, factory_id, name, status) VALUES (?, ?, ?, ?)", "WORK-001", "FACT-001", "Test", "active")
-	db.ExecContext(ctx, "INSERT INTO workbenches (id, workshop_id, name, path, status) VALUES (?, ?, ?, ?, ?)", "BENCH-001", "WORK-001", "Test", "/test", "active")
+	db.ExecContext(ctx, "INSERT INTO workbenches (id, workshop_id, name, status) VALUES (?, ?, ?, ?)", "BENCH-001", "WORK-001", "Test", "active")
 	db.ExecContext(ctx, "INSERT INTO kennels (id, workbench_id, status) VALUES (?, ?, ?)", "KENNEL-001", "BENCH-001", "occupied")
 	db.ExecContext(ctx, "INSERT INTO patrols (id, kennel_id, target, status) VALUES (?, ?, ?, ?)", "PATROL-001", "KENNEL-001", "workshop:bench.2", "active")
 
@@ -87,7 +87,7 @@ func TestCheckRepository_GetByPatrol(t *testing.T) {
 	// Setup
 	db.ExecContext(ctx, "INSERT INTO factories (id, name, status) VALUES (?, ?, ?)", "FACT-001", "Test", "active")
 	db.ExecContext(ctx, "INSERT INTO workshops (id, factory_id, name, status) VALUES (?, ?, ?, ?)", "WORK-001", "FACT-001", "Test", "active")
-	db.ExecContext(ctx, "INSERT INTO workbenches (id, workshop_id, name, path, status) VALUES (?, ?, ?, ?, ?)", "BENCH-001", "WORK-001", "Test", "/test", "active")
+	db.ExecContext(ctx, "INSERT INTO workbenches (id, workshop_id, name, status) VALUES (?, ?, ?, ?)", "BENCH-001", "WORK-001", "Test", "active")
 	db.ExecContext(ctx, "INSERT INTO kennels (id, workbench_id, status) VALUES (?, ?, ?)", "KENNEL-001", "BENCH-001", "occupied")
 	db.ExecContext(ctx, "INSERT INTO patrols (id, kennel_id, target, status) VALUES (?, ?, ?, ?)", "PATROL-001", "KENNEL-001", "workshop:bench.2", "active")
 
@@ -140,7 +140,7 @@ func TestCheckRepository_PatrolExists(t *testing.T) {
 	// Setup
 	db.ExecContext(ctx, "INSERT INTO factories (id, name, status) VALUES (?, ?, ?)", "FACT-001", "Test", "active")
 	db.ExecContext(ctx, "INSERT INTO workshops (id, factory_id, name, status) VALUES (?, ?, ?, ?)", "WORK-001", "FACT-001", "Test", "active")
-	db.ExecContext(ctx, "INSERT INTO workbenches (id, workshop_id, name, path, status) VALUES (?, ?, ?, ?, ?)", "BENCH-001", "WORK-001", "Test", "/test", "active")
+	db.ExecContext(ctx, "INSERT INTO workbenches (id, workshop_id, name, status) VALUES (?, ?, ?, ?)", "BENCH-001", "WORK-001", "Test", "active")
 	db.ExecContext(ctx, "INSERT INTO kennels (id, workbench_id, status) VALUES (?, ?, ?)", "KENNEL-001", "BENCH-001", "occupied")
 	db.ExecContext(ctx, "INSERT INTO patrols (id, kennel_id, target, status) VALUES (?, ?, ?, ?)", "PATROL-001", "KENNEL-001", "workshop:bench.2", "active")
 

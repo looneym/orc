@@ -54,7 +54,7 @@ Examples:
 				fmt.Println("   ✓ ~/.claude/settings.json exists")
 				fmt.Println("   ✓ Valid JSON structure")
 				fmt.Println("   ✓ permissions.additionalDirectories configured")
-				fmt.Println("   ✓ ~/src/worktrees in trusted directories")
+				fmt.Println("   ✓ ~/wb in trusted directories")
 				fmt.Println("   ✓ ~/src/factories in trusted directories")
 				fmt.Println()
 			}
@@ -140,7 +140,7 @@ func checkClaudeSettings(quiet bool) error {
    {
      "permissions": {
        "additionalDirectories": [
-         "~/src/worktrees",
+         "~/wb",
          "~/src/factories"
        ]
      }
@@ -169,7 +169,7 @@ func checkClaudeSettings(quiet bool) error {
    {
      "permissions": {
        "additionalDirectories": [
-         "~/src/worktrees",
+         "~/wb",
          "~/src/factories"
        ]
      }
@@ -183,7 +183,7 @@ func checkClaudeSettings(quiet bool) error {
    FIX: Add to permissions object in ~/.claude/settings.json:
 
    "additionalDirectories": [
-     "~/src/worktrees",
+     "~/wb",
      "~/src/factories"
    ]`)
 	}
@@ -196,13 +196,13 @@ func checkClaudeSettings(quiet bool) error {
 		}
 	}
 
-	missingWorktrees := !foundDirs["~/src/worktrees"]
+	missingWorktrees := !foundDirs["~/wb"]
 	missingFactories := !foundDirs["~/src/factories"]
 
 	if missingWorktrees || missingFactories {
 		msg := "✗ Missing required directories:\n"
 		if missingWorktrees {
-			msg += "     - ~/src/worktrees\n"
+			msg += "     - ~/wb\n"
 		}
 		if missingFactories {
 			msg += "     - ~/src/factories\n"
@@ -238,9 +238,9 @@ func checkDirectories(quiet bool) error {
 			// Count workbenches
 			entries, _ := os.ReadDir(worktreesPath)
 			workbenchCount := len(entries)
-			fmt.Printf("   ✓ ~/src/worktrees exists (%d workbenches)\n", workbenchCount)
+			fmt.Printf("   ✓ ~/wb exists (%d workbenches)\n", workbenchCount)
 		} else {
-			fmt.Println("   ⚠️  ~/src/worktrees does not exist (will be created on first workbench)")
+			fmt.Println("   ⚠️  ~/wb does not exist (will be created on first workbench)")
 		}
 
 		if factoriesExists {

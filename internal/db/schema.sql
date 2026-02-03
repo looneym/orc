@@ -53,11 +53,11 @@ CREATE TABLE IF NOT EXISTS workshops (
 );
 
 -- Workbenches (Git worktrees within a workshop)
+-- Path is computed dynamically as ~/wb/{name}, not stored
 CREATE TABLE IF NOT EXISTS workbenches (
 	id TEXT PRIMARY KEY,
 	workshop_id TEXT NOT NULL,
-	name TEXT NOT NULL,
-	path TEXT NOT NULL UNIQUE,
+	name TEXT NOT NULL UNIQUE,
 	repo_id TEXT,
 	status TEXT NOT NULL CHECK(status IN ('active', 'archived')) DEFAULT 'active',
 	home_branch TEXT,

@@ -98,7 +98,7 @@ func TestWorkspaceAdapter_DefaultPaths(t *testing.T) {
 	home, _ := os.UserHomeDir()
 
 	// Check default worktrees path
-	expectedWorktrees := filepath.Join(home, "src", "worktrees")
+	expectedWorktrees := filepath.Join(home, "wb")
 	if adapter.GetWorktreesBasePath() != expectedWorktrees {
 		t.Errorf("expected default worktrees path %s, got %s", expectedWorktrees, adapter.GetWorktreesBasePath())
 	}

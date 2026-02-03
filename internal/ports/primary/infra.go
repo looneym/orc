@@ -107,9 +107,8 @@ type InfraApplyResponse struct {
 
 // CleanupWorkbenchRequest contains parameters for cleaning up workbench infrastructure.
 type CleanupWorkbenchRequest struct {
-	WorkbenchID  string
-	WorktreePath string
-	Force        bool // Force deletion even if worktree has uncommitted changes
+	WorkbenchID string
+	Force       bool // Force deletion even if worktree has uncommitted changes
 }
 
 // CleanupWorkshopRequest contains parameters for cleaning up workshop infrastructure.

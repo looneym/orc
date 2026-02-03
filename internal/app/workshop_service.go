@@ -10,6 +10,7 @@ import (
 
 	"github.com/example/orc/internal/config"
 	"github.com/example/orc/internal/core/effects"
+	coreworkbench "github.com/example/orc/internal/core/workbench"
 	coreworkshop "github.com/example/orc/internal/core/workshop"
 	"github.com/example/orc/internal/ports/primary"
 	"github.com/example/orc/internal/ports/secondary"
@@ -230,14 +231,15 @@ func (s *WorkshopServiceImpl) PlanOpenWorkshop(ctx context.Context, req primary.
 				repoName = repo.Name
 			}
 		}
+		wbPath := coreworkbench.ComputePath(wb.Name)
 		wbInputs = append(wbInputs, coreworkshop.WorkbenchPlanInput{
 			ID:             wb.ID,
 			Name:           wb.Name,
-			WorktreePath:   wb.WorktreePath,
+			WorktreePath:   wbPath,
 			RepoName:       repoName,
 			HomeBranch:     wb.HomeBranch,
-			WorktreeExists: s.dirExists(wb.WorktreePath),
-			ConfigExists:   s.fileExists(filepath.Join(wb.WorktreePath, ".orc", "config.json")),
+			WorktreeExists: s.dirExists(wbPath),
+			ConfigExists:   s.fileExists(filepath.Join(wbPath, ".orc", "config.json")),
 			Status:         wb.Status,
 		})
 	}
@@ -307,16 +309,16 @@ func (s *WorkshopServiceImpl) ApplyOpenWorkshop(ctx context.Context, plan *prima
 		if plan.TMuxOp.AddToExisting {
 			// Add windows to existing session
 			for _, window := range plan.TMuxOp.Windows {
-				// Find the workbench path for this window
-				var wbPath string
+				// Find the workbench for this window and compute path
+				var windowPath string
 				for _, wb := range workbenches {
 					if wb.Name == window.Name {
-						wbPath = wb.WorktreePath
+						windowPath = coreworkbench.ComputePath(wb.Name)
 						break
 					}
 				}
-				if wbPath != "" {
-					_ = s.tmuxAdapter.CreateWorkbenchWindow(ctx, plan.SessionName, window.Index, window.Name, wbPath)
+				if windowPath != "" {
+					_ = s.tmuxAdapter.CreateWorkbenchWindow(ctx, plan.SessionName, window.Index, window.Name, windowPath)
 				}
 			}
 			sessionAlreadyOpen = true
@@ -336,7 +338,7 @@ func (s *WorkshopServiceImpl) ApplyOpenWorkshop(ctx context.Context, plan *prima
 
 			// Create tmux windows for each workbench
 			for i, wb := range workbenches {
-				_ = s.tmuxAdapter.CreateWorkbenchWindow(ctx, plan.SessionName, i+2, wb.Name, wb.WorktreePath)
+				_ = s.tmuxAdapter.CreateWorkbenchWindow(ctx, plan.SessionName, i+2, wb.Name, coreworkbench.ComputePath(wb.Name))
 			}
 		}
 	}
@@ -362,8 +364,11 @@ func (s *WorkshopServiceImpl) OpenWorkshop(ctx context.Context, req primary.Open
 // ensureWorktreeExists creates a worktree and IMP config if they don't exist.
 // All effects are batched into a single execute call for atomicity.
 func (s *WorkshopServiceImpl) ensureWorktreeExists(ctx context.Context, wb *secondary.WorkbenchRecord) error {
+	// Compute path from name
+	wbPath := coreworkbench.ComputePath(wb.Name)
+
 	// Check if worktree already exists
-	exists, err := s.workspaceAdapter.WorktreeExists(ctx, wb.WorktreePath)
+	exists, err := s.workspaceAdapter.WorktreeExists(ctx, wbPath)
 	if err != nil {
 		return err
 	}
@@ -376,7 +381,7 @@ func (s *WorkshopServiceImpl) ensureWorktreeExists(ctx context.Context, wb *seco
 			// No repo linked - just create the directory via FileEffect
 			effs = append(effs, effects.FileEffect{
 				Operation: "mkdir",
-				Path:      wb.WorktreePath,
+				Path:      wbPath,
 				Mode:      0755,
 			})
 		} else {
@@ -390,13 +395,13 @@ func (s *WorkshopServiceImpl) ensureWorktreeExists(ctx context.Context, wb *seco
 			effs = append(effs, effects.GitEffect{
 				Operation: "worktree_add",
 				RepoPath:  repo.LocalPath,
-				Args:      []string{wb.HomeBranch, wb.WorktreePath},
+				Args:      []string{wb.HomeBranch, wbPath},
 			})
 		}
 	}
 
 	// 2. Build config effects (always - idempotent)
-	orcDir := filepath.Join(wb.WorktreePath, ".orc")
+	orcDir := filepath.Join(wbPath, ".orc")
 	configPath := filepath.Join(orcDir, "config.json")
 	cfg := &config.Config{
 		Version: "1.0",

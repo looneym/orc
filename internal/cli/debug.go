@@ -140,7 +140,7 @@ Checks:
 Useful for debugging workspace setup issues.
 
 Examples:
-  orc debug validate-context ~/src/worktrees/test-workbench
+  orc debug validate-context ~/wb/test-workbench
   orc debug validate-context .`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {

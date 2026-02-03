@@ -12,6 +12,7 @@ import (
 	"github.com/example/orc/internal/config"
 	"github.com/example/orc/internal/core/effects"
 	coreinfra "github.com/example/orc/internal/core/infra"
+	coreworkbench "github.com/example/orc/internal/core/workbench"
 	coreworkshop "github.com/example/orc/internal/core/workshop"
 	"github.com/example/orc/internal/ports/primary"
 	"github.com/example/orc/internal/ports/secondary"
@@ -100,14 +101,15 @@ func (s *InfraServiceImpl) PlanInfra(ctx context.Context, req primary.InfraPlanR
 				repoName = repo.Name
 			}
 		}
+		wbPath := coreworkbench.ComputePath(wb.Name)
 		wbInputs = append(wbInputs, coreinfra.WorkbenchPlanInput{
 			ID:             wb.ID,
 			Name:           wb.Name,
-			WorktreePath:   wb.WorktreePath,
+			WorktreePath:   wbPath,
 			RepoName:       repoName,
 			HomeBranch:     wb.HomeBranch,
-			WorktreeExists: s.dirExists(wb.WorktreePath),
-			ConfigExists:   s.fileExists(filepath.Join(wb.WorktreePath, ".orc", "config.json")),
+			WorktreeExists: s.dirExists(wbPath),
+			ConfigExists:   s.fileExists(filepath.Join(wbPath, ".orc", "config.json")),
 		})
 	}
 
@@ -115,12 +117,13 @@ func (s *InfraServiceImpl) PlanInfra(ctx context.Context, req primary.InfraPlanR
 	orphanWbs, orphanGhs := s.scanForOrphans(ctx, workbenches, gatehouse)
 	// Archived workbenches are also orphans (should be deleted)
 	for _, wb := range archivedWorkbenches {
+		wbPath := coreworkbench.ComputePath(wb.Name)
 		orphanWbs = append(orphanWbs, coreinfra.WorkbenchPlanInput{
 			ID:             wb.ID,
 			Name:           wb.Name,
-			WorktreePath:   wb.WorktreePath,
-			WorktreeExists: s.dirExists(wb.WorktreePath),
-			ConfigExists:   s.fileExists(filepath.Join(wb.WorktreePath, ".orc", "config.json")),
+			WorktreePath:   wbPath,
+			WorktreeExists: s.dirExists(wbPath),
+			ConfigExists:   s.fileExists(filepath.Join(wbPath, ".orc", "config.json")),
 		})
 	}
 	// Archived workshop's gatehouse is also an orphan
@@ -153,7 +156,7 @@ func (s *InfraServiceImpl) PlanInfra(ctx context.Context, req primary.InfraPlanR
 			for _, wb := range workbenches {
 				tmuxExpectedWindows = append(tmuxExpectedWindows, coreinfra.TMuxWindowInput{
 					Name: wb.Name,
-					Path: wb.WorktreePath,
+					Path: coreworkbench.ComputePath(wb.Name),
 				})
 			}
 		}
@@ -650,7 +653,8 @@ func (s *InfraServiceImpl) createGatehouseDir(path, gatehouseID string) error {
 
 // ensureWorktreeExists creates a worktree and IMP config if they don't exist.
 func (s *InfraServiceImpl) ensureWorktreeExists(ctx context.Context, wb *secondary.WorkbenchRecord) error {
-	exists, err := s.workspaceAdapter.WorktreeExists(ctx, wb.WorktreePath)
+	wbPath := coreworkbench.ComputePath(wb.Name)
+	exists, err := s.workspaceAdapter.WorktreeExists(ctx, wbPath)
 	if err != nil {
 		return err
 	}
@@ -661,7 +665,7 @@ func (s *InfraServiceImpl) ensureWorktreeExists(ctx context.Context, wb *seconda
 		if wb.RepoID == "" {
 			effs = append(effs, effects.FileEffect{
 				Operation: "mkdir",
-				Path:      wb.WorktreePath,
+				Path:      wbPath,
 				Mode:      0755,
 			})
 		} else {
@@ -672,13 +676,13 @@ func (s *InfraServiceImpl) ensureWorktreeExists(ctx context.Context, wb *seconda
 			effs = append(effs, effects.GitEffect{
 				Operation: "worktree_add",
 				RepoPath:  repo.LocalPath,
-				Args:      []string{wb.HomeBranch, wb.WorktreePath},
+				Args:      []string{wb.HomeBranch, wbPath},
 			})
 		}
 	}
 
 	// Create config
-	orcDir := filepath.Join(wb.WorktreePath, ".orc")
+	orcDir := filepath.Join(wbPath, ".orc")
 	configPath := filepath.Join(orcDir, "config.json")
 	cfg := &config.Config{
 		Version: "1.0",
@@ -701,7 +705,8 @@ func (s *InfraServiceImpl) ensureWorktreeExists(ctx context.Context, wb *seconda
 
 // ensureConfigExists creates only the config for an existing worktree.
 func (s *InfraServiceImpl) ensureConfigExists(ctx context.Context, wb *secondary.WorkbenchRecord) error {
-	orcDir := filepath.Join(wb.WorktreePath, ".orc")
+	wbPath := coreworkbench.ComputePath(wb.Name)
+	orcDir := filepath.Join(wbPath, ".orc")
 	configPath := filepath.Join(orcDir, "config.json")
 	cfg := &config.Config{
 		Version: "1.0",
@@ -722,30 +727,32 @@ func (s *InfraServiceImpl) ensureConfigExists(ctx context.Context, wb *secondary
 
 // CleanupWorkbench removes the worktree directory for a workbench.
 func (s *InfraServiceImpl) CleanupWorkbench(ctx context.Context, req primary.CleanupWorkbenchRequest) error {
+	// Get workbench to compute path and get workshop info
+	wb, err := s.workbenchRepo.GetByID(ctx, req.WorkbenchID)
+	if err != nil {
+		return fmt.Errorf("workbench not found: %w", err)
+	}
+
+	wbPath := coreworkbench.ComputePath(wb.Name)
+
 	// Check for dirty worktree if not forced
-	if !req.Force && req.WorktreePath != "" {
-		dirty, modified, untracked, err := s.isWorktreeDirty(req.WorktreePath)
+	if !req.Force {
+		dirty, modified, untracked, err := s.isWorktreeDirty(wbPath)
 		if err == nil && dirty {
 			return fmt.Errorf("cannot delete %s: worktree has uncommitted changes (%d modified, %d untracked). Use --force to override", req.WorkbenchID, modified, untracked)
 		}
 	}
 
 	// Remove the worktree directory
-	if req.WorktreePath != "" {
-		if err := os.RemoveAll(req.WorktreePath); err != nil {
-			return fmt.Errorf("failed to remove worktree %s: %w", req.WorktreePath, err)
-		}
+	if err := os.RemoveAll(wbPath); err != nil {
+		return fmt.Errorf("failed to remove worktree %s: %w", wbPath, err)
 	}
 
 	// Kill tmux window if exists (best effort - don't fail if not found)
 	if s.tmuxAdapter != nil {
-		// Find session for this workbench's workshop
-		wb, err := s.workbenchRepo.GetByID(ctx, req.WorkbenchID)
-		if err == nil {
-			sessionName := s.tmuxAdapter.FindSessionByWorkshopID(ctx, wb.WorkshopID)
-			if sessionName != "" {
-				_ = s.tmuxAdapter.KillWindow(ctx, sessionName, wb.Name)
-			}
+		sessionName := s.tmuxAdapter.FindSessionByWorkshopID(ctx, wb.WorkshopID)
+		if sessionName != "" {
+			_ = s.tmuxAdapter.KillWindow(ctx, sessionName, wb.Name)
 		}
 	}
 
@@ -766,9 +773,8 @@ func (s *InfraServiceImpl) CleanupWorkshop(ctx context.Context, req primary.Clea
 	// Cleanup each workbench
 	for _, wb := range workbenches {
 		if err := s.CleanupWorkbench(ctx, primary.CleanupWorkbenchRequest{
-			WorkbenchID:  wb.ID,
-			WorktreePath: wb.WorktreePath,
-			Force:        req.Force,
+			WorkbenchID: wb.ID,
+			Force:       req.Force,
 		}); err != nil {
 			return fmt.Errorf("failed to cleanup workbench %s: %w", wb.ID, err)
 		}

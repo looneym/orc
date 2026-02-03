@@ -343,8 +343,8 @@ func TestWorkshopRepository_CountWorkbenches(t *testing.T) {
 	}
 
 	// Add workbenches
-	_, _ = db.Exec("INSERT INTO workbenches (id, workshop_id, name, path, status) VALUES (?, ?, ?, ?, 'active')", "BENCH-001", "SHOP-001", "bench-1", "/tmp/bench-1")
-	_, _ = db.Exec("INSERT INTO workbenches (id, workshop_id, name, path, status) VALUES (?, ?, ?, ?, 'active')", "BENCH-002", "SHOP-001", "bench-2", "/tmp/bench-2")
+	_, _ = db.Exec("INSERT INTO workbenches (id, workshop_id, name, status) VALUES (?, ?, ?, 'active')", "BENCH-001", "SHOP-001", "bench-1")
+	_, _ = db.Exec("INSERT INTO workbenches (id, workshop_id, name, status) VALUES (?, ?, ?, 'active')", "BENCH-002", "SHOP-001", "bench-2")
 
 	// Count should be 2
 	count, err = repo.CountWorkbenches(ctx, "SHOP-001")
@@ -468,8 +468,8 @@ func TestWorkshopRepository_GetActiveCommissions_IMPFocusSHIP(t *testing.T) {
 	seedWorkshop(t, db, "SHOP-001", "FACT-001", "test-workshop")
 	seedCommission(t, db, "COMM-001", "Test Commission")
 	seedShipment(t, db, "SHIP-001", "COMM-001", "Test Shipment")
-	_, _ = db.Exec("INSERT INTO workbenches (id, workshop_id, name, path, status, focused_id) VALUES (?, ?, ?, ?, 'active', ?)",
-		"BENCH-001", "SHOP-001", "bench-1", "/tmp/bench-1", "SHIP-001")
+	_, _ = db.Exec("INSERT INTO workbenches (id, workshop_id, name, status, focused_id) VALUES (?, ?, ?, 'active', ?)",
+		"BENCH-001", "SHOP-001", "bench-1", "SHIP-001")
 
 	commissions, err := repo.GetActiveCommissions(ctx, "SHOP-001")
 	if err != nil {
@@ -500,8 +500,8 @@ func TestWorkshopRepository_GetActiveCommissions_MultipleActors(t *testing.T) {
 	_, _ = db.Exec("UPDATE gatehouses SET focused_id = ? WHERE id = ?", "COMM-002", "GATE-001")
 
 	// IMP focuses SHIP-001 (resolves to COMM-001)
-	_, _ = db.Exec("INSERT INTO workbenches (id, workshop_id, name, path, status, focused_id) VALUES (?, ?, ?, ?, 'active', ?)",
-		"BENCH-001", "SHOP-001", "bench-1", "/tmp/bench-1", "SHIP-001")
+	_, _ = db.Exec("INSERT INTO workbenches (id, workshop_id, name, status, focused_id) VALUES (?, ?, ?, 'active', ?)",
+		"BENCH-001", "SHOP-001", "bench-1", "SHIP-001")
 
 	commissions, err := repo.GetActiveCommissions(ctx, "SHOP-001")
 	if err != nil {
@@ -537,10 +537,10 @@ func TestWorkshopRepository_GetActiveCommissions_Deduplication(t *testing.T) {
 	seedShipment(t, db, "SHIP-002", "COMM-001", "Shipment 2")
 
 	// Two workbenches focus different shipments from same commission
-	_, _ = db.Exec("INSERT INTO workbenches (id, workshop_id, name, path, status, focused_id) VALUES (?, ?, ?, ?, 'active', ?)",
-		"BENCH-001", "SHOP-001", "bench-1", "/tmp/bench-1", "SHIP-001")
-	_, _ = db.Exec("INSERT INTO workbenches (id, workshop_id, name, path, status, focused_id) VALUES (?, ?, ?, ?, 'active', ?)",
-		"BENCH-002", "SHOP-001", "bench-2", "/tmp/bench-2", "SHIP-002")
+	_, _ = db.Exec("INSERT INTO workbenches (id, workshop_id, name, status, focused_id) VALUES (?, ?, ?, 'active', ?)",
+		"BENCH-001", "SHOP-001", "bench-1", "SHIP-001")
+	_, _ = db.Exec("INSERT INTO workbenches (id, workshop_id, name, status, focused_id) VALUES (?, ?, ?, 'active', ?)",
+		"BENCH-002", "SHOP-001", "bench-2", "SHIP-002")
 
 	commissions, err := repo.GetActiveCommissions(ctx, "SHOP-001")
 	if err != nil {

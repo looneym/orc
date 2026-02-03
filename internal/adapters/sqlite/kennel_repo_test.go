@@ -16,7 +16,7 @@ func TestKennelRepository_Create(t *testing.T) {
 	// Create test fixtures: factory -> workshop -> workbench
 	db.ExecContext(ctx, "INSERT INTO factories (id, name, status) VALUES (?, ?, ?)", "FACT-001", "Test Factory", "active")
 	db.ExecContext(ctx, "INSERT INTO workshops (id, factory_id, name, status) VALUES (?, ?, ?, ?)", "WORK-001", "FACT-001", "Test Workshop", "active")
-	db.ExecContext(ctx, "INSERT INTO workbenches (id, workshop_id, name, path, status) VALUES (?, ?, ?, ?, ?)", "BENCH-001", "WORK-001", "Test Workbench", "/test/path", "active")
+	db.ExecContext(ctx, "INSERT INTO workbenches (id, workshop_id, name, status) VALUES (?, ?, ?, ?)", "BENCH-001", "WORK-001", "Test Workbench", "active")
 
 	t.Run("creates kennel successfully", func(t *testing.T) {
 		record := &secondary.KennelRecord{
@@ -52,7 +52,7 @@ func TestKennelRepository_GetByID(t *testing.T) {
 	// Setup
 	db.ExecContext(ctx, "INSERT INTO factories (id, name, status) VALUES (?, ?, ?)", "FACT-001", "Test", "active")
 	db.ExecContext(ctx, "INSERT INTO workshops (id, factory_id, name, status) VALUES (?, ?, ?, ?)", "WORK-001", "FACT-001", "Test", "active")
-	db.ExecContext(ctx, "INSERT INTO workbenches (id, workshop_id, name, path, status) VALUES (?, ?, ?, ?, ?)", "BENCH-001", "WORK-001", "Test", "/test", "active")
+	db.ExecContext(ctx, "INSERT INTO workbenches (id, workshop_id, name, status) VALUES (?, ?, ?, ?)", "BENCH-001", "WORK-001", "Test", "active")
 
 	repo.Create(ctx, &secondary.KennelRecord{
 		ID:          "KENNEL-001",
@@ -86,7 +86,7 @@ func TestKennelRepository_GetByWorkbench(t *testing.T) {
 	// Setup
 	db.ExecContext(ctx, "INSERT INTO factories (id, name, status) VALUES (?, ?, ?)", "FACT-001", "Test", "active")
 	db.ExecContext(ctx, "INSERT INTO workshops (id, factory_id, name, status) VALUES (?, ?, ?, ?)", "WORK-001", "FACT-001", "Test", "active")
-	db.ExecContext(ctx, "INSERT INTO workbenches (id, workshop_id, name, path, status) VALUES (?, ?, ?, ?, ?)", "BENCH-001", "WORK-001", "Test", "/test", "active")
+	db.ExecContext(ctx, "INSERT INTO workbenches (id, workshop_id, name, status) VALUES (?, ?, ?, ?)", "BENCH-001", "WORK-001", "Test", "active")
 
 	repo.Create(ctx, &secondary.KennelRecord{
 		ID:          "KENNEL-001",
@@ -123,8 +123,8 @@ func TestKennelRepository_List(t *testing.T) {
 	// Setup
 	db.ExecContext(ctx, "INSERT INTO factories (id, name, status) VALUES (?, ?, ?)", "FACT-001", "Test", "active")
 	db.ExecContext(ctx, "INSERT INTO workshops (id, factory_id, name, status) VALUES (?, ?, ?, ?)", "WORK-001", "FACT-001", "Test", "active")
-	db.ExecContext(ctx, "INSERT INTO workbenches (id, workshop_id, name, path, status) VALUES (?, ?, ?, ?, ?)", "BENCH-001", "WORK-001", "Test 1", "/test1", "active")
-	db.ExecContext(ctx, "INSERT INTO workbenches (id, workshop_id, name, path, status) VALUES (?, ?, ?, ?, ?)", "BENCH-002", "WORK-001", "Test 2", "/test2", "active")
+	db.ExecContext(ctx, "INSERT INTO workbenches (id, workshop_id, name, status) VALUES (?, ?, ?, ?)", "BENCH-001", "WORK-001", "Test 1", "active")
+	db.ExecContext(ctx, "INSERT INTO workbenches (id, workshop_id, name, status) VALUES (?, ?, ?, ?)", "BENCH-002", "WORK-001", "Test 2", "active")
 
 	repo.Create(ctx, &secondary.KennelRecord{ID: "KENNEL-001", WorkbenchID: "BENCH-001", Status: "vacant"})
 	repo.Create(ctx, &secondary.KennelRecord{ID: "KENNEL-002", WorkbenchID: "BENCH-002", Status: "occupied"})
@@ -174,7 +174,7 @@ func TestKennelRepository_Delete(t *testing.T) {
 	// Setup
 	db.ExecContext(ctx, "INSERT INTO factories (id, name, status) VALUES (?, ?, ?)", "FACT-001", "Test", "active")
 	db.ExecContext(ctx, "INSERT INTO workshops (id, factory_id, name, status) VALUES (?, ?, ?, ?)", "WORK-001", "FACT-001", "Test", "active")
-	db.ExecContext(ctx, "INSERT INTO workbenches (id, workshop_id, name, path, status) VALUES (?, ?, ?, ?, ?)", "BENCH-001", "WORK-001", "Test", "/test", "active")
+	db.ExecContext(ctx, "INSERT INTO workbenches (id, workshop_id, name, status) VALUES (?, ?, ?, ?)", "BENCH-001", "WORK-001", "Test", "active")
 
 	repo.Create(ctx, &secondary.KennelRecord{ID: "KENNEL-001", WorkbenchID: "BENCH-001", Status: "vacant"})
 
@@ -222,7 +222,7 @@ func TestKennelRepository_UpdateStatus(t *testing.T) {
 	// Setup
 	db.ExecContext(ctx, "INSERT INTO factories (id, name, status) VALUES (?, ?, ?)", "FACT-001", "Test", "active")
 	db.ExecContext(ctx, "INSERT INTO workshops (id, factory_id, name, status) VALUES (?, ?, ?, ?)", "WORK-001", "FACT-001", "Test", "active")
-	db.ExecContext(ctx, "INSERT INTO workbenches (id, workshop_id, name, path, status) VALUES (?, ?, ?, ?, ?)", "BENCH-001", "WORK-001", "Test", "/test", "active")
+	db.ExecContext(ctx, "INSERT INTO workbenches (id, workshop_id, name, status) VALUES (?, ?, ?, ?)", "BENCH-001", "WORK-001", "Test", "active")
 
 	repo.Create(ctx, &secondary.KennelRecord{
 		ID:          "KENNEL-001",
@@ -270,7 +270,7 @@ func TestKennelRepository_WorkbenchExists(t *testing.T) {
 	// Setup
 	db.ExecContext(ctx, "INSERT INTO factories (id, name, status) VALUES (?, ?, ?)", "FACT-001", "Test", "active")
 	db.ExecContext(ctx, "INSERT INTO workshops (id, factory_id, name, status) VALUES (?, ?, ?, ?)", "WORK-001", "FACT-001", "Test", "active")
-	db.ExecContext(ctx, "INSERT INTO workbenches (id, workshop_id, name, path, status) VALUES (?, ?, ?, ?, ?)", "BENCH-001", "WORK-001", "Test", "/test", "active")
+	db.ExecContext(ctx, "INSERT INTO workbenches (id, workshop_id, name, status) VALUES (?, ?, ?, ?)", "BENCH-001", "WORK-001", "Test", "active")
 
 	t.Run("returns true for existing workbench", func(t *testing.T) {
 		exists, err := repo.WorkbenchExists(ctx, "BENCH-001")
@@ -301,8 +301,8 @@ func TestKennelRepository_WorkbenchHasKennel(t *testing.T) {
 	// Setup
 	db.ExecContext(ctx, "INSERT INTO factories (id, name, status) VALUES (?, ?, ?)", "FACT-001", "Test", "active")
 	db.ExecContext(ctx, "INSERT INTO workshops (id, factory_id, name, status) VALUES (?, ?, ?, ?)", "WORK-001", "FACT-001", "Test", "active")
-	db.ExecContext(ctx, "INSERT INTO workbenches (id, workshop_id, name, path, status) VALUES (?, ?, ?, ?, ?)", "BENCH-001", "WORK-001", "Test 1", "/test1", "active")
-	db.ExecContext(ctx, "INSERT INTO workbenches (id, workshop_id, name, path, status) VALUES (?, ?, ?, ?, ?)", "BENCH-002", "WORK-001", "Test 2", "/test2", "active")
+	db.ExecContext(ctx, "INSERT INTO workbenches (id, workshop_id, name, status) VALUES (?, ?, ?, ?)", "BENCH-001", "WORK-001", "Test 1", "active")
+	db.ExecContext(ctx, "INSERT INTO workbenches (id, workshop_id, name, status) VALUES (?, ?, ?, ?)", "BENCH-002", "WORK-001", "Test 2", "active")
 
 	repo.Create(ctx, &secondary.KennelRecord{
 		ID:          "KENNEL-001",

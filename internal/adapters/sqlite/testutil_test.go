@@ -146,8 +146,8 @@ func seedWorkbench(t *testing.T, db *sql.DB, id, _ /* commissionID */, name stri
 	if name == "" {
 		name = "test-workbench"
 	}
-	path := "/tmp/test/" + id // Use ID to ensure unique paths
-	_, err := db.Exec("INSERT INTO workbenches (id, workshop_id, name, path, status) VALUES (?, ?, ?, ?, 'active')", id, "SHOP-001", name, path)
+	// Path is computed dynamically as ~/wb/{name}, not stored in DB
+	_, err := db.Exec("INSERT INTO workbenches (id, workshop_id, name, status) VALUES (?, ?, ?, 'active')", id, "SHOP-001", name)
 	if err != nil {
 		t.Fatalf("failed to seed workbench: %v", err)
 	}

@@ -54,7 +54,6 @@ type CreateWorkbenchRequest struct {
 	WorkshopID      string   // Required
 	RepoID          string   // Optional - link to repo
 	Repos           []string // Optional repository names for worktree creation
-	BasePath        string   // Optional, defaults to ~/src/worktrees
 	SkipConfigWrite bool     // If true, caller writes config after worktree setup
 }
 

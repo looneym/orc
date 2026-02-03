@@ -66,12 +66,8 @@ func (s *WorkbenchServiceImpl) CreateWorkbench(ctx context.Context, req primary.
 		return nil, result.Error()
 	}
 
-	// 4. Build workbench path (~/wb/<name>)
-	basePath := req.BasePath
-	if basePath == "" {
-		basePath = s.defaultBasePath()
-	}
-	workbenchPath := filepath.Join(basePath, req.Name)
+	// 4. Compute workbench path (deterministic: ~/wb/<name>)
+	workbenchPath := coreworkbench.ComputePath(req.Name)
 
 	// 5. Generate home branch name
 	homeBranch := GenerateHomeBranchName(UserInitials, req.Name)
@@ -195,18 +191,13 @@ func (s *WorkbenchServiceImpl) recordToWorkbench(r *secondary.WorkbenchRecord) *
 		Name:          r.Name,
 		WorkshopID:    r.WorkshopID,
 		RepoID:        r.RepoID,
-		Path:          r.WorktreePath,
+		Path:          coreworkbench.ComputePath(r.Name),
 		Status:        r.Status,
 		HomeBranch:    r.HomeBranch,
 		CurrentBranch: r.CurrentBranch,
 		CreatedAt:     r.CreatedAt,
 		UpdatedAt:     r.UpdatedAt,
 	}
-}
-
-func (s *WorkbenchServiceImpl) defaultBasePath() string {
-	home, _ := os.UserHomeDir()
-	return filepath.Join(home, "wb")
 }
 
 func (s *WorkbenchServiceImpl) pathExists(path string) bool {
@@ -239,13 +230,14 @@ func (s *WorkbenchServiceImpl) CheckoutBranch(ctx context.Context, req primary.C
 		return nil, fmt.Errorf("workbench not found: %w", err)
 	}
 
-	// 2. Check path exists
-	if !s.pathExists(workbench.WorktreePath) {
-		return nil, fmt.Errorf("workbench path does not exist: %s", workbench.WorktreePath)
+	// 2. Compute path and check it exists
+	wbPath := coreworkbench.ComputePath(workbench.Name)
+	if !s.pathExists(wbPath) {
+		return nil, fmt.Errorf("workbench path does not exist: %s", wbPath)
 	}
 
 	// 3. Perform stash dance
-	result, err := s.gitService.StashDance(workbench.WorktreePath, req.TargetBranch)
+	result, err := s.gitService.StashDance(wbPath, req.TargetBranch)
 	if err != nil {
 		return nil, fmt.Errorf("stash dance failed: %w", err)
 	}
@@ -272,19 +264,22 @@ func (s *WorkbenchServiceImpl) GetWorkbenchStatus(ctx context.Context, workbench
 		return nil, fmt.Errorf("workbench not found: %w", err)
 	}
 
+	// Compute path
+	wbPath := coreworkbench.ComputePath(workbench.Name)
+
 	status := &primary.WorkbenchGitStatus{
 		WorkbenchID: workbenchID,
 		HomeBranch:  workbench.HomeBranch,
 	}
 
 	// 2. Check if path exists
-	if !s.pathExists(workbench.WorktreePath) {
+	if !s.pathExists(wbPath) {
 		status.CurrentBranch = workbench.CurrentBranch // Use stored value
 		return status, nil
 	}
 
 	// 3. Get current branch from git
-	currentBranch, err := s.gitService.GetCurrentBranch(workbench.WorktreePath)
+	currentBranch, err := s.gitService.GetCurrentBranch(wbPath)
 	if err == nil {
 		status.CurrentBranch = currentBranch
 		// Update database if different
@@ -297,19 +292,19 @@ func (s *WorkbenchServiceImpl) GetWorkbenchStatus(ctx context.Context, workbench
 	}
 
 	// 4. Get dirty state
-	dirty, err := s.gitService.IsDirty(workbench.WorktreePath)
+	dirty, err := s.gitService.IsDirty(wbPath)
 	if err == nil {
 		status.IsDirty = dirty
 	}
 
 	// 5. Get dirty file count
-	count, err := s.gitService.GetDirtyFileCount(workbench.WorktreePath)
+	count, err := s.gitService.GetDirtyFileCount(wbPath)
 	if err == nil {
 		status.DirtyFiles = count
 	}
 
 	// 6. Get ahead/behind
-	ahead, behind, err := s.gitService.GetAheadBehind(workbench.WorktreePath)
+	ahead, behind, err := s.gitService.GetAheadBehind(wbPath)
 	if err == nil {
 		status.AheadBy = ahead
 		status.BehindBy = behind

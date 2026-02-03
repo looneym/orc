@@ -37,7 +37,6 @@ func WorkbenchCmd() *cobra.Command {
 
 func workbenchCreateCmd() *cobra.Command {
 	var workshopID string
-	var basePath string
 	var repoID string
 
 	cmd := &cobra.Command{
@@ -45,8 +44,9 @@ func workbenchCreateCmd() *cobra.Command {
 		Short: "Create a new workbench record in a workshop",
 		Long: `Create a new workbench record in the database.
 
-This command only creates the database record. To create the physical
-infrastructure (git worktrees, config files), run:
+This command creates the database record. The workbench will be
+located at ~/wb/<name>. To create the physical infrastructure
+(git worktrees, config files), run:
   orc infra apply WORK-xxx
 
 Examples:
@@ -66,7 +66,6 @@ Examples:
 				Name:            name,
 				WorkshopID:      workshopID,
 				RepoID:          repoID,
-				BasePath:        basePath,
 				SkipConfigWrite: true, // Infrastructure handled by orc infra apply
 			})
 			if err != nil {
@@ -86,7 +85,6 @@ Examples:
 	}
 
 	cmd.Flags().StringVarP(&workshopID, "workshop", "w", "", "Workshop ID (required)")
-	cmd.Flags().StringVarP(&basePath, "path", "p", "", "Base path for worktrees (default: ~/src/worktrees)")
 	cmd.Flags().StringVar(&repoID, "repo-id", "", "Link to a repo entity (optional)")
 
 	return cmd

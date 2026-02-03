@@ -18,7 +18,7 @@ type WorkspaceAdapter struct {
 }
 
 // NewWorkspaceAdapter creates a new filesystem workspace adapter.
-// If basePaths are empty, defaults to ~/src/worktrees and ~/src respectively.
+// If basePaths are empty, defaults to ~/wb and ~/src respectively.
 func NewWorkspaceAdapter(worktreesBasePath, reposBasePath string) (*WorkspaceAdapter, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
@@ -26,7 +26,7 @@ func NewWorkspaceAdapter(worktreesBasePath, reposBasePath string) (*WorkspaceAda
 	}
 
 	if worktreesBasePath == "" {
-		worktreesBasePath = filepath.Join(home, "src", "worktrees")
+		worktreesBasePath = filepath.Join(home, "wb")
 	}
 	if reposBasePath == "" {
 		reposBasePath = filepath.Join(home, "src")
@@ -112,7 +112,7 @@ func (a *WorkspaceAdapter) DirectoryExists(ctx context.Context, path string) (bo
 	return info.IsDir(), nil
 }
 
-// GetWorktreesBasePath returns the base path for worktrees (e.g., ~/src/worktrees).
+// GetWorktreesBasePath returns the base path for worktrees (e.g., ~/wb).
 func (a *WorkspaceAdapter) GetWorktreesBasePath() string {
 	return a.worktreesBasePath
 }
@@ -122,7 +122,7 @@ func (a *WorkspaceAdapter) GetRepoPath(repoName string) string {
 	return filepath.Join(a.reposBasePath, repoName)
 }
 
-// ResolveWorkbenchPath returns the full path for a workbench (e.g., ~/src/worktrees/auth-backend).
+// ResolveWorkbenchPath returns the full path for a workbench (e.g., ~/wb/auth-backend).
 func (a *WorkspaceAdapter) ResolveWorkbenchPath(workbenchName string) string {
 	return filepath.Join(a.worktreesBasePath, workbenchName)
 }
