@@ -26,6 +26,7 @@ type CommissionSummary struct {
 	IsFocusedCommission bool // true if this is the focused commission
 	Shipments           []ShipmentSummary
 	Tomes               []TomeSummary
+	Notes               []NoteSummary // Commission-level notes (no container)
 	DebugInfo           *DebugInfo
 }
 
@@ -47,9 +48,11 @@ type TomeSummary struct {
 
 // NoteSummary represents a note in the summary view.
 type NoteSummary struct {
-	ID    string
-	Title string
-	Type  string // learning, decision, spec, etc.
+	ID     string
+	Title  string
+	Type   string // learning, decision, spec, etc.
+	Status string // open, closed
+	Pinned bool
 }
 
 // ShipmentSummary represents a shipment with task progress.

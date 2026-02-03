@@ -304,6 +304,9 @@ func (r *NoteRepository) GetByContainer(ctx context.Context, containerType, cont
 		query = "SELECT id, commission_id, title, content, type, status, shipment_id, conclave_id, tome_id, pinned, created_at, updated_at, closed_at, promoted_from_id, promoted_from_type, close_reason, closed_by_note_id FROM notes WHERE conclave_id = ? AND tome_id IS NULL ORDER BY created_at DESC"
 	case "tome":
 		query = "SELECT id, commission_id, title, content, type, status, shipment_id, conclave_id, tome_id, pinned, created_at, updated_at, closed_at, promoted_from_id, promoted_from_type, close_reason, closed_by_note_id FROM notes WHERE tome_id = ? ORDER BY created_at DESC"
+	case "commission":
+		// Notes directly under commission (not in any container)
+		query = "SELECT id, commission_id, title, content, type, status, shipment_id, conclave_id, tome_id, pinned, created_at, updated_at, closed_at, promoted_from_id, promoted_from_type, close_reason, closed_by_note_id FROM notes WHERE commission_id = ? AND shipment_id IS NULL AND conclave_id IS NULL AND tome_id IS NULL ORDER BY created_at DESC"
 	default:
 		return nil, fmt.Errorf("unknown container type: %s", containerType)
 	}

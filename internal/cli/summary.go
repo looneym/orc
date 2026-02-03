@@ -355,6 +355,24 @@ func renderSummary(summary *primary.CommissionSummary, _ string, workshopFocus w
 		focusedMarker = color.New(color.FgHiMagenta).Sprint(" [focused]")
 	}
 	fmt.Printf("%s%s - %s\n", colorizeID(summary.ID), focusedMarker, summary.Title)
+
+	// Render commission-level notes (always shown)
+	if len(summary.Notes) > 0 {
+		fmt.Println("│")
+		fmt.Println("│ 📝 Commission Notes:")
+		for _, note := range summary.Notes {
+			pinnedMark := ""
+			if note.Pinned {
+				pinnedMark = " 📌"
+			}
+			typeMarker := ""
+			if note.Type != "" {
+				typeMarker = color.New(color.FgYellow).Sprintf(" [%s]", note.Type)
+			}
+			fmt.Printf("│    %s%s%s - %s\n", colorizeID(note.ID), typeMarker, pinnedMark, note.Title)
+		}
+	}
+
 	fmt.Println("│")
 
 	totalItems := len(summary.Shipments) + len(summary.Tomes)

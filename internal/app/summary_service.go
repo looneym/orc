@@ -128,6 +128,24 @@ func (s *SummaryServiceImpl) GetCommissionSummary(ctx context.Context, req prima
 		}
 	}
 
+	// Fetch commission-level notes (notes with no container)
+	var noteSummaries []primary.NoteSummary
+	commissionNotes, err := s.noteService.GetNotesByContainer(ctx, "commission", req.CommissionID)
+	if err == nil {
+		for _, note := range commissionNotes {
+			if note.Status == "closed" {
+				continue // Skip closed notes
+			}
+			noteSummaries = append(noteSummaries, primary.NoteSummary{
+				ID:     note.ID,
+				Title:  note.Title,
+				Type:   note.Type,
+				Status: note.Status,
+				Pinned: note.Pinned,
+			})
+		}
+	}
+
 	// Build debug info if in debug mode
 	var debugInfo *primary.DebugInfo
 	if req.DebugMode && len(debugMsgs) > 0 {
@@ -140,6 +158,7 @@ func (s *SummaryServiceImpl) GetCommissionSummary(ctx context.Context, req prima
 		IsFocusedCommission: isFocusedCommission,
 		Shipments:           shipmentSummaries,
 		Tomes:               tomeSummaries,
+		Notes:               noteSummaries,
 		DebugInfo:           debugInfo,
 	}, nil
 }
@@ -158,9 +177,11 @@ func (s *SummaryServiceImpl) buildTomeSummary(ctx context.Context, tome *primary
 				noteCount++
 				if expandNotes {
 					noteSummaries = append(noteSummaries, primary.NoteSummary{
-						ID:    n.ID,
-						Title: n.Title,
-						Type:  n.Type,
+						ID:     n.ID,
+						Title:  n.Title,
+						Type:   n.Type,
+						Status: n.Status,
+						Pinned: n.Pinned,
 					})
 				}
 			}
@@ -218,9 +239,11 @@ func (s *SummaryServiceImpl) buildShipmentSummary(ctx context.Context, ship *pri
 				noteCount++
 				if isFocused {
 					noteSummaries = append(noteSummaries, primary.NoteSummary{
-						ID:    n.ID,
-						Title: n.Title,
-						Type:  n.Type,
+						ID:     n.ID,
+						Title:  n.Title,
+						Type:   n.Type,
+						Status: n.Status,
+						Pinned: n.Pinned,
 					})
 				}
 			}

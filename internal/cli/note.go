@@ -22,7 +22,12 @@ var noteCmd = &cobra.Command{
 var noteCreateCmd = &cobra.Command{
 	Use:   "create [title]",
 	Short: "Create a new note",
-	Args:  cobra.MinimumNArgs(1),
+	Long: `Create a new note in the ledger.
+
+Notes can be attached to a container (shipment, conclave, or tome) or exist
+directly under the commission. If no container flag is provided, the note
+is created at the commission level.`,
+	Args: cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
 		title := args[0]
@@ -104,6 +109,8 @@ var noteCreateCmd = &cobra.Command{
 		}
 		if containerID != "" {
 			fmt.Printf("  Container: %s (%s)\n", containerID, containerType)
+		} else {
+			fmt.Printf("  Container: (commission-level)\n")
 		}
 		fmt.Printf("  Commission: %s\n", note.CommissionID)
 		return nil
@@ -119,6 +126,7 @@ var noteListCmd = &cobra.Command{
 		noteType, _ := cmd.Flags().GetString("type")
 		shipmentID, _ := cmd.Flags().GetString("shipment")
 		tomeID, _ := cmd.Flags().GetString("tome")
+		commissionOnly, _ := cmd.Flags().GetBool("commission-only")
 
 		// Validate entity IDs
 		if err := validateEntityID(shipmentID, "shipment"); err != nil {
@@ -141,6 +149,12 @@ var noteListCmd = &cobra.Command{
 			notes, err = wire.NoteService().GetNotesByContainer(ctx, "shipment", shipmentID)
 		} else if tomeID != "" {
 			notes, err = wire.NoteService().GetNotesByContainer(ctx, "tome", tomeID)
+		} else if commissionOnly {
+			// List only commission-level notes (not in any container)
+			if commissionID == "" {
+				return fmt.Errorf("--commission-only requires a commission context or --commission flag")
+			}
+			notes, err = wire.NoteService().GetNotesByContainer(ctx, "commission", commissionID)
 		} else {
 			notes, err = wire.NoteService().ListNotes(ctx, primary.NoteFilters{
 				Type:         noteType,
@@ -481,6 +495,7 @@ func init() {
 	noteListCmd.Flags().StringP("type", "t", "", "Filter by type")
 	noteListCmd.Flags().String("shipment", "", "Filter by shipment")
 	noteListCmd.Flags().String("tome", "", "Filter by tome")
+	noteListCmd.Flags().Bool("commission-only", false, "List only commission-level notes (not in any container)")
 
 	// note update flags
 	noteUpdateCmd.Flags().String("title", "", "New title")

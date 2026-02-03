@@ -50,9 +50,9 @@ type CreateNoteRequest struct {
 	CommissionID  string
 	Title         string
 	Content       string
-	Type          string // learning, concern, finding, frq, bug
-	ContainerID   string // The container ID (shipment or tome)
-	ContainerType string // "shipment" or "tome"
+	Type          string // learning, concern, finding, frq, bug, spec, roadmap, decision, question, vision, idea, exorcism
+	ContainerID   string // The container ID (shipment or tome), or empty for commission-level notes
+	ContainerType string // "shipment", "tome", or "" (empty = commission-level note)
 }
 
 // CreateNoteResponse contains the result of creating a note.
