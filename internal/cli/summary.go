@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"hash/fnv"
 	"os"
+	"sort"
 	"strings"
 
 	"github.com/fatih/color"
@@ -281,16 +282,16 @@ func renderWorkshopBenches(workshopID, currentWorkbenchID string) {
 
 // workshopFocusInfo tracks what each workbench in the workshop has focused
 type workshopFocusInfo struct {
-	containerToWorkbench map[string]string // containerID -> "name@ID" that has it focused
-	myName               string            // current workbench name
-	myID                 string            // current workbench ID
-	goblinID             string            // gatehouse ID
+	containerToWorkbench map[string][]string // containerID -> list of actors focusing it
+	myName               string              // current workbench name
+	myID                 string              // current workbench ID
+	goblinID             string              // gatehouse ID
 }
 
 // buildWorkshopFocusMap fetches focus for all workbenches and the goblin in the workshop
 func buildWorkshopFocusMap(ctx context.Context, workshopID, currentWorkbenchID, gatehouseID string) workshopFocusInfo {
 	info := workshopFocusInfo{
-		containerToWorkbench: make(map[string]string),
+		containerToWorkbench: make(map[string][]string),
 		myID:                 currentWorkbenchID,
 		goblinID:             gatehouseID,
 	}
@@ -333,18 +334,56 @@ func buildWorkshopFocusMap(ctx context.Context, workshopID, currentWorkbenchID, 
 			continue
 		}
 
-		info.containerToWorkbench[focusedID] = fmt.Sprintf("%s@%s", wb.Name, wb.ID)
+		info.containerToWorkbench[focusedID] = append(info.containerToWorkbench[focusedID], fmt.Sprintf("%s@%s", wb.Name, wb.ID))
 	}
 
 	// Get Goblin's focus (visible to all IMPs)
 	if gatehouseID != "" {
 		gh, err := wire.GatehouseService().GetGatehouse(ctx, gatehouseID)
 		if err == nil && gh.FocusedID != "" {
-			info.containerToWorkbench[gh.FocusedID] = "Goblin"
+			info.containerToWorkbench[gh.FocusedID] = append(info.containerToWorkbench[gh.FocusedID], "Goblin")
 		}
 	}
 
 	return info
+}
+
+// formatFocusActors formats the focus marker for multi-actor display
+// Order: "you" first (if isMeFocused), then "Goblin" (moss green), then others alphabetically
+func formatFocusActors(actors []string, isMeFocused bool) string {
+	var parts []string
+
+	// "you" first if current actor is focusing
+	if isMeFocused {
+		parts = append(parts, color.New(color.FgHiMagenta).Sprint("you"))
+	}
+
+	// Separate Goblin from others for ordering
+	var others []string
+	hasGoblin := false
+	for _, actor := range actors {
+		if actor == "Goblin" {
+			hasGoblin = true
+		} else {
+			others = append(others, actor)
+		}
+	}
+	sort.Strings(others)
+
+	// Goblin second (moss green)
+	if hasGoblin {
+		parts = append(parts, color.New(color.FgHiGreen).Sprint("Goblin"))
+	}
+
+	// Others last (cyan)
+	for _, o := range others {
+		parts = append(parts, color.New(color.FgCyan).Sprint(o))
+	}
+
+	if len(parts) == 0 {
+		return ""
+	}
+	return fmt.Sprintf(" [focused by %s]", strings.Join(parts, ", "))
 }
 
 // renderSummary renders the commission with flat lists of shipments and tomes
@@ -409,12 +448,7 @@ func renderSummary(summary *primary.CommissionSummary, _ string, workshopFocus w
 		if ship.Pinned {
 			pinnedMark = " *"
 		}
-		focusMark := ""
-		if ship.IsFocused {
-			focusMark = color.New(color.FgHiMagenta).Sprint(" [focused by you]")
-		} else if who := workshopFocus.containerToWorkbench[ship.ID]; who != "" {
-			focusMark = color.New(color.FgCyan).Sprintf(" [focused by %s]", who)
-		}
+		focusMark := formatFocusActors(workshopFocus.containerToWorkbench[ship.ID], ship.IsFocused)
 
 		fmt.Printf("%s%s%s%s%s%s - %s%s\n", prefix, colorizeID(ship.ID), statusBadge, benchMarker, focusMark, pinnedMark, ship.Title, taskInfo)
 
@@ -476,12 +510,7 @@ func renderSummary(summary *primary.CommissionSummary, _ string, workshopFocus w
 		if tome.Pinned {
 			pinnedMark = " *"
 		}
-		focusMark := ""
-		if tome.IsFocused {
-			focusMark = color.New(color.FgHiMagenta).Sprint(" [focused by you]")
-		} else if who := workshopFocus.containerToWorkbench[tome.ID]; who != "" {
-			focusMark = color.New(color.FgCyan).Sprintf(" [focused by %s]", who)
-		}
+		focusMark := formatFocusActors(workshopFocus.containerToWorkbench[tome.ID], tome.IsFocused)
 
 		fmt.Printf("%s%s%s%s - %s%s\n", tomePrefix, colorizeID(tome.ID), focusMark, pinnedMark, tome.Title, noteInfo)
 

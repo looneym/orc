@@ -18,36 +18,38 @@ func FocusCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "focus [container-id]",
 		Short: "Set or show the currently focused container",
-		Long: `Focus on a specific container (Shipment or Tome).
+		Long: `Focus on any commission-level entity.
 
-For IMP (workbench context):
-  - Can focus on Shipments (SHIP-xxx) or Tomes (TOME-xxx)
-  - Focus stored in workbenches.focused_id
+Focusable entities:
+  - COMM-xxx  Commission (watch a work area)
+  - SHIP-xxx  Shipment (active implementation)
+  - TOME-xxx  Tome (research/exploration)
+  - NOTE-xxx  Note (root-level only, not inside shipments)
 
-For Goblin (gatehouse context):
-  - Can focus on Commissions (COMM-xxx), Shipments (SHIP-xxx), or Tomes (TOME-xxx)
-  - Focus stored in gatehouses.focused_id
-
-The focused container appears in 'orc prime' output and can be used as default
-for other commands.
+Smart clear: Running --clear refocuses to the commission of the current focus.
+Use --clear --force to fully clear focus with no fallback.
 
 Examples:
-  orc focus SHIP-178    # Focus on a shipment
-  orc focus TOME-028    # Focus on a tome
-  orc focus COMM-001    # Focus on a commission (Goblin only)
-  orc focus --show      # Show current focus
-  orc focus --clear     # Clear the current focus`,
+  orc focus SHIP-178        # Focus on a shipment
+  orc focus TOME-028        # Focus on a tome
+  orc focus COMM-001        # Focus on a commission
+  orc focus NOTE-322        # Focus on a root-level note
+  orc focus --show          # Show current focus
+  orc focus --clear         # Smart clear (refocus to commission)
+  orc focus --clear --force # Fully clear focus`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: runFocus,
 	}
 	cmd.Flags().Bool("show", false, "Show current focus without changing it")
 	cmd.Flags().Bool("clear", false, "Clear the current focus")
+	cmd.Flags().Bool("force", false, "Fully clear focus (no fallback to commission)")
 	return cmd
 }
 
 func runFocus(cmd *cobra.Command, args []string) error {
 	showOnly, _ := cmd.Flags().GetBool("show")
 	clearFlag, _ := cmd.Flags().GetBool("clear")
+	forceFlag, _ := cmd.Flags().GetBool("force")
 
 	// Get current working directory
 	cwd, err := os.Getwd()
@@ -66,18 +68,18 @@ func runFocus(cmd *cobra.Command, args []string) error {
 	switch placeType {
 	case config.PlaceTypeWorkbench:
 		// IMP role - use workbench focus
-		return runIMPFocus(cmd, args, cfg, showOnly, clearFlag)
+		return runIMPFocus(cmd, args, cfg, showOnly, clearFlag, forceFlag)
 	case config.PlaceTypeGatehouse:
 		// Goblin role - use gatehouse focus
-		return runGoblinFocus(cmd, args, cfg, showOnly, clearFlag)
+		return runGoblinFocus(cmd, args, cfg, showOnly, clearFlag, forceFlag)
 	default:
 		return fmt.Errorf("focus requires workbench (IMP) context")
 	}
 }
 
 // runIMPFocus handles focus for IMP role (workbench context)
-// IMP can focus on SHIP-xxx or TOME-xxx
-func runIMPFocus(_ *cobra.Command, args []string, cfg *config.Config, showOnly, clearFlag bool) error {
+// Can focus on any commission-level entity: COMM-xxx, SHIP-xxx, TOME-xxx
+func runIMPFocus(_ *cobra.Command, args []string, cfg *config.Config, showOnly, clearFlag, forceFlag bool) error {
 	workbenchID := cfg.PlaceID // BENCH-XXX
 
 	if showOnly {
@@ -85,7 +87,7 @@ func runIMPFocus(_ *cobra.Command, args []string, cfg *config.Config, showOnly, 
 	}
 
 	if clearFlag {
-		return clearIMPFocus(workbenchID)
+		return clearIMPFocus(workbenchID, forceFlag)
 	}
 
 	if len(args) == 0 {
@@ -95,12 +97,7 @@ func runIMPFocus(_ *cobra.Command, args []string, cfg *config.Config, showOnly, 
 	// Set focus
 	containerID := args[0]
 
-	// IMP can focus on SHIP-xxx or TOME-xxx
-	if !strings.HasPrefix(containerID, "SHIP-") && !strings.HasPrefix(containerID, "TOME-") {
-		return fmt.Errorf("can only focus on Shipments (SHIP-xxx) or Tomes (TOME-xxx), got: %s", containerID)
-	}
-
-	containerType, title, err := validateAndGetInfo(containerID)
+	containerType, title, err := validateFocusTarget(containerID)
 	if err != nil {
 		return err
 	}
@@ -108,10 +105,18 @@ func runIMPFocus(_ *cobra.Command, args []string, cfg *config.Config, showOnly, 
 	return setIMPFocus(workbenchID, containerID, containerType, title)
 }
 
-// validateAndGetInfo validates the container ID exists and returns its type and title
-func validateAndGetInfo(id string) (containerType string, title string, err error) {
+// validateFocusTarget validates the container ID exists and returns its type and title
+// Supports COMM-xxx, SHIP-xxx, TOME-xxx (any actor can focus any type)
+func validateFocusTarget(id string) (containerType string, title string, err error) {
 	ctx := context.Background()
 	switch {
+	case strings.HasPrefix(id, "COMM-"):
+		comm, err := wire.CommissionService().GetCommission(ctx, id)
+		if err != nil {
+			return "", "", fmt.Errorf("commission %s not found", id)
+		}
+		return "Commission", comm.Title, nil
+
 	case strings.HasPrefix(id, "SHIP-"):
 		ship, err := wire.ShipmentService().GetShipment(ctx, id)
 		if err != nil {
@@ -126,9 +131,42 @@ func validateAndGetInfo(id string) (containerType string, title string, err erro
 		}
 		return "Tome", tome.Title, nil
 
+	case strings.HasPrefix(id, "NOTE-"):
+		note, err := wire.NoteService().GetNote(ctx, id)
+		if err != nil {
+			return "", "", fmt.Errorf("note %s not found", id)
+		}
+		// Only root-level notes can be focused (not inside a shipment)
+		if note.ShipmentID != "" {
+			return "", "", fmt.Errorf("cannot focus %s: note is inside %s, focus the shipment instead", id, note.ShipmentID)
+		}
+		return "Note", note.Title, nil
+
 	default:
-		return "", "", fmt.Errorf("unknown container type for ID: %s (expected SHIP-* or TOME-*)", id)
+		return "", "", fmt.Errorf("unknown container type for ID: %s (expected COMM-*, SHIP-*, TOME-*, or NOTE-*)", id)
 	}
+}
+
+// resolveToCommission resolves any focusable entity to its commission ID
+func resolveToCommission(id string) string {
+	ctx := context.Background()
+	switch {
+	case strings.HasPrefix(id, "COMM-"):
+		return id
+	case strings.HasPrefix(id, "SHIP-"):
+		if ship, err := wire.ShipmentService().GetShipment(ctx, id); err == nil {
+			return ship.CommissionID
+		}
+	case strings.HasPrefix(id, "TOME-"):
+		if tome, err := wire.TomeService().GetTome(ctx, id); err == nil {
+			return tome.CommissionID
+		}
+	case strings.HasPrefix(id, "NOTE-"):
+		if note, err := wire.NoteService().GetNote(ctx, id); err == nil {
+			return note.CommissionID
+		}
+	}
+	return ""
 }
 
 // showIMPFocus displays the current IMP focus from DB
@@ -146,7 +184,7 @@ func showIMPFocus(workbenchID string) error {
 		return nil
 	}
 
-	containerType, title, err := validateAndGetInfo(focusID)
+	containerType, title, err := validateFocusTarget(focusID)
 	if err != nil {
 		// Focus is set but container no longer exists - graceful degradation
 		fmt.Printf("Focus: %s (container not found - may have been deleted)\n", focusID)
@@ -163,13 +201,16 @@ func setIMPFocus(workbenchID, containerID, containerType, title string) error {
 	ctx := context.Background()
 
 	// Check for focus exclusivity - another IMP cannot focus the same container
-	otherWorkbenches, err := wire.WorkbenchService().GetWorkbenchesByFocusedID(ctx, containerID)
-	if err != nil {
-		return fmt.Errorf("failed to check focus exclusivity: %w", err)
-	}
-	for _, wb := range otherWorkbenches {
-		if wb.ID != workbenchID {
-			return fmt.Errorf("%s is already focused by %s (%s)", containerID, wb.ID, wb.Name)
+	// Notes are exempt from exclusivity (multiple actors can focus the same note)
+	if !strings.HasPrefix(containerID, "NOTE-") {
+		otherWorkbenches, err := wire.WorkbenchService().GetWorkbenchesByFocusedID(ctx, containerID)
+		if err != nil {
+			return fmt.Errorf("failed to check focus exclusivity: %w", err)
+		}
+		for _, wb := range otherWorkbenches {
+			if wb.ID != workbenchID {
+				return fmt.Errorf("%s is already focused by %s (%s)", containerID, wb.ID, wb.Name)
+			}
 		}
 	}
 
@@ -227,20 +268,56 @@ func autoCheckoutShipmentBranch(workbenchID, shipmentID string) error {
 }
 
 // clearIMPFocus clears the IMP focus in DB
-func clearIMPFocus(workbenchID string) error {
+// If force=false, smart clear: refocus to the commission of the current focus
+// If force=true, fully clear focus (no fallback)
+func clearIMPFocus(workbenchID string, force bool) error {
 	ctx := context.Background()
 
-	if err := wire.WorkbenchService().UpdateFocusedID(ctx, workbenchID, ""); err != nil {
-		return fmt.Errorf("failed to clear focus: %w", err)
+	// Get current focus
+	currentFocusID, _ := wire.WorkbenchService().GetFocusedID(ctx, workbenchID)
+
+	if currentFocusID == "" {
+		fmt.Println("No focus set")
+		return nil
 	}
 
-	fmt.Println("Focus cleared")
+	// If --force, fully clear
+	if force {
+		if err := wire.WorkbenchService().UpdateFocusedID(ctx, workbenchID, ""); err != nil {
+			return fmt.Errorf("failed to clear focus: %w", err)
+		}
+		fmt.Println("Focus fully cleared")
+		return nil
+	}
+
+	// Already at commission level?
+	if strings.HasPrefix(currentFocusID, "COMM-") {
+		fmt.Println("Already at commission level")
+		return nil
+	}
+
+	// Smart clear: resolve to commission and refocus
+	commissionID := resolveToCommission(currentFocusID)
+	if commissionID == "" {
+		// Fallback: if we can't resolve, just clear
+		if err := wire.WorkbenchService().UpdateFocusedID(ctx, workbenchID, ""); err != nil {
+			return fmt.Errorf("failed to clear focus: %w", err)
+		}
+		fmt.Println("Focus cleared")
+		return nil
+	}
+
+	// Refocus to commission
+	if err := wire.WorkbenchService().UpdateFocusedID(ctx, workbenchID, commissionID); err != nil {
+		return fmt.Errorf("failed to refocus to commission: %w", err)
+	}
+	fmt.Printf("Focus cleared from %s → %s (commission)\n", currentFocusID, commissionID)
 	return nil
 }
 
 // runGoblinFocus handles focus for Goblin role (gatehouse context)
-// Goblin can focus on COMM-xxx, SHIP-xxx, or TOME-xxx
-func runGoblinFocus(_ *cobra.Command, args []string, cfg *config.Config, showOnly, clearFlag bool) error {
+// Can focus on any commission-level entity: COMM-xxx, SHIP-xxx, TOME-xxx
+func runGoblinFocus(_ *cobra.Command, args []string, cfg *config.Config, showOnly, clearFlag, forceFlag bool) error {
 	gatehouseID := cfg.PlaceID // GATE-XXX
 
 	if showOnly {
@@ -248,7 +325,7 @@ func runGoblinFocus(_ *cobra.Command, args []string, cfg *config.Config, showOnl
 	}
 
 	if clearFlag {
-		return clearGoblinFocus(gatehouseID)
+		return clearGoblinFocus(gatehouseID, forceFlag)
 	}
 
 	if len(args) == 0 {
@@ -258,48 +335,12 @@ func runGoblinFocus(_ *cobra.Command, args []string, cfg *config.Config, showOnl
 	// Set focus
 	containerID := args[0]
 
-	// Goblin can focus on COMM-xxx, SHIP-xxx, or TOME-xxx
-	if !strings.HasPrefix(containerID, "COMM-") && !strings.HasPrefix(containerID, "SHIP-") && !strings.HasPrefix(containerID, "TOME-") {
-		return fmt.Errorf("can only focus on Commissions (COMM-xxx), Shipments (SHIP-xxx), or Tomes (TOME-xxx), got: %s", containerID)
-	}
-
-	containerType, title, err := validateAndGetGoblinFocusInfo(containerID)
+	containerType, title, err := validateFocusTarget(containerID)
 	if err != nil {
 		return err
 	}
 
 	return setGoblinFocus(gatehouseID, containerID, containerType, title)
-}
-
-// validateAndGetGoblinFocusInfo validates the container ID exists and returns its type and title
-// Supports COMM-xxx, SHIP-xxx, TOME-xxx
-func validateAndGetGoblinFocusInfo(id string) (containerType string, title string, err error) {
-	ctx := context.Background()
-	switch {
-	case strings.HasPrefix(id, "COMM-"):
-		comm, err := wire.CommissionService().GetCommission(ctx, id)
-		if err != nil {
-			return "", "", fmt.Errorf("commission %s not found", id)
-		}
-		return "Commission", comm.Title, nil
-
-	case strings.HasPrefix(id, "SHIP-"):
-		ship, err := wire.ShipmentService().GetShipment(ctx, id)
-		if err != nil {
-			return "", "", fmt.Errorf("shipment %s not found", id)
-		}
-		return "Shipment", ship.Title, nil
-
-	case strings.HasPrefix(id, "TOME-"):
-		tome, err := wire.TomeService().GetTome(ctx, id)
-		if err != nil {
-			return "", "", fmt.Errorf("tome %s not found", id)
-		}
-		return "Tome", tome.Title, nil
-
-	default:
-		return "", "", fmt.Errorf("unknown container type for ID: %s (expected COMM-*, SHIP-*, or TOME-*)", id)
-	}
 }
 
 // showGoblinFocus displays the current Goblin focus from DB
@@ -317,7 +358,7 @@ func showGoblinFocus(gatehouseID string) error {
 		return nil
 	}
 
-	containerType, title, err := validateAndGetGoblinFocusInfo(focusID)
+	containerType, title, err := validateFocusTarget(focusID)
 	if err != nil {
 		// Focus is set but container no longer exists - graceful degradation
 		fmt.Printf("Focus: %s (container not found - may have been deleted)\n", focusID)
@@ -345,14 +386,50 @@ func setGoblinFocus(gatehouseID, containerID, containerType, title string) error
 }
 
 // clearGoblinFocus clears the Goblin focus in DB
-func clearGoblinFocus(gatehouseID string) error {
+// If force=false, smart clear: refocus to the commission of the current focus
+// If force=true, fully clear focus (no fallback)
+func clearGoblinFocus(gatehouseID string, force bool) error {
 	ctx := context.Background()
 
-	if err := wire.GatehouseService().UpdateFocusedID(ctx, gatehouseID, ""); err != nil {
-		return fmt.Errorf("failed to clear focus: %w", err)
+	// Get current focus
+	currentFocusID, _ := wire.GatehouseService().GetFocusedID(ctx, gatehouseID)
+
+	if currentFocusID == "" {
+		fmt.Println("No focus set")
+		return nil
 	}
 
-	fmt.Println("Focus cleared")
+	// If --force, fully clear
+	if force {
+		if err := wire.GatehouseService().UpdateFocusedID(ctx, gatehouseID, ""); err != nil {
+			return fmt.Errorf("failed to clear focus: %w", err)
+		}
+		fmt.Println("Focus fully cleared")
+		return nil
+	}
+
+	// Already at commission level?
+	if strings.HasPrefix(currentFocusID, "COMM-") {
+		fmt.Println("Already at commission level")
+		return nil
+	}
+
+	// Smart clear: resolve to commission and refocus
+	commissionID := resolveToCommission(currentFocusID)
+	if commissionID == "" {
+		// Fallback: if we can't resolve, just clear
+		if err := wire.GatehouseService().UpdateFocusedID(ctx, gatehouseID, ""); err != nil {
+			return fmt.Errorf("failed to clear focus: %w", err)
+		}
+		fmt.Println("Focus cleared")
+		return nil
+	}
+
+	// Refocus to commission
+	if err := wire.GatehouseService().UpdateFocusedID(ctx, gatehouseID, commissionID); err != nil {
+		return fmt.Errorf("failed to refocus to commission: %w", err)
+	}
+	fmt.Printf("Focus cleared from %s → %s (commission)\n", currentFocusID, commissionID)
 	return nil
 }
 
@@ -405,6 +482,10 @@ func GetFocusInfo(focusID string) (containerType, title, status string) {
 	case strings.HasPrefix(focusID, "TOME-"):
 		if tome, err := wire.TomeService().GetTome(ctx, focusID); err == nil {
 			return "Tome", tome.Title, tome.Status
+		}
+	case strings.HasPrefix(focusID, "NOTE-"):
+		if note, err := wire.NoteService().GetNote(ctx, focusID); err == nil {
+			return "Note", note.Title, note.Status
 		}
 	}
 	return "", "", ""
