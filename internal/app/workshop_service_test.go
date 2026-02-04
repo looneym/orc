@@ -499,6 +499,14 @@ func (m *mockTMuxAdapter) GetPaneCommand(ctx context.Context, sessionName, windo
 	return ""
 }
 
+func (m *mockTMuxAdapter) GetPaneStartPath(ctx context.Context, sessionName, windowName string, paneNum int) string {
+	return ""
+}
+
+func (m *mockTMuxAdapter) GetPaneStartCommand(ctx context.Context, sessionName, windowName string, paneNum int) string {
+	return ""
+}
+
 func (m *mockTMuxAdapter) CapturePaneContent(ctx context.Context, target string, lines int) (string, error) {
 	return "", nil
 }

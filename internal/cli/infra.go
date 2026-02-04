@@ -162,6 +162,15 @@ func displayInfraPlan(plan *primary.InfraPlan) {
 			fmt.Println("  Windows:")
 			for _, w := range plan.TMuxSession.Windows {
 				fmt.Printf("    %s %s\n", infraStatusColor(w.Status), w.Name)
+				// Show pane verification if panes exist
+				if len(w.Panes) > 0 {
+					for _, p := range w.Panes {
+						paneStatus := infraPaneStatus(p)
+						if paneStatus != "" {
+							fmt.Printf("      pane %d: %s\n", p.Index, paneStatus)
+						}
+					}
+				}
 			}
 		}
 
@@ -189,6 +198,24 @@ func infraStatusColor(status primary.OpStatus) string {
 	default:
 		return string(status)
 	}
+}
+
+// infraPaneStatus returns a status string for pane verification.
+// Returns empty string if pane is OK (suppress output for healthy panes).
+func infraPaneStatus(pane primary.InfraTMuxPaneOp) string {
+	if pane.PathOK && pane.CommandOK {
+		return "" // All good, nothing to report
+	}
+
+	var issues []string
+	if !pane.PathOK {
+		issues = append(issues, fmt.Sprintf("path mismatch (got: %s)", pane.ActualPath))
+	}
+	if !pane.CommandOK {
+		issues = append(issues, fmt.Sprintf("command mismatch (got: %q)", pane.ActualCommand))
+	}
+
+	return color.New(color.FgYellow).Sprint("⚠ ") + strings.Join(issues, ", ")
 }
 
 func infraApplyCmd() *cobra.Command {

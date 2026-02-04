@@ -149,15 +149,28 @@ func (s *InfraServiceImpl) PlanInfra(ctx context.Context, req primary.InfraPlanR
 		// Build expected windows - first "orc" (goblin), then workbenches
 		// (skip if workshop is archived - entire session should be deleted)
 		if !workshopArchived {
-			tmuxExpectedWindows = append(tmuxExpectedWindows, coreinfra.TMuxWindowInput{
+			orcWindow := coreinfra.TMuxWindowInput{
 				Name: "orc",
 				Path: gatehousePath,
-			})
+			}
+			// Fetch pane data if window exists
+			if tmuxSessionExists && s.tmuxAdapter.WindowExists(ctx, tmuxSessionName, "orc") {
+				orcWindow.Panes = s.fetchPaneData(ctx, tmuxSessionName, "orc", gatehousePath, "")
+			}
+			tmuxExpectedWindows = append(tmuxExpectedWindows, orcWindow)
+
 			for _, wb := range workbenches {
-				tmuxExpectedWindows = append(tmuxExpectedWindows, coreinfra.TMuxWindowInput{
+				wbPath := coreworkbench.ComputePath(wb.Name)
+				wbWindow := coreinfra.TMuxWindowInput{
 					Name: wb.Name,
-					Path: coreworkbench.ComputePath(wb.Name),
-				})
+					Path: wbPath,
+				}
+				// Fetch pane data if window exists
+				if tmuxSessionExists && s.tmuxAdapter.WindowExists(ctx, tmuxSessionName, wb.Name) {
+					// Pane 2 is the IMP pane, should have start_command "orc connect"
+					wbWindow.Panes = s.fetchPaneData(ctx, tmuxSessionName, wb.Name, wbPath, "orc connect")
+				}
+				tmuxExpectedWindows = append(tmuxExpectedWindows, wbWindow)
 			}
 		}
 	}
@@ -384,11 +397,22 @@ func (s *InfraServiceImpl) corePlanToPrimary(core *coreinfra.Plan) *primary.Infr
 		}
 		// Map expected windows
 		for _, w := range core.TMuxSession.Windows {
-			plan.TMuxSession.Windows = append(plan.TMuxSession.Windows, primary.InfraTMuxWindowOp{
+			windowOp := primary.InfraTMuxWindowOp{
 				Name:   w.Name,
 				Path:   w.Path,
 				Status: boolToOpStatus(w.Exists),
-			})
+			}
+			// Map pane verification data
+			for _, p := range w.Panes {
+				windowOp.Panes = append(windowOp.Panes, primary.InfraTMuxPaneOp{
+					Index:         p.Index,
+					PathOK:        p.PathOK,
+					CommandOK:     p.CommandOK,
+					ActualPath:    p.ActualPath,
+					ActualCommand: p.ActualCommand,
+				})
+			}
+			plan.TMuxSession.Windows = append(plan.TMuxSession.Windows, windowOp)
 		}
 		// Map orphan windows (exist but shouldn't)
 		for _, w := range core.TMuxSession.OrphanWindows {
@@ -401,6 +425,35 @@ func (s *InfraServiceImpl) corePlanToPrimary(core *coreinfra.Plan) *primary.Infr
 	}
 
 	return plan
+}
+
+// fetchPaneData fetches pane verification data for a tmux window.
+// expectedPath is the expected pane_start_path for all panes.
+// impExpectedCommand is the expected pane_start_command for pane 2 (IMP pane), empty string skips check.
+func (s *InfraServiceImpl) fetchPaneData(ctx context.Context, sessionName, windowName, expectedPath, impExpectedCommand string) []coreinfra.TMuxPaneInput {
+	var panes []coreinfra.TMuxPaneInput
+	paneCount := s.tmuxAdapter.GetPaneCount(ctx, sessionName, windowName)
+
+	for i := 1; i <= paneCount; i++ {
+		startPath := s.tmuxAdapter.GetPaneStartPath(ctx, sessionName, windowName, i)
+		startCommand := s.tmuxAdapter.GetPaneStartCommand(ctx, sessionName, windowName, i)
+
+		pane := coreinfra.TMuxPaneInput{
+			Index:        i,
+			StartPath:    startPath,
+			StartCommand: startCommand,
+			ExpectedPath: expectedPath,
+		}
+
+		// Only expect command on pane 2 (IMP pane) for workbench windows
+		if i == 2 && impExpectedCommand != "" {
+			pane.ExpectedCommand = impExpectedCommand
+		}
+
+		panes = append(panes, pane)
+	}
+
+	return panes
 }
 
 func (s *InfraServiceImpl) dirExists(path string) bool {

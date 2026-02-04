@@ -83,6 +83,16 @@ func (a *Adapter) GetPaneCommand(ctx context.Context, sessionName, windowName st
 	return tmuxpkg.GetPaneCommand(sessionName, windowName, paneNum)
 }
 
+// GetPaneStartPath returns the initial directory a pane was created with.
+func (a *Adapter) GetPaneStartPath(ctx context.Context, sessionName, windowName string, paneNum int) string {
+	return tmuxpkg.GetPaneStartPath(sessionName, windowName, paneNum)
+}
+
+// GetPaneStartCommand returns the initial command a pane was created with (via respawn-pane).
+func (a *Adapter) GetPaneStartCommand(ctx context.Context, sessionName, windowName string, paneNum int) string {
+	return tmuxpkg.GetPaneStartCommand(sessionName, windowName, paneNum)
+}
+
 // CapturePaneContent captures visible content from a pane.
 func (a *Adapter) CapturePaneContent(ctx context.Context, target string, lines int) (string, error) {
 	return tmuxpkg.CapturePaneContent(target, lines)

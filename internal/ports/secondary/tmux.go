@@ -49,6 +49,8 @@ type TMuxAdapter interface {
 	SendKeys(ctx context.Context, target, keys string) error
 	GetPaneCount(ctx context.Context, sessionName, windowName string) int
 	GetPaneCommand(ctx context.Context, sessionName, windowName string, paneNum int) string
+	GetPaneStartPath(ctx context.Context, sessionName, windowName string, paneNum int) string
+	GetPaneStartCommand(ctx context.Context, sessionName, windowName string, paneNum int) string
 	CapturePaneContent(ctx context.Context, target string, lines int) (string, error)
 	SplitVertical(ctx context.Context, target, workingDir string) error
 	SplitHorizontal(ctx context.Context, target, workingDir string) error
