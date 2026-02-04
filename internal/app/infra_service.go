@@ -115,16 +115,18 @@ func (s *InfraServiceImpl) PlanInfra(ctx context.Context, req primary.InfraPlanR
 
 	// 6. Scan for orphaned configs on disk + add archived workbenches as orphans
 	orphanWbs, orphanGhs := s.scanForOrphans(ctx, workbenches, gatehouse)
-	// Archived workbenches are also orphans (should be deleted)
+	// Archived workbenches are also orphans (should be deleted) - but only if dir still exists
 	for _, wb := range archivedWorkbenches {
 		wbPath := coreworkbench.ComputePath(wb.Name)
-		orphanWbs = append(orphanWbs, coreinfra.WorkbenchPlanInput{
-			ID:             wb.ID,
-			Name:           wb.Name,
-			WorktreePath:   wbPath,
-			WorktreeExists: s.dirExists(wbPath),
-			ConfigExists:   s.fileExists(filepath.Join(wbPath, ".orc", "config.json")),
-		})
+		if s.dirExists(wbPath) {
+			orphanWbs = append(orphanWbs, coreinfra.WorkbenchPlanInput{
+				ID:             wb.ID,
+				Name:           wb.Name,
+				WorktreePath:   wbPath,
+				WorktreeExists: true,
+				ConfigExists:   s.fileExists(filepath.Join(wbPath, ".orc", "config.json")),
+			})
+		}
 	}
 	// Archived workshop's gatehouse is also an orphan
 	if workshopArchived && gatehousePathExists {
