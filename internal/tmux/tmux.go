@@ -238,9 +238,10 @@ func (s *Session) CreateWorkbenchWindow(index int, name, workingDir string) (*Wi
 	// Pane 2 (top right): claude (IMP via orc connect)
 	// Pane 3 (bottom right): shell
 
-	// Launch vim in pane 1 (left)
+	// Launch vim in pane 1 (left) - use respawn-pane so pane_start_command is set
 	pane1 := fmt.Sprintf("%s.1", target)
-	if err := s.SendKeys(pane1, "vim"); err != nil {
+	vimCmd := exec.Command("tmux", "respawn-pane", "-t", pane1, "-k", "vim")
+	if err := vimCmd.Run(); err != nil {
 		return nil, fmt.Errorf("failed to launch vim: %w", err)
 	}
 
