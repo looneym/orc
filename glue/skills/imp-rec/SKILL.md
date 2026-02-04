@@ -15,12 +15,18 @@ Verify completed work, create a receipt, complete the task, and chain to the nex
    - Run lint (`make lint`)
    - Check any manual verification steps from plan
 
-2. **Create receipt**
+2. **Commit changes**
+   ```
+   /commit
+   ```
+   This commits verified work before creating the receipt. If there are no changes to commit, proceed to the next step.
+
+3. **Create receipt**
    ```bash
    orc rec create --task TASK-xxx
    ```
 
-3. **Add receipt content**
+4. **Add receipt content**
    ```bash
    orc rec update REC-xxx --content "$(cat <<'EOF'
    ## Changes Made
@@ -38,19 +44,19 @@ Verify completed work, create a receipt, complete the task, and chain to the nex
    )"
    ```
 
-4. **Submit receipt**
+5. **Submit receipt**
    ```bash
    orc rec submit REC-xxx
    ```
 
-5. **Verify and complete**
+6. **Verify and complete**
    If all verification passed:
    ```bash
    orc rec verify REC-xxx
    orc task complete TASK-xxx
    ```
 
-6. **Check for next task**
+7. **Check for next task**
    ```bash
    orc task list --shipment SHIP-xxx --status ready
    ```
