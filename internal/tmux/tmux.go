@@ -488,6 +488,11 @@ func ApplyGlobalBindings() {
 		"choose-tree", "-sZ", "-F",
 		`#{session_name} [#{ORC_WORKSHOP_ID}] - #{?#{ORC_CONTEXT},#{ORC_CONTEXT},(idle)}`).Run()
 
+	// ORC session picker (prefix+S) with rich agent/focus display
+	// Uses display-menu for custom formatting with colors
+	_ = exec.Command("tmux", "bind-key", "-T", "prefix", "S",
+		"run-shell", "$HOME/.orc/tmux/orc-session-picker.sh").Run()
+
 	// Double-click status bar → orc summary popup
 	_ = BindKeyPopup("", "DoubleClick1Status",
 		"CLICOLOR_FORCE=1 orc summary | less -R",
