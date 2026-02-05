@@ -343,18 +343,15 @@ func renderWorkshopBenches(workshopID, currentWorkbenchID, gatehouseID string) {
 			line = color.New(color.FgHiMagenta).Sprint(line)
 		}
 
-		// Add git branch and dirty status
+		// Add git branch and dirty status (colored branch name)
 		if wb.Path != "" {
 			branch, dirty, err := getGitBranchStatus(wb.Path)
 			if err != nil {
-				line += " ⚪" // Unknown/error
+				line += color.New(color.FgHiBlack).Sprint(" [?]")
+			} else if dirty {
+				line += color.New(color.FgYellow).Sprintf(" [%s]", branch)
 			} else {
-				line += fmt.Sprintf(" [%s]", branch)
-				if dirty {
-					line += " 🟡" // Dirty
-				} else {
-					line += " 🟢" // Clean
-				}
+				line += color.New(color.FgGreen).Sprintf(" [%s]", branch)
 			}
 		}
 
@@ -553,7 +550,7 @@ func renderSummary(summary *primary.CommissionSummary, _ string, workshopFocus w
 	// Commission header with focused marker
 	focusedMarker := ""
 	if summary.IsFocusedCommission {
-		focusedMarker = color.New(color.FgHiMagenta).Sprint(" ✨ [focused by you] ✨")
+		focusedMarker = fmt.Sprintf(" ✨ [focused by %s] ✨", color.New(color.FgHiMagenta).Sprint("you"))
 	}
 	fmt.Printf("%s%s - %s\n", colorizeID(summary.ID), focusedMarker, summary.Title)
 
@@ -585,48 +582,24 @@ func renderSummary(summary *primary.CommissionSummary, _ string, workshopFocus w
 	fmt.Println("│")
 	itemIdx := 0
 
-	// 1. Render commission-level notes as tree items
-	for _, note := range summary.Notes {
-		isLast := itemIdx == totalItems-1 && len(focusedShips) == 0 && len(otherShips) == 0 && len(summary.Tomes) == 0
-		prefix := "├── "
-		if isLast {
-			prefix = "└── "
-		}
-		pinnedMark := ""
-		if note.Pinned {
-			pinnedMark = " 📌"
-		}
-		typeMarker := ""
-		if note.Type != "" {
-			typeMarker = color.New(color.FgYellow).Sprintf(" [%s]", note.Type)
-		}
-		fmt.Printf("%s%s%s%s - %s\n", prefix, colorizeID(note.ID), typeMarker, pinnedMark, truncate(note.Title, 60))
-		itemIdx++
-	}
-
-	// Visual gap after notes if there are shipments or tomes following
-	if len(summary.Notes) > 0 && (len(focusedShips) > 0 || len(otherShips) > 0 || len(summary.Tomes) > 0) {
-		fmt.Println("│")
-	}
-
-	// 2. Render focused shipments
+	// 1. Render focused shipments
 	for _, ship := range focusedShips {
 		renderShipment(ship, workshopFocus, &itemIdx, totalItems)
 	}
 
 	// Visual gap between focused and non-focused shipments
-	if len(focusedShips) > 0 && (len(otherShips) > 0 || len(summary.Tomes) > 0) {
+	if len(focusedShips) > 0 && (len(otherShips) > 0 || len(summary.Tomes) > 0 || len(summary.Notes) > 0) {
 		fmt.Println("│")
 	}
 
-	// 3. Render non-focused shipments
+	// 2. Render non-focused shipments
 	for _, ship := range otherShips {
 		renderShipment(ship, workshopFocus, &itemIdx, totalItems)
 	}
 
-	// 4. Render tomes
+	// 3. Render tomes
 	for _, tome := range summary.Tomes {
-		isLast := itemIdx == totalItems-1
+		isLast := itemIdx == totalItems-1 && len(summary.Notes) == 0
 		tomePrefix := "├── "
 		tomeChildPrefix := "│   "
 		if isLast {
@@ -662,6 +635,30 @@ func renderSummary(summary *primary.CommissionSummary, _ string, workshopFocus w
 			}
 		}
 
+		itemIdx++
+	}
+
+	// Visual gap before commission-level notes
+	if len(summary.Notes) > 0 && (len(focusedShips) > 0 || len(otherShips) > 0 || len(summary.Tomes) > 0) {
+		fmt.Println("│")
+	}
+
+	// 4. Render commission-level notes as tree items (after shipments and tomes)
+	for i, note := range summary.Notes {
+		isLast := i == len(summary.Notes)-1
+		prefix := "├── "
+		if isLast {
+			prefix = "└── "
+		}
+		pinnedMark := ""
+		if note.Pinned {
+			pinnedMark = " 📌"
+		}
+		typeMarker := ""
+		if note.Type != "" {
+			typeMarker = color.New(color.FgYellow).Sprintf(" [%s]", note.Type)
+		}
+		fmt.Printf("%s%s%s%s - %s\n", prefix, colorizeID(note.ID), typeMarker, pinnedMark, truncate(note.Title, 60))
 		itemIdx++
 	}
 }
