@@ -288,7 +288,7 @@ func initServices() {
 	gatehouseRepo := sqlite.NewGatehouseRepository(database) // needed by workshop service for auto-creation
 	factoryService = app.NewFactoryService(factoryRepo)
 	workshopService = app.NewWorkshopService(factoryRepo, workshopRepo, workbenchRepo, repoRepo, gatehouseRepo, tmuxService, workspaceAdapter, executor)
-	workbenchService = app.NewWorkbenchService(workbenchRepo, workshopRepo, agentProvider, executor)
+	workbenchService = app.NewWorkbenchService(workbenchRepo, workshopRepo, repoRepo, agentProvider, executor)
 
 	// Create approval and escalation repositories early (needed by plan service)
 	approvalRepo := sqlite.NewApprovalRepository(database, logWriter)

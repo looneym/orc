@@ -18,6 +18,7 @@ import (
 type WorkbenchServiceImpl struct {
 	workbenchRepo secondary.WorkbenchRepository
 	workshopRepo  secondary.WorkshopRepository
+	repoRepo      secondary.RepoRepository
 	agentProvider secondary.AgentIdentityProvider
 	executor      EffectExecutor
 	gitService    *GitService
@@ -27,12 +28,14 @@ type WorkbenchServiceImpl struct {
 func NewWorkbenchService(
 	workbenchRepo secondary.WorkbenchRepository,
 	workshopRepo secondary.WorkshopRepository,
+	repoRepo secondary.RepoRepository,
 	agentProvider secondary.AgentIdentityProvider,
 	executor EffectExecutor,
 ) *WorkbenchServiceImpl {
 	return &WorkbenchServiceImpl{
 		workbenchRepo: workbenchRepo,
 		workshopRepo:  workshopRepo,
+		repoRepo:      repoRepo,
 		agentProvider: agentProvider,
 		executor:      executor,
 		gitService:    NewGitService(),
@@ -66,15 +69,35 @@ func (s *WorkbenchServiceImpl) CreateWorkbench(ctx context.Context, req primary.
 		return nil, result.Error()
 	}
 
-	// 4. Compute workbench path (deterministic: ~/wb/<name>)
-	workbenchPath := coreworkbench.ComputePath(req.Name)
+	// 4. Get next workbench ID to extract number for auto-generated name
+	nextID, err := s.workbenchRepo.GetNextID(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get next workbench ID: %w", err)
+	}
+	benchNumber := coreworkbench.ParseWorkbenchNumber(nextID)
 
-	// 5. Generate home branch name
-	homeBranch := GenerateHomeBranchName(UserInitials, req.Name)
+	// 5. Auto-generate name if not provided (requires RepoID)
+	name := req.Name
+	if name == "" {
+		if req.RepoID == "" {
+			return nil, fmt.Errorf("name is required when repo_id is not provided")
+		}
+		repo, err := s.repoRepo.GetByID(ctx, req.RepoID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get repo for name generation: %w", err)
+		}
+		name = fmt.Sprintf("%s-%03d", repo.Name, benchNumber)
+	}
 
-	// 6. Create workbench record in DB
+	// 6. Compute workbench path (deterministic: ~/wb/<name>)
+	workbenchPath := coreworkbench.ComputePath(name)
+
+	// 7. Generate home branch name
+	homeBranch := GenerateHomeBranchName(UserInitials, name)
+
+	// 8. Create workbench record in DB
 	record := &secondary.WorkbenchRecord{
-		Name:          req.Name,
+		Name:          name,
 		WorkshopID:    req.WorkshopID,
 		RepoID:        req.RepoID,
 		WorktreePath:  workbenchPath,
