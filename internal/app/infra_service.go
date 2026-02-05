@@ -589,13 +589,24 @@ func (s *InfraServiceImpl) ApplyInfra(ctx context.Context, plan *primary.InfraPl
 		}
 
 		// Create windows for workbenches
+		// When session is newly created, first rename __init__ window to the first planned window name
+		firstWindow := true
 		windowIndex := 1 // Start at 1 since window 0 is typically the default window
 		for _, w := range plan.TMuxSession.Windows {
 			if w.Status == primary.OpCreate {
-				if err := s.tmuxAdapter.CreateWorkbenchWindowShell(ctx, sessionName, windowIndex, w.Name, w.Path); err != nil {
-					return nil, fmt.Errorf("failed to create tmux window %s: %w", w.Name, err)
+				if firstWindow && plan.TMuxSession.Status == primary.OpCreate {
+					// Rename the __init__ placeholder window instead of creating new
+					initTarget := sessionName + ":__init__"
+					if err := s.tmuxAdapter.RenameWindow(ctx, initTarget, w.Name); err != nil {
+						return nil, fmt.Errorf("failed to rename init window to %s: %w", w.Name, err)
+					}
+				} else {
+					if err := s.tmuxAdapter.CreateWorkbenchWindowShell(ctx, sessionName, windowIndex, w.Name, w.Path); err != nil {
+						return nil, fmt.Errorf("failed to create tmux window %s: %w", w.Name, err)
+					}
 				}
 			}
+			firstWindow = false
 			// Set @orc_agent if not matching expected
 			if !w.AgentOK && w.ExpectedAgent != "" {
 				target := sessionName + ":" + w.Name

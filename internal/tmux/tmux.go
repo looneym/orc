@@ -32,6 +32,10 @@ func NewSession(name, workingDir string) (*Session, error) {
 	// Set pane-base-index to 1 (panes start at 1)
 	exec.Command("tmux", "set-option", "-t", name, "pane-base-index", "1").Run()
 
+	// Rename the auto-created first window to a placeholder
+	// The apply logic will rename it to the proper name (e.g., "orc")
+	exec.Command("tmux", "rename-window", "-t", name+":^", "__init__").Run()
+
 	return &Session{Name: name}, nil
 }
 
