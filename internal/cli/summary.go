@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"hash/fnv"
 	"os"
+	"os/exec"
 	"sort"
 	"strings"
 
@@ -349,6 +350,21 @@ func renderWorkshopBenches(workshopID, currentWorkbenchID, gatehouseID string) {
 			line = color.New(color.FgHiMagenta).Sprint(line)
 		}
 
+		// Add git branch and dirty status
+		if wb.Path != "" {
+			branch, dirty, err := getGitBranchStatus(wb.Path)
+			if err != nil {
+				line += " ⚪" // Unknown/error
+			} else {
+				line += fmt.Sprintf(" [%s]", branch)
+				if dirty {
+					line += " 🟡" // Dirty
+				} else {
+					line += " 🟢" // Clean
+				}
+			}
+		}
+
 		// Add focused shipment inline if workbench has one (skip stale focus)
 		focusedID, _ := wire.WorkbenchService().GetFocusedID(ctx, wb.ID)
 		if focusedID != "" && !isStaleFocus(ctx, focusedID) {
@@ -371,6 +387,30 @@ func isStaleFocus(ctx context.Context, focusedID string) bool {
 	}
 	// Terminal states: complete, deployed, archived
 	return ship.Status == "complete" || ship.Status == "deployed" || ship.Status == "archived"
+}
+
+// getGitBranchStatus returns the current git branch and dirty status for a path.
+// Returns branch name, whether it's dirty, and any error.
+func getGitBranchStatus(path string) (branch string, dirty bool, err error) {
+	// Get current branch
+	cmd := exec.Command("git", "rev-parse", "--abbrev-ref", "HEAD")
+	cmd.Dir = path
+	out, err := cmd.Output()
+	if err != nil {
+		return "", false, err
+	}
+	branch = strings.TrimSpace(string(out))
+
+	// Check dirty status
+	cmd = exec.Command("git", "status", "--porcelain")
+	cmd.Dir = path
+	out, err = cmd.Output()
+	if err != nil {
+		return branch, false, err
+	}
+	dirty = len(strings.TrimSpace(string(out))) > 0
+
+	return branch, dirty, nil
 }
 
 // workshopFocusInfo tracks what each workbench in the workshop has focused
