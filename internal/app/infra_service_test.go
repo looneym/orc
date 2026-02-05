@@ -324,10 +324,28 @@ func (m *mockInfraWorkspaceAdapter) ResolveWorkbenchPath(workbenchName string) s
 }
 
 // mockInfraEffectExecutor implements EffectExecutor for testing.
-type mockInfraEffectExecutor struct{}
+// Captures executed effects for verification.
+type mockInfraEffectExecutor struct {
+	executedEffects []effects.Effect
+	executeErr      error
+}
 
 func (m *mockInfraEffectExecutor) Execute(ctx context.Context, effs []effects.Effect) error {
+	if m.executeErr != nil {
+		return m.executeErr
+	}
+	m.executedEffects = append(m.executedEffects, effs...)
 	return nil
+}
+
+// hasFileEffectWithOperation checks if any executed effect is a FileEffect with the given operation.
+func (m *mockInfraEffectExecutor) hasFileEffectWithOperation(op string) bool {
+	for _, e := range m.executedEffects {
+		if fe, ok := e.(effects.FileEffect); ok && fe.Operation == op {
+			return true
+		}
+	}
+	return false
 }
 
 func newTestInfraService() *InfraServiceImpl {
@@ -354,6 +372,34 @@ func newTestInfraService() *InfraServiceImpl {
 	}
 	workspaceAdapter := &mockInfraWorkspaceAdapter{}
 	executor := &mockInfraEffectExecutor{}
+
+	return NewInfraService(factoryRepo, workshopRepo, workbenchRepo, repoRepo, gatehouseRepo, workspaceAdapter, nil, executor)
+}
+
+// newTestInfraServiceWithExecutor creates a test infra service with a custom effect executor.
+func newTestInfraServiceWithExecutor(executor *mockInfraEffectExecutor) *InfraServiceImpl {
+	factoryRepo := &mockInfraFactoryRepo{
+		factories: map[string]*secondary.FactoryRecord{
+			"FACT-001": {ID: "FACT-001", Name: "default", Status: "active"},
+		},
+	}
+	workshopRepo := &mockInfraWorkshopRepo{
+		workshops: map[string]*secondary.WorkshopRecord{
+			"WORK-001": {ID: "WORK-001", Name: "Test Workshop", FactoryID: "FACT-001", Status: "active"},
+		},
+	}
+	workbenchRepo := &mockInfraWorkbenchRepo{
+		workbenches: []*secondary.WorkbenchRecord{
+			{ID: "BENCH-001", Name: "test-bench", WorktreePath: "/tmp/test-bench", WorkshopID: "WORK-001", Status: "active"},
+		},
+	}
+	repoRepo := &mockInfraRepoRepo{}
+	gatehouseRepo := &mockInfraGatehouseRepo{
+		gatehouses: map[string]*secondary.GatehouseRecord{
+			"WORK-001": {ID: "GATE-001", WorkshopID: "WORK-001", Status: "active"},
+		},
+	}
+	workspaceAdapter := &mockInfraWorkspaceAdapter{}
 
 	return NewInfraService(factoryRepo, workshopRepo, workbenchRepo, repoRepo, gatehouseRepo, workspaceAdapter, nil, executor)
 }
@@ -433,5 +479,94 @@ func TestInfraService_PlanInfra_OpStatusCreate(t *testing.T) {
 	// The workbench path won't exist either
 	if len(plan.Workbenches) > 0 && plan.Workbenches[0].Status != primary.OpMissing {
 		t.Errorf("expected workbench status MISSING, got %s", plan.Workbenches[0].Status)
+	}
+}
+
+func TestInfraService_PlanInfra_ArchivedWorkbenchExcluded(t *testing.T) {
+	// Test that archived workbenches are excluded from the plan
+	factoryRepo := &mockInfraFactoryRepo{
+		factories: map[string]*secondary.FactoryRecord{
+			"FACT-001": {ID: "FACT-001", Name: "default", Status: "active"},
+		},
+	}
+	workshopRepo := &mockInfraWorkshopRepo{
+		workshops: map[string]*secondary.WorkshopRecord{
+			"WORK-001": {ID: "WORK-001", Name: "Test Workshop", FactoryID: "FACT-001", Status: "active"},
+		},
+	}
+	// Include both active and archived workbenches
+	workbenchRepo := &mockInfraWorkbenchRepo{
+		workbenches: []*secondary.WorkbenchRecord{
+			{ID: "BENCH-001", Name: "active-bench", WorktreePath: "/tmp/active-bench", WorkshopID: "WORK-001", Status: "active"},
+			{ID: "BENCH-002", Name: "archived-bench", WorktreePath: "/tmp/archived-bench", WorkshopID: "WORK-001", Status: "archived"},
+		},
+	}
+	repoRepo := &mockInfraRepoRepo{}
+	gatehouseRepo := &mockInfraGatehouseRepo{
+		gatehouses: map[string]*secondary.GatehouseRecord{
+			"WORK-001": {ID: "GATE-001", WorkshopID: "WORK-001", Status: "active"},
+		},
+	}
+	workspaceAdapter := &mockInfraWorkspaceAdapter{}
+	executor := &mockInfraEffectExecutor{}
+
+	service := NewInfraService(factoryRepo, workshopRepo, workbenchRepo, repoRepo, gatehouseRepo, workspaceAdapter, nil, executor)
+	ctx := context.Background()
+
+	plan, err := service.PlanInfra(ctx, primary.InfraPlanRequest{
+		WorkshopID: "WORK-001",
+	})
+
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	// Should only include active workbench, not archived
+	if len(plan.Workbenches) != 1 {
+		t.Errorf("expected 1 workbench (active only), got %d", len(plan.Workbenches))
+	}
+
+	if len(plan.Workbenches) > 0 && plan.Workbenches[0].ID != "BENCH-001" {
+		t.Errorf("expected active workbench BENCH-001, got %q", plan.Workbenches[0].ID)
+	}
+
+	// Archived workbench should NOT appear in orphan list either
+	// (archived workbenches have DB records, so they're not orphans)
+	for _, orphan := range plan.OrphanWorkbenches {
+		if orphan.ID == "BENCH-002" {
+			t.Error("archived workbench should NOT appear in orphan list")
+		}
+	}
+}
+
+func TestInfraService_ApplyInfra_NoFilesystemDeletion(t *testing.T) {
+	// Test that ApplyInfra does NOT execute any filesystem deletion effects
+	executor := &mockInfraEffectExecutor{}
+	service := newTestInfraServiceWithExecutor(executor)
+	ctx := context.Background()
+
+	// First get a plan
+	plan, err := service.PlanInfra(ctx, primary.InfraPlanRequest{
+		WorkshopID: "WORK-001",
+	})
+	if err != nil {
+		t.Fatalf("PlanInfra failed: %v", err)
+	}
+
+	// Apply the plan
+	_, err = service.ApplyInfra(ctx, plan)
+	if err != nil {
+		t.Fatalf("ApplyInfra failed: %v", err)
+	}
+
+	// Verify no deletion effects were executed
+	if executor.hasFileEffectWithOperation("rmdir") {
+		t.Error("ApplyInfra should NOT execute rmdir effects")
+	}
+	if executor.hasFileEffectWithOperation("rm") {
+		t.Error("ApplyInfra should NOT execute rm effects")
+	}
+	if executor.hasFileEffectWithOperation("remove") {
+		t.Error("ApplyInfra should NOT execute remove effects")
 	}
 }
