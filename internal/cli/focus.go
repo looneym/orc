@@ -239,6 +239,9 @@ func setIMPFocus(workbenchID, containerID, containerType, title string) error {
 		}
 	}
 
+	// Update tmux ORC_CONTEXT for session browser
+	updateWorkshopContext(workbenchID)
+
 	fmt.Println("\nRun 'orc prime' to see updated context.")
 	return nil
 }
@@ -264,6 +267,48 @@ func autoCheckoutShipmentBranch(workbenchID, shipmentID string) error {
 		TargetBranch: ship.Branch,
 	})
 	return err
+}
+
+// updateWorkshopContext computes active commissions for the workshop and sets ORC_CONTEXT tmux env var.
+// This enriches the tmux session browser (prefix+s) with commission info.
+func updateWorkshopContext(workbenchID string) {
+	ctx := NewContext()
+
+	// Get workbench to find workshop ID
+	wb, err := wire.WorkbenchService().GetWorkbench(ctx, workbenchID)
+	if err != nil || wb.WorkshopID == "" {
+		return // Silently fail - this is a nice-to-have
+	}
+
+	// Get current tmux session name
+	sessionName := wire.TMuxAdapter().GetCurrentSessionName(ctx)
+	if sessionName == "" {
+		return // Not in tmux
+	}
+
+	// Get active commissions from workshop (derives from all focused entities)
+	commissionIDs, err := wire.WorkshopService().GetActiveCommissions(ctx, wb.WorkshopID)
+	if err != nil {
+		return
+	}
+
+	// Build context string: "Title [ID], Title [ID], ..."
+	var parts []string
+	for _, commID := range commissionIDs {
+		comm, err := wire.CommissionService().GetCommission(ctx, commID)
+		if err != nil {
+			continue
+		}
+		parts = append(parts, fmt.Sprintf("%s [%s]", comm.Title, commID))
+	}
+
+	context := strings.Join(parts, ", ")
+	if context == "" {
+		context = "(idle)"
+	}
+
+	// Set tmux environment variable
+	_ = wire.TMuxAdapter().SetEnvironment(ctx, sessionName, "ORC_CONTEXT", context)
 }
 
 // clearIMPFocus clears the IMP focus in DB
