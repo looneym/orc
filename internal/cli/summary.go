@@ -604,7 +604,10 @@ func renderShipment(ship primary.ShipmentSummary, workshopFocus workshopFocusInf
 			if isLastChild {
 				nPrefix = taskPrefix + "└── "
 			}
-			typeMarker := color.New(color.FgYellow).Sprintf("[%s] ", note.Type)
+			typeMarker := ""
+			if note.Type != "" {
+				typeMarker = color.New(color.FgYellow).Sprintf("[%s] ", note.Type)
+			}
 			fmt.Printf("%s%s %s- %s\n", nPrefix, colorizeID(note.ID), typeMarker, note.Title)
 			childIdx++
 		}
