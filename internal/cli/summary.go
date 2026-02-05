@@ -338,7 +338,7 @@ func renderWorkshopBenches(workshopID, currentWorkbenchID, gatehouseID string) {
 		}
 
 		// Build workbench line with optional focus indicator
-		line := fmt.Sprintf("👹 %s (%s)", wb.ID, wb.Name)
+		line := fmt.Sprintf("👹 %s", wb.Name)
 		if wb.ID == currentWorkbenchID {
 			line = color.New(color.FgHiMagenta).Sprint(line)
 		}
