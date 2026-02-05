@@ -181,12 +181,8 @@ func GetAutoTransitionStatus(ctx AutoTransitionContext) string {
 		if ctx.CurrentStatus == "tasked" || ctx.CurrentStatus == "ready_for_imp" || ctx.CurrentStatus == "exploring" || ctx.CurrentStatus == "specced" {
 			return "implementing"
 		}
-	case "task_completed":
-		if ctx.TaskCount > 0 && ctx.TaskCount == ctx.CompletedTaskCount {
-			return "implemented" // Code changes complete, ready for deploy
-		}
 	case "deploy":
-		if ctx.CurrentStatus == "implemented" || ctx.CurrentStatus == "complete" {
+		if ctx.CurrentStatus == "implementing" || ctx.CurrentStatus == "auto_implementing" || ctx.CurrentStatus == "implemented" || ctx.CurrentStatus == "complete" {
 			return "deployed"
 		}
 	case "verify":

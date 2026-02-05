@@ -239,7 +239,7 @@ var shipmentDeployCmd = &cobra.Command{
 	Long: `Mark a shipment as deployed after code has been merged or deployed.
 
 This is typically called by the ship-deploy skill after a successful merge to master.
-The shipment must be in 'implemented' or 'complete' status.`,
+The shipment must be in 'implementing', 'auto_implementing', 'implemented', or 'complete' status.`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := NewContext()
