@@ -133,13 +133,17 @@ orc workbench like feature-v2                        # Creates DB record only
 Use `orc infra` to materialize physical infrastructure:
 
 ```bash
-orc infra plan WORK-001     # Show what would be created (dry run)
-orc infra apply WORK-001    # Create directories, worktrees, configs
+orc infra plan WORK-001     # Show what would be created/cleaned (dry run)
+orc infra apply WORK-001    # Create infra + clean orphan tmux windows
+orc infra cleanup           # Remove orphan directories (explicit action)
 ```
 
 The infrastructure plan shows:
 - **Gatehouse**: Workshop coordination directory (`~/.orc/ws/WORK-xxx-slug/`)
 - **Workbenches**: Git worktrees for each workbench record
+- **TMux**: Session and window state
+
+**Important**: `infra apply` does NOT delete directories. It only creates infrastructure and removes orphan tmux windows (for archived workbenches). Use `infra cleanup` to explicitly remove orphan directories.
 
 ### TMux Connectivity
 
@@ -151,14 +155,15 @@ orc tmux connect WORK-001   # Attach to workshop's tmux session
 
 ### Command Reference
 
-| Command | Creates DB Record | Creates Filesystem | Notes |
-|---------|------------------|-------------------|-------|
-| `orc workbench create` | ✓ | ✗ | DB only |
-| `orc workbench like` | ✓ | ✗ | DB only |
-| `orc commission start` | ✗ | ✗ | Starts tmux session only |
-| `orc infra plan` | ✗ | ✗ | Shows what would change |
-| `orc infra apply` | ✗ | ✓ | Creates gatehouse, worktrees, configs |
-| `orc tmux connect` | ✗ | ✗ | Attaches to existing session |
+| Command | Creates DB Record | Creates Filesystem | Deletes Filesystem | Notes |
+|---------|------------------|-------------------|-------------------|-------|
+| `orc workbench create` | ✓ | ✗ | ✗ | DB only |
+| `orc workbench like` | ✓ | ✗ | ✗ | DB only |
+| `orc commission start` | ✗ | ✗ | ✗ | Starts tmux session only |
+| `orc infra plan` | ✗ | ✗ | ✗ | Shows what would change |
+| `orc infra apply` | ✗ | ✓ | ✗ | Creates infra, cleans tmux windows |
+| `orc infra cleanup` | ✗ | ✗ | ✓ | Removes orphan directories |
+| `orc tmux connect` | ✗ | ✗ | ✗ | Attaches to existing session |
 
 ### Why This Pattern?
 
@@ -166,6 +171,7 @@ orc tmux connect WORK-001   # Attach to workshop's tmux session
 2. **Idempotency**: `apply` is safe to run multiple times
 3. **Visibility**: `plan` shows exactly what will change before committing
 4. **Recovery**: If filesystem gets corrupted, `apply` reconstructs from DB
+5. **Safety**: `apply` never deletes directories — deletion requires explicit `cleanup` command
 
 ---
 
