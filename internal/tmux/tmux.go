@@ -482,6 +482,12 @@ func BindContextMenu(key, title string, items []MenuItem) error {
 // ApplyGlobalBindings sets up ORC's global tmux key bindings.
 // Safe to call repeatedly (idempotent). Silently ignores errors (tmux may not be running).
 func ApplyGlobalBindings() {
+	// Session browser (prefix+s) with ORC context format
+	// Shows: "Workshop Name [WORK-xxx] - Commission Title [COMM-xxx], ..."
+	_ = exec.Command("tmux", "bind-key", "-T", "prefix", "s",
+		"choose-tree", "-sZ", "-F",
+		`#{session_name} [#{ORC_WORKSHOP_ID}] - #{?#{ORC_CONTEXT},#{ORC_CONTEXT},(idle)}`).Run()
+
 	// Double-click status bar → orc summary popup
 	_ = BindKeyPopup("", "DoubleClick1Status",
 		"CLICOLOR_FORCE=1 orc summary | less -R",
