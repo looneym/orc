@@ -520,7 +520,12 @@ func formatFocusActors(actors []string, isMeFocused bool) string {
 	if len(parts) == 0 {
 		return ""
 	}
-	return fmt.Sprintf(" [focused by %s]", strings.Join(parts, ", "))
+	result := fmt.Sprintf(" [focused by %s]", strings.Join(parts, ", "))
+	// Add sparkles when you are focusing
+	if isMeFocused {
+		result = " ✨" + result + " ✨"
+	}
+	return result
 }
 
 // renderCollapsedCommission renders a commission as a single collapsed line with counts
@@ -555,7 +560,7 @@ func renderSummary(summary *primary.CommissionSummary, _ string, workshopFocus w
 	// Commission header with focused marker
 	focusedMarker := ""
 	if summary.IsFocusedCommission {
-		focusedMarker = color.New(color.FgHiMagenta).Sprint(" [focused]")
+		focusedMarker = color.New(color.FgHiMagenta).Sprint(" ✨ [focused by you] ✨")
 	}
 	fmt.Printf("%s%s - %s\n", colorizeID(summary.ID), focusedMarker, summary.Title)
 
