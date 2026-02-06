@@ -325,7 +325,7 @@ func renderWorkshopBenches(workshopID, currentWorkbenchID, gatehouseID string) {
 		if isLast {
 			prefix = "└── "
 		}
-		fmt.Printf("%s🏰 %s\n", prefix, gatehouseID)
+		fmt.Printf("%s👺 %s\n", prefix, gatehouseID)
 		itemIdx++
 	}
 
