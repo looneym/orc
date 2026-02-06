@@ -326,6 +326,24 @@ func runSetCommission(args []string, clearFlag bool) error {
 		return fmt.Errorf("failed to set commission: %w", err)
 	}
 
+	// Set focus for gatehouse (goblin)
+	if err := wire.GatehouseService().UpdateFocusedID(ctx, cfg.PlaceID, commissionID); err != nil {
+		fmt.Printf("  (gatehouse focus skipped: %v)\n", err)
+	}
+
+	// Set focus for all active workbenches (IMPs)
+	workbenches, err := wire.WorkbenchService().ListWorkbenches(ctx, primary.WorkbenchFilters{
+		WorkshopID: workshopID,
+		Status:     "active",
+	})
+	if err == nil {
+		for _, wb := range workbenches {
+			if err := wire.WorkbenchService().UpdateFocusedID(ctx, wb.ID, commissionID); err != nil {
+				fmt.Printf("  (workbench %s focus skipped: %v)\n", wb.ID, err)
+			}
+		}
+	}
+
 	// Rename tmux session if inside one
 	if os.Getenv("TMUX") != "" {
 		if err := renameSessionForCommission(ctx, workshopID, commission); err != nil {
