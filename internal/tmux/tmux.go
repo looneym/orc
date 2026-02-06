@@ -344,6 +344,17 @@ func RespawnPane(target string, command ...string) error {
 	return cmd.Run()
 }
 
+// SetupGoblinPane launches orc connect --role goblin in pane 1 of an existing window.
+// Target format: "session:window" (e.g., "WORK-005:goblin")
+func SetupGoblinPane(target string) error {
+	pane1 := fmt.Sprintf("%s.1", target)
+	cmd := exec.Command("tmux", "respawn-pane", "-t", pane1, "-k", "orc", "connect", "--role", "goblin")
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("failed to launch orc connect in goblin pane: %w", err)
+	}
+	return nil
+}
+
 // GetSessionInfo returns formatted information about the session
 func GetSessionInfo(name string) (string, error) {
 	cmd := exec.Command("tmux", "list-windows", "-t", name)
