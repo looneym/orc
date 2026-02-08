@@ -36,6 +36,39 @@ Before merging to master, run `/docs-doctor` to validate documentation:
 - Checks internal links are valid
 - Validates CLI commands and skills referenced in docs
 
+## Guardrail Enforcement
+
+ORC enforces quality at multiple points in the development lifecycle:
+
+| Guardrail | When | Enforced By |
+|-----------|------|-------------|
+| `make lint` + `make test` | Every commit | pre-commit hook |
+| CHANGELOG.md updated | Feature branch commits | pre-commit hook |
+| `orc doctor` | After merge to master | post-merge hook |
+| `/docs-doctor` | Before release | /release skill |
+
+All guardrails are **hard blockers** - they fail the operation if checks don't pass.
+
+Emergency escape hatch: `git commit --no-verify` (usage is audited)
+
+### Skill/Repo Separation of Concerns
+
+Skills and repos have distinct responsibilities:
+
+| Concern | Owner | Example |
+|---------|-------|---------|
+| **Policy discovery** | Skills | `/ship-deploy` discovers what checks to run |
+| **Policy definition** | Repos | `docs/deployment.md` defines repo-specific checks |
+| **Enforcement** | Hooks | Git hooks run the actual checks |
+
+**Key principle:** Skills are repo-agnostic. They reference deployment docs, not implement policy directly.
+
+- `/ship-deploy` reads `docs/deployment.md` to learn what checks this repo requires
+- `/release` runs `/docs-doctor` as a validation step (defined in skill, not hardcoded to repo)
+- Hooks enforce checks at git operation boundaries
+
+This separation allows skills to work across different repos with different policies.
+
 ---
 
 ## Config Files
