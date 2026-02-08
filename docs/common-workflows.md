@@ -7,31 +7,9 @@ This guide covers the standard patterns for working with ORC.
 
 ## Shipment Lifecycle
 
-Shipments are the primary unit of work in ORC. They progress through a defined lifecycle:
+Shipments are the primary unit of work in ORC. They progress through a defined lifecycle.
 
-```mermaid
-stateDiagram-v2
-    [*] --> draft: create shipment
-
-    draft --> exploring: focus event
-    draft --> tasked: task created
-
-    exploring --> tasked: task created
-    exploring --> implementing: task claimed
-
-    tasked --> implementing: task claimed
-
-    implementing --> auto_implementing: /imp-auto on
-    auto_implementing --> implementing: /imp-auto off
-
-    implementing --> deployed: /ship-deploy
-    auto_implementing --> deployed: /ship-deploy
-
-    deployed --> verified: /ship-verify
-    verified --> complete: /ship-complete
-
-    complete --> [*]
-```
+See **[docs/shipment-lifecycle.md](shipment-lifecycle.md)** for the complete state diagram with transitions and operating modes.
 
 ### State Descriptions
 
