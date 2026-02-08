@@ -136,7 +136,13 @@ ORC (Orchestrator) is a commission coordination system for managing complex, mul
        ↓
 /imp-plan-create → Plans (C4 file-level detail)
        ↓
+/imp-plan-submit → Plan approval
+       ↓
+/imp-implement → Show plan, begin coding
+       ↓
 Implementation → Code
+       ↓
+/imp-rec → Verify, receipt, chain to next task
 ```
 
 **Zoom Level Ownership:**
