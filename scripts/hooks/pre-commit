@@ -6,6 +6,19 @@
 # =============================================================================
 
 echo "Running pre-commit checks..."
+
+# CHANGELOG enforcement (feature branches only)
+BRANCH=$(git rev-parse --abbrev-ref HEAD)
+if [[ "$BRANCH" != "master" && "$BRANCH" != "main" ]]; then
+    if ! git diff master -- CHANGELOG.md 2>/dev/null | grep -q .; then
+        echo "❌ CHANGELOG.md has no changes vs master"
+        echo "   Add your changes to the [Unreleased] section"
+        echo "   Emergency bypass: git commit --no-verify"
+        exit 1
+    fi
+    echo "✓ CHANGELOG.md updated"
+fi
+
 make lint || { echo "❌ Lint failed - fix issues before committing"; exit 1; }
 make test || { echo "❌ Tests failed - fix issues before committing"; exit 1; }
 echo "✓ Pre-commit checks passed"
