@@ -44,6 +44,11 @@ Validate documentation against code reality using parallel subagent checks.
 - ER diagram in architecture.md matches internal/db/schema.sql
 - Lifecycle diagram in common-workflows.md matches guards in internal/core/shipment/guards.go
 
+### 5. Skill Repo-Agnosticism Checks
+- No hardcoded absolute paths (e.g., /Users/, /home/, ~/src/)
+- No repo-specific file existence checks (e.g., `if [ -f "CHANGELOG.md" ]`)
+- Skills reference deployment docs, not implement policy directly
+
 ## Architecture
 
 This skill uses a **fan-out pattern** with haiku subagents for parallel validation:
@@ -54,7 +59,8 @@ Main Agent (opus)
     ├── Spawn: Lane Check Agent (haiku)
     ├── Spawn: CLI Validation Agent (haiku)
     ├── Spawn: ER Diagram Agent (haiku)
-    └── Spawn: Lifecycle Diagram Agent (haiku)
+    ├── Spawn: Lifecycle Diagram Agent (haiku)
+    └── Spawn: Repo-Agnosticism Agent (haiku)
          ↓
     Collect findings
          ↓
@@ -152,7 +158,30 @@ Return findings as:
 - status: 'pass' or 'fail'"
 ```
 
-### Step 6: Synthesize Findings
+### Step 6: Spawn Repo-Agnosticism Agent
+
+```
+Prompt: "Check skills for repo-agnostic portability.
+
+1. Use Glob to find all glue/skills/*/SKILL.md files
+2. For each skill, check for violations:
+   - Hardcoded absolute paths: /Users/, /home/, ~/src/, /var/
+   - Repo-specific file checks: patterns like 'if [ -f "CHANGELOG.md" ]' or '[ -f VERSION ]'
+   - Policy implementation: skills should reference deployment docs, not embed repo-specific rules
+
+3. Allowed patterns (not violations):
+   - Conditional checks for BUILD SYSTEM detection (Makefile, package.json)
+   - Optional feature detection (command -v)
+   - Documentation references to repo structure
+
+Return findings as:
+- hardcoded_paths: [{skill, line, path}]
+- repo_specific_checks: [{skill, line, check}]
+- policy_violations: [{skill, description}]
+- status: 'pass' or 'fail'"
+```
+
+### Step 7: Synthesize Findings
 
 Collect all agent results and categorize:
 
@@ -165,8 +194,9 @@ Collect all agent results and categorize:
 - Lane violations (content in wrong file)
 - Diagram mismatches (which is correct?)
 - Invalid commands (docs wrong or code wrong?)
+- Repo-agnosticism violations (refactor skill or accept exception?)
 
-### Step 7: Report and Act
+### Step 8: Report and Act
 
 **If all pass:**
 ```
@@ -177,6 +207,7 @@ Lanes: ✓
 CLI: ✓
 ER Diagram: ✓
 Lifecycle: ✓
+Repo-Agnosticism: ✓
 ```
 
 **If issues found:**
