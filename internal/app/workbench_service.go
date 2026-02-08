@@ -44,32 +44,22 @@ func NewWorkbenchService(
 
 // CreateWorkbench creates a new workbench.
 func (s *WorkbenchServiceImpl) CreateWorkbench(ctx context.Context, req primary.CreateWorkbenchRequest) (*primary.CreateWorkbenchResponse, error) {
-	// 1. Get agent identity
-	identity, err := s.agentProvider.GetCurrentIdentity(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get agent identity: %w", err)
-	}
-
-	// 2. Check if workshop exists
+	// 1. Check if workshop exists
 	workshopExists, err := s.workbenchRepo.WorkshopExists(ctx, req.WorkshopID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check workshop: %w", err)
 	}
 
-	// 3. Guard check
+	// 2. Guard check
 	guardCtx := coreworkbench.CreateWorkbenchContext{
-		GuardContext: coreworkbench.GuardContext{
-			AgentType:  coreworkbench.AgentType(identity.Type),
-			AgentID:    identity.FullID,
-			WorkshopID: req.WorkshopID,
-		},
+		WorkshopID:     req.WorkshopID,
 		WorkshopExists: workshopExists,
 	}
 	if result := coreworkbench.CanCreateWorkbench(guardCtx); !result.Allowed {
 		return nil, result.Error()
 	}
 
-	// 4. Get next workbench ID to extract number for auto-generated name
+	// 3. Get next workbench ID to extract number for auto-generated name
 	nextID, err := s.workbenchRepo.GetNextID(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get next workbench ID: %w", err)

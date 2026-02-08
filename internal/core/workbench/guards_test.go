@@ -14,11 +14,7 @@ func TestCanCreateWorkbench(t *testing.T) {
 		{
 			name: "can create workbench when workshop exists",
 			ctx: CreateWorkbenchContext{
-				GuardContext: GuardContext{
-					AgentType:  AgentTypeORC,
-					AgentID:    "ORC",
-					WorkshopID: "WORK-001",
-				},
+				WorkshopID:     "WORK-001",
 				WorkshopExists: true,
 			},
 			wantAllowed: true,
@@ -27,11 +23,7 @@ func TestCanCreateWorkbench(t *testing.T) {
 		{
 			name: "cannot create workbench when workshop does not exist",
 			ctx: CreateWorkbenchContext{
-				GuardContext: GuardContext{
-					AgentType:  AgentTypeORC,
-					AgentID:    "ORC",
-					WorkshopID: "WORK-999",
-				},
+				WorkshopID:     "WORK-999",
 				WorkshopExists: false,
 			},
 			wantAllowed: false,

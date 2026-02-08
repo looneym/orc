@@ -4,16 +4,6 @@ package workbench
 
 import "fmt"
 
-// AgentType represents the type of agent in the workbench domain.
-type AgentType string
-
-const (
-	// AgentTypeORC represents the orchestrator agent.
-	AgentTypeORC AgentType = "ORC"
-	// AgentTypeIMP represents an implementation agent in a workbench.
-	AgentTypeIMP AgentType = "IMP"
-)
-
 // GuardResult represents the outcome of a guard evaluation.
 type GuardResult struct {
 	Allowed bool
@@ -28,16 +18,9 @@ func (r GuardResult) Error() error {
 	return fmt.Errorf("%s", r.Reason)
 }
 
-// GuardContext provides context for agent-based guard evaluation.
-type GuardContext struct {
-	AgentType  AgentType
-	AgentID    string
-	WorkshopID string
-}
-
 // CreateWorkbenchContext provides context for workbench creation guards.
 type CreateWorkbenchContext struct {
-	GuardContext
+	WorkshopID     string
 	WorkshopExists bool
 }
 
