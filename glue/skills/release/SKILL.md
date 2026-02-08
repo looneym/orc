@@ -1,0 +1,176 @@
+---
+name: release
+description: |
+  Cut a new release by bumping VERSION, promoting CHANGELOG, committing, and tagging.
+  Use when user says "/release", "cut a release", "bump version", or "create release".
+---
+
+# Release
+
+Cut a new semantic version release by bumping VERSION, promoting CHANGELOG Unreleased section, creating a release commit, and tagging.
+
+## Usage
+
+```
+/release           (suggest patch, ask to confirm)
+/release --patch   (bump patch: 0.1.0 → 0.1.1)
+/release --minor   (bump minor: 0.1.0 → 0.2.0)
+/release --major   (bump major: 0.1.0 → 1.0.0)
+```
+
+## Flow
+
+### Step 1: Pre-flight Checks
+
+```bash
+git status --porcelain
+```
+
+Must be clean. If dirty:
+```
+❌ Working tree is dirty. Commit or stash changes first.
+```
+
+### Step 2: Read Current Version
+
+```bash
+cat VERSION
+```
+
+Parse current version (e.g., `0.1.0`).
+
+If VERSION file missing:
+```
+❌ No VERSION file found. Create one first.
+```
+
+### Step 3: Check CHANGELOG
+
+```bash
+cat CHANGELOG.md
+```
+
+Look for content under `## [Unreleased]` section.
+
+If Unreleased section is empty (only headers, no content):
+```
+⚠️ CHANGELOG Unreleased section is empty.
+
+Proceed anyway? [y/n]
+```
+
+Allow proceeding if user confirms.
+
+### Step 4: Determine Version Bump
+
+**If flag provided:**
+- `--patch`: increment patch (0.1.0 → 0.1.1)
+- `--minor`: increment minor, reset patch (0.1.0 → 0.2.0)
+- `--major`: increment major, reset minor and patch (0.1.0 → 1.0.0)
+
+**If no flag:**
+```
+Current version: 0.1.0
+
+Suggested bump: patch → 0.1.1
+
+Accept? [y/n/minor/major]
+```
+
+- `y` or Enter: use patch
+- `n`: abort
+- `minor`: bump minor instead
+- `major`: bump major instead
+
+### Step 5: Update VERSION File
+
+Write new version to VERSION file:
+```bash
+echo "0.1.1" > VERSION
+```
+
+### Step 6: Update CHANGELOG
+
+Replace `## [Unreleased]` section with versioned section:
+
+**Before:**
+```markdown
+## [Unreleased]
+
+### Added
+- New feature X
+```
+
+**After:**
+```markdown
+## [Unreleased]
+
+## [0.1.1] - 2026-02-08
+
+### Added
+- New feature X
+```
+
+Use today's date in ISO format (YYYY-MM-DD).
+
+### Step 7: Create Release Commit
+
+```bash
+git add VERSION CHANGELOG.md
+git commit -m "release: v0.1.1"
+```
+
+### Step 8: Create Tag
+
+```bash
+git tag v0.1.1
+```
+
+### Step 9: Push (Optional)
+
+```
+Release created locally:
+  - VERSION: 0.1.1
+  - Commit: release: v0.1.1
+  - Tag: v0.1.1
+
+Push to origin? [y/n]
+```
+
+If yes:
+```bash
+git push origin HEAD
+git push origin v0.1.1
+```
+
+### Step 10: Success Output
+
+```
+✓ Released v0.1.1
+
+  VERSION: 0.1.1
+  Commit: <sha>
+  Tag: v0.1.1
+  Pushed: yes/no
+
+Next:
+  - Verify CI passes
+  - Update any dependent systems
+```
+
+## Error Handling
+
+| Error | Action |
+|-------|--------|
+| Dirty working tree | "Commit or stash changes first" |
+| No VERSION file | "Create VERSION file first" |
+| Invalid version format | "VERSION must be semver (X.Y.Z)" |
+| Tag already exists | "Tag vX.Y.Z already exists" |
+| Push rejected | "Remote has new commits. Pull first." |
+
+## Notes
+
+- This is a repo-level skill, not a glue-level skill
+- Tags use `v` prefix (v0.1.0)
+- CHANGELOG follows keepachangelog.com format
+- Empty Unreleased is a warning, not a blocker
