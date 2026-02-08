@@ -69,7 +69,6 @@ ORC (Orchestrator) is a commission coordination system for managing complex, mul
 | ship-queue | View shipyard queue |
 | ship-complete | Complete shipments |
 | ship-deploy | Deploy shipments |
-| ship-verify | Verify shipments |
 | ship-freshness | Rebase and validate tasks/notes |
 | release | Cut semantic version releases |
 
