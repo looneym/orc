@@ -1,3 +1,8 @@
+---
+name: orc-ideate
+description: Rapid idea capture for brainstorming mode. Use when user says /ideate or wants to quickly capture an idea to a focused shipment.
+---
+
 # ORC Ideate
 
 Rapid idea capture for brainstorming mode.
