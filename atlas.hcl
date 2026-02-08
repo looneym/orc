@@ -1,5 +1,5 @@
 // Atlas project configuration
-// Reference: AGENTS.md "Database Migrations (Atlas)" section
+// Reference: CLAUDE.md "Database Migrations (Atlas)" section
 
 variable "home" {
   type    = string
@@ -12,7 +12,7 @@ env "local" {
   dev = "sqlite://dev?mode=memory"
 
   // CRITICAL: Exclude SQLite autoindexes to avoid migration errors
-  // See AGENTS.md for explanation
+  // See CLAUDE.md for explanation
   exclude = ["*.sqlite_autoindex*[type=index]"]
 }
 

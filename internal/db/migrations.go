@@ -11,7 +11,7 @@ package db
 //   2. Run: make schema-diff   (preview changes)
 //   3. Run: make schema-apply  (apply changes)
 //
-// See AGENTS.md "Database Migrations (Atlas)" section for details.
+// See CLAUDE.md "Database Migrations (Atlas)" section for details.
 // =============================================================================
 
 import (
@@ -4026,7 +4026,7 @@ func migrationV41(db *sql.DB) error {
 // - The investigations table
 // - investigation_id columns from tasks and notes tables
 // - All FK constraints referencing investigations
-// See AGENTS.md for Atlas migration workflow.
+// See CLAUDE.md for Atlas migration workflow.
 func migrationV42(db *sql.DB) error {
 	// Atlas handled this migration - see schema_inspected.hcl
 	return nil
@@ -4040,7 +4040,7 @@ func migrationV42(db *sql.DB) error {
 // - container_id and container_type columns to tomes and shipments
 // - focused_conclave_id column to workshops
 // - focused_id column to workbenches
-// See AGENTS.md for Atlas migration workflow.
+// See CLAUDE.md for Atlas migration workflow.
 func migrationV43(db *sql.DB) error {
 	// Step 1: Auto-create Library for each commission that doesn't have one
 	_, err := db.Exec(`
