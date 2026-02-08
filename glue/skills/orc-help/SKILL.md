@@ -56,7 +56,7 @@ Display the category overview:
 
 **orc-*** - Utilities
   General ORC commands and maintenance
-  Examples: /orc-interview, /orc-debug, /orc-help
+  Examples: /orc-interview, /orc-ping, /orc-help
 
 **goblin-*** - Review & Escalation
   Gatehouse review workflows
