@@ -7,11 +7,9 @@ Glue between ORC and Claude Code - skills, hooks, and other integrations.
 ```
 glue/
 ├── skills/           # Claude Code skills
-│   ├── orc-ping/     # Health check skill
-│   └── orc-debug/    # Debug log viewer
-├── hooks/            # Claude Code hooks
-│   └── orc-debug-log.sh  # Logs all tool calls
-└── hooks.json        # Hook configuration
+│   └── orc-ping/     # Health check skill
+├── hooks/            # Claude Code hooks (empty after orc-debug removal)
+└── hooks.json        # Hook configuration (Stop hook only)
 ```
 
 ## Deployment

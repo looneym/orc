@@ -104,7 +104,6 @@ ORC (Orchestrator) is a commission coordination system for managing complex, mul
 | orc-first-run | Interactive first-run walkthrough |
 | orc-interview | Reusable interview primitive |
 | orc-architecture | Maintain ARCHITECTURE.md |
-| orc-debug | View debug logs |
 | orc-help | Orientation to ORC skills |
 | orc-ping | Verify ORC is working |
 | orc-self-test | Integration self-testing |
