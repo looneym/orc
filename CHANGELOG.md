@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `/release` skill now runs `/docs-doctor` validation before release (hard blocker)
+- Pre-commit hook enforces CHANGELOG.md changes on feature branches
+- Post-merge hook runs `orc doctor` on master/main branch
+- `/docs-doctor` skill checks for repo-agnosticism violations in skills
+- Guardrail enforcement documentation in CLAUDE.md
+- Self-test skill now verifies tmux session management
+
 ### Changed
 
 ### Deprecated
