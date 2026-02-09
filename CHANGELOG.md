@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Watchdog monitoring system reimplemented:
+  - `orc shipment should-continue` command for checking if IMP should continue working
+  - Watchdog pane (index 4) added to infra plan/apply when patrol is active
+  - `orc prime` detects WATCHDOG_KENNEL_ID env var and provides watchdog context
+  - `/watchdog-monitor` skill for monitoring loop (check continue, capture pane, detect state, take action)
+  - `/imp-auto` skill now spawns watchdog via patrol start + infra apply
+  - `/imp-start --auto` integrates watchdog spawning flow
+  - `/orc-self-test` includes comprehensive watchdog infrastructure tests
 - `Brewfile` and `Brewfile.dev` for Homebrew dependency management
 - `make bootstrap-dev` target for installing development dependencies (tart, sshpass, atlas)
 - `--strict` flag for `orc doctor` - treats warnings as errors (useful for CI/scripts)
