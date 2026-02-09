@@ -14,16 +14,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Watchdog monitoring system reimplemented:
+  - `orc shipment should-continue` command for checking if IMP should continue working
+  - Watchdog pane (index 4) added to infra plan/apply when patrol is active
+  - `orc prime` detects WATCHDOG_KENNEL_ID env var and provides watchdog context
+  - `/watchdog-monitor` skill for monitoring loop (check continue, capture pane, detect state, take action)
+  - `/imp-auto` skill now spawns watchdog via patrol start + infra apply
+  - `/imp-start --auto` integrates watchdog spawning flow
+  - `/orc-self-test` includes comprehensive watchdog infrastructure tests
 - `make bootstrap` now creates REPO-001 (ORC repository at ~/src/orc) after FACT-001
 - `orc bootstrap --factory FACT-xxx` flag passes factory to /orc-first-run skill
 - `/bootstrap-exercise` skill for manual testing of first-run flow with isolated factory
 - Bootstrap test verifies FACT-001 and REPO-001 creation
-
-### Changed
-
-- `/orc-first-run` skill uses canonical path ~/src/orc instead of $(pwd), accepts factory from directive
-- `docs/getting-started.md` recommends `orc bootstrap` as step 3 after make bootstrap
-
 - `Brewfile` and `Brewfile.dev` for Homebrew dependency management
 - `make bootstrap-dev` target for installing development dependencies (tart, sshpass, atlas)
 - `--strict` flag for `orc doctor` - treats warnings as errors (useful for CI/scripts)
@@ -47,6 +49,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `/orc-first-run` skill uses canonical path ~/src/orc instead of $(pwd), accepts factory from directive
+- `docs/getting-started.md` recommends `orc bootstrap` as step 3 after make bootstrap
 - **BREAKING**: ORC must be cloned to `~/src/orc` (canonical location enforced by orc doctor)
 - Bootstrap now requires Homebrew and runs `brew bundle` to install Go
 - Bootstrap test copies repo to `~/src/orc` in VM and runs `orc doctor` verification

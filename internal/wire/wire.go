@@ -326,14 +326,14 @@ func initServices() {
 
 	// Create patrol service for watchdog monitoring
 	patrolRepo := sqlite.NewPatrolRepository(database)
-	patrolService = app.NewPatrolService(patrolRepo, kennelRepo, workbenchRepo)
+	patrolService = app.NewPatrolService(patrolRepo, kennelRepo, workbenchRepo, tmuxAdapter)
 
 	approvalService = app.NewApprovalService(approvalRepo)
 
 	escalationService = app.NewEscalationService(escalationRepo)
 
 	// Create infra service for infrastructure planning
-	infraService = app.NewInfraService(factoryRepo, workshopRepo, workbenchRepo, repoRepo, gatehouseRepo, workspaceAdapter, tmuxAdapter, executor)
+	infraService = app.NewInfraService(factoryRepo, workshopRepo, workbenchRepo, repoRepo, gatehouseRepo, kennelRepo, workspaceAdapter, tmuxAdapter, executor)
 
 	// Create log service for activity logs (workshopLogRepo created early for LogWriter)
 	logService = app.NewLogService(workshopLogRepo)
