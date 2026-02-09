@@ -1,4 +1,4 @@
-.PHONY: install install-orc install-dev-shim dev build test lint lint-fix schema-check check-test-presence check-coverage check-skills init install-hooks clean help deploy-glue schema-diff schema-apply schema-inspect setup-workbench schema-diff-workbench schema-apply-workbench bootstrap bootstrap-test
+.PHONY: install install-orc install-dev-shim dev build test lint lint-fix schema-check check-test-presence check-coverage check-skills init install-hooks clean help deploy-glue schema-diff schema-apply schema-inspect setup-workbench schema-diff-workbench schema-apply-workbench bootstrap bootstrap-test bootstrap-shell
 
 # Go binary location (handles empty GOBIN)
 GOBIN := $(shell go env GOPATH)/bin
@@ -229,6 +229,10 @@ bootstrap:
 # Test bootstrap in a fresh macOS VM (requires tart)
 bootstrap-test:
 	@./scripts/bootstrap-test.sh
+
+# Bootstrap and drop into VM shell for exploration
+bootstrap-shell:
+	@./scripts/bootstrap-test.sh --shell
 
 # Setup workbench-local development database
 setup-workbench:

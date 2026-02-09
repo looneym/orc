@@ -12,7 +12,9 @@ VM_PASS="admin"
 SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR"
 
 # Flags
+KEEP=false
 KEEP_ON_FAILURE=false
+SHELL_MODE=false
 VERBOSE=false
 
 # Timing
@@ -25,7 +27,9 @@ Usage: $(basename "$0") [OPTIONS]
 Test 'make bootstrap' in a clean macOS Tart VM.
 
 Options:
-    --keep-on-failure   Keep VM on failure for debugging
+    --shell             Drop into interactive shell after bootstrap (implies --keep)
+    --keep              Keep VM after test (success or failure)
+    --keep-on-failure   Keep VM only on failure for debugging
     --verbose, -v       Show verbose output
     --help, -h          Show this help message
 
@@ -35,6 +39,8 @@ Requirements:
 
 Examples:
     $(basename "$0")                    # Run bootstrap test
+    $(basename "$0") --shell            # Bootstrap then drop into VM shell
+    $(basename "$0") --keep             # Keep VM for exploration
     $(basename "$0") --keep-on-failure  # Keep VM if test fails
 EOF
 }
@@ -54,9 +60,27 @@ error() {
     log "✗ ERROR: $1" >&2
 }
 
+print_vm_info() {
+    log ""
+    log "VM kept for exploration:"
+    log "  VM Name:  $VM_NAME"
+    log "  SSH:      sshpass -p $VM_PASS ssh $VM_USER@$VM_IP"
+    log "  Password: $VM_PASS"
+    log ""
+    log "  Cleanup when done:"
+    log "    tart stop $VM_NAME"
+    log "    tart delete $VM_NAME"
+}
+
 cleanup() {
     local exit_code=$?
 
+    # Always keep if --keep was specified
+    if [[ "$KEEP" == "true" ]]; then
+        return
+    fi
+
+    # Keep on failure if --keep-on-failure was specified
     if [[ "$exit_code" -ne 0 ]] && [[ "$KEEP_ON_FAILURE" == "true" ]]; then
         log "⚠ Keeping VM '$VM_NAME' for debugging (--keep-on-failure)"
         log "  To SSH: ssh $VM_USER@\$(tart ip $VM_NAME)"
@@ -76,6 +100,15 @@ trap cleanup EXIT
 # Parse arguments
 while [[ $# -gt 0 ]]; do
     case $1 in
+        --shell)
+            SHELL_MODE=true
+            KEEP=true  # --shell implies --keep
+            shift
+            ;;
+        --keep)
+            KEEP=true
+            shift
+            ;;
         --keep-on-failure)
             KEEP_ON_FAILURE=true
             shift
@@ -230,11 +263,50 @@ else
     exit 1
 fi
 
+# Verify CLI functionality with real commands
+log "Verifying CLI functionality..."
+
+log "Creating test commission..."
+if run_ssh "orc commission create 'Bootstrap Test'"; then
+    log "✓ Commission created"
+else
+    error "Failed to create commission"
+    exit 1
+fi
+
+log "Creating test workshop..."
+if run_ssh "orc workshop create 'Test Workshop' --factory FACT-001"; then
+    log "✓ Workshop created"
+else
+    error "Failed to create workshop"
+    exit 1
+fi
+
+log "Running orc summary..."
+if run_ssh "orc summary"; then
+    log "✓ Summary works"
+else
+    error "Failed to run summary"
+    exit 1
+fi
+
 # Final timing
 ELAPSED=$(($(date +%s) - START_TIME))
 log ""
 log "=========================================="
 log "✓ Bootstrap test PASSED in ${ELAPSED}s"
 log "=========================================="
+
+# Print VM info if keeping
+if [[ "$KEEP" == "true" ]]; then
+    print_vm_info
+fi
+
+# Drop into shell if requested
+if [[ "$SHELL_MODE" == "true" ]]; then
+    log ""
+    log "Dropping into VM shell..."
+    exec sshpass -p "$VM_PASS" ssh $SSH_OPTS "$VM_USER@$VM_IP"
+fi
 
 exit 0

@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `--shell` flag for bootstrap-test: drops into interactive VM shell after bootstrap (`make bootstrap-shell`)
+- `--keep` flag for bootstrap-test: preserves VM for manual exploration
 - Bootstrap VM testing with Tart: `make bootstrap-test` spins up fresh macOS VM to validate first-run experience
 - `/bootstrap-test` skill for running VM-based bootstrap validation
 - `/release` skill now runs `/bootstrap-test` after docs-doctor (hard blocker)
@@ -25,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Bootstrap test now validates CLI functionality (creates commission, workshop, runs summary)
 - `/orc-first-run` skill rewritten for adaptive onboarding - checks existing state, creates missing entities, guides repo/template setup
 - Makefile bootstrap target now points to `orc bootstrap` instead of `/orc-first-run`
 - Simplified `docs/shipment-lifecycle.md` to two phases: Planning and Implementation
