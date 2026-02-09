@@ -38,6 +38,10 @@ Example:
 	cmd.AddCommand(hookStopCmd())
 	cmd.AddCommand(hookUserPromptSubmitCmd())
 
+	// Add event viewing commands
+	cmd.AddCommand(hookTailCmd())
+	cmd.AddCommand(hookShowCmd())
+
 	return cmd
 }
 
@@ -304,4 +308,211 @@ func runHookUserPromptSubmit() error {
 	eventReq.Reason = "user prompt logged"
 
 	return nil
+}
+
+// hookTailCmd shows recent hook events
+func hookTailCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "tail",
+		Short: "Show recent hook events",
+		Long:  "Show recent hook invocation events (default 50)",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runHookTail(cmd)
+		},
+	}
+
+	cmd.Flags().IntP("limit", "n", 50, "Number of events to show")
+	cmd.Flags().StringP("workbench", "w", "", "Filter by workbench ID (auto-detects from cwd)")
+	cmd.Flags().StringP("type", "t", "", "Filter by hook type (Stop, UserPromptSubmit)")
+	cmd.Flags().BoolP("follow", "f", false, "Follow mode: poll for new events")
+
+	return cmd
+}
+
+func runHookTail(cmd *cobra.Command) error {
+	ctx := NewContext()
+
+	limit, _ := cmd.Flags().GetInt("limit")
+	workbenchID, _ := cmd.Flags().GetString("workbench")
+	hookType, _ := cmd.Flags().GetString("type")
+	follow, _ := cmd.Flags().GetBool("follow")
+
+	// Auto-detect workbench from cwd if not specified
+	if workbenchID == "" {
+		cwd, _ := os.Getwd()
+		cfg, err := config.LoadConfig(cwd)
+		if err == nil && config.IsWorkbench(cfg.PlaceID) {
+			workbenchID = cfg.PlaceID
+		}
+	}
+
+	filters := primary.HookEventFilters{
+		WorkbenchID: workbenchID,
+		HookType:    hookType,
+		Limit:       limit,
+	}
+
+	// Initial fetch
+	events, err := wire.HookEventService().ListHookEvents(ctx, filters)
+	if err != nil {
+		return fmt.Errorf("failed to fetch hook events: %w", err)
+	}
+
+	printHookEvents(events)
+
+	// If --follow, poll for new events
+	if follow {
+		var lastTimestamp string
+		if len(events) > 0 {
+			lastTimestamp = events[0].Timestamp
+		}
+
+		for {
+			time.Sleep(1 * time.Second)
+
+			newEvents, err := wire.HookEventService().ListHookEvents(ctx, filters)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error fetching events: %v\n", err)
+				continue
+			}
+
+			// Print only events newer than lastTimestamp
+			for i := len(newEvents) - 1; i >= 0; i-- {
+				event := newEvents[i]
+				if lastTimestamp == "" || event.Timestamp > lastTimestamp {
+					printHookEvent(event)
+					if event.Timestamp > lastTimestamp {
+						lastTimestamp = event.Timestamp
+					}
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+// hookShowCmd shows full details for a single hook event
+func hookShowCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "show <event-id>",
+		Short: "Show hook event details",
+		Long:  "Show full details for a specific hook event including payload JSON",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runHookShow(args[0])
+		},
+	}
+}
+
+func runHookShow(eventID string) error {
+	ctx := NewContext()
+
+	event, err := wire.HookEventService().GetHookEvent(ctx, eventID)
+	if err != nil {
+		return fmt.Errorf("failed to get hook event: %w", err)
+	}
+
+	fmt.Printf("Hook Event: %s\n", event.ID)
+	fmt.Printf("Type: %s\n", event.HookType)
+	fmt.Printf("Timestamp: %s\n", formatHookTimestamp(event.Timestamp))
+	fmt.Printf("Decision: %s\n", formatDecision(event.Decision))
+	if event.Reason != "" {
+		fmt.Printf("Reason: %s\n", event.Reason)
+	}
+	fmt.Println()
+
+	fmt.Println("Context:")
+	if event.WorkbenchID != "" {
+		fmt.Printf("  Workbench: %s\n", event.WorkbenchID)
+	}
+	if event.ShipmentID != "" {
+		fmt.Printf("  Shipment: %s (%s)\n", event.ShipmentID, event.ShipmentStatus)
+	}
+	if event.TaskCountIncomplete >= 0 {
+		fmt.Printf("  Incomplete Tasks: %d\n", event.TaskCountIncomplete)
+	}
+	if event.SessionID != "" {
+		fmt.Printf("  Session: %s\n", event.SessionID)
+	}
+	if event.Cwd != "" {
+		fmt.Printf("  Cwd: %s\n", event.Cwd)
+	}
+	if event.DurationMs >= 0 {
+		fmt.Printf("  Duration: %dms\n", event.DurationMs)
+	}
+	if event.Error != "" {
+		fmt.Printf("  Error: %s\n", event.Error)
+	}
+
+	if event.PayloadJSON != "" {
+		fmt.Println()
+		fmt.Println("Payload JSON:")
+		// Pretty print JSON
+		var prettyJSON map[string]interface{}
+		if err := json.Unmarshal([]byte(event.PayloadJSON), &prettyJSON); err == nil {
+			formatted, _ := json.MarshalIndent(prettyJSON, "  ", "  ")
+			fmt.Printf("  %s\n", formatted)
+		} else {
+			fmt.Printf("  %s\n", event.PayloadJSON)
+		}
+	}
+
+	return nil
+}
+
+func printHookEvents(events []*primary.HookEvent) {
+	if len(events) == 0 {
+		fmt.Println("No hook events found.")
+		return
+	}
+
+	fmt.Printf("Found %d hook events:\n\n", len(events))
+
+	// Print in reverse order (oldest first) for tail view
+	for i := len(events) - 1; i >= 0; i-- {
+		printHookEvent(events[i])
+	}
+}
+
+func printHookEvent(event *primary.HookEvent) {
+	// Format: timestamp | BENCH | hook_type | SHIP-xxx (status) | DECISION | reason
+	shipmentInfo := "-"
+	if event.ShipmentID != "" {
+		shipmentInfo = fmt.Sprintf("%s (%s)", event.ShipmentID, event.ShipmentStatus)
+	}
+
+	workbenchInfo := event.WorkbenchID
+	if workbenchInfo == "" {
+		workbenchInfo = "-"
+	}
+
+	reason := event.Reason
+	if len(reason) > 40 {
+		reason = reason[:40] + "..."
+	}
+
+	fmt.Printf("%s | %-10s | %-16s | %-26s | %-5s | %s\n",
+		formatHookTimestamp(event.Timestamp),
+		workbenchInfo,
+		event.HookType,
+		shipmentInfo,
+		strings.ToUpper(event.Decision),
+		reason,
+	)
+}
+
+func formatHookTimestamp(ts string) string {
+	t, err := time.Parse(time.RFC3339, ts)
+	if err != nil {
+		return ts
+	}
+	return t.Format("2006-01-02 15:04:05")
+}
+
+func formatDecision(decision string) string {
+	if decision == "block" {
+		return "BLOCK"
+	}
+	return "allow"
 }
