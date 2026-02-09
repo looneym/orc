@@ -10,6 +10,17 @@
       ]
     }
   ],
+  "SubagentStop": [
+    {
+      "hooks": [
+        {
+          "type": "command",
+          "command": "orc hook SubagentStop",
+          "timeout": 10000
+        }
+      ]
+    }
+  ],
   "UserPromptSubmit": [
     {
       "hooks": [
