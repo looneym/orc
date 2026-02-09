@@ -124,6 +124,18 @@ fi
 
 log "✓ Dependencies OK"
 
+# Clean up any orphan test VMs from previous runs
+ORPHANS=$(tart list 2>/dev/null | grep "orc-bootstrap-test-" | awk '{print $2}' || true)
+if [[ -n "$ORPHANS" ]]; then
+    log "Cleaning up orphan test VMs..."
+    for vm in $ORPHANS; do
+        log_verbose "  Stopping $vm"
+        tart stop "$vm" 2>/dev/null || true
+        tart delete "$vm" 2>/dev/null || true
+    done
+    log "✓ Orphans cleaned up"
+fi
+
 # Pull base image if needed
 if ! tart list 2>/dev/null | grep -q "tahoe-base"; then
     log "Pulling base image (this may take a while)..."

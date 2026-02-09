@@ -195,14 +195,20 @@ bootstrap:
 		$(MAKE) install; \
 		$(MAKE) deploy-glue; \
 		echo ""; \
+		ORC_BIN="$$(go env GOPATH)/bin/orc"; \
 		echo "Creating default factory..."; \
-		orc factory create Default; \
+		"$$ORC_BIN" factory create Default; \
 		echo ""; \
 		echo "Running health check..."; \
-		orc doctor || true; \
+		"$$ORC_BIN" doctor || true; \
 		echo ""; \
 		echo "✓ ORC bootstrapped successfully!"; \
 		echo ""; \
+		if ! echo "$$PATH" | grep -q "$$(go env GOPATH)/bin"; then \
+			echo "NOTE: Add Go bin to your PATH:"; \
+			echo "  export PATH=\"\$$PATH:$$(go env GOPATH)/bin\""; \
+			echo ""; \
+		fi; \
 		echo "Next step: Run 'orc bootstrap' to start the first-run experience"; \
 	fi
 
@@ -232,6 +238,7 @@ clean:
 # Deploy skills and hooks to Claude Code
 deploy-glue:
 	@echo "Deploying Claude Code skills..."
+	@mkdir -p ~/.claude/skills ~/.claude/hooks
 	@for dir in glue/skills/*/; do \
 		name=$$(basename "$$dir"); \
 		echo "  → $$name"; \
