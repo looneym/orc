@@ -333,7 +333,7 @@ func initServices() {
 	escalationService = app.NewEscalationService(escalationRepo)
 
 	// Create infra service for infrastructure planning
-	infraService = app.NewInfraService(factoryRepo, workshopRepo, workbenchRepo, repoRepo, gatehouseRepo, workspaceAdapter, tmuxAdapter, executor)
+	infraService = app.NewInfraService(factoryRepo, workshopRepo, workbenchRepo, repoRepo, gatehouseRepo, kennelRepo, workspaceAdapter, tmuxAdapter, executor)
 
 	// Create log service for activity logs (workshopLogRepo created early for LogWriter)
 	logService = app.NewLogService(workshopLogRepo)

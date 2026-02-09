@@ -53,6 +53,8 @@ type TMuxWindowInput struct {
 	Panes         []TMuxPaneInput // Pane state (if window exists)
 	ActualAgent   string          // Current @orc_agent value (empty if not set)
 	ExpectedAgent string          // Expected agent (e.g., "IMP-name@BENCH-xxx" or "GOBLIN@GATE-xxx")
+	HasWatchdog   bool            // True if workbench has active kennel (expects pane 4)
+	WorkbenchID   string          // Workbench ID for watchdog target
 }
 
 // TMuxPaneInput contains pre-fetched data for a tmux pane.
@@ -118,6 +120,8 @@ type TMuxWindowOp struct {
 	AgentOK       bool         // @orc_agent matches expected
 	ActualAgent   string       // Current @orc_agent value
 	ExpectedAgent string       // Expected agent (e.g., "IMP-name@BENCH-xxx")
+	HasWatchdog   bool         // True if workbench has active kennel (expects pane 4)
+	WorkbenchID   string       // Workbench ID for watchdog target
 }
 
 // TMuxPaneOp describes tmux pane verification state.
@@ -217,6 +221,8 @@ func buildTMuxSessionOp(input PlanInput) *TMuxSessionOp {
 			ActualAgent:   expected.ActualAgent,
 			ExpectedAgent: expected.ExpectedAgent,
 			AgentOK:       expected.ActualAgent == expected.ExpectedAgent,
+			HasWatchdog:   expected.HasWatchdog,
+			WorkbenchID:   expected.WorkbenchID,
 		}
 
 		// Add pane verification if window exists and has pane data
