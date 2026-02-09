@@ -1,3 +1,7 @@
+-- ORC Database Schema
+-- This file defines the SQLite schema for the ORC orchestration system.
+-- Use Atlas for migrations: see CLAUDE.md for workflow.
+
 -- Tags (generic tagging system)
 CREATE TABLE IF NOT EXISTS tags (
 	id TEXT PRIMARY KEY,
