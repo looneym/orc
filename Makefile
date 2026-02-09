@@ -1,4 +1,4 @@
-.PHONY: install install-orc install-dev-shim dev build test lint lint-fix schema-check check-test-presence check-coverage check-skills init install-hooks clean help deploy-glue schema-diff schema-apply schema-inspect setup-workbench schema-diff-workbench schema-apply-workbench bootstrap
+.PHONY: install install-orc install-dev-shim dev build test lint lint-fix schema-check check-test-presence check-coverage check-skills init install-hooks clean help deploy-glue schema-diff schema-apply schema-inspect setup-workbench schema-diff-workbench schema-apply-workbench bootstrap bootstrap-test
 
 # Go binary location (handles empty GOBIN)
 GOBIN := $(shell go env GOPATH)/bin
@@ -226,6 +226,10 @@ bootstrap:
 		echo "Next step: Run 'orc bootstrap' to start the first-run experience"; \
 	fi
 
+# Test bootstrap in a fresh macOS VM (requires tart)
+bootstrap-test:
+	@./scripts/bootstrap-test.sh
+
 # Setup workbench-local development database
 setup-workbench:
 	@echo "Creating workbench-local database..."
@@ -299,7 +303,8 @@ help:
 	@echo "ORC Makefile Commands:"
 	@echo ""
 	@echo "Getting Started:"
-	@echo "  make bootstrap     First-time setup (new users start here)"
+	@echo "  make bootstrap       First-time setup (new users start here)"
+	@echo "  make bootstrap-test  Test bootstrap in fresh macOS VM (requires tart)"
 	@echo ""
 	@echo "Development:"
 	@echo "  make dev           Build local ./orc for development"
