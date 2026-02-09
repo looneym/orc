@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Bootstrap test now creates `~/.claude/settings.json` stub before `make bootstrap` to prevent jq merge failures on fresh VMs
+
 ### Added
 
 - `Brewfile` and `Brewfile.dev` for Homebrew dependency management

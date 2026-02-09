@@ -247,6 +247,10 @@ run_ssh "mkdir -p ~/src/orc && rsync -a --exclude .git /Volumes/My\ Shared\ File
 }
 log "✓ Repo copied to ~/src/orc"
 
+log "Creating Claude settings.json stub..."
+sshpass -p "$VM_PASS" ssh $SSH_OPTS "$VM_USER@$VM_IP" 'mkdir -p ~/.claude && echo '"'"'{"hooks": {}}'"'"' > ~/.claude/settings.json'
+log "✓ Claude settings.json created"
+
 log "Running 'make bootstrap'..."
 if run_ssh "cd ~/src/orc && make bootstrap"; then
     log "✓ make bootstrap PASSED"
