@@ -123,6 +123,7 @@ Skills specific to this repository (not deployed globally):
 
 | Skill | Description |
 |-------|-------------|
+| bootstrap-test | Test make bootstrap in a fresh macOS VM using Tart |
 | docs-doctor | Validate ORC documentation against code reality |
 
 ### Database (internal/db/, schema/)
