@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Bootstrap test now creates `~/.claude/settings.json` stub before `make bootstrap` to prevent jq merge failures on fresh VMs
+- `/bootstrap-exercise` skill cleanup instructions now use archive + infra apply pattern instead of deprecated delete commands
 
 ### Added
 

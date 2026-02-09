@@ -90,7 +90,7 @@ orc repo show REPO-001
 
 ### 4. Cleanup
 
-Clean up test entities in reverse order:
+Clean up test entities using the archive + infra apply pattern:
 
 ```bash
 # Get IDs from the verification step, then:
@@ -101,19 +101,14 @@ orc workbench archive BENCH-xxx
 # Archive workshop
 orc workshop archive WORK-xxx
 
-# Apply infrastructure to clean up filesystem/tmux
+# Apply infrastructure to clean up filesystem/tmux (removes worktrees and tmux windows)
 orc infra apply WORK-xxx --yes
 
-# Delete entities
-orc workbench delete BENCH-xxx --force
-orc workshop delete WORK-xxx --force
-
-# Delete test commission
-orc commission delete COMM-xxx --force
-
-# Delete test factory
-orc factory delete FACT-xxx --force
+# Archive the test commission
+orc commission archive COMM-xxx
 ```
+
+**Note:** ORC uses soft-delete (archive) rather than hard-delete for most entities. Archived entities are inert and hidden from normal listings. The factory cannot be deleted while it has workshops, but archiving the workshop makes it inactive. This is by design - it preserves audit history.
 
 ### 5. Report Results
 
@@ -128,7 +123,7 @@ Bootstrap Exercise Results
 [PASS] Workshop created with correct factory
 [PASS] Workbench created
 [PASS] REPO-001 still exists
-[PASS] Cleanup successful
+[PASS] Cleanup successful (entities archived, infrastructure removed)
 
 All tests passed! The first-run flow is working correctly.
 ```
@@ -137,9 +132,9 @@ All tests passed! The first-run flow is working correctly.
 
 If any step fails:
 1. Report which step failed and the error
-2. Attempt cleanup of any created resources
-3. Suggest running `orc doctor` for diagnostics
-4. Note that manual cleanup may be needed for orphaned entities
+2. Attempt cleanup by archiving any created resources (archive is always safe)
+3. Run `orc infra apply WORK-xxx --yes` to clean up filesystem/tmux
+4. Suggest running `orc doctor` for diagnostics
 
 ## Notes
 
