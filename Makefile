@@ -252,6 +252,9 @@ bootstrap:
 		echo "Creating default factory..."; \
 		orc factory create default; \
 		echo ""; \
+		echo "Registering ORC repository..."; \
+		orc repo create orc --local-path ~/src/orc --default-branch main; \
+		echo ""; \
 		echo "Running health check..."; \
 		orc doctor || true; \
 		echo ""; \
