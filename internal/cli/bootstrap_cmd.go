@@ -25,8 +25,9 @@ It launches Claude with a directive to run the first-run skill, which will:
   5. End with the tmux connect command
 
 Usage:
-  orc bootstrap              # Start first-run experience
-  orc bootstrap --dry-run    # Show what would be executed
+  orc bootstrap                        # Start first-run experience
+  orc bootstrap --dry-run              # Show what would be executed
+  orc bootstrap --factory FACT-xxx     # Use dedicated factory for testing
 
 The skill is adaptive - if you've already set up ORC, it will tour your
 existing setup rather than creating duplicates.`,
@@ -34,16 +35,21 @@ existing setup rather than creating duplicates.`,
 	}
 
 	cmd.Flags().Bool("dry-run", false, "Show command that would be executed without running it")
+	cmd.Flags().String("factory", "", "Factory ID for workshops (uses 'default' if not specified)")
 
 	return cmd
 }
 
 func runBootstrap(cmd *cobra.Command, args []string) error {
 	dryRun, _ := cmd.Flags().GetBool("dry-run")
+	factory, _ := cmd.Flags().GetString("factory")
 	cwd, _ := os.Getwd()
 
 	// The bootstrap directive: Claude must run /orc-first-run immediately
 	bootstrapDirective := "Run the /orc-first-run skill IMMEDIATELY. This is a first-time ORC setup - follow the skill's guidance to configure the environment. Do not greet the user first - just start the skill."
+	if factory != "" {
+		bootstrapDirective = fmt.Sprintf("Use factory %s (instead of 'default') when creating workshops. %s", factory, bootstrapDirective)
+	}
 
 	// Build claude command
 	claudeArgs := []string{bootstrapDirective}
