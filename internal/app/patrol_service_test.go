@@ -182,6 +182,126 @@ func (m *mockWorkbenchRepoForPatrol) GetByFocusedID(ctx context.Context, focused
 	return nil, nil
 }
 
+// mockTMuxAdapterForPatrol implements secondary.TMuxAdapter for testing.
+type mockTMuxAdapterForPatrol struct {
+	sessionsByWorkshop map[string]string
+}
+
+func newMockTMuxAdapterForPatrol() *mockTMuxAdapterForPatrol {
+	return &mockTMuxAdapterForPatrol{
+		sessionsByWorkshop: make(map[string]string),
+	}
+}
+
+func (m *mockTMuxAdapterForPatrol) FindSessionByWorkshopID(ctx context.Context, workshopID string) string {
+	if session, ok := m.sessionsByWorkshop[workshopID]; ok {
+		return session
+	}
+	return ""
+}
+
+// Stub methods to satisfy interface
+func (m *mockTMuxAdapterForPatrol) CreateSession(ctx context.Context, name, workingDir string) error {
+	return nil
+}
+func (m *mockTMuxAdapterForPatrol) SessionExists(ctx context.Context, name string) bool { return false }
+func (m *mockTMuxAdapterForPatrol) KillSession(ctx context.Context, name string) error  { return nil }
+func (m *mockTMuxAdapterForPatrol) GetSessionInfo(ctx context.Context, name string) (string, error) {
+	return "", nil
+}
+func (m *mockTMuxAdapterForPatrol) CreateOrcWindow(ctx context.Context, sessionName string, workingDir string) error {
+	return nil
+}
+func (m *mockTMuxAdapterForPatrol) CreateWorkbenchWindow(ctx context.Context, sessionName string, windowIndex int, windowName string, workingDir string) error {
+	return nil
+}
+func (m *mockTMuxAdapterForPatrol) CreateWorkbenchWindowShell(ctx context.Context, sessionName string, windowIndex int, windowName string, workingDir string) error {
+	return nil
+}
+func (m *mockTMuxAdapterForPatrol) WindowExists(ctx context.Context, sessionName string, windowName string) bool {
+	return false
+}
+func (m *mockTMuxAdapterForPatrol) KillWindow(ctx context.Context, sessionName string, windowName string) error {
+	return nil
+}
+func (m *mockTMuxAdapterForPatrol) SendKeys(ctx context.Context, target, keys string) error {
+	return nil
+}
+func (m *mockTMuxAdapterForPatrol) GetPaneCount(ctx context.Context, sessionName, windowName string) int {
+	return 0
+}
+func (m *mockTMuxAdapterForPatrol) GetPaneCommand(ctx context.Context, sessionName, windowName string, paneNum int) string {
+	return ""
+}
+func (m *mockTMuxAdapterForPatrol) GetPaneStartPath(ctx context.Context, sessionName, windowName string, paneNum int) string {
+	return ""
+}
+func (m *mockTMuxAdapterForPatrol) GetPaneStartCommand(ctx context.Context, sessionName, windowName string, paneNum int) string {
+	return ""
+}
+func (m *mockTMuxAdapterForPatrol) CapturePaneContent(ctx context.Context, target string, lines int) (string, error) {
+	return "", nil
+}
+func (m *mockTMuxAdapterForPatrol) SplitVertical(ctx context.Context, target, workingDir string) error {
+	return nil
+}
+func (m *mockTMuxAdapterForPatrol) SplitHorizontal(ctx context.Context, target, workingDir string) error {
+	return nil
+}
+func (m *mockTMuxAdapterForPatrol) JoinPane(ctx context.Context, source, target string, vertical bool, size int) error {
+	return nil
+}
+func (m *mockTMuxAdapterForPatrol) NudgeSession(ctx context.Context, target, message string) error {
+	return nil
+}
+func (m *mockTMuxAdapterForPatrol) AttachInstructions(sessionName string) string { return "" }
+func (m *mockTMuxAdapterForPatrol) SelectWindow(ctx context.Context, sessionName string, index int) error {
+	return nil
+}
+func (m *mockTMuxAdapterForPatrol) RenameWindow(ctx context.Context, target, newName string) error {
+	return nil
+}
+func (m *mockTMuxAdapterForPatrol) RespawnPane(ctx context.Context, target string, command ...string) error {
+	return nil
+}
+func (m *mockTMuxAdapterForPatrol) RenameSession(ctx context.Context, session, newName string) error {
+	return nil
+}
+func (m *mockTMuxAdapterForPatrol) ConfigureStatusBar(ctx context.Context, session string, config secondary.StatusBarConfig) error {
+	return nil
+}
+func (m *mockTMuxAdapterForPatrol) DisplayPopup(ctx context.Context, session, command string, config secondary.PopupConfig) error {
+	return nil
+}
+func (m *mockTMuxAdapterForPatrol) ConfigureSessionBindings(ctx context.Context, session string, bindings []secondary.KeyBinding) error {
+	return nil
+}
+func (m *mockTMuxAdapterForPatrol) ConfigureSessionPopupBindings(ctx context.Context, session string, bindings []secondary.PopupKeyBinding) error {
+	return nil
+}
+func (m *mockTMuxAdapterForPatrol) GetCurrentSessionName(ctx context.Context) string { return "" }
+func (m *mockTMuxAdapterForPatrol) SetEnvironment(ctx context.Context, sessionName, key, value string) error {
+	return nil
+}
+func (m *mockTMuxAdapterForPatrol) GetEnvironment(ctx context.Context, sessionName, key string) (string, error) {
+	return "", nil
+}
+func (m *mockTMuxAdapterForPatrol) ListSessions(ctx context.Context) ([]string, error) {
+	return nil, nil
+}
+func (m *mockTMuxAdapterForPatrol) ListWindows(ctx context.Context, sessionName string) ([]string, error) {
+	return nil, nil
+}
+func (m *mockTMuxAdapterForPatrol) GetWindowOption(ctx context.Context, target, option string) string {
+	return ""
+}
+func (m *mockTMuxAdapterForPatrol) SetWindowOption(ctx context.Context, target, option, value string) error {
+	return nil
+}
+func (m *mockTMuxAdapterForPatrol) SetupGoblinPane(ctx context.Context, sessionName, windowName string) error {
+	return nil
+}
+
 // mockKennelRepoForPatrol implements secondary.KennelRepository for testing.
 type mockKennelRepoForPatrol struct {
 	kennels            map[string]*secondary.KennelRecord
@@ -242,28 +362,32 @@ func (m *mockKennelRepoForPatrol) WorkbenchHasKennel(ctx context.Context, workbe
 	return has, nil
 }
 
-func newTestPatrolService() (*PatrolServiceImpl, *mockPatrolRepository, *mockKennelRepoForPatrol, *mockWorkbenchRepoForPatrol) {
+func newTestPatrolService() (*PatrolServiceImpl, *mockPatrolRepository, *mockKennelRepoForPatrol, *mockWorkbenchRepoForPatrol, *mockTMuxAdapterForPatrol) {
 	patrolRepo := newMockPatrolRepository()
 	kennelRepo := newMockKennelRepoForPatrol()
 	workbenchRepo := newMockWorkbenchRepoForPatrol()
-	service := NewPatrolService(patrolRepo, kennelRepo, workbenchRepo)
-	return service, patrolRepo, kennelRepo, workbenchRepo
+	tmuxAdapter := newMockTMuxAdapterForPatrol()
+	service := NewPatrolService(patrolRepo, kennelRepo, workbenchRepo, tmuxAdapter)
+	return service, patrolRepo, kennelRepo, workbenchRepo, tmuxAdapter
 }
 
 func TestPatrolService_StartPatrol(t *testing.T) {
-	service, patrolRepo, kennelRepo, workbenchRepo := newTestPatrolService()
+	service, patrolRepo, kennelRepo, workbenchRepo, tmuxAdapter := newTestPatrolService()
 	ctx := context.Background()
 
 	// Setup: workbench and kennel exist
 	workbenchRepo.workbenches["BENCH-001"] = &secondary.WorkbenchRecord{
-		ID:   "BENCH-001",
-		Name: "test-bench",
+		ID:         "BENCH-001",
+		Name:       "test-bench",
+		WorkshopID: "WORK-001",
 	}
 	kennelRepo.kennels["KENNEL-001"] = &secondary.KennelRecord{
 		ID:          "KENNEL-001",
 		WorkbenchID: "BENCH-001",
 	}
 	kennelRepo.kennelsByWorkbench["BENCH-001"] = kennelRepo.kennels["KENNEL-001"]
+	// Setup tmux session mapping
+	tmuxAdapter.sessionsByWorkshop["WORK-001"] = "test-session"
 
 	patrol, err := service.StartPatrol(ctx, "BENCH-001")
 	if err != nil {
@@ -276,8 +400,9 @@ func TestPatrolService_StartPatrol(t *testing.T) {
 	if patrol.KennelID != "KENNEL-001" {
 		t.Errorf("expected KennelID 'KENNEL-001', got %q", patrol.KennelID)
 	}
-	if patrol.Target != "orc:test-bench.0" {
-		t.Errorf("expected Target 'orc:test-bench.0', got %q", patrol.Target)
+	// Target format: session:window.2 (pane 2 is IMP)
+	if patrol.Target != "test-session:test-bench.2" {
+		t.Errorf("expected Target 'test-session:test-bench.2', got %q", patrol.Target)
 	}
 	if patrol.Status != primary.PatrolStatusActive {
 		t.Errorf("expected status 'active', got %q", patrol.Status)
@@ -290,7 +415,7 @@ func TestPatrolService_StartPatrol(t *testing.T) {
 }
 
 func TestPatrolService_StartPatrol_WorkbenchNotFound(t *testing.T) {
-	service, _, _, _ := newTestPatrolService()
+	service, _, _, _, _ := newTestPatrolService()
 	ctx := context.Background()
 
 	_, err := service.StartPatrol(ctx, "BENCH-999")
@@ -300,7 +425,7 @@ func TestPatrolService_StartPatrol_WorkbenchNotFound(t *testing.T) {
 }
 
 func TestPatrolService_StartPatrol_NoKennel(t *testing.T) {
-	service, _, _, workbenchRepo := newTestPatrolService()
+	service, _, _, workbenchRepo, _ := newTestPatrolService()
 	ctx := context.Background()
 
 	// Setup: workbench exists but no kennel
@@ -316,7 +441,7 @@ func TestPatrolService_StartPatrol_NoKennel(t *testing.T) {
 }
 
 func TestPatrolService_StartPatrol_AlreadyActive(t *testing.T) {
-	service, patrolRepo, kennelRepo, workbenchRepo := newTestPatrolService()
+	service, patrolRepo, kennelRepo, workbenchRepo, _ := newTestPatrolService()
 	ctx := context.Background()
 
 	// Setup: workbench and kennel exist, with active patrol
@@ -345,7 +470,7 @@ func TestPatrolService_StartPatrol_AlreadyActive(t *testing.T) {
 }
 
 func TestPatrolService_EndPatrol(t *testing.T) {
-	service, patrolRepo, _, _ := newTestPatrolService()
+	service, patrolRepo, _, _, _ := newTestPatrolService()
 	ctx := context.Background()
 
 	// Setup: active patrol
@@ -367,7 +492,7 @@ func TestPatrolService_EndPatrol(t *testing.T) {
 }
 
 func TestPatrolService_EndPatrol_NotFound(t *testing.T) {
-	service, _, _, _ := newTestPatrolService()
+	service, _, _, _, _ := newTestPatrolService()
 	ctx := context.Background()
 
 	err := service.EndPatrol(ctx, "PATROL-999")
@@ -377,7 +502,7 @@ func TestPatrolService_EndPatrol_NotFound(t *testing.T) {
 }
 
 func TestPatrolService_EndPatrol_NotActive(t *testing.T) {
-	service, patrolRepo, _, _ := newTestPatrolService()
+	service, patrolRepo, _, _, _ := newTestPatrolService()
 	ctx := context.Background()
 
 	// Setup: already completed patrol
@@ -394,13 +519,13 @@ func TestPatrolService_EndPatrol_NotActive(t *testing.T) {
 }
 
 func TestPatrolService_GetPatrol(t *testing.T) {
-	service, patrolRepo, _, _ := newTestPatrolService()
+	service, patrolRepo, _, _, _ := newTestPatrolService()
 	ctx := context.Background()
 
 	patrolRepo.patrols["PATROL-001"] = &secondary.PatrolRecord{
 		ID:       "PATROL-001",
 		KennelID: "KENNEL-001",
-		Target:   "orc:test.0",
+		Target:   "test-session:test.2",
 		Status:   "active",
 	}
 
@@ -409,13 +534,13 @@ func TestPatrolService_GetPatrol(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if patrol.Target != "orc:test.0" {
-		t.Errorf("expected Target 'orc:test.0', got %q", patrol.Target)
+	if patrol.Target != "test-session:test.2" {
+		t.Errorf("expected Target 'test-session:test.2', got %q", patrol.Target)
 	}
 }
 
 func TestPatrolService_ListPatrols(t *testing.T) {
-	service, patrolRepo, _, _ := newTestPatrolService()
+	service, patrolRepo, _, _, _ := newTestPatrolService()
 	ctx := context.Background()
 
 	patrolRepo.patrols["PATROL-001"] = &secondary.PatrolRecord{ID: "PATROL-001", KennelID: "KENNEL-001", Status: "active"}
@@ -432,7 +557,7 @@ func TestPatrolService_ListPatrols(t *testing.T) {
 }
 
 func TestPatrolService_ListPatrols_FilterByStatus(t *testing.T) {
-	service, patrolRepo, _, _ := newTestPatrolService()
+	service, patrolRepo, _, _, _ := newTestPatrolService()
 	ctx := context.Background()
 
 	patrolRepo.patrols["PATROL-001"] = &secondary.PatrolRecord{ID: "PATROL-001", KennelID: "KENNEL-001", Status: "active"}
@@ -452,7 +577,7 @@ func TestPatrolService_ListPatrols_FilterByStatus(t *testing.T) {
 }
 
 func TestPatrolService_GetActivePatrolForKennel(t *testing.T) {
-	service, patrolRepo, _, _ := newTestPatrolService()
+	service, patrolRepo, _, _, _ := newTestPatrolService()
 	ctx := context.Background()
 
 	patrolRepo.patrols["PATROL-001"] = &secondary.PatrolRecord{
@@ -473,7 +598,7 @@ func TestPatrolService_GetActivePatrolForKennel(t *testing.T) {
 }
 
 func TestPatrolService_GetActivePatrolForKennel_NoActive(t *testing.T) {
-	service, _, _, _ := newTestPatrolService()
+	service, _, _, _, _ := newTestPatrolService()
 	ctx := context.Background()
 
 	patrol, err := service.GetActivePatrolForKennel(ctx, "KENNEL-001")

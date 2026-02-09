@@ -13,14 +13,16 @@ type PatrolServiceImpl struct {
 	patrolRepo    secondary.PatrolRepository
 	kennelRepo    secondary.KennelRepository
 	workbenchRepo secondary.WorkbenchRepository
+	tmuxAdapter   secondary.TMuxAdapter
 }
 
 // NewPatrolService creates a new PatrolService with injected dependencies.
-func NewPatrolService(patrolRepo secondary.PatrolRepository, kennelRepo secondary.KennelRepository, workbenchRepo secondary.WorkbenchRepository) *PatrolServiceImpl {
+func NewPatrolService(patrolRepo secondary.PatrolRepository, kennelRepo secondary.KennelRepository, workbenchRepo secondary.WorkbenchRepository, tmuxAdapter secondary.TMuxAdapter) *PatrolServiceImpl {
 	return &PatrolServiceImpl{
 		patrolRepo:    patrolRepo,
 		kennelRepo:    kennelRepo,
 		workbenchRepo: workbenchRepo,
+		tmuxAdapter:   tmuxAdapter,
 	}
 }
 
@@ -53,9 +55,14 @@ func (s *PatrolServiceImpl) StartPatrol(ctx context.Context, workbenchID string)
 		return nil, fmt.Errorf("failed to generate patrol ID: %w", err)
 	}
 
-	// Derive TMux target from workbench name
-	// Convention: orc:<workbench-name>.0
-	target := fmt.Sprintf("orc:%s.0", workbench.Name)
+	// Derive TMux target from workshop session and workbench window
+	// Format: "session:window.pane" where pane 2 is IMP (orc connect)
+	sessionName := s.tmuxAdapter.FindSessionByWorkshopID(ctx, workbench.WorkshopID)
+	if sessionName == "" {
+		// Fallback to workshop ID if session not found (workshop tmux session not running)
+		sessionName = workbench.WorkshopID
+	}
+	target := fmt.Sprintf("%s:%s.2", sessionName, workbench.Name)
 
 	// Create patrol record
 	record := &secondary.PatrolRecord{

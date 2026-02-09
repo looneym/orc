@@ -326,7 +326,7 @@ func initServices() {
 
 	// Create patrol service for watchdog monitoring
 	patrolRepo := sqlite.NewPatrolRepository(database)
-	patrolService = app.NewPatrolService(patrolRepo, kennelRepo, workbenchRepo)
+	patrolService = app.NewPatrolService(patrolRepo, kennelRepo, workbenchRepo, tmuxAdapter)
 
 	approvalService = app.NewApprovalService(approvalRepo)
 
