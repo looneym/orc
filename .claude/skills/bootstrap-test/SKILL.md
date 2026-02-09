@@ -13,6 +13,7 @@ Run `make bootstrap` in a clean macOS VM to verify the bootstrap experience work
 
 ```
 /bootstrap-test                   (run test, cleanup on success)
+/bootstrap-test --shell           (bootstrap then drop into VM shell)
 /bootstrap-test --keep            (keep VM for exploration after test)
 /bootstrap-test --keep-on-failure (keep VM only if test fails)
 /bootstrap-test --verbose         (show detailed progress)
@@ -55,10 +56,17 @@ If missing, show installation instructions.
 make bootstrap-test
 ```
 
+Or to bootstrap and drop into a shell:
+
+```bash
+make bootstrap-shell
+```
+
 Or with flags:
 
 ```bash
 ./scripts/bootstrap-test.sh --verbose
+./scripts/bootstrap-test.sh --shell             # Bootstrap then drop into shell
 ./scripts/bootstrap-test.sh --keep              # Keep VM for exploration
 ./scripts/bootstrap-test.sh --keep-on-failure   # Keep VM only on failure
 ```
@@ -122,3 +130,20 @@ VM kept for exploration:
 ```
 
 Use this to explore the VM state after bootstrap, debug issues, or verify the environment manually.
+
+## --shell Flag
+
+The `--shell` flag bootstraps the VM and then drops you into an interactive SSH session:
+
+```bash
+./scripts/bootstrap-test.sh --shell
+# or
+make bootstrap-shell
+```
+
+**Behavior:**
+- `--shell` implies `--keep` (VM must be manually cleaned up)
+- After bootstrap completes, the script `exec`s into SSH (script doesn't return)
+- Connection info is printed before the shell session starts
+
+This is the recommended way to explore a freshly bootstrapped environment.
