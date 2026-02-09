@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- SubagentStop hook support: `orc hook SubagentStop` complements Stop hook by catching skill/subagent completion points
 - Bootstrap VM testing with Tart: `make bootstrap-test` spins up fresh macOS VM to validate first-run experience
 - `/bootstrap-test` skill for running VM-based bootstrap validation
 - `/release` skill now runs `/bootstrap-test` after docs-doctor (hard blocker)
