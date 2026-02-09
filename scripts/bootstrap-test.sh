@@ -14,6 +14,7 @@ SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLeve
 # Flags
 KEEP=false
 KEEP_ON_FAILURE=false
+SHELL_MODE=false
 VERBOSE=false
 
 # Timing
@@ -26,6 +27,7 @@ Usage: $(basename "$0") [OPTIONS]
 Test 'make bootstrap' in a clean macOS Tart VM.
 
 Options:
+    --shell             Drop into interactive shell after bootstrap (implies --keep)
     --keep              Keep VM after test (success or failure)
     --keep-on-failure   Keep VM only on failure for debugging
     --verbose, -v       Show verbose output
@@ -37,6 +39,7 @@ Requirements:
 
 Examples:
     $(basename "$0")                    # Run bootstrap test
+    $(basename "$0") --shell            # Bootstrap then drop into VM shell
     $(basename "$0") --keep             # Keep VM for exploration
     $(basename "$0") --keep-on-failure  # Keep VM if test fails
 EOF
@@ -97,6 +100,11 @@ trap cleanup EXIT
 # Parse arguments
 while [[ $# -gt 0 ]]; do
     case $1 in
+        --shell)
+            SHELL_MODE=true
+            KEEP=true  # --shell implies --keep
+            shift
+            ;;
         --keep)
             KEEP=true
             shift
@@ -292,6 +300,13 @@ log "=========================================="
 # Print VM info if keeping
 if [[ "$KEEP" == "true" ]]; then
     print_vm_info
+fi
+
+# Drop into shell if requested
+if [[ "$SHELL_MODE" == "true" ]]; then
+    log ""
+    log "Dropping into VM shell..."
+    exec sshpass -p "$VM_PASS" ssh $SSH_OPTS "$VM_USER@$VM_IP"
 fi
 
 exit 0
