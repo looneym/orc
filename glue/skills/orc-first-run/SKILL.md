@@ -15,6 +15,9 @@ Adaptive onboarding for new ORC users. Checks what already exists, creates what'
 
 Run this via `orc bootstrap` for the complete first-run experience.
 
+When launched with `orc bootstrap --factory FACT-xxx`, the skill will create
+the workshop in the specified factory instead of 'default'.
+
 ## Philosophy
 
 This skill is **adaptive** - it checks existing state before creating anything:
@@ -69,14 +72,12 @@ orc repo list | grep -i orc
 
 **If ORC repo not found:**
 ```bash
-# Get current directory (should be ORC repo after make bootstrap)
-pwd
-orc repo create orc --local-path "$(pwd)" --default-branch main
+orc repo create orc --local-path ~/src/orc --default-branch main
 ```
 
 Explain:
 ```
-Registered the ORC repository from your current directory.
+Registered the ORC repository at ~/src/orc (the canonical installation location).
 This lets ORC create workbenches (git worktrees) for development.
 ```
 
@@ -126,6 +127,13 @@ orc workshop list
 ```
 
 **If no workshop linked to the commission:**
+
+If the directive includes a factory (e.g., "Use factory FACT-xxx"), pass it to the command:
+```bash
+orc workshop create --factory FACT-xxx
+```
+
+Otherwise use the default factory:
 ```bash
 orc workshop create
 ```
