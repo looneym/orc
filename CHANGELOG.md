@@ -45,4 +45,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `docs-doctor` glossary check no longer fails on outbound links (cross-references allowed)
+
 ### Security
