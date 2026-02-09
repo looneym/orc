@@ -20,6 +20,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Simplified `docs/shipment-lifecycle.md` to two phases: Planning and Implementation
+- Consolidated `docs/glossary/` into single `docs/glossary.md` (A-Z term list)
+- Stripped `docs/troubleshooting.md` to only `/orc-help` and `orc doctor`
+- `docs-doctor` skill now validates glossary structure (no mermaid, no outbound links)
+- Fixed `--repo` → `--repo-id` flag in `docs/getting-started.md`
 - `docs-doctor` skill moved from `glue/skills/` to `.claude/skills/` (repo-local, not globally deployed)
 - `docs-doctor` now uses subset validation for diagrams (simplified diagrams are intentional)
 - ER diagram and lifecycle diagram moved from inline to dedicated docs

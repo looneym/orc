@@ -79,7 +79,7 @@ orc commission create "My First Project"
 orc workshop create "Development" --factory FACT-001
 
 # Create a workbench (git worktree)
-orc workbench create my-workbench --workshop WORK-001 --repo <repo-path>
+orc workbench create my-workbench --workshop WORK-001 --repo-id REPO-001
 
 # Apply infrastructure
 orc infra apply WORK-001
@@ -109,4 +109,4 @@ Now that ORC is installed:
 
 1. **Learn the workflows** → [docs/common-workflows.md](common-workflows.md)
 2. **Understand the architecture** → [docs/architecture.md](architecture.md)
-3. **Review terminology** → [docs/glossary/](glossary/)
+3. **Review terminology** → [docs/glossary.md](glossary.md)

@@ -1,9 +1,9 @@
 # Shipment Lifecycle
 
 **Status**: Living document
-**Last Updated**: 2026-02-08
+**Last Updated**: 2026-02-09
 
-This document contains the complete state machine for ORC shipments.
+Shipments move through two phases: **Planning** and **Implementation**.
 
 ---
 
@@ -13,100 +13,57 @@ This document contains the complete state machine for ORC shipments.
 stateDiagram-v2
     [*] --> draft: create shipment
 
-    draft --> exploring: focus event
-    draft --> tasked: task created
+    state "Planning Phase" as planning {
+        draft --> exploring: focus
+        exploring --> tasked: /ship-plan
+    }
 
-    exploring --> tasked: task created
-    exploring --> implementing: task claimed
-
-    tasked --> implementing: task claimed
-
-    implementing --> auto_implementing: /imp-auto on
-    auto_implementing --> implementing: /imp-auto off
-
-    implementing --> paused: pause
-    auto_implementing --> paused: pause
-    paused --> implementing: resume
-    paused --> auto_implementing: resume
-
-    implementing --> deployed: /ship-deploy
-    auto_implementing --> deployed: /ship-deploy
-
-    deployed --> complete: /ship-complete
+    state "Implementation Phase" as implementation {
+        tasked --> auto_implementing: /imp-start --auto
+        auto_implementing --> deployed: /ship-deploy
+        deployed --> complete: /ship-complete
+    }
 
     complete --> [*]
 ```
 
 ---
 
-## State Descriptions
+## Planning Phase
 
-| State | Description |
-|-------|-------------|
-| `draft` | Shipment created but not started |
-| `exploring` | Active ideation/research phase |
-| `tasked` | Tasks have been created |
-| `implementing` | Manual implementation mode |
-| `auto_implementing` | Autonomous implementation mode (Stop hook blocks) |
-| `paused` | Implementation paused |
-| `deployed` | Merged to main branch |
-| `complete` | Terminal state - shipment finished |
+| State | Description | Next Step |
+|-------|-------------|-----------|
+| `draft` | Shipment created | Focus to begin exploration |
+| `exploring` | Ideation and research | `/ship-plan` to create tasks |
+| `tasked` | Tasks defined | `/imp-start --auto` to begin |
+
+**Skills used**: `/ship-new`, `/orc-ideate`, `/ship-synthesize`, `/ship-plan`
 
 ---
 
-## Transitions
+## Implementation Phase
 
-### Manual Transitions
+| State | Description | Next Step |
+|-------|-------------|-----------|
+| `auto_implementing` | IMP working autonomously | `/ship-deploy` when done |
+| `deployed` | Merged to main branch | `/ship-complete` to finish |
+| `complete` | Terminal state | — |
 
-| From | To | Trigger | Command |
-|------|-----|---------|---------|
-| implementing | auto_implementing | Enable auto mode | `/imp-auto on` |
-| auto_implementing | implementing | Disable auto mode | `/imp-auto off` |
-| implementing | paused | Pause work | `orc shipment pause` |
-| auto_implementing | paused | Pause work | `orc shipment pause` |
-| paused | implementing | Resume work | `orc shipment resume` |
-| implementing | deployed | Deploy to main | `/ship-deploy` |
-| auto_implementing | deployed | Deploy to main | `/ship-deploy` |
-| deployed | complete | Complete shipment | `/ship-complete` |
-
-### Auto-Transitions
-
-These transitions happen automatically based on events:
-
-| Event | From | To |
-|-------|------|-----|
-| Focus shipment | draft | exploring |
-| Create first task | draft, exploring | tasked |
-| Claim task | tasked, exploring | implementing |
+**Skills used**: `/imp-start`, `/imp-plan-create`, `/imp-rec`, `/ship-deploy`, `/ship-complete`
 
 ---
 
-## Operating Modes
+## Auto Mode
 
-### Manual Mode (`implementing`)
+Auto mode (`auto_implementing`) is the default implementation path:
 
-Default mode. IMP can stop at any time for human review or oversight.
-
-- Human controls the pace
-- Can pause/resume freely
-- Use for sensitive or complex work
-
-### Auto Mode (`auto_implementing`)
-
-Autonomous mode. Stop hook blocks until shipment is complete or paused.
-
-- IMP is propelled through workflow automatically
-- No plan? → `/imp-plan-create`
-- Plan exists? → Implement it, then `/imp-rec`
-- Stuck? → `/imp-escalate`
-- Task complete? → `/imp-rec` chains to next
-
-Toggle with `/imp-auto on` or `/imp-auto off`.
+- Stop hook blocks until shipment completes
+- IMP is propelled through the workflow automatically
+- Toggle off with `/imp-auto off` if manual control needed
 
 ---
 
 ## See Also
 
-- `docs/common-workflows.md` - IMP workflow documentation
-- `docs/schema.md` - Database schema
-- `internal/core/shipment/guards.go` - Guard implementations
+- [docs/schema.md](schema.md) - Database schema with all valid states
+- [internal/core/shipment/guards.go](../internal/core/shipment/guards.go) - Guard implementations

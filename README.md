@@ -49,7 +49,7 @@ ORC follows a structured workflow: exploration → synthesis → planning → im
 | **Task** | Deed to be done within a shipment |
 | **Handoff** | Context passed between sessions |
 
-→ See [docs/glossary/](docs/glossary/) for complete terminology.
+→ See [docs/glossary.md](docs/glossary.md) for complete terminology.
 
 ## The Cast
 
@@ -59,7 +59,7 @@ ORC follows a structured workflow: exploration → synthesis → planning → im
 
 **Workbenches** are git worktrees - isolated workspaces where changes happen safely.
 
-→ See [docs/glossary/forest-factory-roles.md](docs/glossary/forest-factory-roles.md) for role details.
+→ See [docs/glossary.md](docs/glossary.md) for role details.
 
 ---
 

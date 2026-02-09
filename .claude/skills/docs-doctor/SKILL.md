@@ -29,6 +29,8 @@ Validate ORC documentation against code reality using parallel subagent checks.
 ### 1. Structural Checks
 - Internal markdown links in docs/*.md are valid
 - No broken cross-references between documentation files
+- `docs/glossary.md` exists (not `glossary/` directory)
+- Glossary contains term definitions only (no mermaid diagrams, no outbound links)
 
 ### 2. Lane Checks
 - README.md contains no agent instructions (CLAUDE.md's job)
@@ -80,6 +82,26 @@ Prompt: "Check internal documentation links.
 
 Return findings as:
 - broken_links: [{file, line, target}]
+- status: 'pass' or 'fail'"
+```
+
+### Step 1b: Spawn Glossary Check Agent
+
+```
+Prompt: "Validate glossary structure.
+
+1. Check that docs/glossary.md exists
+2. Check that docs/glossary/ directory does NOT exist
+3. Read glossary.md and verify:
+   - Contains term definitions (look for **Term** pattern)
+   - No mermaid code blocks (no complex diagrams)
+   - No outbound links to other docs (self-contained definitions only)
+
+Return findings as:
+- glossary_exists: boolean
+- glossary_dir_exists: boolean (should be false)
+- has_mermaid: boolean (should be false)
+- has_outbound_links: boolean (should be false)
 - status: 'pass' or 'fail'"
 ```
 
@@ -174,6 +196,7 @@ Collect all agent results and categorize:
 Docs Doctor: All checks passed
 
 Structural: pass
+Glossary: pass
 Lanes: pass
 CLI: pass
 ER Diagram: pass
