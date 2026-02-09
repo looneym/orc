@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Bootstrap VM testing with Tart: `make bootstrap-test` spins up fresh macOS VM to validate first-run experience
+- `/bootstrap-test` skill for running VM-based bootstrap validation
+- `/release` skill now runs `/bootstrap-test` after docs-doctor (hard blocker)
+- Bootstrap VM Testing documentation in CLAUDE.md
 - `orc bootstrap` CLI command - starts Claude with `/orc-first-run` skill for first-time setup
 - `/release` skill now runs `/docs-doctor` validation before release (hard blocker)
 - Pre-commit hook enforces CHANGELOG.md changes on feature branches
