@@ -7,9 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Actor model redesign**: Goblin is now the coordinator (human's workbench pane), IMP is a disposable worker (spawned by Claude Teams)
+- Shipment lifecycle simplified to 4 statuses: draft → ready → in-progress → closed (all transitions manual)
+- Task lifecycle simplified to 4 statuses: open → in-progress → closed (blocked as lateral state)
+- `orc connect` retains `--role` flag but removes place-based autodetection
+
 ### Removed
 
+- Gatehouse entity, GATE- place IDs, and all gatehouse infrastructure (absorbed into workbench)
+- Message/mail system (replaced by Claude Teams messaging)
+- Receipt entity and all receipt CLI/service/repo/guards
+- Nudge CLI command (autorun propulsion removed)
+- Auto-transition machinery (GetAutoTransitionStatus, AutoTransitionContext, event triggers)
+- 9 shipment statuses collapsed: exploring, synthesizing, specced, planned, tasked, ready_for_imp, implementing, auto_implementing, implemented, verified, deployed
+- 2 task statuses removed: ready, paused
+- CLI commands: shipment auto/manual/ready/should-continue, shipment deploy/verify
+- Skills deleted: imp-poll, imp-start, imp-implement, imp-auto, imp-nudge, imp-respawn, imp-rec, imp-plan-create, imp-plan-submit, goblin-escalation-receive, watchdog-monitor
 - Watchdog state model removed: kennel, patrol, dogbed, stuck, check entities and all related CLI commands, skills, and documentation
+
+### Added
+
+- `orc backfill lifecycle-statuses` command for migrating existing data to new status values
+- `closed_reason` column on shipments (nullable)
 
 ### Fixed
 
