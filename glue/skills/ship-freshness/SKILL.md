@@ -19,7 +19,7 @@ Rebase the current branch against latest master and validate that tasks/notes ar
 - Returning to a shipment after time away
 - Before starting implementation on a stale branch
 - After significant changes merged to master by others
-- Reality check before /imp-start
+- Reality check before starting implementation work
 
 ## Flow
 
@@ -156,8 +156,8 @@ Ship Freshness Complete:
   Notes: A validated (B need review)
 
 Ready to proceed:
-  /imp-start     - Begin implementation
   /ship-plan     - Re-plan if needed
+  orc task list  - View tasks to work on
 ```
 
 ## Error Handling
@@ -174,4 +174,4 @@ Ready to proceed:
 - This is a reality check, not a full re-synthesis
 - Does not modify tasks/notes automatically - reports findings
 - User decides whether to update based on findings
-- Run before /imp-start on long-running shipments
+- Run before starting implementation on long-running shipments

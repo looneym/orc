@@ -1,18 +1,17 @@
 ---
 name: ship-complete
-description: Complete a shipment after verification. Use when user says /ship-complete or wants to mark a shipment as finished.
+description: Close a shipment. Use when user says /ship-complete or wants to mark a shipment as finished.
 ---
 
 # Ship Complete Skill
 
-Mark a shipment as complete (terminal state) after verification is done.
+Close a shipment (terminal state).
 
 ## Usage
 
 ```
-/ship-complete              (complete focused shipment)
-/ship-complete SHIP-xxx     (complete specific shipment)
-/ship-complete --force      (complete even from non-verified status)
+/ship-complete              (close focused shipment)
+/ship-complete SHIP-xxx     (close specific shipment)
 ```
 
 ## Status Lifecycle
@@ -20,10 +19,10 @@ Mark a shipment as complete (terminal state) after verification is done.
 This is the final step in the shipment lifecycle:
 
 ```
-implementing → implemented → deployed → verified → complete
+draft → ready → in-progress → closed
 ```
 
-Shipments should normally be in "verified" status before completing.
+Shipments should normally be in "in-progress" status before closing.
 
 ## Flow
 
@@ -34,7 +33,7 @@ If argument provided:
 
 If no argument:
 - Get focused shipment from `orc focus --show`
-- If no focus, ask which shipment to complete
+- If no focus, ask which shipment to close
 
 ### Step 2: Verify Readiness
 
@@ -43,39 +42,31 @@ orc shipment show <SHIP-xxx>
 ```
 
 Check:
-- Shipment status is "verified" (preferred) or "deployed"/"implemented" (with --force)
+- Shipment status is "in-progress" or "ready"
 - Shipment is not pinned
 
 ### Step 3: Handle Issues
 
-If status is not "verified" and no --force:
+If status is "draft":
 ```
-Cannot complete SHIP-xxx: shipment is in '<status>' status
+Cannot close SHIP-xxx: shipment is still in 'draft' status
 
-The standard lifecycle is:
-  implemented → deployed → verified → complete
-
-If you want to skip verification, use:
-  /ship-complete SHIP-xxx --force
+Move it to ready first:
+  orc shipment ready SHIP-xxx
 ```
 
 If shipment is pinned:
 ```
-Cannot complete SHIP-xxx: shipment is pinned
+Cannot close SHIP-xxx: shipment is pinned
 
 Unpin first:
   orc shipment unpin SHIP-xxx
 ```
 
-### Step 4: Complete Shipment
+### Step 4: Close Shipment
 
 ```bash
-orc shipment complete <SHIP-xxx>
-```
-
-Or with force:
-```bash
-orc shipment complete <SHIP-xxx> --force
+orc shipment close <SHIP-xxx>
 ```
 
 ### Step 5: Clear Focus
@@ -88,9 +79,9 @@ orc focus --clear
 
 Output:
 ```
-Shipment completed:
+Shipment closed:
   SHIP-xxx: <Title>
-  Status: complete (terminal)
+  Status: closed
 
 Next steps:
   orc summary              - View remaining work
@@ -106,17 +97,17 @@ User: /ship-complete
 Agent: [gets focused shipment SHIP-250]
        [runs orc shipment show SHIP-250]
 
-Agent: Completing SHIP-250: Core Model Simplification
+Agent: Closing SHIP-250: Core Model Simplification
 
-       Status: verified
-       Ready for completion.
+       Status: in-progress
+       Ready for closure.
 
-       [runs orc shipment complete SHIP-250]
+       [runs orc shipment close SHIP-250]
        [runs orc focus --clear]
 
-Agent: Shipment completed:
+Agent: Shipment closed:
          SHIP-250: Core Model Simplification
-         Status: complete (terminal)
+         Status: closed
 
        Next steps:
          orc summary - View remaining work

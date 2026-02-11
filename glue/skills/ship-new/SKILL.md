@@ -58,15 +58,13 @@ Capture the created `SHIP-xxx` ID from output.
 orc focus <SHIP-xxx>
 ```
 
-This auto-transitions status: draft → exploring
-
 ### Step 5: Confirm Ready
 
 Output:
 ```
 Shipment created and focused:
   SHIP-xxx: <Title>
-  Status: exploring
+  Status: draft
 ```
 
 ### Step 6: Enter Ideation Mode
@@ -92,7 +90,7 @@ Agent: [runs orc status, detects COMM-001]
 
 Agent: Shipment created and focused:
          SHIP-xxx: User Authentication
-         Status: exploring
+         Status: draft
 
        Now entering ideation mode...
 

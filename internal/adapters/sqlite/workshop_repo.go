@@ -315,25 +315,11 @@ func (r *WorkshopRepository) SetActiveCommissionID(ctx context.Context, workshop
 }
 
 // GetActiveCommissions returns commission IDs derived from focus:
-// - Gatehouse focused_id (resolved to commission)
 // - All workbench focused_ids in workshop (resolved to commission)
 // Returns deduplicated commission IDs.
 func (r *WorkshopRepository) GetActiveCommissions(ctx context.Context, workshopID string) ([]string, error) {
-	// Collect all focused_ids from gatehouse and workbenches
+	// Collect all focused_ids from workbenches
 	focusedIDs := make(map[string]bool)
-
-	// Get gatehouse focused_id for this workshop
-	var gatehouseFocusedID sql.NullString
-	err := r.db.QueryRowContext(ctx,
-		"SELECT focused_id FROM gatehouses WHERE workshop_id = ?",
-		workshopID,
-	).Scan(&gatehouseFocusedID)
-	if err != nil && err != sql.ErrNoRows {
-		return nil, fmt.Errorf("failed to get gatehouse focus: %w", err)
-	}
-	if gatehouseFocusedID.Valid && gatehouseFocusedID.String != "" {
-		focusedIDs[gatehouseFocusedID.String] = true
-	}
 
 	// Get all workbench focused_ids for this workshop
 	rows, err := r.db.QueryContext(ctx,

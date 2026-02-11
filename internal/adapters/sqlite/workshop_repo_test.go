@@ -433,31 +433,6 @@ func TestWorkshopRepository_GetActiveCommissions_Empty(t *testing.T) {
 	}
 }
 
-func TestWorkshopRepository_GetActiveCommissions_GoblinFocusCOMM(t *testing.T) {
-	db := setupTestDB(t)
-	repo := sqlite.NewWorkshopRepository(db)
-	ctx := context.Background()
-
-	// Seed data
-	seedFactory(t, db, "FACT-001", "test-factory")
-	seedWorkshop(t, db, "SHOP-001", "FACT-001", "test-workshop")
-	seedGatehouse(t, db, "GATE-001", "SHOP-001")
-
-	// Set gatehouse focus to a commission
-	_, _ = db.Exec("UPDATE gatehouses SET focused_id = ? WHERE id = ?", "COMM-001", "GATE-001")
-
-	commissions, err := repo.GetActiveCommissions(ctx, "SHOP-001")
-	if err != nil {
-		t.Fatalf("GetActiveCommissions failed: %v", err)
-	}
-	if len(commissions) != 1 {
-		t.Errorf("expected 1 commission, got %d", len(commissions))
-	}
-	if len(commissions) > 0 && commissions[0] != "COMM-001" {
-		t.Errorf("expected COMM-001, got %s", commissions[0])
-	}
-}
-
 func TestWorkshopRepository_GetActiveCommissions_IMPFocusSHIP(t *testing.T) {
 	db := setupTestDB(t)
 	repo := sqlite.NewWorkshopRepository(db)
@@ -483,7 +458,7 @@ func TestWorkshopRepository_GetActiveCommissions_IMPFocusSHIP(t *testing.T) {
 	}
 }
 
-func TestWorkshopRepository_GetActiveCommissions_MultipleActors(t *testing.T) {
+func TestWorkshopRepository_GetActiveCommissions_MultipleWorkbenches(t *testing.T) {
 	db := setupTestDB(t)
 	repo := sqlite.NewWorkshopRepository(db)
 	ctx := context.Background()
@@ -494,14 +469,12 @@ func TestWorkshopRepository_GetActiveCommissions_MultipleActors(t *testing.T) {
 	seedCommission(t, db, "COMM-001", "Commission 1")
 	seedCommission(t, db, "COMM-002", "Commission 2")
 	seedShipment(t, db, "SHIP-001", "COMM-001", "Shipment 1")
-	seedGatehouse(t, db, "GATE-001", "SHOP-001")
 
-	// Goblin focuses COMM-002
-	_, _ = db.Exec("UPDATE gatehouses SET focused_id = ? WHERE id = ?", "COMM-002", "GATE-001")
-
-	// IMP focuses SHIP-001 (resolves to COMM-001)
+	// Two workbenches focus different commissions
 	_, _ = db.Exec("INSERT INTO workbenches (id, workshop_id, name, status, focused_id) VALUES (?, ?, ?, 'active', ?)",
 		"BENCH-001", "SHOP-001", "bench-1", "SHIP-001")
+	_, _ = db.Exec("INSERT INTO workbenches (id, workshop_id, name, status, focused_id) VALUES (?, ?, ?, 'active', ?)",
+		"BENCH-002", "SHOP-001", "bench-2", "COMM-002")
 
 	commissions, err := repo.GetActiveCommissions(ctx, "SHOP-001")
 	if err != nil {

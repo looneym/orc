@@ -16,7 +16,7 @@ func TestEscalationRepository_Create(t *testing.T) {
 	// Create test fixtures
 	db.ExecContext(ctx, "INSERT INTO commissions (id, title, status) VALUES (?, ?, ?)", "COMM-001", "Test", "active")
 	db.ExecContext(ctx, "INSERT INTO shipments (id, commission_id, title, status) VALUES (?, ?, ?, ?)", "SHIP-001", "COMM-001", "Test Shipment", "draft")
-	db.ExecContext(ctx, "INSERT INTO tasks (id, shipment_id, commission_id, title, status) VALUES (?, ?, ?, ?, ?)", "TASK-001", "SHIP-001", "COMM-001", "Test Task", "ready")
+	db.ExecContext(ctx, "INSERT INTO tasks (id, shipment_id, commission_id, title, status) VALUES (?, ?, ?, ?, ?)", "TASK-001", "SHIP-001", "COMM-001", "Test Task", "open")
 	db.ExecContext(ctx, "INSERT INTO plans (id, commission_id, task_id, title, status) VALUES (?, ?, ?, ?, ?)", "PLAN-001", "COMM-001", "TASK-001", "Test Plan", "draft")
 
 	t.Run("creates escalation successfully", func(t *testing.T) {
@@ -94,7 +94,7 @@ func TestEscalationRepository_GetByID(t *testing.T) {
 	// Setup
 	db.ExecContext(ctx, "INSERT INTO commissions (id, title, status) VALUES (?, ?, ?)", "COMM-001", "Test", "active")
 	db.ExecContext(ctx, "INSERT INTO shipments (id, commission_id, title, status) VALUES (?, ?, ?, ?)", "SHIP-001", "COMM-001", "Test", "draft")
-	db.ExecContext(ctx, "INSERT INTO tasks (id, shipment_id, commission_id, title, status) VALUES (?, ?, ?, ?, ?)", "TASK-001", "SHIP-001", "COMM-001", "Test", "ready")
+	db.ExecContext(ctx, "INSERT INTO tasks (id, shipment_id, commission_id, title, status) VALUES (?, ?, ?, ?, ?)", "TASK-001", "SHIP-001", "COMM-001", "Test", "open")
 	db.ExecContext(ctx, "INSERT INTO plans (id, commission_id, task_id, title, status) VALUES (?, ?, ?, ?, ?)", "PLAN-001", "COMM-001", "TASK-001", "Test", "draft")
 
 	repo.Create(ctx, &secondary.EscalationRecord{
@@ -133,7 +133,7 @@ func TestEscalationRepository_List(t *testing.T) {
 	// Setup
 	db.ExecContext(ctx, "INSERT INTO commissions (id, title, status) VALUES (?, ?, ?)", "COMM-001", "Test", "active")
 	db.ExecContext(ctx, "INSERT INTO shipments (id, commission_id, title, status) VALUES (?, ?, ?, ?)", "SHIP-001", "COMM-001", "Test", "draft")
-	db.ExecContext(ctx, "INSERT INTO tasks (id, shipment_id, commission_id, title, status) VALUES (?, ?, ?, ?, ?)", "TASK-001", "SHIP-001", "COMM-001", "Test", "ready")
+	db.ExecContext(ctx, "INSERT INTO tasks (id, shipment_id, commission_id, title, status) VALUES (?, ?, ?, ?, ?)", "TASK-001", "SHIP-001", "COMM-001", "Test", "open")
 	db.ExecContext(ctx, "INSERT INTO plans (id, commission_id, task_id, title, status) VALUES (?, ?, ?, ?, ?)", "PLAN-001", "COMM-001", "TASK-001", "Test 1", "draft")
 	db.ExecContext(ctx, "INSERT INTO plans (id, commission_id, task_id, title, status) VALUES (?, ?, ?, ?, ?)", "PLAN-002", "COMM-001", "TASK-001", "Test 2", "draft")
 
@@ -185,7 +185,7 @@ func TestEscalationRepository_Delete(t *testing.T) {
 	// Setup
 	db.ExecContext(ctx, "INSERT INTO commissions (id, title, status) VALUES (?, ?, ?)", "COMM-001", "Test", "active")
 	db.ExecContext(ctx, "INSERT INTO shipments (id, commission_id, title, status) VALUES (?, ?, ?, ?)", "SHIP-001", "COMM-001", "Test", "draft")
-	db.ExecContext(ctx, "INSERT INTO tasks (id, shipment_id, commission_id, title, status) VALUES (?, ?, ?, ?, ?)", "TASK-001", "SHIP-001", "COMM-001", "Test", "ready")
+	db.ExecContext(ctx, "INSERT INTO tasks (id, shipment_id, commission_id, title, status) VALUES (?, ?, ?, ?, ?)", "TASK-001", "SHIP-001", "COMM-001", "Test", "open")
 	db.ExecContext(ctx, "INSERT INTO plans (id, commission_id, task_id, title, status) VALUES (?, ?, ?, ?, ?)", "PLAN-001", "COMM-001", "TASK-001", "Test", "draft")
 
 	repo.Create(ctx, &secondary.EscalationRecord{ID: "ESC-001", PlanID: "PLAN-001", TaskID: "TASK-001", Reason: "Test", Status: "pending", RoutingRule: "workshop_gatehouse", OriginActorID: "IMP-BENCH-001"})
@@ -234,7 +234,7 @@ func TestEscalationRepository_UpdateStatus(t *testing.T) {
 	// Setup
 	db.ExecContext(ctx, "INSERT INTO commissions (id, title, status) VALUES (?, ?, ?)", "COMM-001", "Test", "active")
 	db.ExecContext(ctx, "INSERT INTO shipments (id, commission_id, title, status) VALUES (?, ?, ?, ?)", "SHIP-001", "COMM-001", "Test", "draft")
-	db.ExecContext(ctx, "INSERT INTO tasks (id, shipment_id, commission_id, title, status) VALUES (?, ?, ?, ?, ?)", "TASK-001", "SHIP-001", "COMM-001", "Test", "ready")
+	db.ExecContext(ctx, "INSERT INTO tasks (id, shipment_id, commission_id, title, status) VALUES (?, ?, ?, ?, ?)", "TASK-001", "SHIP-001", "COMM-001", "Test", "open")
 	db.ExecContext(ctx, "INSERT INTO plans (id, commission_id, task_id, title, status) VALUES (?, ?, ?, ?, ?)", "PLAN-001", "COMM-001", "TASK-001", "Test", "draft")
 
 	repo.Create(ctx, &secondary.EscalationRecord{
@@ -278,7 +278,7 @@ func TestEscalationRepository_Resolve(t *testing.T) {
 	// Setup
 	db.ExecContext(ctx, "INSERT INTO commissions (id, title, status) VALUES (?, ?, ?)", "COMM-001", "Test", "active")
 	db.ExecContext(ctx, "INSERT INTO shipments (id, commission_id, title, status) VALUES (?, ?, ?, ?)", "SHIP-001", "COMM-001", "Test", "draft")
-	db.ExecContext(ctx, "INSERT INTO tasks (id, shipment_id, commission_id, title, status) VALUES (?, ?, ?, ?, ?)", "TASK-001", "SHIP-001", "COMM-001", "Test", "ready")
+	db.ExecContext(ctx, "INSERT INTO tasks (id, shipment_id, commission_id, title, status) VALUES (?, ?, ?, ?, ?)", "TASK-001", "SHIP-001", "COMM-001", "Test", "open")
 	db.ExecContext(ctx, "INSERT INTO plans (id, commission_id, task_id, title, status) VALUES (?, ?, ?, ?, ?)", "PLAN-001", "COMM-001", "TASK-001", "Test", "draft")
 
 	repo.Create(ctx, &secondary.EscalationRecord{
@@ -328,7 +328,7 @@ func TestEscalationRepository_Exists(t *testing.T) {
 	// Setup
 	db.ExecContext(ctx, "INSERT INTO commissions (id, title, status) VALUES (?, ?, ?)", "COMM-001", "Test", "active")
 	db.ExecContext(ctx, "INSERT INTO shipments (id, commission_id, title, status) VALUES (?, ?, ?, ?)", "SHIP-001", "COMM-001", "Test", "draft")
-	db.ExecContext(ctx, "INSERT INTO tasks (id, shipment_id, commission_id, title, status) VALUES (?, ?, ?, ?, ?)", "TASK-001", "SHIP-001", "COMM-001", "Test", "ready")
+	db.ExecContext(ctx, "INSERT INTO tasks (id, shipment_id, commission_id, title, status) VALUES (?, ?, ?, ?, ?)", "TASK-001", "SHIP-001", "COMM-001", "Test", "open")
 	db.ExecContext(ctx, "INSERT INTO plans (id, commission_id, task_id, title, status) VALUES (?, ?, ?, ?, ?)", "PLAN-001", "COMM-001", "TASK-001", "Test", "draft")
 	db.ExecContext(ctx, "INSERT INTO approvals (id, plan_id, task_id, mechanism, outcome) VALUES (?, ?, ?, ?, ?)", "APPR-001", "PLAN-001", "TASK-001", "subagent", "escalated")
 

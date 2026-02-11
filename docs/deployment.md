@@ -80,14 +80,6 @@ make schema-apply   # Apply to local DB
    git rebase master
    ```
 
-## Shipment Status
-
-After successful deployment, update shipment status:
-
-```bash
-orc shipment deploy SHIP-XXX
-```
-
 ## Post-Deploy Verification
 
 After deployment, verify the installation works correctly.
@@ -120,6 +112,5 @@ Verification Results:
 After verification passes:
 
 ```bash
-orc shipment verify SHIP-XXX    # Transition to verified
-/ship-complete SHIP-XXX         # Complete shipment (terminal state)
+/ship-complete SHIP-XXX         # Close shipment (terminal state)
 ```

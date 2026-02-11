@@ -224,14 +224,14 @@ func TestPRService_CreatePR(t *testing.T) {
 	t.Run("creates PR for active shipment", func(t *testing.T) {
 		prRepo := newMockPRRepository()
 		prRepo.shipmentExists["SHIP-001"] = true
-		prRepo.shipmentStatus["SHIP-001"] = "active"
+		prRepo.shipmentStatus["SHIP-001"] = "in-progress"
 		prRepo.repoExists["REPO-001"] = true
 
 		shipmentSvc := newMockShipmentServiceForPR()
 		shipmentSvc.shipments["SHIP-001"] = &primary.Shipment{
 			ID:           "SHIP-001",
 			CommissionID: "COMM-001",
-			Status:       "active",
+			Status:       "in-progress",
 		}
 
 		svc := NewPRService(prRepo, shipmentSvc)
@@ -257,14 +257,14 @@ func TestPRService_CreatePR(t *testing.T) {
 	t.Run("creates draft PR", func(t *testing.T) {
 		prRepo := newMockPRRepository()
 		prRepo.shipmentExists["SHIP-001"] = true
-		prRepo.shipmentStatus["SHIP-001"] = "active"
+		prRepo.shipmentStatus["SHIP-001"] = "in-progress"
 		prRepo.repoExists["REPO-001"] = true
 
 		shipmentSvc := newMockShipmentServiceForPR()
 		shipmentSvc.shipments["SHIP-001"] = &primary.Shipment{
 			ID:           "SHIP-001",
 			CommissionID: "COMM-001",
-			Status:       "active",
+			Status:       "in-progress",
 		}
 
 		svc := NewPRService(prRepo, shipmentSvc)
@@ -326,7 +326,7 @@ func TestPRService_CreatePR(t *testing.T) {
 	t.Run("fails when shipment already has PR", func(t *testing.T) {
 		prRepo := newMockPRRepository()
 		prRepo.shipmentExists["SHIP-001"] = true
-		prRepo.shipmentStatus["SHIP-001"] = "active"
+		prRepo.shipmentStatus["SHIP-001"] = "in-progress"
 		prRepo.repoExists["REPO-001"] = true
 		prRepo.shipmentHasPR["SHIP-001"] = true
 

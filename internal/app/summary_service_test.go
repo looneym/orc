@@ -499,9 +499,9 @@ func TestSummaryService_GetCommissionSummary_FlatStructure(t *testing.T) {
 
 	// Add tasks to shipment
 	shipmentSvc.shipmentTasks["SHIP-001"] = []*primary.Task{
-		{ID: "TASK-001", Title: "Task 1", Status: "complete"},
-		{ID: "TASK-002", Title: "Task 2", Status: "ready"},
-		{ID: "TASK-003", Title: "Task 3", Status: "ready"},
+		{ID: "TASK-001", Title: "Task 1", Status: "closed"},
+		{ID: "TASK-002", Title: "Task 2", Status: "open"},
+		{ID: "TASK-003", Title: "Task 3", Status: "open"},
 	}
 
 	// Add workbench
@@ -519,7 +519,7 @@ func TestSummaryService_GetCommissionSummary_FlatStructure(t *testing.T) {
 	}
 
 	// Create service (no conclave service needed)
-	svc := NewSummaryService(commissionSvc, tomeSvc, shipmentSvc, taskSvc, noteSvc, workbenchSvc, nil, nil, nil, nil)
+	svc := NewSummaryService(commissionSvc, tomeSvc, shipmentSvc, taskSvc, noteSvc, workbenchSvc, nil, nil, nil)
 
 	// Request summary
 	req := primary.SummaryRequest{
@@ -608,7 +608,7 @@ func TestSummaryService_GetCommissionSummary_ShowsAllShipments(t *testing.T) {
 	}
 
 	// Create service
-	svc := NewSummaryService(commissionSvc, tomeSvc, shipmentSvc, taskSvc, noteSvc, workbenchSvc, nil, nil, nil, nil)
+	svc := NewSummaryService(commissionSvc, tomeSvc, shipmentSvc, taskSvc, noteSvc, workbenchSvc, nil, nil, nil)
 
 	// Request summary - all shipments should be visible regardless of workbench assignment
 	req := primary.SummaryRequest{
@@ -650,19 +650,19 @@ func TestSummaryService_GetCommissionSummary_TaskCounting(t *testing.T) {
 		Status:       "active",
 	}
 
-	// 3 complete, 5 not complete = 8 total, 3 done
+	// 3 closed, 5 not closed = 8 total, 3 done
 	shipmentSvc.shipmentTasks["SHIP-001"] = []*primary.Task{
-		{ID: "TASK-001", Status: "complete"},
-		{ID: "TASK-002", Status: "complete"},
-		{ID: "TASK-003", Status: "complete"},
-		{ID: "TASK-004", Status: "ready"},
-		{ID: "TASK-005", Status: "in_progress"},
+		{ID: "TASK-001", Status: "closed"},
+		{ID: "TASK-002", Status: "closed"},
+		{ID: "TASK-003", Status: "closed"},
+		{ID: "TASK-004", Status: "open"},
+		{ID: "TASK-005", Status: "in-progress"},
 		{ID: "TASK-006", Status: "blocked"},
-		{ID: "TASK-007", Status: "ready"},
-		{ID: "TASK-008", Status: "ready"},
+		{ID: "TASK-007", Status: "open"},
+		{ID: "TASK-008", Status: "open"},
 	}
 
-	svc := NewSummaryService(commissionSvc, tomeSvc, shipmentSvc, taskSvc, noteSvc, workbenchSvc, nil, nil, nil, nil)
+	svc := NewSummaryService(commissionSvc, tomeSvc, shipmentSvc, taskSvc, noteSvc, workbenchSvc, nil, nil, nil)
 
 	req := primary.SummaryRequest{
 		CommissionID: "COMM-001",
@@ -730,10 +730,10 @@ func TestSummaryService_GetCommissionSummary_HidesClosedAndComplete(t *testing.T
 		ID:           "SHIP-002",
 		CommissionID: "COMM-001",
 		Title:        "Complete Shipment",
-		Status:       "complete",
+		Status:       "closed",
 	}
 
-	svc := NewSummaryService(commissionSvc, tomeSvc, shipmentSvc, taskSvc, noteSvc, workbenchSvc, nil, nil, nil, nil)
+	svc := NewSummaryService(commissionSvc, tomeSvc, shipmentSvc, taskSvc, noteSvc, workbenchSvc, nil, nil, nil)
 
 	req := primary.SummaryRequest{
 		CommissionID: "COMM-001",
@@ -777,7 +777,7 @@ func TestSummaryService_GetCommissionSummary_FocusedCommission(t *testing.T) {
 		Status:       "active",
 	}
 
-	svc := NewSummaryService(commissionSvc, tomeSvc, shipmentSvc, taskSvc, noteSvc, workbenchSvc, nil, nil, nil, nil)
+	svc := NewSummaryService(commissionSvc, tomeSvc, shipmentSvc, taskSvc, noteSvc, workbenchSvc, nil, nil, nil)
 
 	// Test with focus on shipment in this commission
 	req := primary.SummaryRequest{
@@ -840,7 +840,7 @@ func TestSummaryService_GetCommissionSummary_TomeNoteCount(t *testing.T) {
 		{ID: "NOTE-003", Title: "Closed Note", Status: "closed"},
 	}
 
-	svc := NewSummaryService(commissionSvc, tomeSvc, shipmentSvc, taskSvc, noteSvc, workbenchSvc, nil, nil, nil, nil)
+	svc := NewSummaryService(commissionSvc, tomeSvc, shipmentSvc, taskSvc, noteSvc, workbenchSvc, nil, nil, nil)
 
 	req := primary.SummaryRequest{
 		CommissionID: "COMM-001",

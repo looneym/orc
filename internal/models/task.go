@@ -30,11 +30,11 @@ type Task struct {
 	PromotedFromType    sql.NullString
 }
 
-// Task status constants
+// Task status constants - simplified lifecycle
+// Flow: open → in-progress → closed (with blocked as a lateral state)
 const (
-	TaskStatusReady      = "ready"
-	TaskStatusInProgress = "in_progress"
-	TaskStatusPaused     = "paused"
-	TaskStatusComplete   = "complete"
+	TaskStatusOpen       = "open"
+	TaskStatusInProgress = "in-progress"
 	TaskStatusBlocked    = "blocked"
+	TaskStatusClosed     = "closed"
 )

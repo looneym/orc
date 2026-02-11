@@ -48,8 +48,6 @@ It coordinates IMPs (Implementation Agents) working in isolated workbenches (wor
 	rootCmd.AddCommand(cli.BootstrapCmd())
 	rootCmd.AddCommand(cli.PrimeCmd())
 	rootCmd.AddCommand(cli.TestCmd())
-	rootCmd.AddCommand(cli.MailCmd())
-	rootCmd.AddCommand(cli.NudgeCmd())
 	rootCmd.AddCommand(cli.FocusCmd())
 
 	// Entity commands (semantic model)
@@ -57,11 +55,7 @@ It coordinates IMPs (Implementation Agents) working in isolated workbenches (wor
 	rootCmd.AddCommand(cli.PlanCmd())
 	rootCmd.AddCommand(cli.TomeCmd())
 
-	// Receipt command
-	rootCmd.AddCommand(cli.ReceiptCmd())
-
-	// New entity commands (Stage 2)
-	rootCmd.AddCommand(cli.GatehouseCmd())
+	// Approval and escalation commands
 	rootCmd.AddCommand(cli.ApprovalCmd())
 	rootCmd.AddCommand(cli.EscalationCmd())
 

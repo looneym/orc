@@ -5,13 +5,13 @@ description: View and manage the shipyard queue. Use when user says /ship-queue 
 
 # Ship Queue Skill
 
-View and manage shipments available for IMP pickup.
+View and manage shipments available for work.
 
 ## Usage
 
 ```
 /ship-queue                     (view available shipments)
-/ship-queue SHIP-xxx            (mark shipment ready for IMP)
+/ship-queue SHIP-xxx            (mark shipment ready)
 /ship-queue priority SHIP-xxx N (set priority)
 ```
 
@@ -20,7 +20,7 @@ View and manage shipments available for IMP pickup.
 ### Step 1: Determine Action
 
 If SHIP-xxx argument (without priority):
-- Go to Ready flow (mark shipment ready_for_imp)
+- Go to Ready flow (mark shipment ready)
 
 If "priority SHIP-xxx N" arguments:
 - Go to Priority flow
@@ -38,7 +38,7 @@ Otherwise:
 orc shipment list --available
 ```
 
-This shows shipments in `ready_for_imp` status.
+This shows shipments in `ready` status.
 
 ### Step 3: Show Options
 
@@ -59,7 +59,7 @@ Actions:
 
 ## Ready Flow
 
-Mark a shipment as ready for IMP pickup.
+Mark a shipment as ready for work.
 
 ### Step 2: Mark Ready
 
@@ -67,17 +67,17 @@ Mark a shipment as ready for IMP pickup.
 orc shipment ready SHIP-xxx
 ```
 
-This sets status to `ready_for_imp`, signaling the shipment is ready for IMP work.
+This sets status to `ready`, signaling the shipment is ready for implementation.
 
 ### Step 3: Confirm
 
 Output:
 ```
-Shipment SHIP-xxx marked ready_for_imp
+Shipment SHIP-xxx marked ready
 
-IMP can now claim this shipment:
+Work can now begin:
   orc focus SHIP-xxx
-  orc task claim TASK-yyy
+  orc task list --shipment SHIP-xxx
 ```
 
 ---
@@ -121,9 +121,9 @@ User: /ship-queue SHIP-249
 
 Agent: [runs orc shipment ready SHIP-249]
 
-Agent: ✓ Shipment SHIP-249 marked ready_for_imp
+Agent: Shipment SHIP-249 marked ready
 
-       IMP can now pick up this shipment:
+       Work can now begin:
          orc focus SHIP-249
          orc task list --shipment SHIP-249
 ```

@@ -10,7 +10,7 @@ A-Z definitions of ORC terminology. For schema details see [schema.md](schema.md
 ## Terms
 
 **✅ Approval**
-A Goblin's sign-off on an IMP's implementation plan. Required before code changes.
+A sign-off on an implementation plan. Required before code changes.
 
 **📋 Commission**
 A body of work being tracked. Top-level organizational unit. Contains shipments.
@@ -21,38 +21,32 @@ The human. Strategic decision maker and boss. Commands the forest.
 **🏭 Factory**
 A collection of workshops, typically representing a codebase or project area.
 
-**🏰 Gatehouse**
-The Goblin's workspace within a workshop. Coordination point for reviews and escalations.
-
 **👺 Goblin**
-Workshop gatekeeper. Reviews plans, handles escalations, coordinates across workbenches. Does not write code.
+Coordinator agent. The human's long-running workbench pane. Creates/manages ORC tasks with the human. Memory and policy layer (what and why).
 
 **🤝 Handoff**
 Session context snapshot for continuity between Claude sessions.
 
 **👹 IMP**
-Implementation agent. Works in a workbench to implement features, fix bugs, complete tasks.
+Disposable worker agent spawned by Claude Teams. Executes tasks using Teams primitives. Execution layer (how and who).
 
 **📝 Note**
 Captured thought within a shipment. Types: idea, question, finding, decision, concern, spec.
 
 **📐 Plan**
-C4-level implementation detail created by IMP. Specifies files and functions to edit.
-
-**🧾 Receipt**
-Proof of task completion. Created by `/imp-rec` after implementation.
+C4-level implementation detail. Specifies files and functions to edit.
 
 **📦 Shipment**
-Unit of work with exploration → implementation lifecycle. Contains tasks and notes.
+Unit of work with a 4-status lifecycle: draft, ready, in-progress, closed. Contains tasks and notes.
 
 **✔️ Task**
-Specific implementation work within a shipment. C2/C3 scope (what systems to touch).
+Specific implementation work within a shipment. Lifecycle: open, in-progress, closed (+blocked lateral state).
 
 **📖 Tome**
 Knowledge container at commission level. Holds notes for long-running reference.
 
 **🔧 Workbench**
-Git worktree where an IMP works. Isolated development environment with dedicated tmux window.
+Git worktree where agents work. Isolated development environment with dedicated tmux window.
 
 **🛠️ Workshop**
-Collection of workbenches for coordinated work. Has one gatehouse and many workbenches.
+Collection of workbenches for coordinated work.

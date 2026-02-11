@@ -166,7 +166,7 @@ Show active commissions and ask:
 ```bash
 orc workshop set-commission WORK-xxx COMM-yyy
 ```
-(Note: Must run from gatehouse directory, but gatehouse doesn't exist yet. Need to link after apply - see Step 9.)
+(Note: Must run from coordinator directory, but it doesn't exist yet. Need to link after apply - see Step 9.)
 
 **If creating new:**
 ```bash

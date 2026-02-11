@@ -22,7 +22,6 @@ type WorkshopServiceImpl struct {
 	workshopRepo     secondary.WorkshopRepository
 	workbenchRepo    secondary.WorkbenchRepository
 	repoRepo         secondary.RepoRepository
-	gatehouseRepo    secondary.GatehouseRepository
 	tmuxAdapter      secondary.TMuxAdapter
 	workspaceAdapter secondary.WorkspaceAdapter
 	executor         EffectExecutor
@@ -34,7 +33,6 @@ func NewWorkshopService(
 	workshopRepo secondary.WorkshopRepository,
 	workbenchRepo secondary.WorkbenchRepository,
 	repoRepo secondary.RepoRepository,
-	gatehouseRepo secondary.GatehouseRepository,
 	tmuxAdapter secondary.TMuxAdapter,
 	workspaceAdapter secondary.WorkspaceAdapter,
 	executor EffectExecutor,
@@ -44,7 +42,6 @@ func NewWorkshopService(
 		workshopRepo:     workshopRepo,
 		workbenchRepo:    workbenchRepo,
 		repoRepo:         repoRepo,
-		gatehouseRepo:    gatehouseRepo,
 		tmuxAdapter:      tmuxAdapter,
 		workspaceAdapter: workspaceAdapter,
 		executor:         executor,
@@ -282,17 +279,11 @@ func (s *WorkshopServiceImpl) ApplyOpenWorkshop(ctx context.Context, plan *prima
 		}, nil
 	}
 
-	// 1. Ensure gatehouse exists in DB (auto-create if needed)
-	gatehouse, err := s.ensureGatehouseExists(ctx, plan.WorkshopID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to ensure gatehouse: %w", err)
-	}
-
-	// 2. Create gatehouse directory if needed
+	// 1. Create workshop directory if needed
 	home, _ := os.UserHomeDir()
-	gatehouseDir := coreworkshop.GatehousePath(home, plan.WorkshopID, plan.WorkshopName)
+	workshopDir := coreworkshop.GatehousePath(home, plan.WorkshopID, plan.WorkshopName)
 	if plan.GatehouseOp != nil && (!plan.GatehouseOp.Exists || !plan.GatehouseOp.ConfigExists) {
-		gatehouseDir = s.createGatehouseDir(plan.WorkshopID, plan.WorkshopName, gatehouse.ID)
+		workshopDir = s.createWorkshopDir(plan.WorkshopID, plan.WorkshopName)
 	}
 
 	// 2. Create workbenches if needed
@@ -324,16 +315,16 @@ func (s *WorkshopServiceImpl) ApplyOpenWorkshop(ctx context.Context, plan *prima
 			sessionAlreadyOpen = true
 		} else {
 			// Create new session
-			if err := s.tmuxAdapter.CreateSession(ctx, plan.SessionName, gatehouseDir); err != nil {
+			if err := s.tmuxAdapter.CreateSession(ctx, plan.SessionName, workshopDir); err != nil {
 				return nil, fmt.Errorf("failed to create session: %w", err)
 			}
 
 			// Mark session with workshop ID env var (survives renames)
 			_ = s.tmuxAdapter.SetEnvironment(ctx, plan.SessionName, "ORC_WORKSHOP_ID", plan.WorkshopID)
 
-			// Setup Gatehouse (ORC) window
-			if err := s.tmuxAdapter.CreateOrcWindow(ctx, plan.SessionName, gatehouseDir); err != nil {
-				return nil, fmt.Errorf("failed to create gatehouse: %w", err)
+			// Setup ORC coordinator window
+			if err := s.tmuxAdapter.CreateOrcWindow(ctx, plan.SessionName, workshopDir); err != nil {
+				return nil, fmt.Errorf("failed to create workshop window: %w", err)
 			}
 
 			// Create tmux windows for each workbench
@@ -436,53 +427,13 @@ func (s *WorkshopServiceImpl) CloseWorkshop(ctx context.Context, workshopID stri
 	return nil
 }
 
-// ensureGatehouseExists returns the gatehouse for a workshop, creating it if needed.
-// This implements the 1:1 gatehouse auto-creation on workshop open.
-func (s *WorkshopServiceImpl) ensureGatehouseExists(ctx context.Context, workshopID string) (*secondary.GatehouseRecord, error) {
-	// Check if gatehouse already exists
-	existing, err := s.gatehouseRepo.GetByWorkshop(ctx, workshopID)
-	if err == nil {
-		return existing, nil
-	}
-
-	// Create new gatehouse
-	id, err := s.gatehouseRepo.GetNextID(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate gatehouse ID: %w", err)
-	}
-
-	gatehouse := &secondary.GatehouseRecord{
-		ID:         id,
-		WorkshopID: workshopID,
-		Status:     "active",
-	}
-	if err := s.gatehouseRepo.Create(ctx, gatehouse); err != nil {
-		return nil, fmt.Errorf("failed to create gatehouse: %w", err)
-	}
-
-	return gatehouse, nil
-}
-
-// createGatehouseDir creates the Gatehouse directory for a workshop
-// at ~/.orc/ws/{workshop-id}-{slug}/ with a Goblin config containing the gatehouse ID
-func (s *WorkshopServiceImpl) createGatehouseDir(workshopID, workshopName, gatehouseID string) string {
+// createWorkshopDir creates the workshop coordination directory.
+func (s *WorkshopServiceImpl) createWorkshopDir(workshopID, workshopName string) string {
 	home, _ := os.UserHomeDir()
 	slug := slugify(workshopName)
 	dirName := fmt.Sprintf("%s-%s", workshopID, slug)
 	dir := filepath.Join(home, ".orc", "ws", dirName)
 	_ = os.MkdirAll(dir, 0755)
-
-	// Create .orc subdir for config
-	orcDir := filepath.Join(dir, ".orc")
-	_ = os.MkdirAll(orcDir, 0755)
-
-	// Create config.json with gatehouse place_id
-	cfg := &config.Config{
-		Version: "1.0",
-		PlaceID: gatehouseID, // GATE-XXX
-	}
-	_ = config.SaveConfig(dir, cfg)
-
 	return dir
 }
 

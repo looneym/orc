@@ -27,7 +27,7 @@ func TestHookEventRepository_Create(t *testing.T) {
 			Cwd:                 "/Users/test/project",
 			SessionID:           "sess-123",
 			ShipmentID:          "SHIP-001",
-			ShipmentStatus:      "implementing",
+			ShipmentStatus:      "in-progress",
 			TaskCountIncomplete: 3,
 			Decision:            "block",
 			Reason:              "Incomplete tasks",
@@ -63,8 +63,8 @@ func TestHookEventRepository_Create(t *testing.T) {
 		if got.ShipmentID != "SHIP-001" {
 			t.Errorf("ShipmentID = %q, want %q", got.ShipmentID, "SHIP-001")
 		}
-		if got.ShipmentStatus != "implementing" {
-			t.Errorf("ShipmentStatus = %q, want %q", got.ShipmentStatus, "implementing")
+		if got.ShipmentStatus != "in-progress" {
+			t.Errorf("ShipmentStatus = %q, want %q", got.ShipmentStatus, "in-progress")
 		}
 		if got.TaskCountIncomplete != 3 {
 			t.Errorf("TaskCountIncomplete = %d, want %d", got.TaskCountIncomplete, 3)

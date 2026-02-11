@@ -223,7 +223,7 @@ Explain:
 Created shipment: SHIP-xxx "First Steps"
 
 A shipment tracks work through stages:
-  exploring → tasked → implementing → deployed → complete
+  draft → ready → in-progress → closed
 
 This shipment is now focused - any notes or tasks you create will attach here.
 ```
@@ -255,8 +255,8 @@ Display tmux explanation:
 TMux Navigation
 
 Your workshop runs in a tmux session with multiple windows:
-- Window 0: Gatehouse (Goblin/coordinator view)
-- Window 1+: Workbenches (where IMPs work)
+- Window 0: Coordinator (Goblin - your workbench pane)
+- Window 1+: Workbenches (where IMP workers operate)
 
 Key bindings:
 - Ctrl+b n     → Next window
@@ -344,7 +344,7 @@ Essential Commands:
 Shipment Workflow:
   /ship-new "Title"        Create new shipment
   /ship-plan               Plan tasks from notes
-  /imp-start               Begin autonomous work
+  /ship-deploy             Deploy to master
 
 Workshop Management:
   /orc-workshop            Create a new workshop

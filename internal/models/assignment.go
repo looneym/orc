@@ -105,11 +105,11 @@ func WriteShipmentAssignment(workbenchDir string, shipment *Shipment, tasks []*T
 
 		// Update progress counts
 		switch task.Status {
-		case "complete":
+		case "closed":
 			completedTasks++
-		case "implement", "in_progress":
+		case "in-progress":
 			inProgressTasks++
-		case "ready":
+		case "open":
 			readyTasks++
 		}
 	}

@@ -3,7 +3,6 @@ package app
 import (
 	"context"
 	"errors"
-	"fmt"
 	"testing"
 
 	"github.com/example/orc/internal/core/effects"
@@ -220,70 +219,6 @@ func (m *mockInfraRepoRepo) HasActivePRs(ctx context.Context, repoID string) (bo
 	return false, nil
 }
 
-// mockInfraGatehouseRepo implements secondary.GatehouseRepository for infra tests.
-type mockInfraGatehouseRepo struct {
-	gatehouses map[string]*secondary.GatehouseRecord
-}
-
-func (m *mockInfraGatehouseRepo) GetByWorkshop(ctx context.Context, workshopID string) (*secondary.GatehouseRecord, error) {
-	if g, ok := m.gatehouses[workshopID]; ok {
-		return g, nil
-	}
-	return nil, errors.New("not found")
-}
-
-func (m *mockInfraGatehouseRepo) GetByID(ctx context.Context, id string) (*secondary.GatehouseRecord, error) {
-	for _, g := range m.gatehouses {
-		if g.ID == id {
-			return g, nil
-		}
-	}
-	return nil, errors.New("not found")
-}
-
-func (m *mockInfraGatehouseRepo) Create(ctx context.Context, g *secondary.GatehouseRecord) error {
-	return nil
-}
-
-func (m *mockInfraGatehouseRepo) List(ctx context.Context, filters secondary.GatehouseFilters) ([]*secondary.GatehouseRecord, error) {
-	return nil, nil
-}
-
-func (m *mockInfraGatehouseRepo) Update(ctx context.Context, g *secondary.GatehouseRecord) error {
-	return nil
-}
-
-func (m *mockInfraGatehouseRepo) UpdateStatus(ctx context.Context, id, status string) error {
-	return nil
-}
-
-func (m *mockInfraGatehouseRepo) WorkshopExists(ctx context.Context, workshopID string) (bool, error) {
-	return true, nil
-}
-
-func (m *mockInfraGatehouseRepo) WorkshopHasGatehouse(ctx context.Context, workshopID string) (bool, error) {
-	_, ok := m.gatehouses[workshopID]
-	return ok, nil
-}
-
-func (m *mockInfraGatehouseRepo) UpdateFocusedID(ctx context.Context, id, focusedID string) error {
-	for _, g := range m.gatehouses {
-		if g.ID == id {
-			g.FocusedID = focusedID
-			return nil
-		}
-	}
-	return fmt.Errorf("gatehouse %s not found", id)
-}
-
-func (m *mockInfraGatehouseRepo) Delete(ctx context.Context, id string) error {
-	return nil
-}
-
-func (m *mockInfraGatehouseRepo) GetNextID(ctx context.Context) (string, error) {
-	return "GATE-001", nil
-}
-
 // mockInfraWorkspaceAdapter implements secondary.WorkspaceAdapter for testing.
 type mockInfraWorkspaceAdapter struct{}
 
@@ -365,15 +300,10 @@ func newTestInfraService() *InfraServiceImpl {
 		},
 	}
 	repoRepo := &mockInfraRepoRepo{}
-	gatehouseRepo := &mockInfraGatehouseRepo{
-		gatehouses: map[string]*secondary.GatehouseRecord{
-			"WORK-001": {ID: "GATE-001", WorkshopID: "WORK-001", Status: "active"},
-		},
-	}
 	workspaceAdapter := &mockInfraWorkspaceAdapter{}
 	executor := &mockInfraEffectExecutor{}
 
-	return NewInfraService(factoryRepo, workshopRepo, workbenchRepo, repoRepo, gatehouseRepo, workspaceAdapter, nil, executor)
+	return NewInfraService(factoryRepo, workshopRepo, workbenchRepo, repoRepo, workspaceAdapter, nil, executor)
 }
 
 // newTestInfraServiceWithExecutor creates a test infra service with a custom effect executor.
@@ -394,14 +324,9 @@ func newTestInfraServiceWithExecutor(executor *mockInfraEffectExecutor) *InfraSe
 		},
 	}
 	repoRepo := &mockInfraRepoRepo{}
-	gatehouseRepo := &mockInfraGatehouseRepo{
-		gatehouses: map[string]*secondary.GatehouseRecord{
-			"WORK-001": {ID: "GATE-001", WorkshopID: "WORK-001", Status: "active"},
-		},
-	}
 	workspaceAdapter := &mockInfraWorkspaceAdapter{}
 
-	return NewInfraService(factoryRepo, workshopRepo, workbenchRepo, repoRepo, gatehouseRepo, workspaceAdapter, nil, executor)
+	return NewInfraService(factoryRepo, workshopRepo, workbenchRepo, repoRepo, workspaceAdapter, nil, executor)
 }
 
 func TestInfraService_PlanInfra(t *testing.T) {
@@ -432,8 +357,8 @@ func TestInfraService_PlanInfra(t *testing.T) {
 		t.Fatal("expected gatehouse op to be set")
 	}
 
-	if plan.Gatehouse.ID != "GATE-001" {
-		t.Errorf("expected gatehouse ID 'GATE-001', got %q", plan.Gatehouse.ID)
+	if plan.Gatehouse.ID != "WORK-001" {
+		t.Errorf("expected gatehouse ID 'WORK-001', got %q", plan.Gatehouse.ID)
 	}
 
 	if len(plan.Workbenches) != 1 {
@@ -502,15 +427,10 @@ func TestInfraService_PlanInfra_ArchivedWorkbenchExcluded(t *testing.T) {
 		},
 	}
 	repoRepo := &mockInfraRepoRepo{}
-	gatehouseRepo := &mockInfraGatehouseRepo{
-		gatehouses: map[string]*secondary.GatehouseRecord{
-			"WORK-001": {ID: "GATE-001", WorkshopID: "WORK-001", Status: "active"},
-		},
-	}
 	workspaceAdapter := &mockInfraWorkspaceAdapter{}
 	executor := &mockInfraEffectExecutor{}
 
-	service := NewInfraService(factoryRepo, workshopRepo, workbenchRepo, repoRepo, gatehouseRepo, workspaceAdapter, nil, executor)
+	service := NewInfraService(factoryRepo, workshopRepo, workbenchRepo, repoRepo, workspaceAdapter, nil, executor)
 	ctx := context.Background()
 
 	plan, err := service.PlanInfra(ctx, primary.InfraPlanRequest{

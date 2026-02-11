@@ -26,16 +26,16 @@ type CreateTaskContext struct {
 	ShipmentExists   bool   // only checked if ShipmentID != ""
 }
 
-// CompleteTaskContext provides context for task completion guards.
-type CompleteTaskContext struct {
+// CloseTaskContext provides context for task close guards.
+type CloseTaskContext struct {
 	TaskID   string
 	IsPinned bool
 }
 
-// StatusTransitionContext provides context for pause/resume guards.
+// StatusTransitionContext provides context for status transition guards.
 type StatusTransitionContext struct {
 	TaskID string
-	Status string // "ready", "in_progress", "paused", "complete"
+	Status string // "open", "in-progress", "blocked", "closed"
 }
 
 // TagTaskContext provides context for tag operation guards.
@@ -69,42 +69,14 @@ func CanCreateTask(ctx CreateTaskContext) GuardResult {
 	return GuardResult{Allowed: true}
 }
 
-// CanCompleteTask evaluates whether a task can be completed.
+// CanCloseTask evaluates whether a task can be closed.
 // Rules:
 // - Task must not be pinned
-func CanCompleteTask(ctx CompleteTaskContext) GuardResult {
+func CanCloseTask(ctx CloseTaskContext) GuardResult {
 	if ctx.IsPinned {
 		return GuardResult{
 			Allowed: false,
-			Reason:  fmt.Sprintf("cannot complete pinned task %s. Unpin first with: orc task unpin %s", ctx.TaskID, ctx.TaskID),
-		}
-	}
-
-	return GuardResult{Allowed: true}
-}
-
-// CanPauseTask evaluates whether a task can be paused.
-// Rules:
-// - Status must be "in_progress"
-func CanPauseTask(ctx StatusTransitionContext) GuardResult {
-	if ctx.Status != "in_progress" {
-		return GuardResult{
-			Allowed: false,
-			Reason:  fmt.Sprintf("can only pause in_progress tasks (current status: %s)", ctx.Status),
-		}
-	}
-
-	return GuardResult{Allowed: true}
-}
-
-// CanResumeTask evaluates whether a task can be resumed.
-// Rules:
-// - Status must be "paused"
-func CanResumeTask(ctx StatusTransitionContext) GuardResult {
-	if ctx.Status != "paused" {
-		return GuardResult{
-			Allowed: false,
-			Reason:  fmt.Sprintf("can only resume paused tasks (current status: %s)", ctx.Status),
+			Reason:  fmt.Sprintf("cannot close pinned task %s. Unpin first with: orc task unpin %s", ctx.TaskID, ctx.TaskID),
 		}
 	}
 

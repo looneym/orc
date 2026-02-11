@@ -90,9 +90,14 @@ func (r *TaskRepository) Create(ctx context.Context, task *secondary.TaskRecord)
 		taskType = sql.NullString{String: task.Type, Valid: true}
 	}
 
+	status := task.Status
+	if status == "" {
+		status = "open"
+	}
+
 	_, err := r.db.ExecContext(ctx,
 		"INSERT INTO tasks (id, shipment_id, commission_id, title, description, type, status) VALUES (?, ?, ?, ?, ?, ?, ?)",
-		task.ID, shipmentID, task.CommissionID, task.Title, desc, taskType, "ready",
+		task.ID, shipmentID, task.CommissionID, task.Title, desc, taskType, status,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create task: %w", err)
@@ -366,7 +371,7 @@ func (r *TaskRepository) Claim(ctx context.Context, id, workbenchID string) erro
 	}
 
 	result, err := r.db.ExecContext(ctx,
-		"UPDATE tasks SET status = 'in_progress', assigned_workbench_id = ?, claimed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+		"UPDATE tasks SET status = 'in-progress', assigned_workbench_id = ?, claimed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
 		workbenchIDNullable, id,
 	)
 	if err != nil {

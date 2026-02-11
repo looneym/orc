@@ -98,12 +98,12 @@ func SeedFixtures(database *sql.DB) error {
 		}
 	}
 
-	// Shipments (valid statuses: draft, exploring, specced, tasked, ready_for_imp, implementing, auto_implementing, complete)
+	// Shipments (valid statuses: draft, ready, in-progress, closed)
 	shipments := []struct{ id, commissionID, title, status string }{
-		{"SHIP-001", "COMM-001", "Initial Setup", "complete"},
-		{"SHIP-002", "COMM-001", "Core Features", "implementing"},
+		{"SHIP-001", "COMM-001", "Initial Setup", "closed"},
+		{"SHIP-002", "COMM-001", "Core Features", "in-progress"},
 		{"SHIP-003", "COMM-001", "Polish & Docs", "draft"},
-		{"SHIP-004", "COMM-002", "API Integration", "tasked"},
+		{"SHIP-004", "COMM-002", "API Integration", "ready"},
 		{"SHIP-005", "COMM-002", "Testing Suite", "draft"},
 	}
 	for _, s := range shipments {
@@ -117,16 +117,16 @@ func SeedFixtures(database *sql.DB) error {
 
 	// Tasks
 	tasks := []struct{ id, commissionID, shipmentID, title, status string }{
-		{"TASK-001", "COMM-001", "SHIP-001", "Setup repository", "complete"},
-		{"TASK-002", "COMM-001", "SHIP-001", "Configure CI", "complete"},
-		{"TASK-003", "COMM-001", "SHIP-002", "Implement core logic", "in_progress"},
-		{"TASK-004", "COMM-001", "SHIP-002", "Add error handling", "ready"},
-		{"TASK-005", "COMM-001", "SHIP-002", "Write unit tests", "ready"},
-		{"TASK-006", "COMM-001", "SHIP-003", "Update README", "ready"},
-		{"TASK-007", "COMM-002", "SHIP-004", "Design API schema", "ready"},
-		{"TASK-008", "COMM-002", "SHIP-004", "Implement endpoints", "ready"},
-		{"TASK-009", "COMM-002", "SHIP-005", "Setup test framework", "ready"},
-		{"TASK-010", "COMM-002", "SHIP-005", "Write integration tests", "ready"},
+		{"TASK-001", "COMM-001", "SHIP-001", "Setup repository", "closed"},
+		{"TASK-002", "COMM-001", "SHIP-001", "Configure CI", "closed"},
+		{"TASK-003", "COMM-001", "SHIP-002", "Implement core logic", "in-progress"},
+		{"TASK-004", "COMM-001", "SHIP-002", "Add error handling", "open"},
+		{"TASK-005", "COMM-001", "SHIP-002", "Write unit tests", "open"},
+		{"TASK-006", "COMM-001", "SHIP-003", "Update README", "open"},
+		{"TASK-007", "COMM-002", "SHIP-004", "Design API schema", "open"},
+		{"TASK-008", "COMM-002", "SHIP-004", "Implement endpoints", "open"},
+		{"TASK-009", "COMM-002", "SHIP-005", "Setup test framework", "open"},
+		{"TASK-010", "COMM-002", "SHIP-005", "Write integration tests", "open"},
 	}
 	for _, t := range tasks {
 		if _, err := database.Exec(

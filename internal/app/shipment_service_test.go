@@ -422,7 +422,7 @@ func TestGetShipment_Found(t *testing.T) {
 		ID:           "SHIPMENT-001",
 		CommissionID: "COMM-001",
 		Title:        "Test Shipment",
-		Status:       "active",
+		Status:       "draft",
 	}
 
 	shipment, err := service.GetShipment(ctx, "SHIPMENT-001")
@@ -458,13 +458,13 @@ func TestListShipments_FilterByCommission(t *testing.T) {
 		ID:           "SHIPMENT-001",
 		CommissionID: "COMM-001",
 		Title:        "Shipment 1",
-		Status:       "active",
+		Status:       "draft",
 	}
 	shipmentRepo.shipments["SHIPMENT-002"] = &secondary.ShipmentRecord{
 		ID:           "SHIPMENT-002",
 		CommissionID: "COMM-002",
 		Title:        "Shipment 2",
-		Status:       "active",
+		Status:       "draft",
 	}
 
 	shipments, err := service.ListShipments(ctx, primary.ShipmentFilters{CommissionID: "COMM-001"})
@@ -485,16 +485,16 @@ func TestListShipments_FilterByStatus(t *testing.T) {
 		ID:           "SHIPMENT-001",
 		CommissionID: "COMM-001",
 		Title:        "Active Shipment",
-		Status:       "active",
+		Status:       "draft",
 	}
 	shipmentRepo.shipments["SHIPMENT-002"] = &secondary.ShipmentRecord{
 		ID:           "SHIPMENT-002",
 		CommissionID: "COMM-001",
-		Title:        "Paused Shipment",
-		Status:       "paused",
+		Title:        "Closed Shipment",
+		Status:       "closed",
 	}
 
-	shipments, err := service.ListShipments(ctx, primary.ShipmentFilters{Status: "active"})
+	shipments, err := service.ListShipments(ctx, primary.ShipmentFilters{Status: "draft"})
 
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
@@ -516,20 +516,20 @@ func TestCompleteShipment_UnpinnedAllowed(t *testing.T) {
 		ID:           "SHIPMENT-001",
 		CommissionID: "COMM-001",
 		Title:        "Test Shipment",
-		Status:       "active",
+		Status:       "draft",
 		Pinned:       false,
 	}
-	// All tasks complete
-	taskRepo.tasks["TASK-001"] = &secondary.TaskRecord{ID: "TASK-001", ShipmentID: "SHIPMENT-001", Status: "complete"}
-	taskRepo.tasks["TASK-002"] = &secondary.TaskRecord{ID: "TASK-002", ShipmentID: "SHIPMENT-001", Status: "complete"}
+	// All tasks closed
+	taskRepo.tasks["TASK-001"] = &secondary.TaskRecord{ID: "TASK-001", ShipmentID: "SHIPMENT-001", Status: "closed"}
+	taskRepo.tasks["TASK-002"] = &secondary.TaskRecord{ID: "TASK-002", ShipmentID: "SHIPMENT-001", Status: "closed"}
 
 	err := service.CompleteShipment(ctx, "SHIPMENT-001", false)
 
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-	if shipmentRepo.shipments["SHIPMENT-001"].Status != "complete" {
-		t.Errorf("expected status 'complete', got '%s'", shipmentRepo.shipments["SHIPMENT-001"].Status)
+	if shipmentRepo.shipments["SHIPMENT-001"].Status != "closed" {
+		t.Errorf("expected status 'closed', got '%s'", shipmentRepo.shipments["SHIPMENT-001"].Status)
 	}
 }
 
@@ -541,7 +541,7 @@ func TestCompleteShipment_PinnedBlocked(t *testing.T) {
 		ID:           "SHIPMENT-001",
 		CommissionID: "COMM-001",
 		Title:        "Pinned Shipment",
-		Status:       "active",
+		Status:       "draft",
 		Pinned:       true,
 	}
 
@@ -560,20 +560,20 @@ func TestCompleteShipment_IncompleteTasksBlocked(t *testing.T) {
 		ID:           "SHIPMENT-001",
 		CommissionID: "COMM-001",
 		Title:        "Test Shipment",
-		Status:       "active",
+		Status:       "draft",
 		Pinned:       false,
 	}
-	// One task incomplete
-	taskRepo.tasks["TASK-001"] = &secondary.TaskRecord{ID: "TASK-001", ShipmentID: "SHIPMENT-001", Status: "complete"}
-	taskRepo.tasks["TASK-002"] = &secondary.TaskRecord{ID: "TASK-002", ShipmentID: "SHIPMENT-001", Status: "ready"}
+	// One task not closed
+	taskRepo.tasks["TASK-001"] = &secondary.TaskRecord{ID: "TASK-001", ShipmentID: "SHIPMENT-001", Status: "closed"}
+	taskRepo.tasks["TASK-002"] = &secondary.TaskRecord{ID: "TASK-002", ShipmentID: "SHIPMENT-001", Status: "open"}
 
 	err := service.CompleteShipment(ctx, "SHIPMENT-001", false)
 
 	if err == nil {
-		t.Fatal("expected error for incomplete tasks, got nil")
+		t.Fatal("expected error for non-closed tasks, got nil")
 	}
-	if shipmentRepo.shipments["SHIPMENT-001"].Status == "complete" {
-		t.Error("shipment should not be completed with incomplete tasks")
+	if shipmentRepo.shipments["SHIPMENT-001"].Status == "closed" {
+		t.Error("shipment should not be closed with non-closed tasks")
 	}
 }
 
@@ -585,21 +585,21 @@ func TestCompleteShipment_IncompleteTasksForced(t *testing.T) {
 		ID:           "SHIPMENT-001",
 		CommissionID: "COMM-001",
 		Title:        "Test Shipment",
-		Status:       "active",
+		Status:       "draft",
 		Pinned:       false,
 	}
-	// One task incomplete
-	taskRepo.tasks["TASK-001"] = &secondary.TaskRecord{ID: "TASK-001", ShipmentID: "SHIPMENT-001", Status: "complete"}
-	taskRepo.tasks["TASK-002"] = &secondary.TaskRecord{ID: "TASK-002", ShipmentID: "SHIPMENT-001", Status: "ready"}
+	// One task not closed
+	taskRepo.tasks["TASK-001"] = &secondary.TaskRecord{ID: "TASK-001", ShipmentID: "SHIPMENT-001", Status: "closed"}
+	taskRepo.tasks["TASK-002"] = &secondary.TaskRecord{ID: "TASK-002", ShipmentID: "SHIPMENT-001", Status: "open"}
 
-	// Force completion
+	// Force close
 	err := service.CompleteShipment(ctx, "SHIPMENT-001", true)
 
 	if err != nil {
 		t.Fatalf("expected no error with force=true, got %v", err)
 	}
-	if shipmentRepo.shipments["SHIPMENT-001"].Status != "complete" {
-		t.Errorf("expected status 'complete', got '%s'", shipmentRepo.shipments["SHIPMENT-001"].Status)
+	if shipmentRepo.shipments["SHIPMENT-001"].Status != "closed" {
+		t.Errorf("expected status 'closed', got '%s'", shipmentRepo.shipments["SHIPMENT-001"].Status)
 	}
 }
 
@@ -615,110 +615,6 @@ func TestCompleteShipment_NotFound(t *testing.T) {
 }
 
 // ============================================================================
-// PauseShipment Tests
-// ============================================================================
-
-func TestPauseShipment_ActiveAllowed(t *testing.T) {
-	service, shipmentRepo, _ := newTestShipmentService()
-	ctx := context.Background()
-
-	shipmentRepo.shipments["SHIPMENT-001"] = &secondary.ShipmentRecord{
-		ID:           "SHIPMENT-001",
-		CommissionID: "COMM-001",
-		Title:        "Active Shipment",
-		Status:       "active",
-	}
-
-	err := service.PauseShipment(ctx, "SHIPMENT-001")
-
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-	if shipmentRepo.shipments["SHIPMENT-001"].Status != "paused" {
-		t.Errorf("expected status 'paused', got '%s'", shipmentRepo.shipments["SHIPMENT-001"].Status)
-	}
-}
-
-func TestPauseShipment_NotActiveBlocked(t *testing.T) {
-	service, shipmentRepo, _ := newTestShipmentService()
-	ctx := context.Background()
-
-	shipmentRepo.shipments["SHIPMENT-001"] = &secondary.ShipmentRecord{
-		ID:           "SHIPMENT-001",
-		CommissionID: "COMM-001",
-		Title:        "Paused Shipment",
-		Status:       "paused",
-	}
-
-	err := service.PauseShipment(ctx, "SHIPMENT-001")
-
-	if err == nil {
-		t.Fatal("expected error for pausing non-active shipment, got nil")
-	}
-}
-
-func TestPauseShipment_CompleteBlocked(t *testing.T) {
-	service, shipmentRepo, _ := newTestShipmentService()
-	ctx := context.Background()
-
-	shipmentRepo.shipments["SHIPMENT-001"] = &secondary.ShipmentRecord{
-		ID:           "SHIPMENT-001",
-		CommissionID: "COMM-001",
-		Title:        "Complete Shipment",
-		Status:       "complete",
-	}
-
-	err := service.PauseShipment(ctx, "SHIPMENT-001")
-
-	if err == nil {
-		t.Fatal("expected error for pausing complete shipment, got nil")
-	}
-}
-
-// ============================================================================
-// ResumeShipment Tests
-// ============================================================================
-
-func TestResumeShipment_PausedAllowed(t *testing.T) {
-	service, shipmentRepo, _ := newTestShipmentService()
-	ctx := context.Background()
-
-	shipmentRepo.shipments["SHIPMENT-001"] = &secondary.ShipmentRecord{
-		ID:           "SHIPMENT-001",
-		CommissionID: "COMM-001",
-		Title:        "Paused Shipment",
-		Status:       "paused",
-	}
-
-	err := service.ResumeShipment(ctx, "SHIPMENT-001")
-
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-	if shipmentRepo.shipments["SHIPMENT-001"].Status != "active" {
-		t.Errorf("expected status 'active', got '%s'", shipmentRepo.shipments["SHIPMENT-001"].Status)
-	}
-}
-
-func TestResumeShipment_NotPausedBlocked(t *testing.T) {
-	service, shipmentRepo, _ := newTestShipmentService()
-	ctx := context.Background()
-
-	shipmentRepo.shipments["SHIPMENT-001"] = &secondary.ShipmentRecord{
-		ID:           "SHIPMENT-001",
-		CommissionID: "COMM-001",
-		Title:        "Active Shipment",
-		Status:       "active",
-	}
-
-	err := service.ResumeShipment(ctx, "SHIPMENT-001")
-
-	if err == nil {
-		t.Fatal("expected error for resuming non-paused shipment, got nil")
-	}
-}
-
-// ============================================================================
 // Pin/Unpin Tests
 // ============================================================================
 
@@ -730,7 +626,7 @@ func TestPinShipment(t *testing.T) {
 		ID:           "SHIPMENT-001",
 		CommissionID: "COMM-001",
 		Title:        "Test Shipment",
-		Status:       "active",
+		Status:       "draft",
 		Pinned:       false,
 	}
 
@@ -752,7 +648,7 @@ func TestUnpinShipment(t *testing.T) {
 		ID:           "SHIPMENT-001",
 		CommissionID: "COMM-001",
 		Title:        "Pinned Shipment",
-		Status:       "active",
+		Status:       "draft",
 		Pinned:       true,
 	}
 
@@ -778,7 +674,7 @@ func TestAssignShipmentToWorkbench_Success(t *testing.T) {
 		ID:           "SHIPMENT-001",
 		CommissionID: "COMM-001",
 		Title:        "Test Shipment",
-		Status:       "active",
+		Status:       "draft",
 	}
 
 	err := service.AssignShipmentToWorkbench(ctx, "SHIPMENT-001", "BENCH-001")
@@ -810,13 +706,13 @@ func TestAssignShipmentToWorkbench_WorkbenchAlreadyAssigned(t *testing.T) {
 		ID:           "SHIPMENT-001",
 		CommissionID: "COMM-001",
 		Title:        "Shipment 1",
-		Status:       "active",
+		Status:       "draft",
 	}
 	shipmentRepo.shipments["SHIPMENT-002"] = &secondary.ShipmentRecord{
 		ID:                  "SHIPMENT-002",
 		CommissionID:        "COMM-001",
 		Title:               "Shipment 2",
-		Status:              "active",
+		Status:              "draft",
 		AssignedWorkbenchID: "BENCH-001",
 	}
 	shipmentRepo.workbenchAssignments["BENCH-001"] = "SHIPMENT-002"
@@ -840,14 +736,14 @@ func TestGetShipmentsByWorkbench_Success(t *testing.T) {
 		ID:                  "SHIPMENT-001",
 		CommissionID:        "COMM-001",
 		Title:               "Assigned Shipment",
-		Status:              "active",
+		Status:              "draft",
 		AssignedWorkbenchID: "BENCH-001",
 	}
 	shipmentRepo.shipments["SHIPMENT-002"] = &secondary.ShipmentRecord{
 		ID:           "SHIPMENT-002",
 		CommissionID: "COMM-001",
 		Title:        "Unassigned Shipment",
-		Status:       "active",
+		Status:       "draft",
 	}
 
 	shipments, err := service.GetShipmentsByWorkbench(ctx, "BENCH-001")
@@ -872,7 +768,7 @@ func TestGetShipmentTasks_Success(t *testing.T) {
 		ID:           "SHIPMENT-001",
 		CommissionID: "COMM-001",
 		Title:        "Test Shipment",
-		Status:       "active",
+		Status:       "draft",
 	}
 
 	tasks, err := service.GetShipmentTasks(ctx, "SHIPMENT-001")
@@ -899,7 +795,7 @@ func TestUpdateShipment_Title(t *testing.T) {
 		CommissionID: "COMM-001",
 		Title:        "Old Title",
 		Description:  "Original description",
-		Status:       "active",
+		Status:       "draft",
 	}
 
 	err := service.UpdateShipment(ctx, primary.UpdateShipmentRequest{
@@ -927,7 +823,7 @@ func TestDeleteShipment_Success(t *testing.T) {
 		ID:           "SHIPMENT-001",
 		CommissionID: "COMM-001",
 		Title:        "Test Shipment",
-		Status:       "active",
+		Status:       "draft",
 	}
 
 	err := service.DeleteShipment(ctx, "SHIPMENT-001")
@@ -1016,7 +912,7 @@ func TestCompleteShipment_ClosesSpecNote(t *testing.T) {
 		ID:           "SHIP-001",
 		CommissionID: "COMM-001",
 		Title:        "Test Shipment",
-		Status:       "active",
+		Status:       "draft",
 		SpecNoteID:   "NOTE-001",
 	}
 
@@ -1048,7 +944,7 @@ func TestCompleteShipment_WithoutSpecNote(t *testing.T) {
 		ID:           "SHIP-001",
 		CommissionID: "COMM-001",
 		Title:        "Test Shipment",
-		Status:       "active",
+		Status:       "draft",
 	}
 
 	err := service.CompleteShipment(ctx, "SHIP-001", true)

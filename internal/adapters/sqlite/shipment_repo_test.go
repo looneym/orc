@@ -162,9 +162,9 @@ func TestShipmentRepository_List_FilterByStatus(t *testing.T) {
 
 	// Create and complete a shipment
 	s2 := createTestShipment(t, repo, ctx, "COMM-001", "Complete Shipment", "")
-	_ = repo.UpdateStatus(ctx, s2.ID, "complete", true)
+	_ = repo.UpdateStatus(ctx, s2.ID, "closed", true)
 
-	// List only active
+	// List only draft
 	shipments, err := repo.List(ctx, secondary.ShipmentFilters{Status: "draft"})
 	if err != nil {
 		t.Fatalf("List failed: %v", err)
@@ -325,28 +325,28 @@ func TestShipmentRepository_UpdateStatus(t *testing.T) {
 	shipment := createTestShipment(t, repo, ctx, "COMM-001", "Status Test", "")
 
 	// Update status without completed timestamp
-	err := repo.UpdateStatus(ctx, shipment.ID, "implementing", false)
+	err := repo.UpdateStatus(ctx, shipment.ID, "in-progress", false)
 	if err != nil {
 		t.Fatalf("UpdateStatus failed: %v", err)
 	}
 
 	retrieved, _ := repo.GetByID(ctx, shipment.ID)
-	if retrieved.Status != "implementing" {
-		t.Errorf("expected status 'implementing', got '%s'", retrieved.Status)
+	if retrieved.Status != "in-progress" {
+		t.Errorf("expected status 'in-progress', got '%s'", retrieved.Status)
 	}
 	if retrieved.CompletedAt != "" {
 		t.Error("expected CompletedAt to be empty")
 	}
 
-	// Update to complete with timestamp
-	err = repo.UpdateStatus(ctx, shipment.ID, "complete", true)
+	// Update to closed with timestamp
+	err = repo.UpdateStatus(ctx, shipment.ID, "closed", true)
 	if err != nil {
 		t.Fatalf("UpdateStatus failed: %v", err)
 	}
 
 	retrieved, _ = repo.GetByID(ctx, shipment.ID)
-	if retrieved.Status != "complete" {
-		t.Errorf("expected status 'complete', got '%s'", retrieved.Status)
+	if retrieved.Status != "closed" {
+		t.Errorf("expected status 'closed', got '%s'", retrieved.Status)
 	}
 	if retrieved.CompletedAt == "" {
 		t.Error("expected CompletedAt to be set")
@@ -358,7 +358,7 @@ func TestShipmentRepository_UpdateStatus_NotFound(t *testing.T) {
 	repo := sqlite.NewShipmentRepository(db, nil)
 	ctx := context.Background()
 
-	err := repo.UpdateStatus(ctx, "SHIP-999", "complete", true)
+	err := repo.UpdateStatus(ctx, "SHIP-999", "closed", true)
 	if err == nil {
 		t.Error("expected error for non-existent shipment")
 	}

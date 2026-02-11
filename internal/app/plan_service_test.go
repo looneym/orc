@@ -322,107 +322,6 @@ func (m *mockWorkbenchRepoForPlan) WorkshopExists(ctx context.Context, workshopI
 	return true, nil
 }
 
-// mockGatehouseRepoForPlan is a minimal mock for testing PlanService.
-type mockGatehouseRepoForPlan struct {
-	gatehousesByWorkshop map[string]*secondary.GatehouseRecord
-}
-
-func newMockGatehouseRepoForPlan() *mockGatehouseRepoForPlan {
-	return &mockGatehouseRepoForPlan{
-		gatehousesByWorkshop: make(map[string]*secondary.GatehouseRecord),
-	}
-}
-
-func (m *mockGatehouseRepoForPlan) Create(ctx context.Context, g *secondary.GatehouseRecord) error {
-	return nil
-}
-
-func (m *mockGatehouseRepoForPlan) GetByID(ctx context.Context, id string) (*secondary.GatehouseRecord, error) {
-	return nil, errors.New("not found")
-}
-
-func (m *mockGatehouseRepoForPlan) GetByWorkshop(ctx context.Context, workshopID string) (*secondary.GatehouseRecord, error) {
-	if g, ok := m.gatehousesByWorkshop[workshopID]; ok {
-		return g, nil
-	}
-	return nil, errors.New("not found")
-}
-
-func (m *mockGatehouseRepoForPlan) List(ctx context.Context, filters secondary.GatehouseFilters) ([]*secondary.GatehouseRecord, error) {
-	return nil, nil
-}
-
-func (m *mockGatehouseRepoForPlan) Update(ctx context.Context, g *secondary.GatehouseRecord) error {
-	return nil
-}
-
-func (m *mockGatehouseRepoForPlan) Delete(ctx context.Context, id string) error {
-	return nil
-}
-
-func (m *mockGatehouseRepoForPlan) GetNextID(ctx context.Context) (string, error) {
-	return "GATE-001", nil
-}
-
-func (m *mockGatehouseRepoForPlan) UpdateStatus(ctx context.Context, id, status string) error {
-	return nil
-}
-
-func (m *mockGatehouseRepoForPlan) WorkshopExists(ctx context.Context, workshopID string) (bool, error) {
-	return true, nil
-}
-
-func (m *mockGatehouseRepoForPlan) WorkshopHasGatehouse(ctx context.Context, workshopID string) (bool, error) {
-	_, ok := m.gatehousesByWorkshop[workshopID]
-	return ok, nil
-}
-
-func (m *mockGatehouseRepoForPlan) UpdateFocusedID(ctx context.Context, id, focusedID string) error {
-	for _, g := range m.gatehousesByWorkshop {
-		if g.ID == id {
-			g.FocusedID = focusedID
-			return nil
-		}
-	}
-	return fmt.Errorf("gatehouse %s not found", id)
-}
-
-// mockMessageServiceForPlan is a minimal mock for testing PlanService.
-type mockMessageServiceForPlan struct {
-	messages []*primary.CreateMessageRequest
-}
-
-func newMockMessageServiceForPlan() *mockMessageServiceForPlan {
-	return &mockMessageServiceForPlan{
-		messages: make([]*primary.CreateMessageRequest, 0),
-	}
-}
-
-func (m *mockMessageServiceForPlan) CreateMessage(ctx context.Context, req primary.CreateMessageRequest) (*primary.CreateMessageResponse, error) {
-	m.messages = append(m.messages, &req)
-	return &primary.CreateMessageResponse{MessageID: "MSG-001"}, nil
-}
-
-func (m *mockMessageServiceForPlan) GetMessage(ctx context.Context, messageID string) (*primary.Message, error) {
-	return nil, errors.New("not found")
-}
-
-func (m *mockMessageServiceForPlan) ListMessages(ctx context.Context, recipient string, unreadOnly bool) ([]*primary.Message, error) {
-	return nil, nil
-}
-
-func (m *mockMessageServiceForPlan) MarkRead(ctx context.Context, messageID string) error {
-	return nil
-}
-
-func (m *mockMessageServiceForPlan) GetConversation(ctx context.Context, actor1, actor2 string) ([]*primary.Message, error) {
-	return nil, nil
-}
-
-func (m *mockMessageServiceForPlan) GetUnreadCount(ctx context.Context, recipient string) (int, error) {
-	return 0, nil
-}
-
 // mockTMuxAdapterForPlan is a minimal mock for testing PlanService.
 type mockTMuxAdapterForPlan struct{}
 
@@ -539,10 +438,8 @@ func newTestPlanService() (*PlanServiceImpl, *mockPlanRepository, *mockApprovalR
 	approvalRepo := newMockApprovalRepository()
 	escalationRepo := newMockEscalationRepoForPlan()
 	workbenchRepo := newMockWorkbenchRepoForPlan()
-	gatehouseRepo := newMockGatehouseRepoForPlan()
-	messageService := newMockMessageServiceForPlan()
 	tmuxAdapter := newMockTMuxAdapterForPlan()
-	service := NewPlanService(planRepo, approvalRepo, escalationRepo, workbenchRepo, gatehouseRepo, messageService, tmuxAdapter)
+	service := NewPlanService(planRepo, approvalRepo, escalationRepo, workbenchRepo, tmuxAdapter)
 	return service, planRepo, approvalRepo
 }
 

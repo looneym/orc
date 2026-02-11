@@ -18,7 +18,6 @@ type SummaryServiceImpl struct {
 	planService       primary.PlanService
 	approvalService   primary.ApprovalService
 	escalationService primary.EscalationService
-	receiptService    primary.ReceiptService
 }
 
 // NewSummaryService creates a new SummaryService with injected dependencies.
@@ -32,7 +31,6 @@ func NewSummaryService(
 	planService primary.PlanService,
 	approvalService primary.ApprovalService,
 	escalationService primary.EscalationService,
-	receiptService primary.ReceiptService,
 ) *SummaryServiceImpl {
 	return &SummaryServiceImpl{
 		commissionService: commissionService,
@@ -44,7 +42,6 @@ func NewSummaryService(
 		planService:       planService,
 		approvalService:   approvalService,
 		escalationService: escalationService,
-		receiptService:    receiptService,
 	}
 }
 
@@ -81,8 +78,8 @@ func (s *SummaryServiceImpl) GetCommissionSummary(ctx context.Context, req prima
 	// Build flat shipment list
 	var shipmentSummaries []primary.ShipmentSummary
 	for _, ship := range allShipments {
-		if ship.Status == "complete" {
-			addDebug(fmt.Sprintf("Hidden: %s (%s) - status is complete", ship.ID, ship.Title))
+		if ship.Status == "closed" {
+			addDebug(fmt.Sprintf("Hidden: %s (%s) - status is closed", ship.ID, ship.Title))
 			continue
 		}
 
@@ -212,11 +209,11 @@ func (s *SummaryServiceImpl) buildShipmentSummary(ctx context.Context, ship *pri
 	if err == nil {
 		for _, t := range tasks {
 			tasksTotal++
-			if t.Status == "complete" {
+			if t.Status == "closed" {
 				tasksDone++
 			}
-			// Include non-complete tasks for focused shipment
-			if isFocused && t.Status != "complete" {
+			// Include non-closed tasks for focused shipment
+			if isFocused && t.Status != "closed" {
 				taskSummary := primary.TaskSummary{
 					ID:     t.ID,
 					Title:  t.Title,
@@ -317,18 +314,6 @@ func (s *SummaryServiceImpl) fetchTaskChildren(ctx context.Context, task *primar
 		}
 	}
 
-	// Fetch receipts for this task
-	if s.receiptService != nil {
-		receipts, err := s.receiptService.ListReceipts(ctx, primary.ReceiptFilters{TaskID: task.ID})
-		if err == nil {
-			for _, r := range receipts {
-				task.Receipts = append(task.Receipts, primary.ReceiptSummary{
-					ID:     r.ID,
-					Status: r.Status,
-				})
-			}
-		}
-	}
 }
 
 // Ensure SummaryServiceImpl implements the interface

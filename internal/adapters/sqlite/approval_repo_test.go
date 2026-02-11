@@ -16,7 +16,7 @@ func TestApprovalRepository_Create(t *testing.T) {
 	// Create test fixtures: commission -> shipment -> task, plan
 	db.ExecContext(ctx, "INSERT INTO commissions (id, title, status) VALUES (?, ?, ?)", "COMM-001", "Test", "active")
 	db.ExecContext(ctx, "INSERT INTO shipments (id, commission_id, title, status) VALUES (?, ?, ?, ?)", "SHIP-001", "COMM-001", "Test Shipment", "draft")
-	db.ExecContext(ctx, "INSERT INTO tasks (id, shipment_id, commission_id, title, status) VALUES (?, ?, ?, ?, ?)", "TASK-001", "SHIP-001", "COMM-001", "Test Task", "ready")
+	db.ExecContext(ctx, "INSERT INTO tasks (id, shipment_id, commission_id, title, status) VALUES (?, ?, ?, ?, ?)", "TASK-001", "SHIP-001", "COMM-001", "Test Task", "open")
 	db.ExecContext(ctx, "INSERT INTO plans (id, commission_id, task_id, title, status) VALUES (?, ?, ?, ?, ?)", "PLAN-001", "COMM-001", "TASK-001", "Test Plan", "draft")
 
 	t.Run("creates approval successfully", func(t *testing.T) {
@@ -104,7 +104,7 @@ func TestApprovalRepository_GetByID(t *testing.T) {
 	// Setup
 	db.ExecContext(ctx, "INSERT INTO commissions (id, title, status) VALUES (?, ?, ?)", "COMM-001", "Test", "active")
 	db.ExecContext(ctx, "INSERT INTO shipments (id, commission_id, title, status) VALUES (?, ?, ?, ?)", "SHIP-001", "COMM-001", "Test", "draft")
-	db.ExecContext(ctx, "INSERT INTO tasks (id, shipment_id, commission_id, title, status) VALUES (?, ?, ?, ?, ?)", "TASK-001", "SHIP-001", "COMM-001", "Test", "ready")
+	db.ExecContext(ctx, "INSERT INTO tasks (id, shipment_id, commission_id, title, status) VALUES (?, ?, ?, ?, ?)", "TASK-001", "SHIP-001", "COMM-001", "Test", "open")
 	db.ExecContext(ctx, "INSERT INTO plans (id, commission_id, task_id, title, status) VALUES (?, ?, ?, ?, ?)", "PLAN-001", "COMM-001", "TASK-001", "Test", "draft")
 
 	repo.Create(ctx, &secondary.ApprovalRecord{
@@ -141,7 +141,7 @@ func TestApprovalRepository_GetByPlan(t *testing.T) {
 	// Setup
 	db.ExecContext(ctx, "INSERT INTO commissions (id, title, status) VALUES (?, ?, ?)", "COMM-001", "Test", "active")
 	db.ExecContext(ctx, "INSERT INTO shipments (id, commission_id, title, status) VALUES (?, ?, ?, ?)", "SHIP-001", "COMM-001", "Test", "draft")
-	db.ExecContext(ctx, "INSERT INTO tasks (id, shipment_id, commission_id, title, status) VALUES (?, ?, ?, ?, ?)", "TASK-001", "SHIP-001", "COMM-001", "Test", "ready")
+	db.ExecContext(ctx, "INSERT INTO tasks (id, shipment_id, commission_id, title, status) VALUES (?, ?, ?, ?, ?)", "TASK-001", "SHIP-001", "COMM-001", "Test", "open")
 	db.ExecContext(ctx, "INSERT INTO plans (id, commission_id, task_id, title, status) VALUES (?, ?, ?, ?, ?)", "PLAN-001", "COMM-001", "TASK-001", "Test", "draft")
 
 	repo.Create(ctx, &secondary.ApprovalRecord{
@@ -181,8 +181,8 @@ func TestApprovalRepository_List(t *testing.T) {
 	// Setup
 	db.ExecContext(ctx, "INSERT INTO commissions (id, title, status) VALUES (?, ?, ?)", "COMM-001", "Test", "active")
 	db.ExecContext(ctx, "INSERT INTO shipments (id, commission_id, title, status) VALUES (?, ?, ?, ?)", "SHIP-001", "COMM-001", "Test", "draft")
-	db.ExecContext(ctx, "INSERT INTO tasks (id, shipment_id, commission_id, title, status) VALUES (?, ?, ?, ?, ?)", "TASK-001", "SHIP-001", "COMM-001", "Test 1", "ready")
-	db.ExecContext(ctx, "INSERT INTO tasks (id, shipment_id, commission_id, title, status) VALUES (?, ?, ?, ?, ?)", "TASK-002", "SHIP-001", "COMM-001", "Test 2", "ready")
+	db.ExecContext(ctx, "INSERT INTO tasks (id, shipment_id, commission_id, title, status) VALUES (?, ?, ?, ?, ?)", "TASK-001", "SHIP-001", "COMM-001", "Test 1", "open")
+	db.ExecContext(ctx, "INSERT INTO tasks (id, shipment_id, commission_id, title, status) VALUES (?, ?, ?, ?, ?)", "TASK-002", "SHIP-001", "COMM-001", "Test 2", "open")
 	db.ExecContext(ctx, "INSERT INTO plans (id, commission_id, task_id, title, status) VALUES (?, ?, ?, ?, ?)", "PLAN-001", "COMM-001", "TASK-001", "Test 1", "draft")
 	db.ExecContext(ctx, "INSERT INTO plans (id, commission_id, task_id, title, status) VALUES (?, ?, ?, ?, ?)", "PLAN-002", "COMM-001", "TASK-002", "Test 2", "draft")
 
@@ -234,7 +234,7 @@ func TestApprovalRepository_Delete(t *testing.T) {
 	// Setup
 	db.ExecContext(ctx, "INSERT INTO commissions (id, title, status) VALUES (?, ?, ?)", "COMM-001", "Test", "active")
 	db.ExecContext(ctx, "INSERT INTO shipments (id, commission_id, title, status) VALUES (?, ?, ?, ?)", "SHIP-001", "COMM-001", "Test", "draft")
-	db.ExecContext(ctx, "INSERT INTO tasks (id, shipment_id, commission_id, title, status) VALUES (?, ?, ?, ?, ?)", "TASK-001", "SHIP-001", "COMM-001", "Test", "ready")
+	db.ExecContext(ctx, "INSERT INTO tasks (id, shipment_id, commission_id, title, status) VALUES (?, ?, ?, ?, ?)", "TASK-001", "SHIP-001", "COMM-001", "Test", "open")
 	db.ExecContext(ctx, "INSERT INTO plans (id, commission_id, task_id, title, status) VALUES (?, ?, ?, ?, ?)", "PLAN-001", "COMM-001", "TASK-001", "Test", "draft")
 
 	repo.Create(ctx, &secondary.ApprovalRecord{ID: "APPR-001", PlanID: "PLAN-001", TaskID: "TASK-001", Mechanism: "subagent", Outcome: "approved"})
@@ -282,7 +282,7 @@ func TestApprovalRepository_PlanExists(t *testing.T) {
 
 	// Setup
 	db.ExecContext(ctx, "INSERT INTO commissions (id, title, status) VALUES (?, ?, ?)", "COMM-001", "Test", "active")
-	db.ExecContext(ctx, "INSERT INTO tasks (id, commission_id, title, status) VALUES (?, ?, ?, ?)", "TASK-001", "COMM-001", "Test", "ready")
+	db.ExecContext(ctx, "INSERT INTO tasks (id, commission_id, title, status) VALUES (?, ?, ?, ?)", "TASK-001", "COMM-001", "Test", "open")
 	db.ExecContext(ctx, "INSERT INTO plans (id, commission_id, task_id, title, status) VALUES (?, ?, ?, ?, ?)", "PLAN-001", "COMM-001", "TASK-001", "Test", "draft")
 
 	t.Run("returns true for existing plan", func(t *testing.T) {
@@ -313,7 +313,7 @@ func TestApprovalRepository_TaskExists(t *testing.T) {
 
 	// Setup
 	db.ExecContext(ctx, "INSERT INTO commissions (id, title, status) VALUES (?, ?, ?)", "COMM-001", "Test", "active")
-	db.ExecContext(ctx, "INSERT INTO tasks (id, commission_id, title, status) VALUES (?, ?, ?, ?)", "TASK-001", "COMM-001", "Test", "ready")
+	db.ExecContext(ctx, "INSERT INTO tasks (id, commission_id, title, status) VALUES (?, ?, ?, ?)", "TASK-001", "COMM-001", "Test", "open")
 
 	t.Run("returns true for existing task", func(t *testing.T) {
 		exists, err := repo.TaskExists(ctx, "TASK-001")
@@ -344,7 +344,7 @@ func TestApprovalRepository_PlanHasApproval(t *testing.T) {
 	// Setup
 	db.ExecContext(ctx, "INSERT INTO commissions (id, title, status) VALUES (?, ?, ?)", "COMM-001", "Test", "active")
 	db.ExecContext(ctx, "INSERT INTO shipments (id, commission_id, title, status) VALUES (?, ?, ?, ?)", "SHIP-001", "COMM-001", "Test", "draft")
-	db.ExecContext(ctx, "INSERT INTO tasks (id, shipment_id, commission_id, title, status) VALUES (?, ?, ?, ?, ?)", "TASK-001", "SHIP-001", "COMM-001", "Test", "ready")
+	db.ExecContext(ctx, "INSERT INTO tasks (id, shipment_id, commission_id, title, status) VALUES (?, ?, ?, ?, ?)", "TASK-001", "SHIP-001", "COMM-001", "Test", "open")
 	db.ExecContext(ctx, "INSERT INTO plans (id, commission_id, task_id, title, status) VALUES (?, ?, ?, ?, ?)", "PLAN-001", "COMM-001", "TASK-001", "Test 1", "draft")
 	db.ExecContext(ctx, "INSERT INTO plans (id, commission_id, task_id, title, status) VALUES (?, ?, ?, ?, ?)", "PLAN-002", "COMM-001", "TASK-001", "Test 2", "draft")
 

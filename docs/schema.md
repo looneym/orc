@@ -16,14 +16,12 @@ erDiagram
     FACTORY ||--o{ WORKSHOP : contains
     FACTORY ||--o{ COMMISSION : owns
     WORKSHOP ||--o{ WORKBENCH : contains
-    WORKSHOP ||--|| GATEHOUSE : "has one"
     COMMISSION ||--o{ SHIPMENT : contains
     COMMISSION ||--o{ TOME : contains
     SHIPMENT ||--o{ TASK : contains
     SHIPMENT ||--o{ NOTE : contains
     TOME ||--o{ NOTE : contains
     TASK ||--o{ PLAN : "planned by"
-    TASK ||--o| RECEIPT : "completed with"
     PLAN ||--o| APPROVAL : "approved by"
 
     FACTORY {
@@ -43,12 +41,6 @@ erDiagram
         string workshop_id FK
         string name
         string repo_id FK
-        string status
-        string focused_id
-    }
-    GATEHOUSE {
-        string id PK
-        string workshop_id FK
         string status
         string focused_id
     }
@@ -75,6 +67,7 @@ erDiagram
         string status
         string type
         string priority
+        boolean blocked
     }
     TOME {
         string id PK
@@ -107,12 +100,6 @@ erDiagram
         string mechanism
         string outcome
     }
-    RECEIPT {
-        string id PK
-        string task_id FK
-        string delivered_outcome
-        string status
-    }
 ```
 
 ---
@@ -124,15 +111,13 @@ erDiagram
 | **factories** | TMux sessions / runtime environments | name, status |
 | **workshops** | TMux sessions within a factory | factory_id, name, active_commission_id |
 | **workbenches** | Git worktrees within a workshop | workshop_id, repo_id, focused_id |
-| **gatehouses** | Goblin seats (1:1 with workshop) | workshop_id, focused_id |
 | **commissions** | Top-level coordination scopes | factory_id, title, status |
 | **shipments** | Work containers with lifecycle | commission_id, title, status, branch |
-| **tasks** | Atomic units of work | shipment_id, title, status, type, priority |
+| **tasks** | Atomic units of work | shipment_id, title, status, type, priority, blocked |
 | **tomes** | Knowledge containers | commission_id, title, status |
 | **notes** | Observations, learnings, decisions | shipment_id, tome_id, title, type |
 | **plans** | Implementation plans (1:many with task) | task_id, title, content, status |
 | **approvals** | Plan approvals (1:1 with plan) | plan_id, mechanism, outcome |
-| **receipts** | Task completion records (1:1 with task) | task_id, delivered_outcome, status |
 
 ---
 
@@ -141,13 +126,12 @@ erDiagram
 **Infrastructure:**
 ```
 Factory → Workshop → Workbench
-                  → Gatehouse (1:1)
 ```
 
 **Work Tracking:**
 ```
 Commission → Shipment → Task → Plan → Approval
-                     → Note     → Receipt
+                     → Note
           → Tome → Note
 ```
 

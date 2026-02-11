@@ -1,38 +1,36 @@
 # Common Workflows
 
 **Status**: Living document
-**Last Updated**: 2026-02-08
+**Last Updated**: 2026-02-11
 
 This guide covers the standard patterns for working with ORC.
 
 ## Shipment Lifecycle
 
-Shipments are the primary unit of work in ORC. They progress through a defined lifecycle.
+Shipments are the primary unit of work in ORC. They progress through a simple 4-status lifecycle.
 
-See **[docs/shipment-lifecycle.md](shipment-lifecycle.md)** for the complete state diagram with transitions and operating modes.
+See **[docs/shipment-lifecycle.md](shipment-lifecycle.md)** for the complete state diagram.
 
 ### State Descriptions
 
 | State | Description |
 |-------|-------------|
-| `draft` | Shipment created but not started |
-| `exploring` | Active ideation/research phase |
-| `tasked` | Tasks have been created |
-| `implementing` | Manual implementation mode |
-| `auto_implementing` | Autonomous implementation mode |
-| `deployed` | Merged to main branch |
-| `verified` | Post-deploy verification passed |
-| `complete` | Terminal state |
+| `draft` | Shipment created but not yet scoped |
+| `ready` | Scoped and ready for implementation |
+| `in-progress` | Active implementation |
+| `closed` | Terminal state |
 
-### Auto-Transitions
+All transitions are manual -- the Goblin (coordinator) decides when to advance.
 
-Some transitions happen automatically:
+### Task Lifecycle
 
-| Event | Transition |
-|-------|------------|
-| Focus shipment | draft → exploring |
-| Create first task | draft/exploring → tasked |
-| Claim task | tasked → implementing |
+| State | Description |
+|-------|-------------|
+| `open` | Task created, available for work |
+| `in-progress` | Actively being worked on |
+| `closed` | Terminal state |
+
+`blocked` is a lateral flag (not a status) that can be set on any non-closed task.
 
 ## Creating Work
 
@@ -42,7 +40,7 @@ Some transitions happen automatically:
 /ship-new "Title of the work"
 ```
 
-Creates a shipment and focuses it. Use for any piece of work you want to track.
+Creates a shipment in `draft` status. Use for any piece of work you want to track.
 
 ### Quick Idea Capture
 
@@ -68,76 +66,23 @@ When a shipment has accumulated exploration notes, use this to compact them into
 
 C2/C3 engineering review that pressure-tests synthesized knowledge and creates tasks. Use when ready to convert exploration into actionable implementation.
 
+## Goblin Workflow
+
+The Goblin (coordinator) is the human's long-running workbench pane. It manages ORC tasks and context:
+
+1. **Create shipments** with `/ship-new`
+2. **Advance lifecycle** manually (draft -> ready -> in-progress -> closed)
+3. **Create and manage tasks** within shipments
+4. **Coordinate with IMPs** via Claude Teams
+
 ## IMP Workflow
 
-The IMP (Implementation agent) follows a structured workflow for each task:
+IMPs (workers) are disposable agents spawned by Claude Teams. They execute tasks:
 
-### 1. Start Work
-
-```
-/imp-start        # Manual mode
-/imp-start --auto # Auto mode (Stop hook blocks until complete)
-```
-
-Claims the first ready task and optionally enables autonomous mode.
-
-### 2. Create Plan
-
-```
-/imp-plan-create
-```
-
-Research the codebase and create an implementation plan for the current task. The plan documents:
-- What files to modify
-- What changes to make
-- Verification steps
-
-### 3. Submit Plan
-
-```
-/imp-plan-submit
-```
-
-Submits and approves the plan. Plans are approved immediately since task specification happens upstream via `/ship-plan`.
-
-### 4. Implement
-
-Execute the plan:
-- Make the code changes
-- Run verification (tests, lint)
-- Ensure all plan items are addressed
-
-### 5. Create Receipt
-
-```
-/imp-rec
-```
-
-Verifies completed work, creates a receipt documenting the outcome, completes the task, and claims the next ready task.
-
-## Operating Modes
-
-### Manual Mode (implementing)
-
-Default mode. IMP can stop at any time for human review or oversight.
-
-```
-/imp-auto off    # Switch to manual
-```
-
-### Auto Mode (auto_implementing)
-
-Autonomous mode. Stop hook blocks until shipment is complete.
-
-```
-/imp-auto on     # Switch to auto
-```
-
-In auto mode, the IMP is propelled through the workflow:
-1. No plan? → /imp-plan-create
-2. Plan exists? → Implement it, then /imp-rec
-3. Stuck? → /imp-escalate
-4. Task complete? → /imp-rec chains to next
+1. **Receive task assignment** from Teams
+2. **Read ORC context** for requirements
+3. **Implement changes** in their workbench
+4. **Report completion** back to Teams
 
 ## Deployment
 
@@ -147,7 +92,7 @@ In auto mode, the IMP is propelled through the workflow:
 /ship-deploy
 ```
 
-Merges the workbench branch to main. Only available when all tasks are complete.
+Merges the workbench branch to main. Only available when all tasks are closed.
 
 ### Complete Shipment
 
@@ -155,7 +100,7 @@ Merges the workbench branch to main. Only available when all tasks are complete.
 /ship-complete
 ```
 
-Marks the shipment as complete after verification passes.
+Marks the shipment as closed after verification passes.
 
 ## Next Steps
 

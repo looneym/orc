@@ -1,15 +1,12 @@
 package cli
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
-	"strings"
 	"text/tabwriter"
 
 	"github.com/spf13/cobra"
 
-	"github.com/example/orc/internal/config"
 	orccontext "github.com/example/orc/internal/context"
 	"github.com/example/orc/internal/ports/primary"
 	"github.com/example/orc/internal/wire"
@@ -71,13 +68,6 @@ var shipmentListCmd = &cobra.Command{
 		ctx := NewContext()
 		commissionID, _ := cmd.Flags().GetString("commission")
 		status, _ := cmd.Flags().GetString("status")
-		available, _ := cmd.Flags().GetBool("available")
-
-		// --available is shorthand for --status ready_for_imp
-		if available {
-			status = "ready_for_imp"
-		}
-
 		// Get commission from context if not specified
 		if commissionID == "" {
 			commissionID = orccontext.GetContextCommissionID()
@@ -92,34 +82,19 @@ var shipmentListCmd = &cobra.Command{
 		}
 
 		if len(shipments) == 0 {
-			if available {
-				fmt.Println("No shipments available for IMP pickup.")
-			} else {
-				fmt.Println("No shipments found.")
-			}
+			fmt.Println("No shipments found.")
 			return nil
 		}
 
 		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-		if available {
-			fmt.Fprintln(w, "ID\tTITLE\tTASKS\tCOMMISSION")
-			fmt.Fprintln(w, "--\t-----\t-----\t----------")
-			for _, s := range shipments {
-				// Get task count for this shipment
-				tasks, _ := wire.ShipmentService().GetShipmentTasks(ctx, s.ID)
-				taskCount := len(tasks)
-				fmt.Fprintf(w, "%s\t%s\t%d\t%s\n", s.ID, s.Title, taskCount, s.CommissionID)
+		fmt.Fprintln(w, "ID\tTITLE\tSTATUS\tCOMMISSION")
+		fmt.Fprintln(w, "--\t-----\t------\t-------")
+		for _, s := range shipments {
+			pinnedMark := ""
+			if s.Pinned {
+				pinnedMark = " [pinned]"
 			}
-		} else {
-			fmt.Fprintln(w, "ID\tTITLE\tSTATUS\tCOMMISSION")
-			fmt.Fprintln(w, "--\t-----\t------\t-------")
-			for _, s := range shipments {
-				pinnedMark := ""
-				if s.Pinned {
-					pinnedMark = " [pinned]"
-				}
-				fmt.Fprintf(w, "%s\t%s%s\t%s\t%s\n", s.ID, s.Title, pinnedMark, s.Status, s.CommissionID)
-			}
+			fmt.Fprintf(w, "%s\t%s%s\t%s\t%s\n", s.ID, s.Title, pinnedMark, s.Status, s.CommissionID)
 		}
 		w.Flush()
 		return nil
@@ -196,95 +171,6 @@ var shipmentCompleteCmd = &cobra.Command{
 		}
 
 		fmt.Printf("🏁 Shipment %s marked as complete\n", shipmentID)
-		return nil
-	},
-}
-
-var shipmentPauseCmd = &cobra.Command{
-	Use:   "pause [shipment-id]",
-	Short: "Pause an active shipment",
-	Args:  cobra.ExactArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
-		ctx := NewContext()
-		shipmentID := args[0]
-
-		err := wire.ShipmentService().PauseShipment(ctx, shipmentID)
-		if err != nil {
-			return fmt.Errorf("failed to pause shipment: %w", err)
-		}
-
-		fmt.Printf("⏸️ Shipment %s paused\n", shipmentID)
-		return nil
-	},
-}
-
-var shipmentResumeCmd = &cobra.Command{
-	Use:   "resume [shipment-id]",
-	Short: "Resume a paused shipment",
-	Args:  cobra.ExactArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
-		ctx := NewContext()
-		shipmentID := args[0]
-
-		err := wire.ShipmentService().ResumeShipment(ctx, shipmentID)
-		if err != nil {
-			return fmt.Errorf("failed to resume shipment: %w", err)
-		}
-
-		fmt.Printf("▶️ Shipment %s resumed\n", shipmentID)
-		return nil
-	},
-}
-
-var shipmentDeployCmd = &cobra.Command{
-	Use:   "deploy [shipment-id]",
-	Short: "Mark shipment as deployed (merged to master or deployed to prod)",
-	Long: `Mark a shipment as deployed after code has been merged or deployed.
-
-This is typically called by the ship-deploy skill after a successful merge to master.
-The shipment must be in 'implementing', 'auto_implementing', 'implemented', or 'complete' status,
-and all tasks must be complete.`,
-	Args: cobra.ExactArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
-		ctx := NewContext()
-		shipmentID := args[0]
-
-		if err := validateEntityID(shipmentID, "shipment"); err != nil {
-			return err
-		}
-
-		err := wire.ShipmentService().DeployShipment(ctx, shipmentID)
-		if err != nil {
-			return fmt.Errorf("failed to deploy shipment: %w", err)
-		}
-
-		fmt.Printf("🚀 Shipment %s marked as deployed\n", shipmentID)
-		return nil
-	},
-}
-
-var shipmentVerifyCmd = &cobra.Command{
-	Use:   "verify [shipment-id]",
-	Short: "Mark shipment as verified (post-deploy verification passed)",
-	Long: `Mark a shipment as verified after successful post-deploy verification.
-
-This is typically called by the ship-verify skill after validation tests pass.
-The shipment must be in 'deployed' status.`,
-	Args: cobra.ExactArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
-		ctx := NewContext()
-		shipmentID := args[0]
-
-		if err := validateEntityID(shipmentID, "shipment"); err != nil {
-			return err
-		}
-
-		err := wire.ShipmentService().VerifyShipment(ctx, shipmentID)
-		if err != nil {
-			return fmt.Errorf("failed to verify shipment: %w", err)
-		}
-
-		fmt.Printf("✅ Shipment %s marked as verified\n", shipmentID)
 		return nil
 	},
 }
@@ -374,107 +260,17 @@ var shipmentAssignCmd = &cobra.Command{
 	},
 }
 
-var shipmentReadyCmd = &cobra.Command{
-	Use:   "ready [shipment-id]",
-	Short: "Mark shipment as ready for IMP (Goblin→IMP handoff)",
-	Long: `Mark a shipment as ready_for_imp, signaling Goblin→IMP handoff.
-
-This status indicates the shipment is ready to be picked up by an IMP.
-The IMP will transition it to 'implementing' or 'auto_implementing' when work begins.`,
-	Args: cobra.ExactArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
-		ctx := NewContext()
-		shipmentID := args[0]
-
-		err := wire.ShipmentService().UpdateStatus(ctx, shipmentID, "ready_for_imp")
-		if err != nil {
-			return fmt.Errorf("failed to update shipment status: %w", err)
-		}
-
-		fmt.Printf("🎯 Shipment %s marked as ready_for_imp\n", shipmentID)
-		fmt.Println("  IMP can now claim tasks from this shipment")
-		return nil
-	},
-}
-
-var shipmentAutoCmd = &cobra.Command{
-	Use:   "auto [shipment-id]",
-	Short: "Enable auto mode (hook-propelled autonomous implementation)",
-	Long: `Set shipment to auto_implementing mode.
-
-In this mode, the Stop hook will block the IMP from stopping until all tasks
-are complete. The IMP will be propelled forward automatically through the
-/imp-* workflow commands.`,
-	Args: cobra.ExactArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
-		ctx := NewContext()
-		shipmentID := args[0]
-
-		err := wire.ShipmentService().UpdateStatus(ctx, shipmentID, "auto_implementing")
-		if err != nil {
-			return fmt.Errorf("failed to update shipment status: %w", err)
-		}
-
-		fmt.Printf("🤖 Shipment %s set to auto_implementing\n", shipmentID)
-		fmt.Println("  Stop hook will block until shipment is complete")
-		return nil
-	},
-}
-
-var shipmentManualCmd = &cobra.Command{
-	Use:   "manual [shipment-id]",
-	Short: "Enable manual mode (IMP can stop freely)",
-	Long: `Set shipment to implementing (manual) mode.
-
-In this mode, the IMP can stop at any time. The Stop hook will not block.
-Use this when you want human oversight or interactive development.`,
-	Args: cobra.ExactArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
-		ctx := NewContext()
-		shipmentID := args[0]
-
-		err := wire.ShipmentService().UpdateStatus(ctx, shipmentID, "implementing")
-		if err != nil {
-			return fmt.Errorf("failed to update shipment status: %w", err)
-		}
-
-		fmt.Printf("👷 Shipment %s set to implementing (manual mode)\n", shipmentID)
-		fmt.Println("  IMP can stop at any time")
-		return nil
-	},
-}
-
-var shipmentShouldContinueCmd = &cobra.Command{
-	Use:   "should-continue [shipment-id]",
-	Short: "Check if IMP should continue working on shipment",
-	Long: `Check if a shipment has work remaining and is in auto mode.
-
-Used by:
-- Stop hook to decide whether to block
-
-Returns JSON: {"continue": true/false, "reason": "...", "incomplete_tasks": N}
-Exit 0 = continue, Exit 1 = stop
-
-If no shipment-id provided, uses the focused shipment from current workbench.`,
-	Args: cobra.MaximumNArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
-		return runShipmentShouldContinue(cmd, args)
-	},
-}
-
 var shipmentStatusCmd = &cobra.Command{
 	Use:   "status [shipment-id]",
 	Short: "Override shipment status (escape hatch)",
 	Long: `Override a shipment's status manually.
 
-⚠️  This is an escape hatch. Manual status override is not normal workflow.
+This is an escape hatch. Manual status override is not normal workflow.
 Use this only to correct stuck shipments or recover from errors.
 
-Valid statuses: draft, exploring, synthesizing, specced, planned, tasked,
-ready_for_imp, implementing, auto_implementing, implemented, deployed,
-verified, complete
+Valid statuses: draft, ready, in-progress, closed
 
-Backwards transitions (e.g., tasked → exploring) require --force flag.`,
+Backwards transitions require --force flag.`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := NewContext()
@@ -498,140 +294,6 @@ Backwards transitions (e.g., tasked → exploring) require --force flag.`,
 	},
 }
 
-// ShouldContinueResponse is the JSON output for should-continue command
-type ShouldContinueResponse struct {
-	Continue        bool   `json:"continue"`
-	Reason          string `json:"reason"`
-	ShipmentID      string `json:"shipment_id,omitempty"`
-	ShipmentStatus  string `json:"shipment_status,omitempty"`
-	IncompleteTasks int    `json:"incomplete_tasks"`
-}
-
-func runShipmentShouldContinue(_ *cobra.Command, args []string) error {
-	ctx := NewContext()
-	resp := ShouldContinueResponse{IncompleteTasks: -1}
-
-	var shipmentID string
-	var shipmentStatus string
-	var incompleteCount int
-
-	if len(args) > 0 {
-		// Explicit shipment ID provided
-		shipmentID = args[0]
-
-		// Get shipment to check status
-		shipment, err := wire.ShipmentService().GetShipment(ctx, shipmentID)
-		if err != nil {
-			resp.Reason = fmt.Sprintf("shipment not found: %v", err)
-			return outputShouldContinue(resp, false)
-		}
-		shipmentStatus = shipment.Status
-
-		// Get tasks for the shipment
-		tasks, err := wire.ShipmentService().GetShipmentTasks(ctx, shipmentID)
-		if err != nil {
-			resp.Reason = fmt.Sprintf("failed to get tasks: %v", err)
-			return outputShouldContinue(resp, false)
-		}
-
-		// Count incomplete tasks
-		incompleteCount = 0
-		for _, task := range tasks {
-			if task.Status != "complete" {
-				incompleteCount++
-			}
-		}
-	} else {
-		// Auto-detect from workbench context (like the hook does)
-		cwd, err := os.Getwd()
-		if err != nil {
-			resp.Reason = "failed to get working directory"
-			return outputShouldContinue(resp, false)
-		}
-
-		// Load config
-		cfg, err := config.LoadConfig(cwd)
-		if err != nil {
-			resp.Reason = "no workbench config found"
-			return outputShouldContinue(resp, false)
-		}
-
-		// Check if this is a workbench
-		if !config.IsWorkbench(cfg.PlaceID) {
-			resp.Reason = "not a workbench context"
-			return outputShouldContinue(resp, false)
-		}
-
-		// Get focused shipment
-		focusID, err := wire.WorkbenchService().GetFocusedID(ctx, cfg.PlaceID)
-		if err != nil || focusID == "" {
-			resp.Reason = "no shipment focused"
-			return outputShouldContinue(resp, false)
-		}
-
-		// Check if focus is a shipment
-		if !strings.HasPrefix(focusID, "SHIP-") {
-			resp.Reason = "focus is not a shipment"
-			return outputShouldContinue(resp, false)
-		}
-		shipmentID = focusID
-
-		// Get shipment to check status
-		shipment, err := wire.ShipmentService().GetShipment(ctx, shipmentID)
-		if err != nil {
-			resp.Reason = fmt.Sprintf("shipment not found: %v", err)
-			return outputShouldContinue(resp, false)
-		}
-		shipmentStatus = shipment.Status
-
-		// Get tasks
-		tasks, err := wire.ShipmentService().GetShipmentTasks(ctx, shipmentID)
-		if err != nil {
-			resp.Reason = fmt.Sprintf("failed to get tasks: %v", err)
-			return outputShouldContinue(resp, false)
-		}
-
-		// Count incomplete tasks
-		incompleteCount = 0
-		for _, task := range tasks {
-			if task.Status != "complete" {
-				incompleteCount++
-			}
-		}
-	}
-
-	resp.ShipmentID = shipmentID
-	resp.ShipmentStatus = shipmentStatus
-	resp.IncompleteTasks = incompleteCount
-
-	// Decision logic (same as Stop hook)
-	// Only continue if: auto_implementing AND incomplete tasks > 0
-	if shipmentStatus != "auto_implementing" {
-		resp.Reason = fmt.Sprintf("shipment status is %s (not auto_implementing)", shipmentStatus)
-		return outputShouldContinue(resp, false)
-	}
-
-	if incompleteCount == 0 {
-		resp.Reason = "all tasks complete"
-		return outputShouldContinue(resp, false)
-	}
-
-	// Should continue!
-	resp.Continue = true
-	resp.Reason = fmt.Sprintf("%d incomplete tasks", incompleteCount)
-	return outputShouldContinue(resp, true)
-}
-
-func outputShouldContinue(resp ShouldContinueResponse, shouldContinue bool) error {
-	output, _ := json.Marshal(resp)
-	fmt.Println(string(output))
-
-	if !shouldContinue {
-		os.Exit(1)
-	}
-	return nil
-}
-
 func init() {
 	// shipment create flags
 	shipmentCreateCmd.Flags().StringP("commission", "c", "", "Commission ID (defaults to context)")
@@ -641,8 +303,7 @@ func init() {
 
 	// shipment list flags
 	shipmentListCmd.Flags().StringP("commission", "c", "", "Filter by commission")
-	shipmentListCmd.Flags().StringP("status", "s", "", "Filter by status")
-	shipmentListCmd.Flags().BoolP("available", "a", false, "Show only shipments ready for IMP pickup (ready_for_imp status)")
+	shipmentListCmd.Flags().StringP("status", "s", "", "Filter by status (draft, ready, in-progress, closed)")
 
 	// shipment update flags
 	shipmentUpdateCmd.Flags().String("title", "", "New title")
@@ -661,19 +322,11 @@ func init() {
 	shipmentCmd.AddCommand(shipmentListCmd)
 	shipmentCmd.AddCommand(shipmentShowCmd)
 	shipmentCmd.AddCommand(shipmentCompleteCmd)
-	shipmentCmd.AddCommand(shipmentPauseCmd)
-	shipmentCmd.AddCommand(shipmentResumeCmd)
-	shipmentCmd.AddCommand(shipmentDeployCmd)
-	shipmentCmd.AddCommand(shipmentVerifyCmd)
 	shipmentCmd.AddCommand(shipmentUpdateCmd)
 	shipmentCmd.AddCommand(shipmentPinCmd)
 	shipmentCmd.AddCommand(shipmentUnpinCmd)
 	shipmentCmd.AddCommand(shipmentAssignCmd)
-	shipmentCmd.AddCommand(shipmentReadyCmd)
-	shipmentCmd.AddCommand(shipmentAutoCmd)
-	shipmentCmd.AddCommand(shipmentManualCmd)
 	shipmentCmd.AddCommand(shipmentStatusCmd)
-	shipmentCmd.AddCommand(shipmentShouldContinueCmd)
 }
 
 // ShipmentCmd returns the shipment command

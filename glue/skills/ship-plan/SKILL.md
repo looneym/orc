@@ -36,10 +36,10 @@ If not found, proceed with codebase exploration.
 | C1: System Context | External systems, actors | ship-plan (identify) |
 | C2: Container | Services, apps, databases | **ship-plan (primary)** |
 | C3: Component | Modules within containers | **ship-plan (secondary)** |
-| C4: Code | Files, functions, edits | IMP plans (exclusive) |
+| C4: Code | Files, functions, edits | IMP (implementation) |
 
 **ship-plan** creates tasks at C2/C3: "touch the auth component in the CLI container"
-**IMP plans** operate at C4: "edit cmd/auth.go lines 45-60"
+**IMP** operates at C4: "edit cmd/auth.go lines 45-60"
 
 ## Flow
 
@@ -293,7 +293,7 @@ orc task create "<Title>" \
 ```
 Shipment planned:
   SHIP-xxx: <Title>
-  Status: tasked
+  Status: ready
   Tasks created: X
 
 Engineering review complete:
@@ -304,8 +304,7 @@ Engineering review complete:
   ✓ Reality checks passed
 
 Ready for implementation:
-  orc task claim TASK-xxx
-  /imp-start
+  orc task list --shipment SHIP-xxx
 ```
 
 ## Guidelines
@@ -321,9 +320,8 @@ Ready for implementation:
 | Artifact | Created By | Zoom Level | Contains |
 |----------|------------|------------|----------|
 | Task | ship-plan | C2/C3 | What systems/components to touch |
-| Plan | IMP (imp-plan-create) | C4 | What files/functions/edits to make |
 
-Tasks are work packages with scope. Plans are implementation details.
+Tasks are work packages with scope. IMP agents handle C4 implementation details.
 
 ## Example Session
 
@@ -369,10 +367,9 @@ Create these 8 tasks? [y/n/edit]
 
 Shipment planned:
   SHIP-276: Skill Cognitive Redesign
-  Status: tasked
+  Status: ready
   Tasks created: 8
 
 Ready for implementation:
-  orc task claim TASK-672
-  /imp-start
+  orc task list --shipment SHIP-276
 ```

@@ -24,7 +24,6 @@ type InfraServiceImpl struct {
 	workshopRepo     secondary.WorkshopRepository
 	workbenchRepo    secondary.WorkbenchRepository
 	repoRepo         secondary.RepoRepository
-	gatehouseRepo    secondary.GatehouseRepository
 	workspaceAdapter secondary.WorkspaceAdapter
 	tmuxAdapter      secondary.TMuxAdapter
 	executor         EffectExecutor
@@ -36,7 +35,6 @@ func NewInfraService(
 	workshopRepo secondary.WorkshopRepository,
 	workbenchRepo secondary.WorkbenchRepository,
 	repoRepo secondary.RepoRepository,
-	gatehouseRepo secondary.GatehouseRepository,
 	workspaceAdapter secondary.WorkspaceAdapter,
 	tmuxAdapter secondary.TMuxAdapter,
 	executor EffectExecutor,
@@ -46,7 +44,6 @@ func NewInfraService(
 		workshopRepo:     workshopRepo,
 		workbenchRepo:    workbenchRepo,
 		repoRepo:         repoRepo,
-		gatehouseRepo:    gatehouseRepo,
 		workspaceAdapter: workspaceAdapter,
 		tmuxAdapter:      tmuxAdapter,
 		executor:         executor,
@@ -68,20 +65,13 @@ func (s *InfraServiceImpl) PlanInfra(ctx context.Context, req primary.InfraPlanR
 		return nil, fmt.Errorf("factory not found: %w", err)
 	}
 
-	// 3. Get gatehouse (may not exist)
-	var gatehouseID string
-	gatehouse, err := s.gatehouseRepo.GetByWorkshop(ctx, req.WorkshopID)
-	if err == nil {
-		gatehouseID = gatehouse.ID
-	}
-
-	// 4. Compute gatehouse path and check existence
+	// 3. Compute workshop coordination path and check existence
 	home, _ := os.UserHomeDir()
 	gatehousePath := coreworkshop.GatehousePath(home, req.WorkshopID, workshop.Name)
 	gatehousePathExists := s.dirExists(gatehousePath)
 	gatehouseConfigExists := s.fileExists(filepath.Join(gatehousePath, ".orc", "config.json"))
 
-	// 5. Get workbenches and check each one's state
+	// 4. Get workbenches and check each one's state
 	allWorkbenches, _ := s.workbenchRepo.List(ctx, req.WorkshopID)
 	// Filter to active workbenches only (archived workbenches are excluded from planning)
 	var workbenches []*secondary.WorkbenchRecord
@@ -110,12 +100,12 @@ func (s *InfraServiceImpl) PlanInfra(ctx context.Context, req primary.InfraPlanR
 		})
 	}
 
-	// 6. Scan for orphaned configs on disk (true orphans only - no DB record)
+	// 5. Scan for orphaned configs on disk (true orphans only - no DB record)
 	// Note: Archived workbenches are NOT added to orphan list - they have DB records
 	// and should not have their directories deleted by infra apply.
-	orphanWbs, orphanGhs := s.scanForOrphans(ctx, workbenches, gatehouse)
+	orphanWbs, orphanGhs := s.scanForOrphans(ctx, workbenches)
 
-	// 7. Fetch TMux session state
+	// 6. Fetch TMux session state
 	tmuxSessionName := ""
 	tmuxSessionExists := false
 	var tmuxExistingWindows []string
@@ -136,21 +126,20 @@ func (s *InfraServiceImpl) PlanInfra(ctx context.Context, req primary.InfraPlanR
 		if tmuxSessionExists {
 			tmuxExistingWindows, _ = s.tmuxAdapter.ListWindows(ctx, tmuxSessionName)
 		}
-		// Build expected windows - first goblin window, then workbenches
+		// Build expected windows - coordinator window, then workbenches
 		// (skip if workshop is archived - entire session should be deleted)
 		if !workshopArchived {
-			// Goblin window name: goblin-NNN (derived from GATE-NNN)
-			goblinWindowName := "goblin-" + strings.TrimPrefix(gatehouseID, "GATE-")
-			goblinExpectedAgent := fmt.Sprintf("GOBLIN@%s", gatehouseID)
-			goblinActualAgent := ""
+			// Coordinator window
+			coordWindowName := "orc"
+			coordActualAgent := ""
 			if tmuxSessionExists {
-				goblinActualAgent = s.tmuxAdapter.GetWindowOption(ctx, tmuxSessionName+":"+goblinWindowName, "@orc_agent")
+				coordActualAgent = s.tmuxAdapter.GetWindowOption(ctx, tmuxSessionName+":"+coordWindowName, "@orc_agent")
 			}
 			tmuxExpectedWindows = append(tmuxExpectedWindows, coreinfra.TMuxWindowInput{
-				Name:          goblinWindowName,
+				Name:          coordWindowName,
 				Path:          gatehousePath,
-				ExpectedAgent: goblinExpectedAgent,
-				ActualAgent:   goblinActualAgent,
+				ExpectedAgent: fmt.Sprintf("ORC@%s", req.WorkshopID),
+				ActualAgent:   coordActualAgent,
 			})
 			// Workbench windows (IMPs)
 			for _, wb := range workbenches {
@@ -177,13 +166,13 @@ func (s *InfraServiceImpl) PlanInfra(ctx context.Context, req primary.InfraPlanR
 		}
 	}
 
-	// 8. Generate plan using pure function (all I/O already done above)
+	// 7. Generate plan using pure function (all I/O already done above)
 	input := coreinfra.PlanInput{
 		WorkshopID:            req.WorkshopID,
 		WorkshopName:          workshop.Name,
 		FactoryID:             factory.ID,
 		FactoryName:           factory.Name,
-		GatehouseID:           gatehouseID,
+		GatehouseID:           req.WorkshopID,
 		GatehousePath:         gatehousePath,
 		GatehousePathExists:   gatehousePathExists,
 		GatehouseConfigExists: gatehouseConfigExists,
@@ -206,8 +195,8 @@ func (s *InfraServiceImpl) PlanInfra(ctx context.Context, req primary.InfraPlanR
 }
 
 // scanForOrphans scans filesystem for config.json files with place_ids not in DB.
-// Scans ~/wb/*/.orc/config.json for workbenches and ~/.orc/ws/WORK-*/.orc/config.json for gatehouses.
-func (s *InfraServiceImpl) scanForOrphans(ctx context.Context, knownWorkbenches []*secondary.WorkbenchRecord, knownGatehouse *secondary.GatehouseRecord) ([]coreinfra.WorkbenchPlanInput, []coreinfra.GatehousePlanInput) {
+// Scans ~/wb/*/.orc/config.json for workbenches and ~/.orc/ws/WORK-*/.orc/config.json for workshop dirs.
+func (s *InfraServiceImpl) scanForOrphans(ctx context.Context, knownWorkbenches []*secondary.WorkbenchRecord) ([]coreinfra.WorkbenchPlanInput, []coreinfra.GatehousePlanInput) {
 	var orphanWbs []coreinfra.WorkbenchPlanInput
 	var orphanGhs []coreinfra.GatehousePlanInput
 
@@ -220,10 +209,6 @@ func (s *InfraServiceImpl) scanForOrphans(ctx context.Context, knownWorkbenches 
 	knownWbIDs := make(map[string]bool)
 	for _, wb := range knownWorkbenches {
 		knownWbIDs[wb.ID] = true
-	}
-	knownGhID := ""
-	if knownGatehouse != nil {
-		knownGhID = knownGatehouse.ID
 	}
 
 	// Scan ~/wb/*/.orc/config.json for workbenches
@@ -256,7 +241,7 @@ func (s *InfraServiceImpl) scanForOrphans(ctx context.Context, knownWorkbenches 
 		})
 	}
 
-	// Scan ~/.orc/ws/WORK-*/.orc/config.json for gatehouses
+	// Scan ~/.orc/ws/WORK-*/.orc/config.json for orphan workshop dirs
 	ghPattern := filepath.Join(home, ".orc", "ws", "WORK-*", ".orc", "config.json")
 	ghConfigs, _ := filepath.Glob(ghPattern)
 	for _, configPath := range ghConfigs {
@@ -264,20 +249,11 @@ func (s *InfraServiceImpl) scanForOrphans(ctx context.Context, knownWorkbenches 
 		if err != nil || placeID == "" {
 			continue
 		}
-		// Only consider GATE-* place IDs
+		// Skip non-GATE place IDs (legacy configs)
 		if !strings.HasPrefix(placeID, "GATE-") {
 			continue
 		}
-		// Check if this is the known gatehouse
-		if placeID == knownGhID {
-			continue // Known gatehouse, not an orphan
-		}
-		// Verify it's truly not in DB
-		_, err = s.gatehouseRepo.GetByID(ctx, placeID)
-		if err == nil {
-			continue // Found in DB, not an orphan
-		}
-		// This is an orphan
+		// This is an orphan (gatehouses no longer exist)
 		ghPath := filepath.Dir(filepath.Dir(configPath))
 		orphanGhs = append(orphanGhs, coreinfra.GatehousePlanInput{
 			PlaceID: placeID,
@@ -521,21 +497,11 @@ func (s *InfraServiceImpl) ApplyInfra(ctx context.Context, plan *primary.InfraPl
 		return response, nil
 	}
 
-	// 1. Create gatehouse directory and config if needed
+	// 1. Create workshop coordination directory if needed
 	if plan.Gatehouse != nil {
 		if plan.Gatehouse.Status == primary.OpCreate || plan.Gatehouse.ConfigStatus == primary.OpCreate {
-			gatehouseID := plan.Gatehouse.ID
-			// If no gatehouse record exists, create one
-			if gatehouseID == "" {
-				gatehouse, err := s.ensureGatehouseExists(ctx, plan.WorkshopID)
-				if err != nil {
-					return nil, fmt.Errorf("failed to ensure gatehouse: %w", err)
-				}
-				gatehouseID = gatehouse.ID
-			}
-
-			if err := s.createGatehouseDir(plan.Gatehouse.Path, gatehouseID); err != nil {
-				return nil, fmt.Errorf("failed to create gatehouse directory: %w", err)
+			if err := s.createWorkshopDir(plan.Gatehouse.Path); err != nil {
+				return nil, fmt.Errorf("failed to create workshop directory: %w", err)
 			}
 			response.GatehouseCreated = true
 			response.ConfigsCreated++
@@ -652,32 +618,8 @@ func (s *InfraServiceImpl) ApplyInfra(ctx context.Context, plan *primary.InfraPl
 	return response, nil
 }
 
-// ensureGatehouseExists returns the gatehouse for a workshop, creating it if needed.
-func (s *InfraServiceImpl) ensureGatehouseExists(ctx context.Context, workshopID string) (*secondary.GatehouseRecord, error) {
-	existing, err := s.gatehouseRepo.GetByWorkshop(ctx, workshopID)
-	if err == nil {
-		return existing, nil
-	}
-
-	id, err := s.gatehouseRepo.GetNextID(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate gatehouse ID: %w", err)
-	}
-
-	gatehouse := &secondary.GatehouseRecord{
-		ID:         id,
-		WorkshopID: workshopID,
-		Status:     "active",
-	}
-	if err := s.gatehouseRepo.Create(ctx, gatehouse); err != nil {
-		return nil, fmt.Errorf("failed to create gatehouse: %w", err)
-	}
-
-	return gatehouse, nil
-}
-
-// createGatehouseDir creates the gatehouse directory with config.
-func (s *InfraServiceImpl) createGatehouseDir(path, gatehouseID string) error {
+// createWorkshopDir creates the workshop coordination directory.
+func (s *InfraServiceImpl) createWorkshopDir(path string) error {
 	var effs []effects.Effect
 
 	// Create directory
@@ -685,31 +627,6 @@ func (s *InfraServiceImpl) createGatehouseDir(path, gatehouseID string) error {
 		Operation: "mkdir",
 		Path:      path,
 		Mode:      0755,
-	})
-
-	// Create .orc subdir
-	orcDir := filepath.Join(path, ".orc")
-	effs = append(effs, effects.FileEffect{
-		Operation: "mkdir",
-		Path:      orcDir,
-		Mode:      0755,
-	})
-
-	// Create config
-	cfg := &config.Config{
-		Version: "1.0",
-		PlaceID: gatehouseID,
-	}
-	configJSON, err := json.MarshalIndent(cfg, "", "  ")
-	if err != nil {
-		return fmt.Errorf("failed to marshal config: %w", err)
-	}
-	configPath := filepath.Join(orcDir, "config.json")
-	effs = append(effs, effects.FileEffect{
-		Operation: "write",
-		Path:      configPath,
-		Content:   configJSON,
-		Mode:      0644,
 	})
 
 	return s.executor.Execute(context.Background(), effs)
@@ -867,7 +784,7 @@ func (s *InfraServiceImpl) CleanupOrphans(ctx context.Context, req primary.Clean
 	response := &primary.CleanupOrphansResponse{}
 
 	// Scan for orphans (passing empty known lists to find all orphans)
-	orphanWbs, orphanGhs := s.scanForOrphans(ctx, nil, nil)
+	orphanWbs, orphanGhs := s.scanForOrphans(ctx, nil)
 
 	// Delete orphan workbenches
 	for _, wb := range orphanWbs {

@@ -272,17 +272,16 @@ func runSetCommission(args []string, clearFlag bool) error {
 		return fmt.Errorf("no ORC config found in current directory")
 	}
 
-	// Must be Goblin context (gatehouse)
-	if !config.IsGatehouse(cfg.PlaceID) {
-		return fmt.Errorf("set-commission requires Goblin context (gatehouse directory)")
+	// Determine workshop ID from config
+	workshopID := ""
+	if config.IsWorkbench(cfg.PlaceID) {
+		if wb, err := wire.WorkbenchService().GetWorkbench(ctx, cfg.PlaceID); err == nil {
+			workshopID = wb.WorkshopID
+		}
 	}
-
-	// Look up workshop from gatehouse
-	gatehouse, err := wire.GatehouseService().GetGatehouse(ctx, cfg.PlaceID)
-	if err != nil {
-		return fmt.Errorf("failed to get gatehouse: %w", err)
+	if workshopID == "" {
+		return fmt.Errorf("cannot determine workshop from current directory")
 	}
-	workshopID := gatehouse.WorkshopID
 
 	if clearFlag {
 		if err := wire.WorkshopService().SetActiveCommission(ctx, workshopID, ""); err != nil {
@@ -326,12 +325,7 @@ func runSetCommission(args []string, clearFlag bool) error {
 		return fmt.Errorf("failed to set commission: %w", err)
 	}
 
-	// Set focus for gatehouse (goblin)
-	if err := wire.GatehouseService().UpdateFocusedID(ctx, cfg.PlaceID, commissionID); err != nil {
-		fmt.Printf("  (gatehouse focus skipped: %v)\n", err)
-	}
-
-	// Set focus for all active workbenches (IMPs)
+	// Set focus for all active workbenches
 	workbenches, err := wire.WorkbenchService().ListWorkbenches(ctx, primary.WorkbenchFilters{
 		WorkshopID: workshopID,
 		Status:     "active",

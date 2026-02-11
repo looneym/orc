@@ -79,7 +79,6 @@ type TaskSummary struct {
 	Plans       []PlanSummary
 	Approvals   []ApprovalSummary
 	Escalations []EscalationSummary
-	Receipts    []ReceiptSummary
 }
 
 // PlanSummary represents a plan in the summary view.
@@ -98,11 +97,5 @@ type ApprovalSummary struct {
 type EscalationSummary struct {
 	ID            string
 	Status        string // pending, resolved, dismissed
-	TargetActorID string // GATE-xxx
-}
-
-// ReceiptSummary represents a receipt in the summary view.
-type ReceiptSummary struct {
-	ID     string
-	Status string // draft, submitted, verified
+	TargetActorID string
 }

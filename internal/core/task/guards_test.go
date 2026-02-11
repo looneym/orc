@@ -64,149 +64,35 @@ func TestCanCreateTask(t *testing.T) {
 	}
 }
 
-func TestCanCompleteTask(t *testing.T) {
+func TestCanCloseTask(t *testing.T) {
 	tests := []struct {
 		name        string
-		ctx         CompleteTaskContext
+		ctx         CloseTaskContext
 		wantAllowed bool
 		wantReason  string
 	}{
 		{
-			name: "can complete unpinned task",
-			ctx: CompleteTaskContext{
+			name: "can close unpinned task",
+			ctx: CloseTaskContext{
 				TaskID:   "TASK-001",
 				IsPinned: false,
 			},
 			wantAllowed: true,
 		},
 		{
-			name: "cannot complete pinned task",
-			ctx: CompleteTaskContext{
+			name: "cannot close pinned task",
+			ctx: CloseTaskContext{
 				TaskID:   "TASK-001",
 				IsPinned: true,
 			},
 			wantAllowed: false,
-			wantReason:  "cannot complete pinned task TASK-001. Unpin first with: orc task unpin TASK-001",
+			wantReason:  "cannot close pinned task TASK-001. Unpin first with: orc task unpin TASK-001",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := CanCompleteTask(tt.ctx)
-			if result.Allowed != tt.wantAllowed {
-				t.Errorf("Allowed = %v, want %v", result.Allowed, tt.wantAllowed)
-			}
-			if !tt.wantAllowed && result.Reason != tt.wantReason {
-				t.Errorf("Reason = %q, want %q", result.Reason, tt.wantReason)
-			}
-		})
-	}
-}
-
-func TestCanPauseTask(t *testing.T) {
-	tests := []struct {
-		name        string
-		ctx         StatusTransitionContext
-		wantAllowed bool
-		wantReason  string
-	}{
-		{
-			name: "can pause in_progress task",
-			ctx: StatusTransitionContext{
-				TaskID: "TASK-001",
-				Status: "in_progress",
-			},
-			wantAllowed: true,
-		},
-		{
-			name: "cannot pause ready task",
-			ctx: StatusTransitionContext{
-				TaskID: "TASK-001",
-				Status: "ready",
-			},
-			wantAllowed: false,
-			wantReason:  "can only pause in_progress tasks (current status: ready)",
-		},
-		{
-			name: "cannot pause paused task",
-			ctx: StatusTransitionContext{
-				TaskID: "TASK-001",
-				Status: "paused",
-			},
-			wantAllowed: false,
-			wantReason:  "can only pause in_progress tasks (current status: paused)",
-		},
-		{
-			name: "cannot pause complete task",
-			ctx: StatusTransitionContext{
-				TaskID: "TASK-001",
-				Status: "complete",
-			},
-			wantAllowed: false,
-			wantReason:  "can only pause in_progress tasks (current status: complete)",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := CanPauseTask(tt.ctx)
-			if result.Allowed != tt.wantAllowed {
-				t.Errorf("Allowed = %v, want %v", result.Allowed, tt.wantAllowed)
-			}
-			if !tt.wantAllowed && result.Reason != tt.wantReason {
-				t.Errorf("Reason = %q, want %q", result.Reason, tt.wantReason)
-			}
-		})
-	}
-}
-
-func TestCanResumeTask(t *testing.T) {
-	tests := []struct {
-		name        string
-		ctx         StatusTransitionContext
-		wantAllowed bool
-		wantReason  string
-	}{
-		{
-			name: "can resume paused task",
-			ctx: StatusTransitionContext{
-				TaskID: "TASK-001",
-				Status: "paused",
-			},
-			wantAllowed: true,
-		},
-		{
-			name: "cannot resume ready task",
-			ctx: StatusTransitionContext{
-				TaskID: "TASK-001",
-				Status: "ready",
-			},
-			wantAllowed: false,
-			wantReason:  "can only resume paused tasks (current status: ready)",
-		},
-		{
-			name: "cannot resume in_progress task",
-			ctx: StatusTransitionContext{
-				TaskID: "TASK-001",
-				Status: "in_progress",
-			},
-			wantAllowed: false,
-			wantReason:  "can only resume paused tasks (current status: in_progress)",
-		},
-		{
-			name: "cannot resume complete task",
-			ctx: StatusTransitionContext{
-				TaskID: "TASK-001",
-				Status: "complete",
-			},
-			wantAllowed: false,
-			wantReason:  "can only resume paused tasks (current status: complete)",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := CanResumeTask(tt.ctx)
+			result := CanCloseTask(tt.ctx)
 			if result.Allowed != tt.wantAllowed {
 				t.Errorf("Allowed = %v, want %v", result.Allowed, tt.wantAllowed)
 			}

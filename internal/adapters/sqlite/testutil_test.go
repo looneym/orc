@@ -90,7 +90,7 @@ func seedTask(t *testing.T, db *sql.DB, id, commissionID, title string) string {
 	if title == "" {
 		title = "Test Task"
 	}
-	_, err := db.Exec("INSERT INTO tasks (id, commission_id, title, status) VALUES (?, ?, ?, 'ready')", id, commissionID, title)
+	_, err := db.Exec("INSERT INTO tasks (id, commission_id, title, status) VALUES (?, ?, ?, 'open')", id, commissionID, title)
 	if err != nil {
 		t.Fatalf("failed to seed task: %v", err)
 	}
@@ -150,22 +150,6 @@ func seedWorkbench(t *testing.T, db *sql.DB, id, _ /* commissionID */, name stri
 	_, err := db.Exec("INSERT INTO workbenches (id, workshop_id, name, status) VALUES (?, ?, ?, 'active')", id, "SHOP-001", name)
 	if err != nil {
 		t.Fatalf("failed to seed workbench: %v", err)
-	}
-	return id
-}
-
-// seedGatehouse inserts a test gatehouse and returns its ID.
-func seedGatehouse(t *testing.T, db *sql.DB, id, workshopID string) string {
-	t.Helper()
-	if id == "" {
-		id = "GATE-001"
-	}
-	if workshopID == "" {
-		workshopID = "SHOP-001"
-	}
-	_, err := db.Exec("INSERT INTO gatehouses (id, workshop_id, status) VALUES (?, ?, 'active')", id, workshopID)
-	if err != nil {
-		t.Fatalf("failed to seed gatehouse: %v", err)
 	}
 	return id
 }

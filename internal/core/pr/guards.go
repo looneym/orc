@@ -23,7 +23,7 @@ type CreatePRContext struct {
 	ShipmentID     string
 	RepoID         string
 	ShipmentExists bool
-	ShipmentStatus string // "active", "paused", "complete"
+	ShipmentStatus string // "draft", "ready", "in-progress", "closed"
 	ShipmentHasPR  bool
 	RepoExists     bool
 }
@@ -67,11 +67,11 @@ func CanCreatePR(ctx CreatePRContext) GuardResult {
 		}
 	}
 
-	// Rule 2: Shipment must be active
-	if ctx.ShipmentStatus != "active" {
+	// Rule 2: Shipment must be in-progress
+	if ctx.ShipmentStatus != "in-progress" {
 		return GuardResult{
 			Allowed: false,
-			Reason:  fmt.Sprintf("can only create PR for active shipments (current status: %s)", ctx.ShipmentStatus),
+			Reason:  fmt.Sprintf("can only create PR for in-progress shipments (current status: %s)", ctx.ShipmentStatus),
 		}
 	}
 

@@ -100,26 +100,15 @@ CREATE TABLE IF NOT EXISTS commissions (
 	FOREIGN KEY (workshop_id) REFERENCES workshops(id)
 );
 
--- Messages (Agent mail system - actor-to-actor)
-CREATE TABLE IF NOT EXISTS messages (
-	id TEXT PRIMARY KEY,
-	sender TEXT NOT NULL,
-	recipient TEXT NOT NULL,
-	subject TEXT NOT NULL,
-	body TEXT NOT NULL,
-	timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-	read INTEGER DEFAULT 0
-);
-
 -- Shipments (Work containers)
--- Lifecycle: draft → exploring → specced → tasked → ready_for_imp → implementing/auto_implementing → implemented → deployed → verified → complete
--- Location tracked by FKs: shipyard_id (queued), assigned_workbench_id (assigned)
+-- Lifecycle: draft → ready → in-progress → closed
 CREATE TABLE IF NOT EXISTS shipments (
 	id TEXT PRIMARY KEY,
 	commission_id TEXT NOT NULL,
 	title TEXT NOT NULL,
 	description TEXT,
-	status TEXT NOT NULL CHECK(status IN ('draft', 'exploring', 'specced', 'tasked', 'ready_for_imp', 'implementing', 'auto_implementing', 'implemented', 'deployed', 'verified', 'complete')) DEFAULT 'draft',
+	status TEXT NOT NULL CHECK(status IN ('draft', 'ready', 'in-progress', 'closed')) DEFAULT 'draft',
+	closed_reason TEXT,
 	assigned_workbench_id TEXT,
 	repo_id TEXT,
 	branch TEXT,
@@ -170,7 +159,7 @@ CREATE TABLE IF NOT EXISTS tasks (
 	title TEXT NOT NULL,
 	description TEXT,
 	type TEXT CHECK(type IN ('research', 'implementation', 'fix', 'documentation', 'maintenance')),
-	status TEXT NOT NULL CHECK(status IN ('ready', 'in_progress', 'blocked', 'paused', 'complete')) DEFAULT 'ready',
+	status TEXT NOT NULL CHECK(status IN ('open', 'in-progress', 'blocked', 'closed')) DEFAULT 'open',
 	priority TEXT CHECK(priority IN ('low', 'medium', 'high')),
 	assigned_workbench_id TEXT,
 	context_ref TEXT,
@@ -317,9 +306,6 @@ CREATE INDEX IF NOT EXISTS idx_workbenches_repo ON workbenches(repo_id);
 CREATE INDEX IF NOT EXISTS idx_commissions_factory ON commissions(factory_id);
 CREATE INDEX IF NOT EXISTS idx_commissions_workshop ON commissions(workshop_id);
 CREATE INDEX IF NOT EXISTS idx_commissions_status ON commissions(status);
-CREATE INDEX IF NOT EXISTS idx_messages_recipient ON messages(recipient, read);
-CREATE INDEX IF NOT EXISTS idx_messages_sender ON messages(sender);
-CREATE INDEX IF NOT EXISTS idx_messages_timestamp ON messages(timestamp DESC);
 CREATE INDEX IF NOT EXISTS idx_shipments_commission ON shipments(commission_id);
 CREATE INDEX IF NOT EXISTS idx_shipments_status ON shipments(status);
 CREATE INDEX IF NOT EXISTS idx_shipments_workbench ON shipments(assigned_workbench_id);
@@ -349,35 +335,6 @@ CREATE INDEX IF NOT EXISTS idx_shipyards_factory ON shipyards(factory_id);
 CREATE INDEX IF NOT EXISTS idx_tomes_container ON tomes(container_id);
 CREATE INDEX IF NOT EXISTS idx_shipments_conclave ON shipments(conclave_id);
 CREATE INDEX IF NOT EXISTS idx_shipments_shipyard ON shipments(shipyard_id);
-
--- Receipts (1:1 with Task)
-CREATE TABLE IF NOT EXISTS receipts (
-	id TEXT PRIMARY KEY,
-	task_id TEXT NOT NULL UNIQUE,
-	delivered_outcome TEXT NOT NULL,
-	evidence TEXT,
-	verification_notes TEXT,
-	status TEXT NOT NULL CHECK(status IN ('draft', 'submitted', 'verified')) DEFAULT 'draft',
-	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-	updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-	FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE
-);
-
-CREATE INDEX IF NOT EXISTS idx_receipts_task ON receipts(task_id);
-CREATE INDEX IF NOT EXISTS idx_receipts_status ON receipts(status);
-
--- Gatehouses (1:1 with Workshop - Goblin seat)
-CREATE TABLE IF NOT EXISTS gatehouses (
-	id TEXT PRIMARY KEY,
-	workshop_id TEXT NOT NULL UNIQUE,
-	status TEXT NOT NULL DEFAULT 'active',
-	focused_id TEXT,
-	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-	updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-	FOREIGN KEY (workshop_id) REFERENCES workshops(id) ON DELETE CASCADE
-);
-CREATE INDEX IF NOT EXISTS idx_gatehouses_workshop ON gatehouses(workshop_id);
-CREATE INDEX IF NOT EXISTS idx_gatehouses_status ON gatehouses(status);
 
 -- Approvals (1:1 with Plan)
 CREATE TABLE IF NOT EXISTS approvals (

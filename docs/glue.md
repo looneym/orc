@@ -166,11 +166,7 @@ echo "$INPUT" | jq -c '{tool: .tool_name}' >> ~/.claude/orc-debug.log
 
 ### ORC Stop Hook
 
-The `orc hook Stop` command is special - it blocks session stop when:
-- Shipment is in `auto_implementing` mode
-- Tasks remain incomplete
-
-This enables autonomous IMP workflow where the agent continues until the shipment is complete.
+The `orc hook Stop` command is special - it can block session stop based on policy defined in the ORC configuration.
 
 ## Deployment
 
@@ -209,18 +205,14 @@ Use the help skill to discover available commands:
 
 Lists skill categories:
 - **ship-*** - Shipment workflow
-- **imp-*** - IMP (implementation) workflow
 - **orc-*** - Utilities and management
-- **goblin-*** - Review and escalation
 
 ### Skill Categories
 
 | Prefix | Purpose |
 |--------|---------|
-| `ship-` | Shipment lifecycle (new, synthesize, plan, deploy, verify, complete) |
-| `imp-` | Implementation workflow (start, plan-create, plan-submit, rec, auto) |
+| `ship-` | Shipment lifecycle (new, synthesize, plan, deploy, complete) |
 | `orc-` | Utilities (help, ping, interview, commission, workshop, workbench) |
-| `goblin-` | Review workflow (escalation-receive) |
 
 ## Next Steps
 

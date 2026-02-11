@@ -69,8 +69,8 @@ func TestTaskRepository_Create(t *testing.T) {
 	if retrieved.Title != "Test Task" {
 		t.Errorf("expected title 'Test Task', got '%s'", retrieved.Title)
 	}
-	if retrieved.Status != "ready" {
-		t.Errorf("expected status 'ready', got '%s'", retrieved.Status)
+	if retrieved.Status != "open" {
+		t.Errorf("expected status 'open', got '%s'", retrieved.Status)
 	}
 	if retrieved.ShipmentID != "SHIP-001" {
 		t.Errorf("expected shipment 'SHIP-001', got '%s'", retrieved.ShipmentID)
@@ -176,19 +176,19 @@ func TestTaskRepository_List_FilterByStatus(t *testing.T) {
 	repo := sqlite.NewTaskRepository(db, nil)
 	ctx := context.Background()
 
-	task1 := createTestTask(t, repo, ctx, "COMM-001", "", "Ready Task")
-	createTestTask(t, repo, ctx, "COMM-001", "", "Another Ready Task")
+	task1 := createTestTask(t, repo, ctx, "COMM-001", "", "Open Task")
+	createTestTask(t, repo, ctx, "COMM-001", "", "Another Open Task")
 
 	// Change status of task1
-	_ = repo.UpdateStatus(ctx, task1.ID, "in_progress", true, false)
+	_ = repo.UpdateStatus(ctx, task1.ID, "in-progress", true, false)
 
-	tasks, err := repo.List(ctx, secondary.TaskFilters{Status: "ready"})
+	tasks, err := repo.List(ctx, secondary.TaskFilters{Status: "open"})
 	if err != nil {
 		t.Fatalf("List failed: %v", err)
 	}
 
 	if len(tasks) != 1 {
-		t.Errorf("expected 1 ready task, got %d", len(tasks))
+		t.Errorf("expected 1 open task, got %d", len(tasks))
 	}
 }
 
@@ -339,14 +339,14 @@ func TestTaskRepository_UpdateStatus(t *testing.T) {
 	task := createTestTask(t, repo, ctx, "COMM-001", "", "Status Test")
 
 	// Update status with claimed timestamp
-	err := repo.UpdateStatus(ctx, task.ID, "in_progress", true, false)
+	err := repo.UpdateStatus(ctx, task.ID, "in-progress", true, false)
 	if err != nil {
 		t.Fatalf("UpdateStatus failed: %v", err)
 	}
 
 	retrieved, _ := repo.GetByID(ctx, task.ID)
-	if retrieved.Status != "in_progress" {
-		t.Errorf("expected status 'in_progress', got '%s'", retrieved.Status)
+	if retrieved.Status != "in-progress" {
+		t.Errorf("expected status 'in-progress', got '%s'", retrieved.Status)
 	}
 	if retrieved.ClaimedAt == "" {
 		t.Error("expected ClaimedAt to be set")
@@ -355,15 +355,15 @@ func TestTaskRepository_UpdateStatus(t *testing.T) {
 		t.Error("expected CompletedAt to be empty")
 	}
 
-	// Update to complete
-	err = repo.UpdateStatus(ctx, task.ID, "complete", false, true)
+	// Update to closed
+	err = repo.UpdateStatus(ctx, task.ID, "closed", false, true)
 	if err != nil {
 		t.Fatalf("UpdateStatus failed: %v", err)
 	}
 
 	retrieved, _ = repo.GetByID(ctx, task.ID)
-	if retrieved.Status != "complete" {
-		t.Errorf("expected status 'complete', got '%s'", retrieved.Status)
+	if retrieved.Status != "closed" {
+		t.Errorf("expected status 'closed', got '%s'", retrieved.Status)
 	}
 	if retrieved.CompletedAt == "" {
 		t.Error("expected CompletedAt to be set")
@@ -375,7 +375,7 @@ func TestTaskRepository_UpdateStatus_NotFound(t *testing.T) {
 	repo := sqlite.NewTaskRepository(db, nil)
 	ctx := context.Background()
 
-	err := repo.UpdateStatus(ctx, "TASK-999", "complete", false, true)
+	err := repo.UpdateStatus(ctx, "TASK-999", "closed", false, true)
 	if err == nil {
 		t.Error("expected error for non-existent task")
 	}
@@ -394,8 +394,8 @@ func TestTaskRepository_Claim(t *testing.T) {
 	}
 
 	retrieved, _ := repo.GetByID(ctx, task.ID)
-	if retrieved.Status != "in_progress" {
-		t.Errorf("expected status 'in_progress', got '%s'", retrieved.Status)
+	if retrieved.Status != "in-progress" {
+		t.Errorf("expected status 'in-progress', got '%s'", retrieved.Status)
 	}
 	if retrieved.AssignedWorkbenchID != "BENCH-001" {
 		t.Errorf("expected assigned workbench 'BENCH-001', got '%s'", retrieved.AssignedWorkbenchID)

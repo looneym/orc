@@ -13,26 +13,14 @@ type ShipmentService interface {
 	// ListShipments lists shipments with optional filters.
 	ListShipments(ctx context.Context, filters ShipmentFilters) ([]*Shipment, error)
 
-	// CompleteShipment marks a shipment as complete.
-	// If force is true, completes even if tasks are incomplete.
+	// CompleteShipment marks a shipment as closed.
+	// If force is true, closes even if tasks are not closed.
 	CompleteShipment(ctx context.Context, shipmentID string, force bool) error
-
-	// PauseShipment pauses an active shipment.
-	PauseShipment(ctx context.Context, shipmentID string) error
-
-	// ResumeShipment resumes a paused shipment.
-	ResumeShipment(ctx context.Context, shipmentID string) error
-
-	// DeployShipment marks a shipment as deployed (merged to master or deployed to prod).
-	DeployShipment(ctx context.Context, shipmentID string) error
-
-	// VerifyShipment marks a shipment as verified (post-deploy verification passed).
-	VerifyShipment(ctx context.Context, shipmentID string) error
 
 	// UpdateShipment updates a shipment's title and/or description.
 	UpdateShipment(ctx context.Context, req UpdateShipmentRequest) error
 
-	// PinShipment pins a shipment to prevent completion.
+	// PinShipment pins a shipment to prevent closing.
 	PinShipment(ctx context.Context, shipmentID string) error
 
 	// UnpinShipment unpins a shipment.
@@ -50,16 +38,12 @@ type ShipmentService interface {
 	// DeleteShipment deletes a shipment.
 	DeleteShipment(ctx context.Context, shipmentID string) error
 
-	// UpdateStatus sets a shipment's status directly (used for auto-transitions).
+	// UpdateStatus sets a shipment's status directly.
 	UpdateStatus(ctx context.Context, shipmentID, status string) error
 
 	// SetStatus sets a shipment's status with escape hatch protection.
 	// If force is true, allows backwards transitions.
 	SetStatus(ctx context.Context, shipmentID, status string, force bool) error
-
-	// TriggerAutoTransition evaluates and applies auto-transition for a shipment.
-	// Returns the new status if a transition occurred, empty string otherwise.
-	TriggerAutoTransition(ctx context.Context, shipmentID, triggerEvent string) (string, error)
 }
 
 // CreateShipmentRequest contains parameters for creating a shipment.
@@ -87,13 +71,13 @@ type UpdateShipmentRequest struct {
 }
 
 // Shipment represents a shipment entity at the port boundary.
-// Status lifecycle: draft → exploring → specced → tasked → ready_for_imp → implementing/auto_implementing → implemented → deployed → verified → complete
+// Status lifecycle: draft -> ready -> in-progress -> closed
 type Shipment struct {
 	ID                  string
 	CommissionID        string
 	Title               string
 	Description         string
-	Status              string // draft, exploring, specced, tasked, ready_for_imp, implementing, auto_implementing, complete
+	Status              string // draft, ready, in-progress, closed
 	AssignedWorkbenchID string
 	RepoID              string // Linked repository for branch ownership
 	Branch              string // Owned branch (e.g., ml/SHIP-001-feature-name)

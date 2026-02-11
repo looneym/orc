@@ -111,10 +111,10 @@ func (s *ShipmentServiceImpl) ListShipments(ctx context.Context, filters primary
 	return shipments, nil
 }
 
-// CompleteShipment marks a shipment as complete.
-// If force is true, completes even if tasks are incomplete.
+// CloseShipment marks a shipment as closed.
+// If force is true, closes even if tasks are not closed.
 // If shipment has a SpecNoteID, the spec note is closed with reason "resolved".
-func (s *ShipmentServiceImpl) CompleteShipment(ctx context.Context, shipmentID string, force bool) error {
+func (s *ShipmentServiceImpl) CloseShipment(ctx context.Context, shipmentID string, force bool) error {
 	record, err := s.shipmentRepo.GetByID(ctx, shipmentID)
 	if err != nil {
 		return err
@@ -135,19 +135,19 @@ func (s *ShipmentServiceImpl) CompleteShipment(ctx context.Context, shipmentID s
 		}
 	}
 
-	// Guard: check all completion preconditions
-	guardCtx := coreshipment.CompleteShipmentContext{
+	// Guard: check all close preconditions
+	guardCtx := coreshipment.CloseShipmentContext{
 		ShipmentID:      shipmentID,
 		IsPinned:        record.Pinned,
 		Tasks:           tasks,
 		ForceCompletion: force,
 	}
-	if result := coreshipment.CanCompleteShipment(guardCtx); !result.Allowed {
+	if result := coreshipment.CanCloseShipment(guardCtx); !result.Allowed {
 		return result.Error()
 	}
 
-	// Update shipment status to complete
-	if err := s.shipmentRepo.UpdateStatus(ctx, shipmentID, "complete", true); err != nil {
+	// Update shipment status to closed
+	if err := s.shipmentRepo.UpdateStatus(ctx, shipmentID, "closed", true); err != nil {
 		return err
 	}
 
@@ -158,7 +158,7 @@ func (s *ShipmentServiceImpl) CompleteShipment(ctx context.Context, shipmentID s
 			Reason: "resolved",
 		}
 		if err := s.noteService.CloseNote(ctx, closeReq); err != nil {
-			// Log but don't fail - shipment is already complete
+			// Log but don't fail - shipment is already closed
 			fmt.Printf("Warning: failed to close spec note %s: %v\n", record.SpecNoteID, err)
 		}
 	}
@@ -166,83 +166,9 @@ func (s *ShipmentServiceImpl) CompleteShipment(ctx context.Context, shipmentID s
 	return nil
 }
 
-// PauseShipment pauses an active shipment.
-func (s *ShipmentServiceImpl) PauseShipment(ctx context.Context, shipmentID string) error {
-	record, err := s.shipmentRepo.GetByID(ctx, shipmentID)
-	if err != nil {
-		return err
-	}
-
-	// Guard: can only pause active shipments
-	if record.Status != "active" {
-		return fmt.Errorf("can only pause active shipments (current status: %s)", record.Status)
-	}
-
-	return s.shipmentRepo.UpdateStatus(ctx, shipmentID, "paused", false)
-}
-
-// ResumeShipment resumes a paused shipment.
-func (s *ShipmentServiceImpl) ResumeShipment(ctx context.Context, shipmentID string) error {
-	record, err := s.shipmentRepo.GetByID(ctx, shipmentID)
-	if err != nil {
-		return err
-	}
-
-	// Guard: can only resume paused shipments
-	if record.Status != "paused" {
-		return fmt.Errorf("can only resume paused shipments (current status: %s)", record.Status)
-	}
-
-	return s.shipmentRepo.UpdateStatus(ctx, shipmentID, "active", false)
-}
-
-// DeployShipment marks a shipment as deployed (merged to master or deployed to prod).
-func (s *ShipmentServiceImpl) DeployShipment(ctx context.Context, shipmentID string) error {
-	record, err := s.shipmentRepo.GetByID(ctx, shipmentID)
-	if err != nil {
-		return err
-	}
-
-	// Get tasks to count open (non-complete) tasks
-	taskRecords, err := s.taskRepo.List(ctx, secondary.TaskFilters{ShipmentID: shipmentID})
-	if err != nil {
-		return fmt.Errorf("failed to get tasks for shipment: %w", err)
-	}
-
-	openCount := 0
-	for _, t := range taskRecords {
-		if t.Status != "complete" {
-			openCount++
-		}
-	}
-
-	// Guard: check deploy preconditions
-	guardCtx := coreshipment.StatusTransitionContext{
-		ShipmentID:    shipmentID,
-		Status:        record.Status,
-		OpenTaskCount: openCount,
-	}
-	if result := coreshipment.CanDeployShipment(guardCtx); !result.Allowed {
-		return result.Error()
-	}
-
-	return s.shipmentRepo.UpdateStatus(ctx, shipmentID, "deployed", false)
-}
-
-// VerifyShipment marks a shipment as verified (post-deploy verification passed).
-func (s *ShipmentServiceImpl) VerifyShipment(ctx context.Context, shipmentID string) error {
-	record, err := s.shipmentRepo.GetByID(ctx, shipmentID)
-	if err != nil {
-		return err
-	}
-
-	// Guard: can only verify deployed shipments
-	guardCtx := coreshipment.StatusTransitionContext{Status: record.Status}
-	if result := coreshipment.CanVerifyShipment(guardCtx); !result.Allowed {
-		return result.Error()
-	}
-
-	return s.shipmentRepo.UpdateStatus(ctx, shipmentID, "verified", false)
+// CompleteShipment is an alias for CloseShipment for backwards compatibility.
+func (s *ShipmentServiceImpl) CompleteShipment(ctx context.Context, shipmentID string, force bool) error {
+	return s.CloseShipment(ctx, shipmentID, force)
 }
 
 // UpdateShipment updates a shipment's title, description, and/or branch.
@@ -256,7 +182,7 @@ func (s *ShipmentServiceImpl) UpdateShipment(ctx context.Context, req primary.Up
 	return s.shipmentRepo.Update(ctx, record)
 }
 
-// UpdateStatus sets a shipment's status directly (used for auto-transitions).
+// UpdateStatus sets a shipment's status directly.
 func (s *ShipmentServiceImpl) UpdateStatus(ctx context.Context, shipmentID, status string) error {
 	return s.shipmentRepo.UpdateStatus(ctx, shipmentID, status, false)
 }
@@ -280,31 +206,10 @@ func (s *ShipmentServiceImpl) SetStatus(ctx context.Context, shipmentID, status 
 		return result.Error()
 	}
 
-	// Set completed flag if transitioning to complete
-	setCompleted := status == "complete"
+	// Set completed flag if transitioning to closed
+	setCompleted := status == "closed"
 
 	return s.shipmentRepo.UpdateStatus(ctx, shipmentID, status, setCompleted)
-}
-
-// TriggerAutoTransition evaluates and applies auto-transition for a shipment.
-func (s *ShipmentServiceImpl) TriggerAutoTransition(ctx context.Context, shipmentID, triggerEvent string) (string, error) {
-	ship, err := s.shipmentRepo.GetByID(ctx, shipmentID)
-	if err != nil {
-		return "", err
-	}
-
-	newStatus := coreshipment.GetAutoTransitionStatus(coreshipment.AutoTransitionContext{
-		CurrentStatus: ship.Status,
-		TriggerEvent:  triggerEvent,
-	})
-	if newStatus == "" {
-		return "", nil // No transition needed
-	}
-
-	if err := s.shipmentRepo.UpdateStatus(ctx, shipmentID, newStatus, false); err != nil {
-		return "", err
-	}
-	return newStatus, nil
 }
 
 // PinShipment pins a shipment.
@@ -421,4 +326,4 @@ func recordToTask(r *secondary.TaskRecord) *primary.Task {
 var _ primary.ShipmentService = (*ShipmentServiceImpl)(nil)
 
 // Sentinel error for pinned shipment
-var ErrShipmentPinned = errors.New("cannot complete pinned shipment")
+var ErrShipmentPinned = errors.New("cannot close pinned shipment")

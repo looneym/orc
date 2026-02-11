@@ -89,23 +89,13 @@ The config identifies "where you are" via a single `place_id`:
 }
 ```
 
-Or for Goblins:
-```json
-{
-  "version": "1.0",
-  "place_id": "GATE-003"
-}
-```
-
 ### Place ID Prefixes
 
 | Prefix | Actor Type | Role | Description |
 |--------|------------|------|-------------|
-| `BENCH-` | Workbench | IMP | Implementation agent workspace (git worktree) |
-| `GATE-` | Gatehouse | Goblin | Workshop gatekeeper (1:1 with workshop) |
+| `BENCH-` | Workbench | Goblin or IMP | Workbench workspace (git worktree) |
 
 ### What NOT to store
-- `role` - Derived from place_id prefix (`BENCH-` → IMP, `GATE-` → Goblin)
 - `commission_id` - Trust the DB (workbench → workshop → factory → commission)
 - `current_focus` - Stored in DB (`workbenches.focused_id`)
 
@@ -113,50 +103,49 @@ Or for Goblins:
 
 ## Actor Model
 
-ORC uses a place-based actor model where identity is tied to "where you are":
+ORC uses a two-actor model where agents operate from workbenches:
 
 ### Actors
 
-| Actor | Place | Role | Purpose |
-|-------|-------|------|---------|
-| IMP | Workbench (`BENCH-xxx`) | Implementation | Executes tasks, writes code |
-| Goblin | Gatehouse (`GATE-xxx`) | Review | Reviews plans, handles escalations |
+| Actor | Role | Purpose |
+|-------|------|---------|
+| **Goblin** | Coordinator | Human's long-running workbench pane. Creates/manages ORC tasks with human. Memory and policy layer. |
+| **IMP** | Worker | Disposable worker agent spawned by Claude Teams. Executes tasks using Teams primitives. |
+
+The naming metaphors match the roles: Goblins are cunning coordinators, IMPs are industrious workers.
+
+### Integration Model (Claude Teams)
+
+ORC and Claude Teams have complementary roles:
+
+| Layer | Owner | Responsibility |
+|-------|-------|---------------|
+| Memory & Policy | ORC (Goblin) | What to do and why |
+| Execution | Teams (IMP) | How to do it and who does it |
+
+- Goblin creates/manages ORC tasks with the human
+- Teams workers (IMPs) execute using Teams primitives
+- ORC provides context; Teams provides execution
 
 ### Key Relationships
 
-- **Workshop → Gatehouse**: 1:1 (every workshop has exactly one gatehouse)
 - **Workshop → Workbenches**: 1:many (a workshop contains multiple workbenches)
-
-### Connect Command
-
-`orc connect` establishes agent identity. It validates role against place:
-
-```bash
-# From a workbench directory (has .orc/config.json with place_id=BENCH-xxx)
-orc connect                # Auto-detects IMP role
-orc connect --role imp     # Explicit IMP role (validates against place)
-orc connect --role goblin  # ERROR: Goblin role not allowed from workbench
-
-# From a gatehouse directory (has .orc/config.json with place_id=GATE-xxx)
-orc connect                # Auto-detects Goblin role
-orc connect --role goblin  # Explicit Goblin role
-orc connect --role imp     # ERROR: IMP role not allowed from gatehouse
-```
+- **Goblin** lives in a workbench pane directly (no separate gatehouse)
 
 ### Summary as Shared Bus
 
 The `orc summary` command serves as a shared information bus:
 - Both IMPs and Goblins see the same data structure
 - Filtering varies by role (IMP sees their shipments, Goblin sees all)
-- Task children (plans, approvals, escalations, receipts) visible to both
-- Status indicators: ✓ (approved/complete), ⚠ (escalated/pending)
+- Task children (plans, approvals) visible to both
+- Status indicators show current state
 
 ---
 
 ## Workshop Commands
 
 ### set-commission
-Sets the active commission for Goblin context. Must be run from a workshop gatehouse directory.
+Sets the active commission for Goblin context. Must be run from a workshop workbench directory.
 
 ```bash
 orc workshop set-commission COMM-001   # Set active commission
@@ -190,7 +179,6 @@ orc infra cleanup           # Remove orphan directories (explicit action)
 ```
 
 The infrastructure plan shows:
-- **Gatehouse**: Workshop coordination directory (`~/.orc/ws/WORK-xxx-slug/`)
 - **Workbenches**: Git worktrees for each workbench record
 - **TMux**: Session and window state
 
@@ -381,7 +369,7 @@ Run `make lint` to verify architecture compliance.
 Default to table-driven tests for guards, planners, validation, and service decision logic.
 
 ```go
-func TestCanPauseTask(t *testing.T) {
+func TestCanCloseTask(t *testing.T) {
     tests := []struct {
         name        string
         ctx         StatusTransitionContext
@@ -389,21 +377,21 @@ func TestCanPauseTask(t *testing.T) {
         wantReason  string
     }{
         {
-            name: "can pause in_progress task",
+            name: "can close in_progress task",
             ctx:  StatusTransitionContext{TaskID: "TASK-001", Status: "in_progress"},
             wantAllowed: true,
         },
         {
-            name: "cannot pause ready task",
-            ctx:  StatusTransitionContext{TaskID: "TASK-001", Status: "ready"},
+            name: "cannot close open task",
+            ctx:  StatusTransitionContext{TaskID: "TASK-001", Status: "open"},
             wantAllowed: false,
-            wantReason:  "can only pause in_progress tasks (current status: ready)",
+            wantReason:  "can only close in_progress tasks (current status: open)",
         },
     }
 
     for _, tt := range tests {
         t.Run(tt.name, func(t *testing.T) {
-            result := CanPauseTask(tt.ctx)
+            result := CanCloseTask(tt.ctx)
             if result.Allowed != tt.wantAllowed {
                 t.Errorf("Allowed = %v, want %v", result.Allowed, tt.wantAllowed)
             }
@@ -471,11 +459,10 @@ When developing changes that affect CLI display (summary, containers, leafs, etc
 ### What's in COMM-003
 
 The test commission contains representative examples of all container types:
-- **Shipment** (SHIP-205) with cycles, work orders, plans, and tasks (including paused status)
-- **Conclave** (CON-007) with nested tome and notes (including pinned note)
+- **Shipment** (SHIP-205) with tasks and notes
 - **Tome** (TOME-008, standalone) with notes
 
-Also includes items with various statuses (ready, paused, draft, complete) and pinned items.
+Also includes items with various statuses (draft, ready, in-progress, closed, open) and pinned items.
 
 ### When to Use
 
@@ -536,7 +523,7 @@ When adding a new state or transition to an entity's state machine:
 
 ### Add New Entity (with Repository)
 
-When adding a new entity that requires persistence (e.g., CycleWorkOrder, Receipt):
+When adding a new entity that requires persistence (e.g., CycleWorkOrder):
 
 - [ ] Create workbench DB: `make setup-workbench`
 - [ ] Guards in `internal/core/<entity>/guards.go`
@@ -653,7 +640,7 @@ This creates `.orc/workbench.db` with fresh fixtures:
 - 3 tags, 2 repos
 - 2 factories, 3 workshops, 2 workbenches
 - 3 commissions, 5 shipments, 10 tasks
-- 2 conclaves, 2 tomes, 4 notes
+- 2 tomes, 4 notes
 
 ### Using orc-dev
 
@@ -745,15 +732,17 @@ make lint
 
 → See [docs/common-workflows.md](docs/common-workflows.md) for full workflow documentation.
 
-### C4 Zoom Levels
+### Shipment Lifecycle (4 statuses)
 
-| Level | Scope | Owned By |
-|-------|-------|----------|
-| C2: Container | Services, apps, DBs | ship-plan |
-| C3: Component | Modules within containers | ship-plan |
-| C4: Code | Files, functions, edits | IMP plans |
+`draft` → `ready` → `in-progress` → `closed`
 
-Tasks say *what systems* to touch. IMP plans say *what files* to edit.
+All transitions are manual (Goblin decides). No auto-transitions.
+
+### Task Lifecycle (4 statuses)
+
+`open` → `in-progress` → `closed`
+
+`blocked` is a lateral state (can be set/unset on any non-closed task).
 
 ---
 
@@ -767,17 +756,14 @@ Tasks say *what systems* to touch. IMP plans say *what files* to edit.
 | `/exorcism` | `/ship-synthesize` (knowledge compaction) |
 | `/conclave` | `/ship-new` |
 | `orc conclave` | `orc shipment` |
-
-### Existing Conclaves
-
-Existing conclaves remain accessible for reference:
-
-```bash
-orc conclave list              # View existing conclaves
-orc conclave show CON-xxx      # View details
-orc conclave migrate CON-xxx   # Migrate to shipment
-orc conclave migrate --all     # Migrate all open conclaves
-```
+| Gatehouse entity | Absorbed into workbench (Goblin lives in workbench pane) |
+| `GATE-` place IDs | Removed (all actors use `BENCH-` prefix) |
+| Mail/message system | Replaced by Claude Teams messaging |
+| Nudge (autorun propulsion) | Removed |
+| Receipt entity | Removed |
+| Auto-transition machinery | All transitions are now manual |
+| Old shipment statuses | Replaced by: draft, ready, in-progress, closed |
+| Old task statuses (`ready`, `paused`) | Replaced by: open, in-progress, closed (+blocked lateral) |
 
 ### Tomes
 

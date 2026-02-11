@@ -457,67 +457,6 @@ func TestIntegration_NotesAcrossContainers(t *testing.T) {
 }
 
 // ============================================================================
-// Message Conversation Tests
-// ============================================================================
-
-func TestIntegration_MessageConversations(t *testing.T) {
-	db := setupTestDB(t)
-	ctx := context.Background()
-
-	messageRepo := sqlite.NewMessageRepository(db)
-
-	// Create conversation between ORC and IMP
-	msg1 := &secondary.MessageRecord{
-		ID:        "MSG-001",
-		Sender:    "ORC",
-		Recipient: "IMP-001",
-		Subject:   "Task Assignment",
-		Body:      "Please work on...",
-	}
-	msg2 := &secondary.MessageRecord{
-		ID:        "MSG-002",
-		Sender:    "IMP-001",
-		Recipient: "ORC",
-		Subject:   "Re: Task Assignment",
-		Body:      "I'm on it",
-	}
-	msg3 := &secondary.MessageRecord{
-		ID:        "MSG-003",
-		Sender:    "ORC",
-		Recipient: "IMP-002",
-		Subject:   "Different IMP",
-		Body:      "Different conversation",
-	}
-
-	_ = messageRepo.Create(ctx, msg1)
-	_ = messageRepo.Create(ctx, msg2)
-	_ = messageRepo.Create(ctx, msg3)
-
-	// Get conversation between ORC and IMP-001
-	conversation, err := messageRepo.GetConversation(ctx, "ORC", "IMP-001")
-	if err != nil {
-		t.Fatalf("GetConversation failed: %v", err)
-	}
-	if len(conversation) != 2 {
-		t.Errorf("expected 2 messages in conversation, got %d", len(conversation))
-	}
-
-	// Verify unread count for IMP-001
-	unread, _ := messageRepo.GetUnreadCount(ctx, "IMP-001")
-	if unread != 1 {
-		t.Errorf("expected 1 unread for IMP-001, got %d", unread)
-	}
-
-	// Mark as read
-	_ = messageRepo.MarkRead(ctx, "MSG-001")
-
-	// Verify unread count updated
-	unread, _ = messageRepo.GetUnreadCount(ctx, "IMP-001")
-	if unread != 0 {
-		t.Errorf("expected 0 unread after marking read, got %d", unread)
-	}
-}
-
 // ============================================================================
 // Status Workflow Tests
 // ============================================================================
@@ -548,8 +487,8 @@ func TestIntegration_EntityStatusWorkflows(t *testing.T) {
 	}
 
 	tsk, _ := taskRepo.GetByID(ctx, "TASK-001")
-	if tsk.Status != "ready" {
-		t.Errorf("expected task status 'ready', got '%s'", tsk.Status)
+	if tsk.Status != "open" {
+		t.Errorf("expected task status 'open', got '%s'", tsk.Status)
 	}
 
 	op, _ := operationRepo.GetByID(ctx, "OP-001")
@@ -557,26 +496,26 @@ func TestIntegration_EntityStatusWorkflows(t *testing.T) {
 		t.Errorf("expected operation status 'ready', got '%s'", op.Status)
 	}
 
-	// Transition to implementing/in_progress
-	_ = shipmentRepo.UpdateStatus(ctx, "SHIP-001", "implementing", false)
-	_ = taskRepo.UpdateStatus(ctx, "TASK-001", "in_progress", false, false)
+	// Transition to in-progress
+	_ = shipmentRepo.UpdateStatus(ctx, "SHIP-001", "in-progress", false)
+	_ = taskRepo.UpdateStatus(ctx, "TASK-001", "in-progress", false, false)
 	_ = operationRepo.UpdateStatus(ctx, "OP-001", "in_progress", false)
 
-	// Verify implementing/in_progress
+	// Verify in-progress
 	s, _ = shipmentRepo.GetByID(ctx, "SHIP-001")
-	if s.Status != "implementing" {
-		t.Errorf("expected shipment status 'implementing', got '%s'", s.Status)
+	if s.Status != "in-progress" {
+		t.Errorf("expected shipment status 'in-progress', got '%s'", s.Status)
 	}
 
-	// Transition to complete with timestamp
-	_ = shipmentRepo.UpdateStatus(ctx, "SHIP-001", "complete", true)
-	_ = taskRepo.UpdateStatus(ctx, "TASK-001", "complete", false, true)
+	// Transition to closed/complete with timestamp
+	_ = shipmentRepo.UpdateStatus(ctx, "SHIP-001", "closed", true)
+	_ = taskRepo.UpdateStatus(ctx, "TASK-001", "closed", false, true)
 	_ = operationRepo.UpdateStatus(ctx, "OP-001", "complete", true)
 
-	// Verify complete with CompletedAt
+	// Verify closed with CompletedAt
 	s, _ = shipmentRepo.GetByID(ctx, "SHIP-001")
-	if s.Status != "complete" {
-		t.Errorf("expected shipment status 'complete', got '%s'", s.Status)
+	if s.Status != "closed" {
+		t.Errorf("expected shipment status 'closed', got '%s'", s.Status)
 	}
 	if s.CompletedAt == "" {
 		t.Error("expected CompletedAt to be set")

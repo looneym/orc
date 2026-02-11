@@ -3,7 +3,6 @@ package app
 import (
 	"context"
 	"errors"
-	"fmt"
 	"testing"
 
 	"github.com/example/orc/internal/ports/primary"
@@ -209,92 +208,6 @@ func (m *mockFactoryRepository) CountWorkshops(ctx context.Context, factoryID st
 
 func (m *mockFactoryRepository) CountCommissions(ctx context.Context, factoryID string) (int, error) {
 	return 0, nil
-}
-
-// mockGatehouseRepositoryForWorkshop implements secondary.GatehouseRepository minimally.
-type mockGatehouseRepositoryForWorkshop struct {
-	gatehouses map[string]*secondary.GatehouseRecord
-	nextID     string
-}
-
-func newMockGatehouseRepositoryForWorkshop() *mockGatehouseRepositoryForWorkshop {
-	return &mockGatehouseRepositoryForWorkshop{
-		gatehouses: make(map[string]*secondary.GatehouseRecord),
-		nextID:     "GATE-001",
-	}
-}
-
-func (m *mockGatehouseRepositoryForWorkshop) Create(ctx context.Context, gatehouse *secondary.GatehouseRecord) error {
-	m.gatehouses[gatehouse.ID] = gatehouse
-	return nil
-}
-
-func (m *mockGatehouseRepositoryForWorkshop) GetByID(ctx context.Context, id string) (*secondary.GatehouseRecord, error) {
-	if g, ok := m.gatehouses[id]; ok {
-		return g, nil
-	}
-	return nil, errors.New("gatehouse not found")
-}
-
-func (m *mockGatehouseRepositoryForWorkshop) GetByWorkshop(ctx context.Context, workshopID string) (*secondary.GatehouseRecord, error) {
-	for _, g := range m.gatehouses {
-		if g.WorkshopID == workshopID {
-			return g, nil
-		}
-	}
-	return nil, errors.New("gatehouse not found")
-}
-
-func (m *mockGatehouseRepositoryForWorkshop) List(ctx context.Context, filters secondary.GatehouseFilters) ([]*secondary.GatehouseRecord, error) {
-	var result []*secondary.GatehouseRecord
-	for _, g := range m.gatehouses {
-		result = append(result, g)
-	}
-	return result, nil
-}
-
-func (m *mockGatehouseRepositoryForWorkshop) Update(ctx context.Context, gatehouse *secondary.GatehouseRecord) error {
-	m.gatehouses[gatehouse.ID] = gatehouse
-	return nil
-}
-
-func (m *mockGatehouseRepositoryForWorkshop) Delete(ctx context.Context, id string) error {
-	delete(m.gatehouses, id)
-	return nil
-}
-
-func (m *mockGatehouseRepositoryForWorkshop) GetNextID(ctx context.Context) (string, error) {
-	return m.nextID, nil
-}
-
-func (m *mockGatehouseRepositoryForWorkshop) UpdateStatus(ctx context.Context, id, status string) error {
-	if g, ok := m.gatehouses[id]; ok {
-		g.Status = status
-		return nil
-	}
-	return errors.New("gatehouse not found")
-}
-
-func (m *mockGatehouseRepositoryForWorkshop) WorkshopExists(ctx context.Context, workshopID string) (bool, error) {
-	// Just return true for testing purposes
-	return true, nil
-}
-
-func (m *mockGatehouseRepositoryForWorkshop) WorkshopHasGatehouse(ctx context.Context, workshopID string) (bool, error) {
-	for _, g := range m.gatehouses {
-		if g.WorkshopID == workshopID {
-			return true, nil
-		}
-	}
-	return false, nil
-}
-
-func (m *mockGatehouseRepositoryForWorkshop) UpdateFocusedID(ctx context.Context, id, focusedID string) error {
-	if g, ok := m.gatehouses[id]; ok {
-		g.FocusedID = focusedID
-		return nil
-	}
-	return fmt.Errorf("gatehouse %s not found", id)
 }
 
 // mockWorkbenchRepositoryForWorkshop implements secondary.WorkbenchRepository minimally.
@@ -654,7 +567,6 @@ func newTestWorkshopService() (*WorkshopServiceImpl, *mockWorkshopRepository, *m
 	workshopRepo := newMockWorkshopRepository()
 	workbenchRepo := newMockWorkbenchRepositoryForWorkshop()
 	repoRepo := newMockRepoRepositoryForWorkshop()
-	gatehouseRepo := newMockGatehouseRepositoryForWorkshop()
 	tmuxAdapter := newMockTMuxAdapter()
 	workspaceAdapter := newMockWorkspaceAdapter()
 	executor := newMockEffectExecutor()
@@ -664,7 +576,6 @@ func newTestWorkshopService() (*WorkshopServiceImpl, *mockWorkshopRepository, *m
 		workshopRepo,
 		workbenchRepo,
 		repoRepo,
-		gatehouseRepo,
 		tmuxAdapter,
 		workspaceAdapter,
 		executor,

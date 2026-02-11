@@ -1,6 +1,6 @@
 # ORC Architecture
 
-**Updated:** 2026-02-03
+**Updated:** 2026-02-11
 
 ---
 
@@ -64,32 +64,13 @@ ORC (Orchestrator) is a commission coordination system for managing complex, mul
 | Skill | Description |
 |-------|-------------|
 | ship-new | Create new shipments |
-| ship-synthesize | Knowledge compaction → summary note |
-| ship-plan | C2/C3 engineering review → tasks |
+| ship-synthesize | Knowledge compaction -> summary note |
+| ship-plan | C2/C3 engineering review -> tasks |
 | ship-queue | View shipyard queue |
 | ship-complete | Complete shipments |
 | ship-deploy | Deploy shipments |
 | ship-freshness | Rebase and validate tasks/notes |
 | release | Cut semantic version releases |
-
-**IMP Workflow:**
-| Skill | Description |
-|-------|-------------|
-| imp-start | Begin IMP work on shipment |
-| imp-plan-create | Create C4 implementation plans |
-| imp-plan-submit | Submit plans for review |
-| imp-implement | Show approved plan for coding phase |
-| imp-auto | Toggle auto mode |
-| imp-rec | Create receipts |
-| imp-escalate | Escalate to gatehouse |
-| imp-nudge | Manual re-propulsion check |
-| imp-poll | Check shipyard queue for work |
-| imp-respawn | Respawn tmux pane for clean context |
-
-**Goblin Workflow:**
-| Skill | Description |
-|-------|-------------|
-| goblin-escalation-receive | Handle incoming escalations |
 
 **Setup & Admin:**
 | Skill | Description |
@@ -111,6 +92,11 @@ ORC (Orchestrator) is a commission coordination system for managing complex, mul
 | orc-ping | Verify ORC is working |
 | orc-self-test | Integration self-testing |
 | bootstrap-exercise | Manual test for first-run flow |
+
+**Agent Integration:**
+| Skill | Description |
+|-------|-------------|
+| imp-escalate | Escalate to coordinator when blocked |
 
 **Exploration:**
 | Skill | Description |
@@ -143,20 +129,16 @@ Skills specific to this repository (not deployed globally):
        ↓
 /ship-plan → Tasks (C2/C3 engineering review)
        ↓
-/imp-plan-create → Plans (C4 file-level detail)
+Teams assigns tasks to IMPs → Implementation
        ↓
-/imp-plan-submit → Plan approval
+/ship-deploy → Merge to main
        ↓
-/imp-implement → Show plan, begin coding
-       ↓
-Implementation → Code
-       ↓
-/imp-rec → Verify, receipt, chain to next task
+/ship-complete → Close shipment
 ```
 
 **Zoom Level Ownership:**
 - C2/C3 (containers, components): ship-plan, orc-architecture
-- C4 (files, functions): imp-plan-create
+- C4 (files, functions): IMP execution via Teams
 
 ---
 
@@ -167,7 +149,7 @@ Commission (coordination scope)
 ├── Shipments (execution containers with lifecycle)
 │   ├── Notes (ideas, questions, decisions, specs)
 │   └── Tasks (atomic units of work)
-└── Workbenches (git worktrees with IMP agents)
+└── Workbenches (git worktrees for agents)
 ```
 
 **Design Principles:**
@@ -188,19 +170,18 @@ Commission (coordination scope)
 
 ### 2. Shipment & Task System
 **Shipment-based workflow:**
-- Shipments represent units of work with exploration → implementation lifecycle
+- Shipments represent units of work with a simple 4-status lifecycle: draft -> ready -> in-progress -> closed
 - Tasks belong to shipments and represent specific implementation work
-- Status lifecycle: draft → exploring → specced → tasked → in_progress → complete
+- Task lifecycle: open -> in-progress -> closed (+blocked as lateral flag)
+- All transitions are manual (Goblin decides)
 - Type categorization: research, implementation, fix, documentation, maintenance
 - Pinnable items for visibility
-- Emoji-rich CLI output for quick status scanning
 
 **Key Commands:**
 ```bash
 orc shipment create "Title" --commission COMM-XXX
 orc task create "Task description" --shipment SHIP-XXX
-orc task claim TASK-XXX
-orc task complete TASK-XXX
+orc task close TASK-XXX
 orc summary                    # Hierarchical view with pinned items
 ```
 
@@ -226,22 +207,22 @@ orc workbench rename BENCH-XXX new-name
 - Writes .orc-commission marker for context detection
 - Opens in TMux with 3-pane IMP layout: vim | claude | shell
 
-### 4. Agent Types (IMP, Goblin)
-**Concept**: Place-based actor model with two agent types
+### 4. Actor Model (Goblin, IMP)
+**Concept**: Two-actor model with complementary roles
 
-**Agent Types:**
-- **IMP (Implementation Agent)**: Works within a workbench (BENCH-XXX) on assigned shipments/tasks
-- **Goblin**: Workshop gatekeeper (GATE-XXX) that reviews plans and handles escalations
+**Actor Types:**
+- **Goblin (Coordinator)**: Human's long-running workbench pane. Creates/manages ORC tasks with the human. Memory and policy layer (what and why).
+- **IMP (Worker)**: Disposable worker agent spawned by Claude Teams. Executes tasks using Teams primitives. Execution layer (how and who).
 
-**Architecture Principles:**
-- Identity tied to place (place_id in config)
-- IMPs operate within workbench boundaries
-- Goblins coordinate via escalation handling
-- Coordination via shared summary bus
+**Integration Model (Claude Teams):**
+- ORC = memory and policy layer (what and why)
+- Teams = execution layer (how and who)
+- Goblin creates/manages ORC tasks with the human
+- Teams workers (IMPs) execute using Teams primitives
 
 **Communication:**
-- Escalations for judgment calls
-- Tasks for implementation work
+- Claude Teams messaging (replaces old mail/escalation system)
+- Shared summary bus via `orc summary`
 
 ### 5. Context Preservation & Handoffs
 **orc prime & handoff Integration:**
@@ -258,12 +239,12 @@ Session boundaries are preserved through:
 - Handoffs searchable via CLI (`orc handoff list`, `orc handoff show`)
 
 ### 6. TMux Integration
-**One TMux session per commission:**
+**One TMux session per workshop:**
 ```
 TMux Session: "Workshop Name" (orc-WORK-XXX)
-├── Window 0: Goblin (coordination)
-├── Window 1: IMP in BENCH-001 (vim | claude | shell)
-└── Window 2: IMP in BENCH-002 (vim | claude | shell)
+├── Window 0: Goblin in BENCH-001 (claude | vim | shell)
+├── Window 1: Workbench BENCH-002 (vim | claude | shell)
+└── Window 2: Workbench BENCH-003 (vim | claude | shell)
 ```
 
 **Features:**
@@ -306,32 +287,27 @@ This pattern replaces SessionStart hooks (which are broken in Claude Code v2.1.7
 
 **Core Tables:**
 - `commissions` - Top-level coordination scopes
-- `work_orders` - Tasks with status, type, parent_id, assigned_workbench_id, pinned flag
-- `workbenches` - Git worktrees registered to commissions
+- `shipments` - Work containers with lifecycle
+- `tasks` - Atomic units of work within shipments
+- `workbenches` - Git worktrees registered to workshops
 - `handoffs` - Session handoff narratives for context preservation
 
-**Removed Tables (simplified in 2.0):**
-- ~~`operations`~~ - Removed (too rigid, use work_order.type instead)
-- ~~`expeditions`~~ - Removed (1:1:1 mapping didn't match workflow)
-- ~~`dependencies`~~ - Not implemented yet (can add later if needed)
-
 **Key Fields:**
-- `work_orders.status`: ready | design | implement | deploy | blocked | paused | complete
-- `work_orders.type`: research | implementation | fix | documentation | maintenance
-- `work_orders.parent_id`: Optional epic/parent reference
-- `work_orders.assigned_workbench_id`: Workbench assignment
-- `work_orders.pinned`: Boolean for visibility
+- `shipments.status`: draft | ready | in-progress | closed
+- `tasks.status`: open | in-progress | closed
+- `tasks.blocked`: Boolean lateral state flag
+- `tasks.type`: research | implementation | fix | documentation | maintenance
 
 ### Entity Relationships (Core)
 
-See **[docs/schema.md](schema.md)** for the complete ER diagram with 12 core tables.
+See **[docs/schema.md](schema.md)** for the complete ER diagram.
 
 **Core Hierarchy:**
-- **Factory** → Workshop → Workbench (infrastructure)
-- **Commission** → Shipment → Task (work tracking)
-- **Task** → Plan → Receipt (execution flow)
+- **Factory** -> Workshop -> Workbench (infrastructure)
+- **Commission** -> Shipment -> Task (work tracking)
+- **Task** -> Plan -> Approval (execution flow)
 
-See `internal/db/schema.sql` for the complete schema including approvals, escalations, and more
+See `internal/db/schema.sql` for the complete schema
 
 ---
 
@@ -398,8 +374,8 @@ Next session can bootstrap from this
 ORC is in active production use with the following capabilities:
 
 - **Commission & Workshop Management**: Full lifecycle support
-- **Shipment Workflow**: exploration → synthesis → planning → implementation
-- **Agent Coordination**: IMP, Goblin roles operational
+- **Shipment Workflow**: draft -> ready -> in-progress -> closed (manual transitions)
+- **Actor Model**: Goblin (coordinator) + IMP (worker via Claude Teams)
 - **TMux Integration**: Multi-workbench sessions working
 - **Skills System**: Claude Code skills for workflow automation
 
@@ -504,9 +480,9 @@ orc handoff create --note "Session summary..."
 
 1. **SQLite Source of Truth** - Single authoritative database for all state
 2. **Zero Cold-Start** - Full context preservation via handoff narratives
-3. **Multi-Agent Coordination** - IMP/Goblin actor model
+3. **Two-Actor Model** - Goblin (coordinator) + IMP (worker via Claude Teams)
 4. **Git Worktree Native** - First-class support for isolated workspaces
-5. **Shipment Workflow** - Exploration → synthesis → planning → implementation
+5. **Simple Lifecycles** - 4-status shipments, 3-status tasks, all manual transitions
 6. **TMux Integration** - One session per workshop, programmatic layout
 7. **Skills System** - Claude Code skills for workflow automation
 8. **Plan/Apply Infrastructure** - DB as source of truth, filesystem materializes on apply
@@ -539,12 +515,12 @@ orc handoff create --note "Session summary..."
 ## Glossary
 
 **Commission**: Top-level coordination scope, owns workshops and shipments
-**Workshop**: Collection of workbenches with a gatehouse for coordination
+**Workshop**: Collection of workbenches for coordinated work
 **Workbench (BENCH-XXX)**: Git worktree registered to a workshop, physical workspace
-**Shipment (SHIP-XXX)**: Unit of work with exploration → implementation lifecycle
-**Task (TASK-XXX)**: Specific implementation work within a shipment
-**IMP**: Implementation agent that works within a workbench
-**Goblin (GATE-XXX)**: Workshop gatekeeper, reviews plans, handles escalations
+**Shipment (SHIP-XXX)**: Unit of work with 4-status lifecycle (draft, ready, in-progress, closed)
+**Task (TASK-XXX)**: Specific implementation work within a shipment (open, in-progress, closed)
+**Goblin**: Coordinator agent -- human's long-running workbench pane
+**IMP**: Disposable worker agent spawned by Claude Teams
 **Handoff**: Session boundary artifact (narrative + work state)
 **orc prime**: Context injection at session start
 

@@ -29,15 +29,12 @@ var (
 	operationService               primary.OperationService
 	planService                    primary.PlanService
 	tagService                     primary.TagService
-	messageService                 primary.MessageService
 	repoService                    primary.RepoService
 	prService                      primary.PRService
 	factoryService                 primary.FactoryService
 	workshopService                primary.WorkshopService
 	workbenchService               primary.WorkbenchService
-	receiptService                 primary.ReceiptService
 	summaryService                 primary.SummaryService
-	gatehouseService               primary.GatehouseService
 	approvalService                primary.ApprovalService
 	escalationService              primary.EscalationService
 	infraService                   primary.InfraService
@@ -103,12 +100,6 @@ func TagService() primary.TagService {
 	return tagService
 }
 
-// MessageService returns the singleton MessageService instance.
-func MessageService() primary.MessageService {
-	once.Do(initServices)
-	return messageService
-}
-
 // RepoService returns the singleton RepoService instance.
 func RepoService() primary.RepoService {
 	once.Do(initServices)
@@ -139,22 +130,10 @@ func WorkbenchService() primary.WorkbenchService {
 	return workbenchService
 }
 
-// ReceiptService returns the singleton ReceiptService instance.
-func ReceiptService() primary.ReceiptService {
-	once.Do(initServices)
-	return receiptService
-}
-
 // SummaryService returns the singleton SummaryService instance.
 func SummaryService() primary.SummaryService {
 	once.Do(initServices)
 	return summaryService
-}
-
-// GatehouseService returns the singleton GatehouseService instance.
-func GatehouseService() primary.GatehouseService {
-	once.Do(initServices)
-	return gatehouseService
 }
 
 // ApprovalService returns the singleton ApprovalService instance.
@@ -263,10 +242,8 @@ func initServices() {
 	// Create plan repository
 	planRepo := sqlite.NewPlanRepository(database, logWriter)
 
-	// Create tag and message services
+	// Create tag service
 	tagService = app.NewTagService(tagRepo)
-	messageRepo := sqlite.NewMessageRepository(database)
-	messageService = app.NewMessageService(messageRepo)
 
 	// Create repo and PR services
 	repoRepo := sqlite.NewRepoRepository(database)
@@ -278,9 +255,8 @@ func initServices() {
 	factoryRepo := sqlite.NewFactoryRepository(database)
 	workshopRepo := sqlite.NewWorkshopRepository(database)
 	// workbenchRepo already created early for LogWriter (with nil LogWriter due to circular dependency)
-	gatehouseRepo := sqlite.NewGatehouseRepository(database) // needed by workshop service for auto-creation
 	factoryService = app.NewFactoryService(factoryRepo)
-	workshopService = app.NewWorkshopService(factoryRepo, workshopRepo, workbenchRepo, repoRepo, gatehouseRepo, tmuxService, workspaceAdapter, executor)
+	workshopService = app.NewWorkshopService(factoryRepo, workshopRepo, workbenchRepo, repoRepo, tmuxService, workspaceAdapter, executor)
 	workbenchService = app.NewWorkbenchService(workbenchRepo, workshopRepo, repoRepo, agentProvider, executor)
 
 	// Create approval and escalation repositories early (needed by plan service)
@@ -293,25 +269,15 @@ func initServices() {
 		approvalRepo,
 		escalationRepo,
 		workbenchRepo,
-		gatehouseRepo,
-		messageService,
 		tmuxAdapter,
 	)
-
-	// Create receipt service
-	receiptRepo := sqlite.NewReceiptRepository(database)
-	receiptService = app.NewReceiptService(receiptRepo)
-
-	// Create new entity services (gatehouses, approvals, escalations)
-	// Pass workshop repo to gatehouse service for EnsureAllWorkshopsHaveGatehouses
-	gatehouseService = app.NewGatehouseService(gatehouseRepo, workshopRepo)
 
 	approvalService = app.NewApprovalService(approvalRepo)
 
 	escalationService = app.NewEscalationService(escalationRepo)
 
 	// Create infra service for infrastructure planning
-	infraService = app.NewInfraService(factoryRepo, workshopRepo, workbenchRepo, repoRepo, gatehouseRepo, workspaceAdapter, tmuxAdapter, executor)
+	infraService = app.NewInfraService(factoryRepo, workshopRepo, workbenchRepo, repoRepo, workspaceAdapter, tmuxAdapter, executor)
 
 	// Create log service for activity logs (workshopLogRepo created early for LogWriter)
 	logService = app.NewLogService(workshopLogRepo)
@@ -334,7 +300,6 @@ func initServices() {
 		planService,
 		approvalService,
 		escalationService,
-		receiptService,
 	)
 }
 

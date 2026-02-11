@@ -98,7 +98,7 @@ func TestLogHookEvent_Success(t *testing.T) {
 		Cwd:                 "/Users/test",
 		SessionID:           "sess-123",
 		ShipmentID:          "SHIP-001",
-		ShipmentStatus:      "implementing",
+		ShipmentStatus:      "in-progress",
 		TaskCountIncomplete: 3,
 		Decision:            "block",
 		Reason:              "Incomplete tasks",

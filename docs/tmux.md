@@ -3,7 +3,7 @@
 **Status**: Living document
 **Last Updated**: 2026-02-08
 
-ORC uses TMux for multi-agent session management. Each workshop has a dedicated TMux session with windows for Goblins and IMPs.
+ORC uses TMux for multi-agent session management. Each workshop has a dedicated TMux session with windows for workbenches.
 
 ## Window/Pane Layouts
 
@@ -26,22 +26,22 @@ Standard 3-pane layout for implementation work:
 | 2 (top-right) | Claude IMP | `orc connect` |
 | 3 (bottom-right) | Shell | (none) |
 
-### Goblin Layout (ORC Window)
+### Goblin Layout (Coordination Window)
 
-Coordination window for workshop oversight:
+The Goblin (coordinator) lives in a workbench pane directly:
 
 ```
 ┌─────────────────────┬──────────────┐
 │                     │   vim        │
 │      claude         │──────────────│
-│    (Goblin mode)    │   shell      │
+│    (Goblin)         │   shell      │
 │                     │              │
 └─────────────────────┴──────────────┘
 ```
 
 | Pane | Purpose | Respawn Command |
 |------|---------|-----------------|
-| 1 (left) | Claude Goblin | `orc connect --role goblin` |
+| 1 (left) | Claude Goblin | `orc connect` |
 | 2 (top-right) | Editor | `vim` |
 | 3 (bottom-right) | Shell | (none) |
 
@@ -50,9 +50,8 @@ Coordination window for workshop oversight:
 Layouts are created by `orc infra apply WORK-xxx`:
 
 1. Creates TMux session for workshop
-2. Creates first window as Goblin (ORC) window
-3. Creates subsequent windows for each workbench
-4. Sets respawn commands so panes can be refreshed
+2. Creates windows for each workbench
+3. Sets respawn commands so panes can be refreshed
 
 ## Pane Respawn
 

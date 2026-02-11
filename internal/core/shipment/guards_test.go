@@ -41,28 +41,28 @@ func TestCanCreateShipment(t *testing.T) {
 	}
 }
 
-func TestCanCompleteShipment(t *testing.T) {
+func TestCanCloseShipment(t *testing.T) {
 	tests := []struct {
 		name        string
-		ctx         CompleteShipmentContext
+		ctx         CloseShipmentContext
 		wantAllowed bool
 		wantReason  string
 	}{
 		{
-			name: "can complete unpinned shipment with all tasks complete",
-			ctx: CompleteShipmentContext{
+			name: "can close unpinned shipment with all tasks closed",
+			ctx: CloseShipmentContext{
 				ShipmentID: "SHIP-001",
 				IsPinned:   false,
 				Tasks: []TaskSummary{
-					{ID: "TASK-001", Status: "complete"},
-					{ID: "TASK-002", Status: "complete"},
+					{ID: "TASK-001", Status: "closed"},
+					{ID: "TASK-002", Status: "closed"},
 				},
 			},
 			wantAllowed: true,
 		},
 		{
-			name: "can complete shipment with no tasks",
-			ctx: CompleteShipmentContext{
+			name: "can close shipment with no tasks",
+			ctx: CloseShipmentContext{
 				ShipmentID: "SHIP-001",
 				IsPinned:   false,
 				Tasks:      []TaskSummary{},
@@ -70,40 +70,40 @@ func TestCanCompleteShipment(t *testing.T) {
 			wantAllowed: true,
 		},
 		{
-			name: "cannot complete pinned shipment",
-			ctx: CompleteShipmentContext{
+			name: "cannot close pinned shipment",
+			ctx: CloseShipmentContext{
 				ShipmentID: "SHIP-001",
 				IsPinned:   true,
 				Tasks: []TaskSummary{
-					{ID: "TASK-001", Status: "complete"},
+					{ID: "TASK-001", Status: "closed"},
 				},
 			},
 			wantAllowed: false,
-			wantReason:  "cannot complete pinned shipment SHIP-001. Unpin first with: orc shipment unpin SHIP-001",
+			wantReason:  "cannot close pinned shipment SHIP-001. Unpin first with: orc shipment unpin SHIP-001",
 		},
 		{
-			name: "cannot complete shipment with incomplete tasks",
-			ctx: CompleteShipmentContext{
+			name: "cannot close shipment with non-closed tasks",
+			ctx: CloseShipmentContext{
 				ShipmentID: "SHIP-001",
 				IsPinned:   false,
 				Tasks: []TaskSummary{
-					{ID: "TASK-001", Status: "complete"},
-					{ID: "TASK-002", Status: "ready"},
-					{ID: "TASK-003", Status: "in_progress"},
+					{ID: "TASK-001", Status: "closed"},
+					{ID: "TASK-002", Status: "open"},
+					{ID: "TASK-003", Status: "in-progress"},
 				},
 			},
 			wantAllowed: false,
-			wantReason:  "cannot complete shipment: 2 task(s) incomplete (TASK-002, TASK-003). Use --force to complete anyway",
+			wantReason:  "cannot close shipment: 2 task(s) not closed (TASK-002, TASK-003). Use --force to close anyway",
 		},
 		{
-			name: "can force complete shipment with incomplete tasks",
-			ctx: CompleteShipmentContext{
+			name: "can force close shipment with non-closed tasks",
+			ctx: CloseShipmentContext{
 				ShipmentID:      "SHIP-001",
 				IsPinned:        false,
 				ForceCompletion: true,
 				Tasks: []TaskSummary{
-					{ID: "TASK-001", Status: "complete"},
-					{ID: "TASK-002", Status: "ready"},
+					{ID: "TASK-001", Status: "closed"},
+					{ID: "TASK-002", Status: "open"},
 				},
 			},
 			wantAllowed: true,
@@ -112,7 +112,7 @@ func TestCanCompleteShipment(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := CanCompleteShipment(tt.ctx)
+			result := CanCloseShipment(tt.ctx)
 			if result.Allowed != tt.wantAllowed {
 				t.Errorf("Allowed = %v, want %v", result.Allowed, tt.wantAllowed)
 			}
@@ -123,329 +123,71 @@ func TestCanCompleteShipment(t *testing.T) {
 	}
 }
 
-func TestCanPauseShipment(t *testing.T) {
+func TestCanOverrideStatus(t *testing.T) {
 	tests := []struct {
 		name        string
-		ctx         StatusTransitionContext
+		ctx         OverrideStatusContext
 		wantAllowed bool
 		wantReason  string
 	}{
 		{
-			name: "can pause implementing shipment",
-			ctx: StatusTransitionContext{
-				ShipmentID: "SHIP-001",
-				Status:     "implementing",
-			},
-			wantAllowed: true,
-		},
-		{
-			name: "can pause auto_implementing shipment",
-			ctx: StatusTransitionContext{
-				ShipmentID: "SHIP-001",
-				Status:     "auto_implementing",
-			},
-			wantAllowed: true,
-		},
-		{
-			name: "cannot pause paused shipment",
-			ctx: StatusTransitionContext{
-				ShipmentID: "SHIP-001",
-				Status:     "paused",
-			},
-			wantAllowed: false,
-			wantReason:  "can only pause implementing shipments (current status: paused)",
-		},
-		{
-			name: "cannot pause complete shipment",
-			ctx: StatusTransitionContext{
-				ShipmentID: "SHIP-001",
-				Status:     "complete",
-			},
-			wantAllowed: false,
-			wantReason:  "can only pause implementing shipments (current status: complete)",
-		},
-		{
-			name: "cannot pause draft shipment",
-			ctx: StatusTransitionContext{
-				ShipmentID: "SHIP-001",
-				Status:     "draft",
-			},
-			wantAllowed: false,
-			wantReason:  "can only pause implementing shipments (current status: draft)",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := CanPauseShipment(tt.ctx)
-			if result.Allowed != tt.wantAllowed {
-				t.Errorf("Allowed = %v, want %v", result.Allowed, tt.wantAllowed)
-			}
-			if !tt.wantAllowed && result.Reason != tt.wantReason {
-				t.Errorf("Reason = %q, want %q", result.Reason, tt.wantReason)
-			}
-		})
-	}
-}
-
-func TestCanResumeShipment(t *testing.T) {
-	tests := []struct {
-		name        string
-		ctx         StatusTransitionContext
-		wantAllowed bool
-		wantReason  string
-	}{
-		{
-			name: "can resume paused shipment",
-			ctx: StatusTransitionContext{
-				ShipmentID: "SHIP-001",
-				Status:     "paused",
-			},
-			wantAllowed: true,
-		},
-		{
-			name: "cannot resume implementing shipment",
-			ctx: StatusTransitionContext{
-				ShipmentID: "SHIP-001",
-				Status:     "implementing",
-			},
-			wantAllowed: false,
-			wantReason:  "can only resume paused shipments (current status: implementing)",
-		},
-		{
-			name: "cannot resume complete shipment",
-			ctx: StatusTransitionContext{
-				ShipmentID: "SHIP-001",
-				Status:     "complete",
-			},
-			wantAllowed: false,
-			wantReason:  "can only resume paused shipments (current status: complete)",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := CanResumeShipment(tt.ctx)
-			if result.Allowed != tt.wantAllowed {
-				t.Errorf("Allowed = %v, want %v", result.Allowed, tt.wantAllowed)
-			}
-			if !tt.wantAllowed && result.Reason != tt.wantReason {
-				t.Errorf("Reason = %q, want %q", result.Reason, tt.wantReason)
-			}
-		})
-	}
-}
-
-func TestCanDeployShipment(t *testing.T) {
-	tests := []struct {
-		name        string
-		ctx         StatusTransitionContext
-		wantAllowed bool
-		wantReason  string
-	}{
-		{
-			name: "can deploy implemented shipment with no open tasks",
-			ctx: StatusTransitionContext{
+			name: "can override to valid forward status",
+			ctx: OverrideStatusContext{
 				ShipmentID:    "SHIP-001",
-				Status:        "implemented",
-				OpenTaskCount: 0,
-			},
-			wantAllowed: true,
-		},
-		{
-			name: "can deploy implementing shipment with no open tasks",
-			ctx: StatusTransitionContext{
-				ShipmentID:    "SHIP-001",
-				Status:        "implementing",
-				OpenTaskCount: 0,
-			},
-			wantAllowed: true,
-		},
-		{
-			name: "can deploy auto_implementing shipment with no open tasks",
-			ctx: StatusTransitionContext{
-				ShipmentID:    "SHIP-001",
-				Status:        "auto_implementing",
-				OpenTaskCount: 0,
-			},
-			wantAllowed: true,
-		},
-		{
-			name: "can deploy complete shipment with no open tasks",
-			ctx: StatusTransitionContext{
-				ShipmentID:    "SHIP-001",
-				Status:        "complete",
-				OpenTaskCount: 0,
-			},
-			wantAllowed: true,
-		},
-		{
-			name: "cannot deploy shipment with open tasks",
-			ctx: StatusTransitionContext{
-				ShipmentID:    "SHIP-001",
-				Status:        "implemented",
-				OpenTaskCount: 2,
-			},
-			wantAllowed: false,
-			wantReason:  "cannot deploy: 2 task(s) still open",
-		},
-		{
-			name: "cannot deploy exploring shipment",
-			ctx: StatusTransitionContext{
-				ShipmentID:    "SHIP-001",
-				Status:        "exploring",
-				OpenTaskCount: 0,
-			},
-			wantAllowed: false,
-			wantReason:  "can only deploy implementing/implemented shipments (current status: exploring)",
-		},
-		{
-			name: "cannot deploy tasked shipment",
-			ctx: StatusTransitionContext{
-				ShipmentID:    "SHIP-001",
-				Status:        "tasked",
-				OpenTaskCount: 0,
-			},
-			wantAllowed: false,
-			wantReason:  "can only deploy implementing/implemented shipments (current status: tasked)",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := CanDeployShipment(tt.ctx)
-			if result.Allowed != tt.wantAllowed {
-				t.Errorf("Allowed = %v, want %v", result.Allowed, tt.wantAllowed)
-			}
-			if !tt.wantAllowed && result.Reason != tt.wantReason {
-				t.Errorf("Reason = %q, want %q", result.Reason, tt.wantReason)
-			}
-		})
-	}
-}
-
-func TestGetAutoTransitionStatus(t *testing.T) {
-	tests := []struct {
-		name       string
-		ctx        AutoTransitionContext
-		wantStatus string
-	}{
-		// Focus transitions
-		{
-			name: "focus on draft shipment transitions to exploring",
-			ctx: AutoTransitionContext{
 				CurrentStatus: "draft",
-				TriggerEvent:  "focus",
+				NewStatus:     "ready",
 			},
-			wantStatus: "exploring",
+			wantAllowed: true,
 		},
 		{
-			name: "focus on exploring shipment does not transition",
-			ctx: AutoTransitionContext{
-				CurrentStatus: "exploring",
-				TriggerEvent:  "focus",
+			name: "cannot override to invalid status",
+			ctx: OverrideStatusContext{
+				ShipmentID:    "SHIP-001",
+				CurrentStatus: "draft",
+				NewStatus:     "exploring",
 			},
-			wantStatus: "",
-		},
-		// Task created transitions
-		{
-			name: "first task created on exploring shipment transitions to tasked",
-			ctx: AutoTransitionContext{
-				CurrentStatus: "exploring",
-				TriggerEvent:  "task_created",
-			},
-			wantStatus: "tasked",
+			wantAllowed: false,
+			wantReason:  "invalid status 'exploring'. Valid statuses: draft, ready, in-progress, closed",
 		},
 		{
-			name: "task created on tasked shipment does not transition",
-			ctx: AutoTransitionContext{
-				CurrentStatus: "tasked",
-				TriggerEvent:  "task_created",
+			name: "cannot go backwards without force",
+			ctx: OverrideStatusContext{
+				ShipmentID:    "SHIP-001",
+				CurrentStatus: "in-progress",
+				NewStatus:     "draft",
 			},
-			wantStatus: "",
-		},
-		// Task claimed transitions
-		{
-			name: "task claimed on tasked shipment transitions to implementing",
-			ctx: AutoTransitionContext{
-				CurrentStatus: "tasked",
-				TriggerEvent:  "task_claimed",
-			},
-			wantStatus: "implementing",
+			wantAllowed: false,
+			wantReason:  "backwards transition from 'in-progress' to 'draft' requires --force flag",
 		},
 		{
-			name: "task claimed on ready_for_imp shipment transitions to implementing",
-			ctx: AutoTransitionContext{
-				CurrentStatus: "ready_for_imp",
-				TriggerEvent:  "task_claimed",
+			name: "can go backwards with force",
+			ctx: OverrideStatusContext{
+				ShipmentID:    "SHIP-001",
+				CurrentStatus: "in-progress",
+				NewStatus:     "draft",
+				Force:         true,
 			},
-			wantStatus: "implementing",
+			wantAllowed: true,
 		},
 		{
-			name: "task claimed on implementing shipment does not transition",
-			ctx: AutoTransitionContext{
-				CurrentStatus: "implementing",
-				TriggerEvent:  "task_claimed",
+			name: "allows transition from unknown status",
+			ctx: OverrideStatusContext{
+				ShipmentID:    "SHIP-001",
+				CurrentStatus: "legacy_status",
+				NewStatus:     "ready",
 			},
-			wantStatus: "",
-		},
-		// Deploy transitions
-		{
-			name: "deploy from implementing transitions to deployed",
-			ctx: AutoTransitionContext{
-				CurrentStatus: "implementing",
-				TriggerEvent:  "deploy",
-			},
-			wantStatus: "deployed",
-		},
-		{
-			name: "deploy from auto_implementing transitions to deployed",
-			ctx: AutoTransitionContext{
-				CurrentStatus: "auto_implementing",
-				TriggerEvent:  "deploy",
-			},
-			wantStatus: "deployed",
-		},
-		{
-			name: "deploy from implemented transitions to deployed",
-			ctx: AutoTransitionContext{
-				CurrentStatus: "implemented",
-				TriggerEvent:  "deploy",
-			},
-			wantStatus: "deployed",
-		},
-		{
-			name: "deploy from complete (legacy) transitions to deployed",
-			ctx: AutoTransitionContext{
-				CurrentStatus: "complete",
-				TriggerEvent:  "deploy",
-			},
-			wantStatus: "deployed",
-		},
-		// Verify transitions
-		{
-			name: "verify from deployed transitions to verified",
-			ctx: AutoTransitionContext{
-				CurrentStatus: "deployed",
-				TriggerEvent:  "verify",
-			},
-			wantStatus: "verified",
-		},
-		{
-			name: "verify from implemented does not transition",
-			ctx: AutoTransitionContext{
-				CurrentStatus: "implemented",
-				TriggerEvent:  "verify",
-			},
-			wantStatus: "",
+			wantAllowed: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := GetAutoTransitionStatus(tt.ctx)
-			if got != tt.wantStatus {
-				t.Errorf("GetAutoTransitionStatus() = %q, want %q", got, tt.wantStatus)
+			result := CanOverrideStatus(tt.ctx)
+			if result.Allowed != tt.wantAllowed {
+				t.Errorf("Allowed = %v, want %v", result.Allowed, tt.wantAllowed)
+			}
+			if !tt.wantAllowed && result.Reason != tt.wantReason {
+				t.Errorf("Reason = %q, want %q", result.Reason, tt.wantReason)
 			}
 		})
 	}

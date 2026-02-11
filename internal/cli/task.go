@@ -248,8 +248,7 @@ var taskCompleteCmd = &cobra.Command{
 		fmt.Printf("✓ Task %s marked as complete\n", taskID)
 		fmt.Println()
 		fmt.Println("💡 Check for next task:")
-		fmt.Println("   orc shipment check-assignment  # See progress")
-		fmt.Println("   orc task list --status ready  # Find next task")
+		fmt.Println("   orc task list --status open  # Find next task")
 		return nil
 	},
 }
@@ -356,8 +355,8 @@ var taskUnpinCmd = &cobra.Command{
 
 var taskDiscoverCmd = &cobra.Command{
 	Use:   "discover",
-	Short: "Find and optionally claim ready tasks",
-	Long:  "Discover ready tasks assigned to the current workbench",
+	Short: "Find and optionally claim open tasks",
+	Long:  "Discover open tasks assigned to the current workbench",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := NewContext()
 		autoClaim, _ := cmd.Flags().GetBool("auto-claim")
@@ -376,14 +375,11 @@ var taskDiscoverCmd = &cobra.Command{
 		}
 
 		if len(readyTasks) == 0 {
-			fmt.Println("✓ No ready tasks found")
-			fmt.Println()
-			fmt.Println("💡 Check assignment status:")
-			fmt.Println("   orc shipment check-assignment")
+			fmt.Println("✓ No open tasks found")
 			return nil
 		}
 
-		fmt.Printf("Found %d ready task(s):\n\n", len(readyTasks))
+		fmt.Printf("Found %d open task(s):\n\n", len(readyTasks))
 		for _, task := range readyTasks {
 			fmt.Printf("📦 %s: %s\n", task.ID, task.Title)
 			if task.Description != "" {
@@ -538,7 +534,7 @@ func init() {
 
 	// task list flags
 	taskListCmd.Flags().String("shipment", "", "Filter by shipment")
-	taskListCmd.Flags().StringP("status", "s", "", "Filter by status")
+	taskListCmd.Flags().StringP("status", "s", "", "Filter by status (open, in-progress, blocked, closed)")
 	taskListCmd.Flags().String("tag", "", "Filter by tag")
 
 	// task update flags
@@ -546,7 +542,7 @@ func init() {
 	taskUpdateCmd.Flags().StringP("description", "d", "", "New description")
 
 	// task discover flags
-	taskDiscoverCmd.Flags().Bool("auto-claim", false, "Automatically claim the first ready task")
+	taskDiscoverCmd.Flags().Bool("auto-claim", false, "Automatically claim the first open task")
 
 	// task move flags
 	taskMoveCmd.Flags().String("to-shipment", "", "Move to shipment")
@@ -582,16 +578,14 @@ func TaskCmd() *cobra.Command {
 // getStatusIcon returns an emoji icon for a task status
 func getStatusIcon(status string) string {
 	switch status {
-	case "ready":
+	case "open":
 		return "📦"
-	case "implement", "in_progress":
+	case "in-progress":
 		return "🔧"
-	case "complete":
+	case "closed":
 		return "✅"
 	case "blocked":
 		return "🚫"
-	case "paused":
-		return "⏸️"
 	default:
 		return "📋"
 	}

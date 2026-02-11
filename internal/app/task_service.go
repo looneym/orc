@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/example/orc/internal/core/shipment"
 	"github.com/example/orc/internal/core/task"
 	"github.com/example/orc/internal/ports/primary"
 	"github.com/example/orc/internal/ports/secondary"
@@ -66,25 +65,11 @@ func (s *TaskServiceImpl) CreateTask(ctx context.Context, req primary.CreateTask
 		Title:        req.Title,
 		Description:  req.Description,
 		Type:         req.Type,
-		Status:       "ready",
+		Status:       "open",
 	}
 
 	if err := s.taskRepo.Create(ctx, record); err != nil {
 		return nil, fmt.Errorf("failed to create task: %w", err)
-	}
-
-	// Auto-transition shipment status when first task is created
-	if req.ShipmentID != "" && s.shipmentRepo != nil {
-		ship, err := s.shipmentRepo.GetByID(ctx, req.ShipmentID)
-		if err == nil {
-			newStatus := shipment.GetAutoTransitionStatus(shipment.AutoTransitionContext{
-				CurrentStatus: ship.Status,
-				TriggerEvent:  "task_created",
-			})
-			if newStatus != "" {
-				_ = s.shipmentRepo.UpdateStatus(ctx, req.ShipmentID, newStatus, false)
-			}
-		}
 	}
 
 	// Fetch created task
@@ -144,105 +129,62 @@ func (s *TaskServiceImpl) ListTasks(ctx context.Context, filters primary.TaskFil
 // ClaimTask claims a task for a workbench.
 func (s *TaskServiceImpl) ClaimTask(ctx context.Context, req primary.ClaimTaskRequest) error {
 	// Verify task exists
-	task, err := s.taskRepo.GetByID(ctx, req.TaskID)
+	_, err := s.taskRepo.GetByID(ctx, req.TaskID)
 	if err != nil {
 		return err
 	}
 
-	if err := s.taskRepo.Claim(ctx, req.TaskID, req.WorkbenchID); err != nil {
-		return err
-	}
-
-	// Auto-transition shipment status when first task is claimed
-	if task.ShipmentID != "" && s.shipmentRepo != nil {
-		ship, err := s.shipmentRepo.GetByID(ctx, task.ShipmentID)
-		if err == nil {
-			newStatus := shipment.GetAutoTransitionStatus(shipment.AutoTransitionContext{
-				CurrentStatus: ship.Status,
-				TriggerEvent:  "task_claimed",
-			})
-			if newStatus != "" {
-				_ = s.shipmentRepo.UpdateStatus(ctx, task.ShipmentID, newStatus, false)
-			}
-		}
-	}
-
-	return nil
+	return s.taskRepo.Claim(ctx, req.TaskID, req.WorkbenchID)
 }
 
-// CompleteTask marks a task as complete.
-func (s *TaskServiceImpl) CompleteTask(ctx context.Context, taskID string) error {
+// CloseTask marks a task as closed.
+func (s *TaskServiceImpl) CloseTask(ctx context.Context, taskID string) error {
 	record, err := s.taskRepo.GetByID(ctx, taskID)
 	if err != nil {
 		return err
 	}
 
-	// Guard: cannot complete pinned task
+	// Guard: cannot close pinned task
 	if record.Pinned {
-		return fmt.Errorf("cannot complete pinned task %s. Unpin first with: orc task unpin %s", taskID, taskID)
+		return fmt.Errorf("cannot close pinned task %s. Unpin first with: orc task unpin %s", taskID, taskID)
 	}
 
-	if err := s.taskRepo.UpdateStatus(ctx, taskID, "complete", false, true); err != nil {
-		return err
-	}
-
-	// Auto-transition shipment status when all tasks are complete
-	if record.ShipmentID != "" && s.shipmentRepo != nil {
-		ship, err := s.shipmentRepo.GetByID(ctx, record.ShipmentID)
-		if err == nil {
-			// Get task counts for the shipment
-			tasks, err := s.taskRepo.List(ctx, secondary.TaskFilters{ShipmentID: record.ShipmentID})
-			if err == nil {
-				completedCount := 0
-				for _, t := range tasks {
-					if t.Status == "complete" {
-						completedCount++
-					}
-				}
-				newStatus := shipment.GetAutoTransitionStatus(shipment.AutoTransitionContext{
-					CurrentStatus:      ship.Status,
-					TriggerEvent:       "task_completed",
-					TaskCount:          len(tasks),
-					CompletedTaskCount: completedCount,
-				})
-				if newStatus != "" {
-					_ = s.shipmentRepo.UpdateStatus(ctx, record.ShipmentID, newStatus, false)
-				}
-			}
-		}
-	}
-
-	return nil
+	return s.taskRepo.UpdateStatus(ctx, taskID, "closed", false, true)
 }
 
-// PauseTask pauses an in_progress task.
+// CompleteTask marks a task as closed (backwards compatibility alias).
+func (s *TaskServiceImpl) CompleteTask(ctx context.Context, taskID string) error {
+	return s.CloseTask(ctx, taskID)
+}
+
+// PauseTask pauses an in-progress task (sets to open).
 func (s *TaskServiceImpl) PauseTask(ctx context.Context, taskID string) error {
 	record, err := s.taskRepo.GetByID(ctx, taskID)
 	if err != nil {
 		return err
 	}
 
-	// Guard: can only pause in_progress tasks
-	if record.Status != "in_progress" {
-		return fmt.Errorf("can only pause in_progress tasks (current status: %s)", record.Status)
+	// Guard: can only pause in-progress tasks
+	if record.Status != "in-progress" {
+		return fmt.Errorf("can only pause in-progress tasks (current status: %s)", record.Status)
 	}
 
-	return s.taskRepo.UpdateStatus(ctx, taskID, "paused", false, false)
+	return s.taskRepo.UpdateStatus(ctx, taskID, "open", false, false)
 }
 
-// ResumeTask resumes a paused task.
+// ResumeTask resumes a paused task (open -> in-progress).
 func (s *TaskServiceImpl) ResumeTask(ctx context.Context, taskID string) error {
 	record, err := s.taskRepo.GetByID(ctx, taskID)
 	if err != nil {
 		return err
 	}
 
-	// Guard: can only resume paused tasks
-	if record.Status != "paused" {
-		return fmt.Errorf("can only resume paused tasks (current status: %s)", record.Status)
+	// Guard: can only resume open tasks
+	if record.Status != "open" {
+		return fmt.Errorf("can only resume open tasks (current status: %s)", record.Status)
 	}
 
-	return s.taskRepo.UpdateStatus(ctx, taskID, "in_progress", false, false)
+	return s.taskRepo.UpdateStatus(ctx, taskID, "in-progress", false, false)
 }
 
 // UpdateTask updates a task's title and/or description.
@@ -279,7 +221,7 @@ func (s *TaskServiceImpl) GetTasksByWorkbench(ctx context.Context, workbenchID s
 	return tasks, nil
 }
 
-// DeleteTask deletes a task and its children (plans, receipts, approvals, escalations).
+// DeleteTask deletes a task and its children (plans, approvals, escalations).
 // Requires force=true as this is an escape hatch operation.
 func (s *TaskServiceImpl) DeleteTask(ctx context.Context, taskID string, force bool) error {
 	// Check if task exists
@@ -366,21 +308,21 @@ func (s *TaskServiceImpl) ListTasksByTag(ctx context.Context, tagName string) ([
 	return tasks, nil
 }
 
-// DiscoverTasks finds ready tasks in the current workbench context.
+// DiscoverTasks finds open tasks in the current workbench context.
 func (s *TaskServiceImpl) DiscoverTasks(ctx context.Context, workbenchID string) ([]*primary.Task, error) {
 	records, err := s.taskRepo.GetByWorkbench(ctx, workbenchID)
 	if err != nil {
 		return nil, err
 	}
 
-	// Filter to ready tasks
-	var readyTasks []*primary.Task
+	// Filter to open tasks
+	var openTasks []*primary.Task
 	for _, r := range records {
-		if r.Status == "ready" {
-			readyTasks = append(readyTasks, recordToTask(r))
+		if r.Status == "open" {
+			openTasks = append(openTasks, recordToTask(r))
 		}
 	}
-	return readyTasks, nil
+	return openTasks, nil
 }
 
 // MoveTask moves a task to a different container.

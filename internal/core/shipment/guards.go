@@ -33,19 +33,19 @@ type TaskSummary struct {
 	Status string
 }
 
-// CompleteShipmentContext provides context for shipment completion guards.
-type CompleteShipmentContext struct {
+// CloseShipmentContext provides context for shipment close guards.
+type CloseShipmentContext struct {
 	ShipmentID      string
 	IsPinned        bool
 	Tasks           []TaskSummary
 	ForceCompletion bool // Skip task check if explicitly forced
 }
 
-// StatusTransitionContext provides context for pause/resume/deploy guards.
+// StatusTransitionContext provides context for status transition guards.
 type StatusTransitionContext struct {
 	ShipmentID    string
-	Status        string // "active", "paused", "complete"
-	OpenTaskCount int    // count of non-complete tasks (for deploy guard)
+	Status        string // "draft", "ready", "in-progress", "closed"
+	OpenTaskCount int    // count of non-closed tasks
 }
 
 // AssignWorkbenchContext provides context for workbench assignment guards.
@@ -70,142 +70,36 @@ func CanCreateShipment(ctx CreateShipmentContext) GuardResult {
 	return GuardResult{Allowed: true}
 }
 
-// CanCompleteShipment evaluates whether a shipment can be completed.
+// CanCloseShipment evaluates whether a shipment can be closed.
 // Rules:
 // - Shipment must not be pinned
-// - All tasks must be complete (unless forced)
-func CanCompleteShipment(ctx CompleteShipmentContext) GuardResult {
+// - All tasks must be closed (unless forced)
+func CanCloseShipment(ctx CloseShipmentContext) GuardResult {
 	if ctx.IsPinned {
 		return GuardResult{
 			Allowed: false,
-			Reason:  fmt.Sprintf("cannot complete pinned shipment %s. Unpin first with: orc shipment unpin %s", ctx.ShipmentID, ctx.ShipmentID),
+			Reason:  fmt.Sprintf("cannot close pinned shipment %s. Unpin first with: orc shipment unpin %s", ctx.ShipmentID, ctx.ShipmentID),
 		}
 	}
 
-	// Check for incomplete tasks (unless force flag is set)
+	// Check for non-closed tasks (unless force flag is set)
 	if !ctx.ForceCompletion {
 		var incomplete []string
 		for _, t := range ctx.Tasks {
-			if t.Status != "complete" {
+			if t.Status != "closed" {
 				incomplete = append(incomplete, t.ID)
 			}
 		}
 		if len(incomplete) > 0 {
 			return GuardResult{
 				Allowed: false,
-				Reason: fmt.Sprintf("cannot complete shipment: %d task(s) incomplete (%s). Use --force to complete anyway",
+				Reason: fmt.Sprintf("cannot close shipment: %d task(s) not closed (%s). Use --force to close anyway",
 					len(incomplete), strings.Join(incomplete, ", ")),
 			}
 		}
 	}
 
 	return GuardResult{Allowed: true}
-}
-
-// CanPauseShipment evaluates whether a shipment can be paused.
-// Rules:
-// - Status must be "implementing" or "auto_implementing"
-func CanPauseShipment(ctx StatusTransitionContext) GuardResult {
-	if ctx.Status != "implementing" && ctx.Status != "auto_implementing" {
-		return GuardResult{
-			Allowed: false,
-			Reason:  fmt.Sprintf("can only pause implementing shipments (current status: %s)", ctx.Status),
-		}
-	}
-
-	return GuardResult{Allowed: true}
-}
-
-// CanResumeShipment evaluates whether a shipment can be resumed.
-// Rules:
-// - Status must be "paused"
-func CanResumeShipment(ctx StatusTransitionContext) GuardResult {
-	if ctx.Status != "paused" {
-		return GuardResult{
-			Allowed: false,
-			Reason:  fmt.Sprintf("can only resume paused shipments (current status: %s)", ctx.Status),
-		}
-	}
-
-	return GuardResult{Allowed: true}
-}
-
-// CanDeployShipment evaluates whether a shipment can be marked as deployed.
-// Rules:
-// - Status must be "implementing", "auto_implementing", "implemented", or "complete"
-// - All tasks must be complete (OpenTaskCount == 0)
-func CanDeployShipment(ctx StatusTransitionContext) GuardResult {
-	validStatuses := map[string]bool{
-		"implementing":      true,
-		"auto_implementing": true,
-		"implemented":       true,
-		"complete":          true,
-	}
-	if !validStatuses[ctx.Status] {
-		return GuardResult{
-			Allowed: false,
-			Reason:  fmt.Sprintf("can only deploy implementing/implemented shipments (current status: %s)", ctx.Status),
-		}
-	}
-
-	if ctx.OpenTaskCount > 0 {
-		return GuardResult{
-			Allowed: false,
-			Reason:  fmt.Sprintf("cannot deploy: %d task(s) still open", ctx.OpenTaskCount),
-		}
-	}
-
-	return GuardResult{Allowed: true}
-}
-
-// CanVerifyShipment evaluates whether a shipment can be marked as verified.
-// Rules:
-// - Status must be "deployed"
-func CanVerifyShipment(ctx StatusTransitionContext) GuardResult {
-	if ctx.Status != "deployed" {
-		return GuardResult{
-			Allowed: false,
-			Reason:  fmt.Sprintf("can only verify deployed shipments (current status: %s)", ctx.Status),
-		}
-	}
-
-	return GuardResult{Allowed: true}
-}
-
-// AutoTransitionContext provides context for automatic status transitions.
-type AutoTransitionContext struct {
-	CurrentStatus      string
-	TriggerEvent       string // "focus", "task_created", "task_claimed", "task_completed", "deploy", "verify"
-	TaskCount          int
-	CompletedTaskCount int
-}
-
-// GetAutoTransitionStatus returns the new status for automatic transitions.
-// Returns empty string if no transition should occur.
-func GetAutoTransitionStatus(ctx AutoTransitionContext) string {
-	switch ctx.TriggerEvent {
-	case "focus":
-		if ctx.CurrentStatus == "draft" {
-			return "exploring"
-		}
-	case "task_created":
-		if ctx.CurrentStatus == "draft" || ctx.CurrentStatus == "exploring" || ctx.CurrentStatus == "specced" {
-			return "tasked"
-		}
-	case "task_claimed":
-		if ctx.CurrentStatus == "tasked" || ctx.CurrentStatus == "ready_for_imp" || ctx.CurrentStatus == "exploring" || ctx.CurrentStatus == "specced" {
-			return "implementing"
-		}
-	case "deploy":
-		if ctx.CurrentStatus == "implementing" || ctx.CurrentStatus == "auto_implementing" || ctx.CurrentStatus == "implemented" || ctx.CurrentStatus == "complete" {
-			return "deployed"
-		}
-	case "verify":
-		if ctx.CurrentStatus == "deployed" {
-			return "verified"
-		}
-	}
-	return ""
 }
 
 // OverrideStatusContext provides context for status override guards.
@@ -219,28 +113,15 @@ type OverrideStatusContext struct {
 // statusOrder defines the progression order for shipment statuses.
 // Lower index = earlier in lifecycle.
 var statusOrder = map[string]int{
-	"draft":             0,
-	"exploring":         1,
-	"synthesizing":      2,
-	"specced":           3,
-	"planned":           4,
-	"tasked":            5,
-	"ready_for_imp":     6,
-	"implementing":      7,
-	"auto_implementing": 8,
-	"implemented":       9,
-	"deployed":          10,
-	"verified":          11,
-	"complete":          12,
+	"draft":       0,
+	"ready":       1,
+	"in-progress": 2,
+	"closed":      3,
 }
 
 // ValidStatuses returns all valid shipment statuses.
 func ValidStatuses() []string {
-	return []string{
-		"draft", "exploring", "synthesizing", "specced", "planned",
-		"tasked", "ready_for_imp", "implementing", "auto_implementing",
-		"implemented", "deployed", "verified", "complete",
-	}
+	return []string{"draft", "ready", "in-progress", "closed"}
 }
 
 // CanOverrideStatus evaluates whether a shipment status can be overridden.

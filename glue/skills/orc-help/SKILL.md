@@ -1,6 +1,6 @@
 ---
 name: orc-help
-description: Orientation to ORC skills. Shows categories (ship, imp, orc, goblin) with examples. Use when user asks for help with ORC or wants to discover available skills.
+description: Orientation to ORC skills. Shows categories (ship, orc) with examples. Use when user asks for help with ORC or wants to discover available skills.
 ---
 
 # ORC Help
@@ -12,7 +12,7 @@ Orientation skill that shows available ORC skill categories with examples.
 ```
 /orc-help                 (show category overview)
 /orc-help ship            (show all ship-* skills)
-/orc-help imp             (show all imp-* skills)
+/orc-help orc             (show all orc-* skills)
 ```
 
 ## Behavior
@@ -26,13 +26,12 @@ ls ~/.claude/skills/
 
 Filter to ORC prefixes only:
 - `ship-*` - Shipment workflow
-- `imp-*` - Implementation workflow
 - `orc-*` - Utilities
-- `goblin-*` - Review & escalation
+- `imp-*` - Implementation helpers (e.g., imp-escalate)
 
 ### Step 2: Check for Argument
 
-If a category argument is provided (ship, imp, orc, goblin):
+If a category argument is provided (ship, orc, imp):
 - List all skills in that category
 - For each, read frontmatter and show name + description
 - Skip to Step 4
@@ -44,25 +43,16 @@ If no argument, continue to Step 3.
 Display the category overview:
 
 ```
-📋 ORC Skill Categories
+ORC Skill Categories
 
 **ship-*** - Shipment Workflow
   Create and manage shipments from exploration to deployment
-  Examples: /ship-new, /ship-plan, /ship-deploy
-
-**imp-*** - Implementation
-  IMP agent workflow for executing tasks
-  Examples: /imp-start, /imp-plan-create, /imp-rec
+  Examples: /ship-new, /ship-plan, /ship-deploy, /ship-complete
 
 **orc-*** - Utilities
   General ORC commands and maintenance
   Examples: /orc-interview, /orc-ping, /orc-help
 
-**goblin-*** - Review & Escalation
-  Gatehouse review workflows
-  Examples: /goblin-escalation-receive
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Want details on a category? Say "tell me about ship" or run /orc-help ship
 ```
 
@@ -71,7 +61,7 @@ Want details on a category? Say "tell me about ship" or run /orc-help ship
 For any skills that couldn't be parsed (missing or invalid frontmatter), add a warning:
 
 ```
-⚠️ Skills with missing frontmatter: orc-foo, orc-bar
+Skills with missing frontmatter: orc-foo, orc-bar
 ```
 
 ## Category Drill-Down
@@ -83,7 +73,7 @@ When user asks about a specific category (e.g., "tell me about ship" or `/orc-he
 3. Display as:
 
 ```
-📦 Ship Skills (Shipment Workflow)
+Ship Skills (Shipment Workflow)
 
 /ship-new
   Create a new shipment for implementation work
@@ -100,11 +90,8 @@ When user asks about a specific category (e.g., "tell me about ship" or `/orc-he
 /ship-deploy
   Merge shipment branch to master
 
-/ship-verify
-  Post-deploy verification
-
 /ship-complete
-  Mark shipment as complete
+  Close a shipment
 ```
 
 ## Notes

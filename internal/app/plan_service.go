@@ -16,8 +16,6 @@ type PlanServiceImpl struct {
 	approvalRepo   secondary.ApprovalRepository
 	escalationRepo secondary.EscalationRepository
 	workbenchRepo  secondary.WorkbenchRepository
-	gatehouseRepo  secondary.GatehouseRepository
-	messageService primary.MessageService
 	tmuxAdapter    secondary.TMuxAdapter
 }
 
@@ -27,8 +25,6 @@ func NewPlanService(
 	approvalRepo secondary.ApprovalRepository,
 	escalationRepo secondary.EscalationRepository,
 	workbenchRepo secondary.WorkbenchRepository,
-	gatehouseRepo secondary.GatehouseRepository,
-	messageService primary.MessageService,
 	tmuxAdapter secondary.TMuxAdapter,
 ) *PlanServiceImpl {
 	return &PlanServiceImpl{
@@ -36,8 +32,6 @@ func NewPlanService(
 		approvalRepo:   approvalRepo,
 		escalationRepo: escalationRepo,
 		workbenchRepo:  workbenchRepo,
-		gatehouseRepo:  gatehouseRepo,
-		messageService: messageService,
 		tmuxAdapter:    tmuxAdapter,
 	}
 }
@@ -221,12 +215,6 @@ func (s *PlanServiceImpl) EscalatePlan(ctx context.Context, req primary.Escalate
 		return nil, fmt.Errorf("failed to get workbench: %w", err)
 	}
 
-	// Get gatehouse for the workshop
-	gatehouse, err := s.gatehouseRepo.GetByWorkshop(ctx, workbench.WorkshopID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get gatehouse for workshop: %w", err)
-	}
-
 	// Create approval record (outcome=escalated)
 	approvalID, err := s.approvalRepo.GetNextID(ctx)
 	if err != nil {
@@ -250,6 +238,9 @@ func (s *PlanServiceImpl) EscalatePlan(ctx context.Context, req primary.Escalate
 		return nil, fmt.Errorf("failed to generate escalation ID: %w", err)
 	}
 
+	// Target is the workshop itself (no more gatehouse)
+	targetActorID := workbench.WorkshopID
+
 	escalationRecord := &secondary.EscalationRecord{
 		ID:            escalationID,
 		ApprovalID:    approvalID,
@@ -257,9 +248,9 @@ func (s *PlanServiceImpl) EscalatePlan(ctx context.Context, req primary.Escalate
 		TaskID:        plan.TaskID,
 		Reason:        req.Reason,
 		Status:        primary.EscalationStatusPending,
-		RoutingRule:   "workshop_gatehouse",
+		RoutingRule:   "workshop",
 		OriginActorID: req.OriginActorID,
-		TargetActorID: gatehouse.ID,
+		TargetActorID: targetActorID,
 	}
 	if err := s.escalationRepo.Create(ctx, escalationRecord); err != nil {
 		return nil, fmt.Errorf("failed to create escalation: %w", err)
@@ -270,32 +261,18 @@ func (s *PlanServiceImpl) EscalatePlan(ctx context.Context, req primary.Escalate
 		return nil, fmt.Errorf("failed to update plan status: %w", err)
 	}
 
-	// Send mail to gatehouse
-	mailBody := fmt.Sprintf("Plan %s has been escalated.\n\nReason: %s\n\nTask: %s\nFrom: %s\n\nUse 'orc plan show %s' to review.",
-		req.PlanID, req.Reason, plan.TaskID, req.OriginActorID, req.PlanID)
-	_, err = s.messageService.CreateMessage(ctx, primary.CreateMessageRequest{
-		Sender:    req.OriginActorID,
-		Recipient: gatehouse.ID,
-		Subject:   fmt.Sprintf("Escalation: %s", req.PlanID),
-		Body:      mailBody,
-	})
-	if err != nil {
-		// Log but don't fail - escalation is already created
-		fmt.Printf("Warning: failed to send escalation mail: %v\n", err)
-	}
-
-	// Nudge gatehouse (best effort - don't fail if tmux not running)
+	// Nudge workshop (best effort - don't fail if tmux not running)
 	nudgeMsg := fmt.Sprintf("New escalation: %s - %s", escalationID, req.Reason)
 	sessionName := s.tmuxAdapter.FindSessionByWorkshopID(ctx, workbench.WorkshopID)
 	if sessionName != "" {
-		target := fmt.Sprintf("%s:1.1", sessionName) // Gatehouse is window 1, pane 1
+		target := fmt.Sprintf("%s:1.1", sessionName) // Coordinator is window 1, pane 1
 		_ = s.tmuxAdapter.NudgeSession(ctx, target, nudgeMsg)
 	}
 
 	return &primary.EscalatePlanResponse{
 		ApprovalID:   approvalID,
 		EscalationID: escalationID,
-		TargetActor:  gatehouse.ID,
+		TargetActor:  targetActorID,
 	}, nil
 }
 

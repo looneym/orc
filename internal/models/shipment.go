@@ -16,6 +16,7 @@ type Shipment struct {
 	Title               string
 	Description         sql.NullString
 	Status              string
+	ClosedReason        sql.NullString // Why was this shipment closed (completed, abandoned, etc.)
 	AssignedWorkbenchID sql.NullString
 	RepoID              sql.NullString // REPO-xxx - linked repository for branch ownership
 	Branch              sql.NullString // Owned branch (e.g., ml/SHIP-001-feature-name)
@@ -26,18 +27,11 @@ type Shipment struct {
 	CompletedAt         sql.NullTime
 }
 
-// Shipment status constants - work state lifecycle
-// Flow: draft → exploring → specced → tasked → ready_for_imp → implementing/auto_implementing → implemented → deployed → verified → complete
+// Shipment status constants - simplified lifecycle
+// Flow: draft → ready → in-progress → closed
 const (
-	ShipmentStatusDraft            = "draft"
-	ShipmentStatusExploring        = "exploring"
-	ShipmentStatusSpecced          = "specced"
-	ShipmentStatusTasked           = "tasked"
-	ShipmentStatusReadyForImp      = "ready_for_imp"
-	ShipmentStatusImplementing     = "implementing"
-	ShipmentStatusAutoImplementing = "auto_implementing"
-	ShipmentStatusImplemented      = "implemented" // All tasks complete, code changes made
-	ShipmentStatusDeployed         = "deployed"    // Merged to master / deployed to prod
-	ShipmentStatusVerified         = "verified"    // Post-deploy verification passed
-	ShipmentStatusComplete         = "complete"    // Terminal state, nothing more to do
+	ShipmentStatusDraft      = "draft"
+	ShipmentStatusReady      = "ready"
+	ShipmentStatusInProgress = "in-progress"
+	ShipmentStatusClosed     = "closed"
 )

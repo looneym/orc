@@ -66,13 +66,9 @@ func runFocus(cmd *cobra.Command, args []string) error {
 	placeType := config.GetPlaceType(cfg.PlaceID)
 	switch placeType {
 	case config.PlaceTypeWorkbench:
-		// IMP role - use workbench focus
 		return runIMPFocus(cmd, args, cfg, showOnly, clearFlag, forceFlag)
-	case config.PlaceTypeGatehouse:
-		// Goblin role - use gatehouse focus
-		return runGoblinFocus(cmd, args, cfg, showOnly, clearFlag, forceFlag)
 	default:
-		return fmt.Errorf("focus requires workbench (IMP) context")
+		return fmt.Errorf("focus requires workbench context")
 	}
 }
 
@@ -221,17 +217,8 @@ func setIMPFocus(workbenchID, containerID, containerType, title string) error {
 	fmt.Printf("Focused on %s: %s\n", containerType, containerID)
 	fmt.Printf("  %s\n", title)
 
-	// Auto-checkout branch and auto-transition status for shipments
+	// Auto-checkout branch for shipments
 	if strings.HasPrefix(containerID, "SHIP-") {
-		// Auto-transition shipment status: draft → exploring
-		ship, err := wire.ShipmentService().GetShipment(ctx, containerID)
-		if err == nil {
-			newStatus, err := wire.ShipmentService().TriggerAutoTransition(ctx, containerID, "focus")
-			if err == nil && newStatus != "" {
-				fmt.Printf("  ✓ Status: %s → %s\n", ship.Status, newStatus)
-			}
-		}
-
 		if err := autoCheckoutShipmentBranch(workbenchID, containerID); err != nil {
 			fmt.Printf("  (branch checkout skipped: %v)\n", err)
 		} else {
@@ -392,135 +379,6 @@ func clearIMPFocus(workbenchID string, force bool) error {
 	return nil
 }
 
-// runGoblinFocus handles focus for Goblin role (gatehouse context)
-// Can focus on any commission-level entity: COMM-xxx, SHIP-xxx, TOME-xxx
-func runGoblinFocus(_ *cobra.Command, args []string, cfg *config.Config, showOnly, clearFlag, forceFlag bool) error {
-	gatehouseID := cfg.PlaceID // GATE-XXX
-
-	if showOnly {
-		return showGoblinFocus(gatehouseID)
-	}
-
-	if clearFlag {
-		return clearGoblinFocus(gatehouseID, forceFlag)
-	}
-
-	if len(args) == 0 {
-		return fmt.Errorf("Usage: orc focus <ID> or orc focus --show or orc focus --clear")
-	}
-
-	// Set focus
-	containerID := args[0]
-
-	containerType, title, err := validateFocusTarget(containerID)
-	if err != nil {
-		return err
-	}
-
-	return setGoblinFocus(gatehouseID, containerID, containerType, title)
-}
-
-// showGoblinFocus displays the current Goblin focus from DB
-func showGoblinFocus(gatehouseID string) error {
-	ctx := NewContext()
-
-	focusID, err := wire.GatehouseService().GetFocusedID(ctx, gatehouseID)
-	if err != nil {
-		return fmt.Errorf("failed to get focus: %w", err)
-	}
-
-	if focusID == "" {
-		fmt.Println("No focus set")
-		fmt.Println("\nSet focus with: orc focus <COMM-xxx>, <SHIP-xxx>, or <TOME-xxx>")
-		return nil
-	}
-
-	containerType, title, err := validateFocusTarget(focusID)
-	if err != nil {
-		// Focus is set but container no longer exists - graceful degradation
-		fmt.Printf("Focus: %s (container not found - may have been deleted)\n", focusID)
-		return nil //nolint:nilerr // intentional: show info even if container deleted
-	}
-
-	fmt.Printf("Focus: %s\n", focusID)
-	fmt.Printf("  %s: %s\n", containerType, title)
-	return nil
-}
-
-// setGoblinFocus sets the Goblin focus in the DB
-func setGoblinFocus(gatehouseID, containerID, containerType, title string) error {
-	ctx := NewContext()
-
-	// Update focus in DB
-	if err := wire.GatehouseService().UpdateFocusedID(ctx, gatehouseID, containerID); err != nil {
-		return fmt.Errorf("failed to set focus: %w", err)
-	}
-
-	// Update tmux @orc_focus window option for session picker
-	updateFocusWindowOption(containerID, title)
-
-	fmt.Printf("Focused on %s: %s\n", containerType, containerID)
-	fmt.Printf("  %s\n", title)
-	fmt.Println("\nRun 'orc prime' to see updated context.")
-	return nil
-}
-
-// clearGoblinFocus clears the Goblin focus in DB
-// If force=false, smart clear: refocus to the commission of the current focus
-// If force=true, fully clear focus (no fallback)
-func clearGoblinFocus(gatehouseID string, force bool) error {
-	ctx := NewContext()
-
-	// Get current focus
-	currentFocusID, _ := wire.GatehouseService().GetFocusedID(ctx, gatehouseID)
-
-	if currentFocusID == "" {
-		fmt.Println("No focus set")
-		return nil
-	}
-
-	// If --force, fully clear
-	if force {
-		if err := wire.GatehouseService().UpdateFocusedID(ctx, gatehouseID, ""); err != nil {
-			return fmt.Errorf("failed to clear focus: %w", err)
-		}
-		updateFocusWindowOption("", "") // Clear @orc_focus
-		fmt.Println("Focus fully cleared")
-		return nil
-	}
-
-	// Already at commission level?
-	if strings.HasPrefix(currentFocusID, "COMM-") {
-		fmt.Println("Already at commission level")
-		return nil
-	}
-
-	// Smart clear: resolve to commission and refocus
-	commissionID := resolveToCommission(currentFocusID)
-	if commissionID == "" {
-		// Fallback: if we can't resolve, just clear
-		if err := wire.GatehouseService().UpdateFocusedID(ctx, gatehouseID, ""); err != nil {
-			return fmt.Errorf("failed to clear focus: %w", err)
-		}
-		updateFocusWindowOption("", "") // Clear @orc_focus
-		fmt.Println("Focus cleared")
-		return nil
-	}
-
-	// Refocus to commission - get commission title for @orc_focus
-	comm, _ := wire.CommissionService().GetCommission(ctx, commissionID)
-	commTitle := ""
-	if comm != nil {
-		commTitle = comm.Title
-	}
-	if err := wire.GatehouseService().UpdateFocusedID(ctx, gatehouseID, commissionID); err != nil {
-		return fmt.Errorf("failed to refocus to commission: %w", err)
-	}
-	updateFocusWindowOption(commissionID, commTitle)
-	fmt.Printf("Focus cleared from %s → %s (commission)\n", currentFocusID, commissionID)
-	return nil
-}
-
 // GetCurrentFocus is exported for use by other commands (e.g., prime)
 // Returns the focused ID from DB based on place_id context
 func GetCurrentFocus(cfg *config.Config) string {
@@ -535,13 +393,6 @@ func GetCurrentFocus(cfg *config.Config) string {
 	case config.PlaceTypeWorkbench:
 		// IMP context - use workbench focus
 		focusID, err := wire.WorkbenchService().GetFocusedID(ctx, cfg.PlaceID)
-		if err != nil {
-			return ""
-		}
-		return focusID
-	case config.PlaceTypeGatehouse:
-		// Gatehouse context - use gatehouse focus
-		focusID, err := wire.GatehouseService().GetFocusedID(ctx, cfg.PlaceID)
 		if err != nil {
 			return ""
 		}

@@ -62,7 +62,7 @@ type InfraPlan struct {
 
 // InfraGatehouseOp describes gatehouse infrastructure state.
 type InfraGatehouseOp struct {
-	ID           string   // GATE-XXX
+	ID           string   // WORK-XXX (workshop ID)
 	Path         string   // ~/.orc/ws/WORK-xxx-slug
 	Status       OpStatus // EXISTS or CREATE
 	ConfigStatus OpStatus // EXISTS or CREATE

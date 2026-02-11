@@ -83,11 +83,9 @@ cd <worktree-path>
 git rebase <main-branch>
 ```
 
-### 5. Update Shipment Status
+### 5. Note Deployment
 
-```bash
-orc shipment deploy SHIP-XXX
-```
+The shipment remains in "in-progress" status. Deployment is tracked by the merge to master, not a separate status transition.
 
 ## PR Workflow (Fallback)
 
@@ -147,9 +145,9 @@ Deployed via direct workflow:
   - Post-merge steps completed
   - Pushed to origin
   - Worktree rebased
-  - Shipment status: deployed
+  - Ready to close shipment
 
-Run /ship-complete to finish.
+Run /ship-complete to close the shipment.
 ```
 
 **PR workflow:**
@@ -157,7 +155,7 @@ Run /ship-complete to finish.
 Created pull request:
   - PR: <url>
   - Follow your repo's review process
-  - After PR merges, run /ship-complete to finish
+  - After PR merges, run /ship-complete to close the shipment
 ```
 
 ## Error Handling

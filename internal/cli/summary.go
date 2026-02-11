@@ -18,6 +18,15 @@ import (
 	"github.com/example/orc/internal/wire"
 )
 
+// truncate truncates a string to maxLen, replacing newlines with spaces.
+func truncate(s string, maxLen int) string {
+	s = strings.ReplaceAll(s, "\n", " ")
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen-3] + "..."
+}
+
 // commissionAliases maps user-friendly aliases to commission IDs
 var commissionAliases = map[string]string{
 	"test": "COMM-003",
@@ -86,30 +95,19 @@ Examples:
 			debugMode, _ := cmd.Flags().GetBool("debug")
 			expandAllCommissions, _ := cmd.Flags().GetBool("expand-all-commissions")
 
-			// Load config for role detection (with Goblin migration if needed)
+			// Load config for role detection
 			cfg, _ := MigrateGoblinConfigIfNeeded(cmd.Context(), cwd)
-			role := config.RoleGoblin // Default to Goblin
+			role := config.RoleIMP // Default to IMP
 			workbenchID := ""
 			workshopID := ""
-			gatehouseID := ""
 
 			if cfg != nil && cfg.PlaceID != "" {
 				role = config.GetRoleFromPlaceID(cfg.PlaceID)
 				if config.IsWorkbench(cfg.PlaceID) {
 					workbenchID = cfg.PlaceID
-					// Look up workshop and gatehouse from workbench
+					// Look up workshop from workbench
 					if wb, err := wire.WorkbenchService().GetWorkbench(cmd.Context(), cfg.PlaceID); err == nil {
 						workshopID = wb.WorkshopID
-						if gh, err := wire.GatehouseService().GetGatehouseByWorkshop(cmd.Context(), wb.WorkshopID); err == nil {
-							gatehouseID = gh.ID
-						}
-					}
-				} else if config.IsGatehouse(cfg.PlaceID) {
-					gatehouseID = cfg.PlaceID
-					// Look up workshop from gatehouse
-					gatehouse, err := wire.GatehouseService().GetGatehouse(cmd.Context(), cfg.PlaceID)
-					if err == nil {
-						workshopID = gatehouse.WorkshopID
 					}
 				}
 			}
@@ -203,10 +201,10 @@ Examples:
 			})
 
 			// Render header based on role
-			renderHeader(role, workbenchID, workshopID, gatehouseID, focusID, filterCommissionID)
+			renderHeader(role, workbenchID, workshopID, focusID, filterCommissionID)
 
 			// Build map of focused containers across all workbenches in this workshop
-			workshopFocus := buildWorkshopFocusMap(cmd.Context(), workshopID, workbenchID, gatehouseID)
+			workshopFocus := buildWorkshopFocusMap(cmd.Context(), workshopID, workbenchID)
 
 			// Display each commission
 			for i, commission := range openCommissions {
@@ -260,8 +258,8 @@ Examples:
 }
 
 // renderHeader prints the header line based on role
-func renderHeader(role, workbenchID, workshopID, gatehouseID, _, commissionID string) {
-	// Show workshop context (for both Goblin and IMP)
+func renderHeader(role, workbenchID, workshopID, _, commissionID string) {
+	// Show workshop context
 	if workshopID != "" {
 		// Fetch workshop name
 		workshopName := ""
@@ -269,24 +267,21 @@ func renderHeader(role, workbenchID, workshopID, gatehouseID, _, commissionID st
 			workshopName = ws.Name
 		}
 
-		fmt.Printf("🏭 Workshop %s", workshopID)
+		fmt.Printf("Workshop %s", workshopID)
 		if workshopName != "" {
 			fmt.Printf(" (%s)", workshopName)
 		}
-		if config.IsGoblinRole(role) && commissionID != "" {
-			fmt.Printf(" - Active: %s", commissionID)
-		}
 		fmt.Println()
 
-		// Show gatehouse and workbenches in workshop with tree format
-		renderWorkshopBenches(workshopID, workbenchID, gatehouseID)
+		// Show workbenches in workshop with tree format
+		renderWorkshopBenches(workshopID, workbenchID)
 	}
 
 	fmt.Println()
 }
 
 // renderWorkshopBenches displays workbenches in the workshop with tree formatting
-func renderWorkshopBenches(workshopID, currentWorkbenchID, gatehouseID string) {
+func renderWorkshopBenches(workshopID, currentWorkbenchID string) {
 	ctx := NewContext()
 
 	allWorkbenches, err := wire.WorkbenchService().ListWorkbenches(ctx, primary.WorkbenchFilters{
@@ -304,30 +299,13 @@ func renderWorkshopBenches(workshopID, currentWorkbenchID, gatehouseID string) {
 		}
 	}
 
-	// Count total tree items: gatehouse (if any) + workbenches
-	hasGatehouse := gatehouseID != ""
 	totalItems := len(workbenches)
-	if hasGatehouse {
-		totalItems++
-	}
-
 	if totalItems == 0 {
 		return
 	}
 
-	fmt.Println("│")
+	fmt.Println("|")
 	itemIdx := 0
-
-	// Render gatehouse first
-	if hasGatehouse {
-		isLast := itemIdx == totalItems-1
-		prefix := "├── "
-		if isLast {
-			prefix = "└── "
-		}
-		fmt.Printf("%s👺 goblin-%s\n", prefix, strings.TrimPrefix(gatehouseID, "GATE-"))
-		itemIdx++
-	}
 
 	// Render workbenches
 	for _, wb := range workbenches {
@@ -375,8 +353,8 @@ func isStaleFocus(ctx context.Context, focusedID string) bool {
 	if err != nil {
 		return true // Can't find it, consider stale
 	}
-	// Terminal states: complete, deployed, archived
-	return ship.Status == "complete" || ship.Status == "deployed" || ship.Status == "archived"
+	// Terminal state: closed
+	return ship.Status == "closed"
 }
 
 // getGitBranchStatus returns the current git branch and dirty status for a path.
@@ -413,15 +391,13 @@ type workshopFocusInfo struct {
 	containerToWorkbench map[string][]string // containerID -> list of actors focusing it
 	myName               string              // current workbench name
 	myID                 string              // current workbench ID
-	goblinID             string              // gatehouse ID
 }
 
-// buildWorkshopFocusMap fetches focus for all workbenches and the goblin in the workshop
-func buildWorkshopFocusMap(ctx context.Context, workshopID, currentWorkbenchID, gatehouseID string) workshopFocusInfo {
+// buildWorkshopFocusMap fetches focus for all workbenches in the workshop
+func buildWorkshopFocusMap(ctx context.Context, workshopID, currentWorkbenchID string) workshopFocusInfo {
 	info := workshopFocusInfo{
 		containerToWorkbench: make(map[string][]string),
 		myID:                 currentWorkbenchID,
-		goblinID:             gatehouseID,
 	}
 
 	if workshopID == "" {
@@ -434,14 +410,6 @@ func buildWorkshopFocusMap(ctx context.Context, workshopID, currentWorkbenchID, 
 			info.myName = wb.Name
 		}
 	}
-
-	// If no workbench but gatehouse exists, we're running as Goblin
-	if info.myName == "" && gatehouseID != "" {
-		info.myName = "goblin"
-		info.myID = gatehouseID
-	}
-
-	// Note: Goblin's focused_conclave_id is deprecated - conclaves removed
 
 	// Get each IMP's focus (only active workbenches)
 	allWorkbenches, err := wire.WorkbenchService().ListWorkbenches(ctx, primary.WorkbenchFilters{
@@ -469,45 +437,23 @@ func buildWorkshopFocusMap(ctx context.Context, workshopID, currentWorkbenchID, 
 		info.containerToWorkbench[focusedID] = append(info.containerToWorkbench[focusedID], fmt.Sprintf("%s@%s", wb.Name, wb.ID))
 	}
 
-	// Get Goblin's focus (visible to all IMPs, skip stale focus)
-	if gatehouseID != "" {
-		gh, err := wire.GatehouseService().GetGatehouse(ctx, gatehouseID)
-		if err == nil && gh.FocusedID != "" && !isStaleFocus(ctx, gh.FocusedID) {
-			info.containerToWorkbench[gh.FocusedID] = append(info.containerToWorkbench[gh.FocusedID], "Goblin")
-		}
-	}
-
 	return info
 }
 
 // formatFocusActors formats the focus marker for multi-actor display
-// Order: "you" first (if isMeFocused), then "Goblin" (moss green), then others alphabetically
+// Order: "you" first (if isMeFocused), then others alphabetically
 func formatFocusActors(actors []string, isMeFocused bool) string {
 	var parts []string
 
-	// "you" first if current actor is focusing (with sparkles around "you")
+	// "you" first if current actor is focusing
 	if isMeFocused {
-		parts = append(parts, "✨ "+color.New(color.FgHiMagenta).Sprint("you")+" ✨")
+		parts = append(parts, color.New(color.FgHiMagenta).Sprint("you"))
 	}
 
-	// Separate Goblin from others for ordering
-	var others []string
-	hasGoblin := false
-	for _, actor := range actors {
-		if actor == "Goblin" {
-			hasGoblin = true
-		} else {
-			others = append(others, actor)
-		}
-	}
+	// Others (sorted alphabetically, cyan)
+	others := append([]string{}, actors...)
 	sort.Strings(others)
 
-	// Goblin second (moss green)
-	if hasGoblin {
-		parts = append(parts, color.New(color.FgHiGreen).Sprint("Goblin"))
-	}
-
-	// Others last (cyan)
 	for _, o := range others {
 		parts = append(parts, color.New(color.FgCyan).Sprint(o))
 	}
@@ -682,7 +628,7 @@ func renderShipment(ship primary.ShipmentSummary, workshopFocus workshopFocusInf
 		}
 	}
 	statusBadge := ""
-	if ship.Status != "" && ship.Status != "complete" {
+	if ship.Status != "" && ship.Status != "closed" {
 		statusBadge = " " + colorizeShipmentStatus(ship.Status)
 	}
 	taskInfo := fmt.Sprintf(" (%d/%d done", ship.TasksDone, ship.TasksTotal)
@@ -728,7 +674,7 @@ func renderShipment(ship primary.ShipmentSummary, workshopFocus workshopFocusInf
 				taskChildPrefix = taskPrefix + "    "
 			}
 			statusMark := ""
-			if task.Status != "" && task.Status != "ready" {
+			if task.Status != "" && task.Status != "open" {
 				statusMark = colorizeStatus(task.Status) + " - "
 			}
 			fmt.Printf("%s%s - %s%s\n", tPrefix, colorizeID(task.ID), statusMark, task.Title)
@@ -777,19 +723,17 @@ func getIDColor(idType string) *color.Color {
 
 // colorizeStatus formats status with semantic color
 func colorizeStatus(status string) string {
-	if status == "" || status == "ready" {
+	if status == "" || status == "open" {
 		return ""
 	}
 	upper := strings.ToUpper(status)
 
 	switch status {
-	case "in_progress", "implementing", "auto_implementing":
+	case "in-progress":
 		return color.New(color.FgHiBlue).Sprint(upper)
-	case "paused":
-		return color.New(color.FgYellow).Sprint(upper)
 	case "blocked":
 		return color.New(color.FgRed).Sprint(upper)
-	case "complete":
+	case "closed":
 		return color.New(color.FgHiGreen).Sprint(upper)
 	default:
 		return color.New(color.FgWhite).Sprint(upper)
@@ -801,22 +745,12 @@ func colorizeShipmentStatus(status string) string {
 	switch status {
 	case "draft":
 		return color.New(color.FgHiBlack).Sprint("[draft]")
-	case "exploring":
-		return color.New(color.FgHiCyan).Sprint("[exploring]")
-	case "specced":
-		return color.New(color.FgHiMagenta).Sprint("[specced]")
-	case "tasked":
-		return color.New(color.FgHiYellow).Sprint("[tasked]")
-	case "ready_for_imp":
-		return color.New(color.FgHiYellow).Sprint("[ready_for_imp]")
-	case "implementing":
-		return color.New(color.FgHiBlue).Sprint("[implementing]")
-	case "auto_implementing":
-		return color.New(color.FgHiBlue).Sprint("[auto_implementing]")
-	case "paused":
-		return color.New(color.FgYellow).Sprint("[paused]")
-	case "complete":
-		return color.New(color.FgHiGreen).Sprint("[complete]")
+	case "ready":
+		return color.New(color.FgHiYellow).Sprint("[ready]")
+	case "in-progress":
+		return color.New(color.FgHiBlue).Sprint("[in-progress]")
+	case "closed":
+		return color.New(color.FgHiGreen).Sprint("[closed]")
 	default:
 		return fmt.Sprintf("[%s]", status)
 	}
@@ -867,23 +801,10 @@ func colorizeEscalationStatus(status string, targetActorID string) string {
 	}
 }
 
-// colorizeReceiptStatus formats receipt status with semantic color and marker
-func colorizeReceiptStatus(status string) string {
-	upper := strings.ToUpper(status)
-	switch status {
-	case "verified":
-		return color.New(color.FgHiGreen).Sprintf("✓ %s", upper)
-	case "submitted":
-		return color.New(color.FgCyan).Sprint(upper)
-	default:
-		return upper // draft
-	}
-}
-
-// renderTaskChildren renders the child entities (plans, approvals, escalations, receipts) under a task
+// renderTaskChildren renders the child entities (plans, approvals, escalations) under a task
 func renderTaskChildren(task primary.TaskSummary, prefix string) {
 	// Count total children
-	totalChildren := len(task.Plans) + len(task.Approvals) + len(task.Escalations) + len(task.Receipts)
+	totalChildren := len(task.Plans) + len(task.Approvals) + len(task.Escalations)
 	if totalChildren == 0 {
 		return
 	}
@@ -920,17 +841,6 @@ func renderTaskChildren(task primary.TaskSummary, prefix string) {
 			childPrefix = prefix + "└── "
 		}
 		fmt.Printf("%s%s %s\n", childPrefix, colorizeID(esc.ID), colorizeEscalationStatus(esc.Status, esc.TargetActorID))
-		childIdx++
-	}
-
-	// Render receipts
-	for _, receipt := range task.Receipts {
-		isLast := childIdx == totalChildren-1
-		childPrefix := prefix + "├── "
-		if isLast {
-			childPrefix = prefix + "└── "
-		}
-		fmt.Printf("%s%s %s\n", childPrefix, colorizeID(receipt.ID), colorizeReceiptStatus(receipt.Status))
 		childIdx++
 	}
 }
