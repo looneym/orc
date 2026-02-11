@@ -5,7 +5,7 @@
 
 This document contains the core entity-relationship diagram for ORC's database schema.
 
-For the complete 27-table schema including monitoring (kennels, patrols), messaging, and auxiliary tables, see `internal/db/schema.sql`.
+For the complete schema including messaging and auxiliary tables, see `internal/db/schema.sql`.
 
 ---
 
@@ -155,6 +155,6 @@ Commission → Shipment → Task → Plan → Approval
 
 ## See Also
 
-- `internal/db/schema.sql` - Complete schema with all 27 tables
+- `internal/db/schema.sql` - Complete schema
 - `docs/architecture.md` - System architecture overview
 - `docs/shipment-lifecycle.md` - Shipment state machine

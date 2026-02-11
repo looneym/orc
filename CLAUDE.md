@@ -103,7 +103,6 @@ Or for Goblins:
 |--------|------------|------|-------------|
 | `BENCH-` | Workbench | IMP | Implementation agent workspace (git worktree) |
 | `GATE-` | Gatehouse | Goblin | Workshop gatekeeper (1:1 with workshop) |
-| `WATCH-` | Watchdog | - | IMP monitor (1:1 with workbench) |
 
 ### What NOT to store
 - `role` - Derived from place_id prefix (`BENCH-` → IMP, `GATE-` → Goblin)
@@ -122,12 +121,10 @@ ORC uses a place-based actor model where identity is tied to "where you are":
 |-------|-------|------|---------|
 | IMP | Workbench (`BENCH-xxx`) | Implementation | Executes tasks, writes code |
 | Goblin | Gatehouse (`GATE-xxx`) | Review | Reviews plans, handles escalations |
-| Watchdog | Watchdog (`WATCH-xxx`) | Monitor | Monitors IMP progress |
 
 ### Key Relationships
 
 - **Workshop → Gatehouse**: 1:1 (every workshop has exactly one gatehouse)
-- **Workbench → Watchdog**: 1:1 (every workbench has exactly one watchdog)
 - **Workshop → Workbenches**: 1:many (a workshop contains multiple workbenches)
 
 ### Connect Command

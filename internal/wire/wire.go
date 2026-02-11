@@ -38,8 +38,6 @@ var (
 	receiptService                 primary.ReceiptService
 	summaryService                 primary.SummaryService
 	gatehouseService               primary.GatehouseService
-	kennelService                  primary.KennelService
-	patrolService                  primary.PatrolService
 	approvalService                primary.ApprovalService
 	escalationService              primary.EscalationService
 	infraService                   primary.InfraService
@@ -157,18 +155,6 @@ func SummaryService() primary.SummaryService {
 func GatehouseService() primary.GatehouseService {
 	once.Do(initServices)
 	return gatehouseService
-}
-
-// KennelService returns the singleton KennelService instance.
-func KennelService() primary.KennelService {
-	once.Do(initServices)
-	return kennelService
-}
-
-// PatrolService returns the singleton PatrolService instance.
-func PatrolService() primary.PatrolService {
-	once.Do(initServices)
-	return patrolService
 }
 
 // ApprovalService returns the singleton ApprovalService instance.
@@ -316,24 +302,16 @@ func initServices() {
 	receiptRepo := sqlite.NewReceiptRepository(database)
 	receiptService = app.NewReceiptService(receiptRepo)
 
-	// Create new entity services (gatehouses, kennels, approvals, escalations)
+	// Create new entity services (gatehouses, approvals, escalations)
 	// Pass workshop repo to gatehouse service for EnsureAllWorkshopsHaveGatehouses
 	gatehouseService = app.NewGatehouseService(gatehouseRepo, workshopRepo)
-
-	// Pass workbench repo to kennel service for EnsureAllWorkbenchesHaveKennels
-	kennelRepo := sqlite.NewKennelRepository(database)
-	kennelService = app.NewKennelService(kennelRepo, workbenchRepo)
-
-	// Create patrol service for watchdog monitoring
-	patrolRepo := sqlite.NewPatrolRepository(database)
-	patrolService = app.NewPatrolService(patrolRepo, kennelRepo, workbenchRepo, tmuxAdapter)
 
 	approvalService = app.NewApprovalService(approvalRepo)
 
 	escalationService = app.NewEscalationService(escalationRepo)
 
 	// Create infra service for infrastructure planning
-	infraService = app.NewInfraService(factoryRepo, workshopRepo, workbenchRepo, repoRepo, gatehouseRepo, kennelRepo, workspaceAdapter, tmuxAdapter, executor)
+	infraService = app.NewInfraService(factoryRepo, workshopRepo, workbenchRepo, repoRepo, gatehouseRepo, workspaceAdapter, tmuxAdapter, executor)
 
 	// Create log service for activity logs (workshopLogRepo created early for LogWriter)
 	logService = app.NewLogService(workshopLogRepo)

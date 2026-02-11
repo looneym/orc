@@ -284,55 +284,6 @@ func (m *mockInfraGatehouseRepo) GetNextID(ctx context.Context) (string, error) 
 	return "GATE-001", nil
 }
 
-// mockInfraKennelRepo implements secondary.KennelRepository for infra tests.
-type mockInfraKennelRepo struct {
-	kennelsByWorkbench map[string]*secondary.KennelRecord
-}
-
-func (m *mockInfraKennelRepo) GetByWorkbench(ctx context.Context, workbenchID string) (*secondary.KennelRecord, error) {
-	if k, ok := m.kennelsByWorkbench[workbenchID]; ok {
-		return k, nil
-	}
-	return nil, errors.New("not found")
-}
-
-func (m *mockInfraKennelRepo) GetByID(ctx context.Context, id string) (*secondary.KennelRecord, error) {
-	return nil, errors.New("not implemented")
-}
-
-func (m *mockInfraKennelRepo) Create(ctx context.Context, k *secondary.KennelRecord) error {
-	return nil
-}
-
-func (m *mockInfraKennelRepo) List(ctx context.Context, filters secondary.KennelFilters) ([]*secondary.KennelRecord, error) {
-	return nil, nil
-}
-
-func (m *mockInfraKennelRepo) Update(ctx context.Context, k *secondary.KennelRecord) error {
-	return nil
-}
-
-func (m *mockInfraKennelRepo) Delete(ctx context.Context, id string) error {
-	return nil
-}
-
-func (m *mockInfraKennelRepo) GetNextID(ctx context.Context) (string, error) {
-	return "KENNEL-001", nil
-}
-
-func (m *mockInfraKennelRepo) UpdateStatus(ctx context.Context, id, status string) error {
-	return nil
-}
-
-func (m *mockInfraKennelRepo) WorkbenchExists(ctx context.Context, workbenchID string) (bool, error) {
-	return true, nil
-}
-
-func (m *mockInfraKennelRepo) WorkbenchHasKennel(ctx context.Context, workbenchID string) (bool, error) {
-	_, ok := m.kennelsByWorkbench[workbenchID]
-	return ok, nil
-}
-
 // mockInfraWorkspaceAdapter implements secondary.WorkspaceAdapter for testing.
 type mockInfraWorkspaceAdapter struct{}
 
@@ -419,13 +370,10 @@ func newTestInfraService() *InfraServiceImpl {
 			"WORK-001": {ID: "GATE-001", WorkshopID: "WORK-001", Status: "active"},
 		},
 	}
-	kennelRepo := &mockInfraKennelRepo{
-		kennelsByWorkbench: make(map[string]*secondary.KennelRecord),
-	}
 	workspaceAdapter := &mockInfraWorkspaceAdapter{}
 	executor := &mockInfraEffectExecutor{}
 
-	return NewInfraService(factoryRepo, workshopRepo, workbenchRepo, repoRepo, gatehouseRepo, kennelRepo, workspaceAdapter, nil, executor)
+	return NewInfraService(factoryRepo, workshopRepo, workbenchRepo, repoRepo, gatehouseRepo, workspaceAdapter, nil, executor)
 }
 
 // newTestInfraServiceWithExecutor creates a test infra service with a custom effect executor.
@@ -451,12 +399,9 @@ func newTestInfraServiceWithExecutor(executor *mockInfraEffectExecutor) *InfraSe
 			"WORK-001": {ID: "GATE-001", WorkshopID: "WORK-001", Status: "active"},
 		},
 	}
-	kennelRepo := &mockInfraKennelRepo{
-		kennelsByWorkbench: make(map[string]*secondary.KennelRecord),
-	}
 	workspaceAdapter := &mockInfraWorkspaceAdapter{}
 
-	return NewInfraService(factoryRepo, workshopRepo, workbenchRepo, repoRepo, gatehouseRepo, kennelRepo, workspaceAdapter, nil, executor)
+	return NewInfraService(factoryRepo, workshopRepo, workbenchRepo, repoRepo, gatehouseRepo, workspaceAdapter, nil, executor)
 }
 
 func TestInfraService_PlanInfra(t *testing.T) {
@@ -562,13 +507,10 @@ func TestInfraService_PlanInfra_ArchivedWorkbenchExcluded(t *testing.T) {
 			"WORK-001": {ID: "GATE-001", WorkshopID: "WORK-001", Status: "active"},
 		},
 	}
-	kennelRepo := &mockInfraKennelRepo{
-		kennelsByWorkbench: make(map[string]*secondary.KennelRecord),
-	}
 	workspaceAdapter := &mockInfraWorkspaceAdapter{}
 	executor := &mockInfraEffectExecutor{}
 
-	service := NewInfraService(factoryRepo, workshopRepo, workbenchRepo, repoRepo, gatehouseRepo, kennelRepo, workspaceAdapter, nil, executor)
+	service := NewInfraService(factoryRepo, workshopRepo, workbenchRepo, repoRepo, gatehouseRepo, workspaceAdapter, nil, executor)
 	ctx := context.Background()
 
 	plan, err := service.PlanInfra(ctx, primary.InfraPlanRequest{

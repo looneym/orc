@@ -42,12 +42,3 @@ func GetWelcomeIMP() (string, error) {
 	}
 	return string(content), nil
 }
-
-// GetWelcomeWatchdog returns the Watchdog welcome message template content
-func GetWelcomeWatchdog() (string, error) {
-	content, err := primeTemplates.ReadFile("prime/welcome-watchdog.tmpl")
-	if err != nil {
-		return "", err
-	}
-	return string(content), nil
-}

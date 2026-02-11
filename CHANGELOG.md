@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+
+- Watchdog state model removed: kennel, patrol, dogbed, stuck, check entities and all related CLI commands, skills, and documentation
+
 ### Fixed
 
 - `orc infra apply` now handles partial apply recovery by falling back to session name detection when ORC_WORKSHOP_ID env var is missing

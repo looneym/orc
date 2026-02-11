@@ -91,11 +91,6 @@ ORC (Orchestrator) is a commission coordination system for managing complex, mul
 |-------|-------------|
 | goblin-escalation-receive | Handle incoming escalations |
 
-**Watchdog Workflow:**
-| Skill | Description |
-|-------|-------------|
-| watchdog-monitor | Monitoring loop for watching IMP |
-
 **Setup & Admin:**
 | Skill | Description |
 |-------|-------------|
@@ -231,13 +226,12 @@ orc workbench rename BENCH-XXX new-name
 - Writes .orc-commission marker for context detection
 - Opens in TMux with 3-pane IMP layout: vim | claude | shell
 
-### 4. Agent Types (IMP, Goblin, Watchdog)
-**Concept**: Place-based actor model with three agent types
+### 4. Agent Types (IMP, Goblin)
+**Concept**: Place-based actor model with two agent types
 
 **Agent Types:**
 - **IMP (Implementation Agent)**: Works within a workbench (BENCH-XXX) on assigned shipments/tasks
 - **Goblin**: Workshop gatekeeper (GATE-XXX) that reviews plans and handles escalations
-- **Watchdog**: IMP monitor (WATCH-XXX) that tracks progress
 
 **Architecture Principles:**
 - Identity tied to place (place_id in config)
@@ -337,7 +331,7 @@ See **[docs/schema.md](schema.md)** for the complete ER diagram with 12 core tab
 - **Commission** → Shipment → Task (work tracking)
 - **Task** → Plan → Receipt (execution flow)
 
-See `internal/db/schema.sql` for the complete 27-table schema including monitoring (Kennels, Patrols), approvals, escalations, and more
+See `internal/db/schema.sql` for the complete schema including approvals, escalations, and more
 
 ---
 
@@ -405,7 +399,7 @@ ORC is in active production use with the following capabilities:
 
 - **Commission & Workshop Management**: Full lifecycle support
 - **Shipment Workflow**: exploration → synthesis → planning → implementation
-- **Agent Coordination**: IMP, Goblin, Watchdog roles operational
+- **Agent Coordination**: IMP, Goblin roles operational
 - **TMux Integration**: Multi-workbench sessions working
 - **Skills System**: Claude Code skills for workflow automation
 
@@ -510,7 +504,7 @@ orc handoff create --note "Session summary..."
 
 1. **SQLite Source of Truth** - Single authoritative database for all state
 2. **Zero Cold-Start** - Full context preservation via handoff narratives
-3. **Multi-Agent Coordination** - IMP/Goblin/Watchdog actor model
+3. **Multi-Agent Coordination** - IMP/Goblin actor model
 4. **Git Worktree Native** - First-class support for isolated workspaces
 5. **Shipment Workflow** - Exploration → synthesis → planning → implementation
 6. **TMux Integration** - One session per workshop, programmatic layout
@@ -551,7 +545,6 @@ orc handoff create --note "Session summary..."
 **Task (TASK-XXX)**: Specific implementation work within a shipment
 **IMP**: Implementation agent that works within a workbench
 **Goblin (GATE-XXX)**: Workshop gatekeeper, reviews plans, handles escalations
-**Watchdog (WATCH-XXX)**: IMP monitor for tracking progress
 **Handoff**: Session boundary artifact (narrative + work state)
 **orc prime**: Context injection at session start
 

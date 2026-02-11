@@ -41,4 +41,3 @@ Manual re-propulsion. Check current state and output the appropriate next action
 - Use when unsure what to do next
 - Use to restart after interruption
 - Use to verify you're on track
-- The Stop hook uses similar logic to prevent premature stopping

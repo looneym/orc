@@ -451,7 +451,6 @@ var shipmentShouldContinueCmd = &cobra.Command{
 
 Used by:
 - Stop hook to decide whether to block
-- Watchdog to know when to nudge or exit
 
 Returns JSON: {"continue": true/false, "reason": "...", "incomplete_tasks": N}
 Exit 0 = continue, Exit 1 = stop

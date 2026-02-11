@@ -25,7 +25,6 @@ type InfraServiceImpl struct {
 	workbenchRepo    secondary.WorkbenchRepository
 	repoRepo         secondary.RepoRepository
 	gatehouseRepo    secondary.GatehouseRepository
-	kennelRepo       secondary.KennelRepository
 	workspaceAdapter secondary.WorkspaceAdapter
 	tmuxAdapter      secondary.TMuxAdapter
 	executor         EffectExecutor
@@ -38,7 +37,6 @@ func NewInfraService(
 	workbenchRepo secondary.WorkbenchRepository,
 	repoRepo secondary.RepoRepository,
 	gatehouseRepo secondary.GatehouseRepository,
-	kennelRepo secondary.KennelRepository,
 	workspaceAdapter secondary.WorkspaceAdapter,
 	tmuxAdapter secondary.TMuxAdapter,
 	executor EffectExecutor,
@@ -49,7 +47,6 @@ func NewInfraService(
 		workbenchRepo:    workbenchRepo,
 		repoRepo:         repoRepo,
 		gatehouseRepo:    gatehouseRepo,
-		kennelRepo:       kennelRepo,
 		workspaceAdapter: workspaceAdapter,
 		tmuxAdapter:      tmuxAdapter,
 		executor:         executor,
@@ -164,26 +161,16 @@ func (s *InfraServiceImpl) PlanInfra(ctx context.Context, req primary.InfraPlanR
 					actualAgent = s.tmuxAdapter.GetWindowOption(ctx, tmuxSessionName+":"+wb.Name, "@orc_agent")
 				}
 
-				// Check if workbench has active kennel (for watchdog pane)
-				hasWatchdog := false
-				if s.kennelRepo != nil {
-					kennel, err := s.kennelRepo.GetByWorkbench(ctx, wb.ID)
-					if err == nil && kennel != nil && kennel.Status == "occupied" {
-						hasWatchdog = true
-					}
-				}
-
 				windowInput := coreinfra.TMuxWindowInput{
 					Name:          wb.Name,
 					Path:          wbPath,
 					ExpectedAgent: expectedAgent,
 					ActualAgent:   actualAgent,
-					HasWatchdog:   hasWatchdog,
 					WorkbenchID:   wb.ID,
 				}
 				// Fetch pane data if window exists
 				if tmuxSessionExists && s.tmuxAdapter.WindowExists(ctx, tmuxSessionName, wb.Name) {
-					windowInput.Panes = s.fetchPaneData(ctx, tmuxSessionName, wb.Name, wbPath, hasWatchdog, wb.ID)
+					windowInput.Panes = s.fetchPaneData(ctx, tmuxSessionName, wb.Name, wbPath)
 				}
 				tmuxExpectedWindows = append(tmuxExpectedWindows, windowInput)
 			}
@@ -458,8 +445,8 @@ func (s *InfraServiceImpl) fileExists(path string) bool {
 }
 
 // fetchPaneData retrieves pane verification data for an existing window.
-// Expected layout: Pane 1 (vim), Pane 2 (orc connect), Pane 3 (shell), Pane 4 (watchdog, optional).
-func (s *InfraServiceImpl) fetchPaneData(ctx context.Context, sessionName, windowName, expectedPath string, hasWatchdog bool, workbenchID string) []coreinfra.TMuxPaneInput {
+// Expected layout: Pane 1 (vim), Pane 2 (orc connect), Pane 3 (shell).
+func (s *InfraServiceImpl) fetchPaneData(ctx context.Context, sessionName, windowName, expectedPath string) []coreinfra.TMuxPaneInput {
 	var panes []coreinfra.TMuxPaneInput
 
 	// Pane 1: vim (expected command = "vim")
@@ -488,17 +475,6 @@ func (s *InfraServiceImpl) fetchPaneData(ctx context.Context, sessionName, windo
 		ExpectedPath:    expectedPath,
 		ExpectedCommand: "", // Shell - no command expected
 	})
-
-	// Pane 4: Watchdog (optional, only when kennel is active)
-	if hasWatchdog {
-		panes = append(panes, coreinfra.TMuxPaneInput{
-			Index:           4,
-			StartPath:       s.tmuxAdapter.GetPaneStartPath(ctx, sessionName, windowName, 4),
-			StartCommand:    s.tmuxAdapter.GetPaneStartCommand(ctx, sessionName, windowName, 4),
-			ExpectedPath:    expectedPath,
-			ExpectedCommand: fmt.Sprintf("orc connect --role watchdog --target %s", workbenchID),
-		})
-	}
 
 	return panes
 }

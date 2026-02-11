@@ -51,9 +51,6 @@ Specific implementation work within a shipment. C2/C3 scope (what systems to tou
 **📖 Tome**
 Knowledge container at commission level. Holds notes for long-running reference.
 
-**🐕 Watchdog**
-IMP monitor. Tracks progress and reports anomalies. One per workbench.
-
 **🔧 Workbench**
 Git worktree where an IMP works. Isolated development environment with dedicated tmux window.
 

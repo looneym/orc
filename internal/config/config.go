@@ -18,7 +18,6 @@ const (
 const (
 	PlaceTypeWorkbench = "workbench" // BENCH-XXX
 	PlaceTypeGatehouse = "gatehouse" // GATE-XXX
-	PlaceTypeKennel    = "kennel"    // KENNEL-XXX
 )
 
 // Config represents the flat ORC configuration (identity only)
@@ -127,14 +126,10 @@ func IsGoblinRole(role string) bool {
 }
 
 // GetPlaceType returns the place type for a given place ID.
-// Returns "workbench" for BENCH-XXX, "gatehouse" for GATE-XXX, "kennel" for KENNEL-XXX, or "" for unknown.
+// Returns "workbench" for BENCH-XXX, "gatehouse" for GATE-XXX, or "" for unknown.
 func GetPlaceType(placeID string) string {
 	if len(placeID) < 5 {
 		return ""
-	}
-	// Check 6-char prefix first for KENNEL
-	if len(placeID) >= 6 && placeID[:6] == "KENNEL" {
-		return PlaceTypeKennel
 	}
 	prefix := placeID[:5]
 	switch prefix {
@@ -144,11 +139,6 @@ func GetPlaceType(placeID string) string {
 		return PlaceTypeGatehouse
 	}
 	return ""
-}
-
-// IsKennel returns true if the place ID is a kennel (KENNEL-XXX)
-func IsKennel(placeID string) bool {
-	return GetPlaceType(placeID) == PlaceTypeKennel
 }
 
 // IsWorkbench returns true if the place ID is a workbench (BENCH-XXX)

@@ -12,9 +12,8 @@ import (
 type AgentType string
 
 const (
-	AgentTypeGoblin   AgentType = "GOBLIN"
-	AgentTypeIMP      AgentType = "IMP"
-	AgentTypeWatchdog AgentType = "WATCHDOG"
+	AgentTypeGoblin AgentType = "GOBLIN"
+	AgentTypeIMP    AgentType = "IMP"
 )
 
 // AgentIdentity represents a parsed agent ID
@@ -50,13 +49,6 @@ func GetCurrentAgentID() (*AgentIdentity, error) {
 				Type:   AgentTypeGoblin,
 				ID:     cfg.PlaceID,
 				FullID: fmt.Sprintf("GOBLIN-%s", cfg.PlaceID),
-			}, nil
-		case config.PlaceTypeKennel:
-			// We're in a kennel - this is a Watchdog
-			return &AgentIdentity{
-				Type:   AgentTypeWatchdog,
-				ID:     cfg.PlaceID,
-				FullID: fmt.Sprintf("WATCHDOG-%s", cfg.PlaceID),
 			}, nil
 		}
 	}
@@ -105,14 +97,7 @@ func ParseAgentID(agentID string) (*AgentIdentity, error) {
 			ID:     id,
 			FullID: agentID,
 		}, nil
-	case AgentTypeWatchdog:
-		// For WATCHDOG, kennel IDs are like KENNEL-014
-		return &AgentIdentity{
-			Type:   AgentTypeWatchdog,
-			ID:     id,
-			FullID: agentID,
-		}, nil
 	default:
-		return nil, fmt.Errorf("unknown agent type: %s (expected GOBLIN, IMP, or WATCHDOG)", agentType)
+		return nil, fmt.Errorf("unknown agent type: %s (expected GOBLIN or IMP)", agentType)
 	}
 }
