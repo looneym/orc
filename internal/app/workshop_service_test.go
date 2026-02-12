@@ -424,10 +424,6 @@ func (m *mockTMuxAdapter) SplitHorizontal(ctx context.Context, target, workingDi
 	return nil
 }
 
-func (m *mockTMuxAdapter) NudgeSession(ctx context.Context, target, message string) error {
-	return nil
-}
-
 func (m *mockTMuxAdapter) AttachInstructions(sessionName string) string {
 	return "tmux attach -t " + sessionName
 }

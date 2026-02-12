@@ -83,7 +83,7 @@ func runPrime(cmd *cobra.Command, args []string) error {
 			fullOutput = buildGoblinPrimeOutput(cwd, cfg)
 		}
 	case role == config.RoleGoblin:
-		// Explicit Goblin role from gatehouse
+		// Explicit Goblin role
 		fullOutput = buildGoblinPrimeOutput(cwd, cfg)
 	default:
 		// No config = Goblin context (default behavior)

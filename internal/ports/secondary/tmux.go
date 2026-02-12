@@ -56,9 +56,6 @@ type TMuxAdapter interface {
 	SplitHorizontal(ctx context.Context, target, workingDir string) error
 	JoinPane(ctx context.Context, source, target string, vertical bool, size int) error
 
-	// Communication
-	NudgeSession(ctx context.Context, target, message string) error
-
 	// Information
 	AttachInstructions(sessionName string) string
 

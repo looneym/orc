@@ -249,7 +249,7 @@ func (s *InfraServiceImpl) scanForOrphans(ctx context.Context, knownWorkbenches 
 		if err != nil || placeID == "" {
 			continue
 		}
-		// Any workshop dir with a GATE- place ID is an orphan (gatehouses removed)
+		// Any workshop dir with a GATE- place ID is an orphan
 		if !strings.HasPrefix(placeID, "GATE-") {
 			continue
 		}

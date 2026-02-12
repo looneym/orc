@@ -98,11 +98,6 @@ func (a *Adapter) CapturePaneContent(ctx context.Context, target string, lines i
 	return tmuxpkg.CapturePaneContent(target, lines)
 }
 
-// NudgeSession sends a message to a running Claude session.
-func (a *Adapter) NudgeSession(ctx context.Context, target, message string) error {
-	return tmuxpkg.NudgeSession(target, message)
-}
-
 // AttachInstructions returns user-friendly instructions for attaching to a session.
 func (a *Adapter) AttachInstructions(sessionName string) string {
 	return tmuxpkg.AttachInstructions(sessionName)

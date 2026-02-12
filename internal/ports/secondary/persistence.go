@@ -706,7 +706,6 @@ type WorkshopRepository interface {
 	SetActiveCommissionID(ctx context.Context, workshopID, commissionID string) error
 
 	// GetActiveCommissions returns commission IDs derived from focus:
-	// - Gatehouse focused_id (resolved to commission)
 	// - All workbench focused_ids in workshop (resolved to commission)
 	// Returns deduplicated commission IDs.
 	GetActiveCommissions(ctx context.Context, workshopID string) ([]string, error)

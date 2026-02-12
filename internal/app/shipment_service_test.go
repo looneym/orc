@@ -162,8 +162,6 @@ func (m *mockShipmentRepository) WorkbenchAssignedToOther(ctx context.Context, w
 	return "", nil
 }
 
-// Deprecated methods removed: SetShipyardID, SetConclaveID, ListShipyardQueue, GetFactoryIDForCommission, UpdatePriority
-
 // mockTaskRepositoryForShipment implements minimal TaskRepository for shipment tests.
 type mockTaskRepositoryForShipment struct {
 	tasks     map[string]*secondary.TaskRecord

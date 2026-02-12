@@ -262,11 +262,8 @@ var shipmentAssignCmd = &cobra.Command{
 
 var shipmentStatusCmd = &cobra.Command{
 	Use:   "status [shipment-id]",
-	Short: "Override shipment status (escape hatch)",
-	Long: `Override a shipment's status manually.
-
-This is an escape hatch. Manual status override is not normal workflow.
-Use this only to correct stuck shipments or recover from errors.
+	Short: "Set shipment status",
+	Long: `Set a shipment's status.
 
 Valid statuses: draft, ready, in-progress, closed
 
@@ -281,8 +278,6 @@ Backwards transitions require --force flag.`,
 		if status == "" {
 			return fmt.Errorf("--set flag is required")
 		}
-
-		fmt.Println("⚠️  This is an escape hatch. Manual status override is not normal workflow.")
 
 		err := wire.ShipmentService().SetStatus(ctx, shipmentID, status, force)
 		if err != nil {

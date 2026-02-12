@@ -46,7 +46,6 @@ orc infra plan WORK-xxx
 ```
 
 Verify the plan shows:
-- Gatehouse: `CREATE`
 - Workbench: `CREATE` (or `MISSING` if no repo linked)
 - TMux Session: `CREATE` (session doesn't exist yet)
 - TMux Windows: `CREATE` for each workbench
@@ -58,7 +57,6 @@ orc infra apply WORK-xxx --yes
 ```
 
 Verify output shows:
-- Gatehouse created
 - Workbenches created
 - TMux session created (if shown)
 
@@ -70,7 +68,7 @@ ls -la ~/.orc/ws/WORK-xxx-*/.orc/config.json
 ```
 
 Verify:
-- Gatehouse directory exists
+- Workbench directory exists
 - Config file exists with proper content
 
 ### 7. Verify TMux State
@@ -135,7 +133,7 @@ ORC Self-Test Results
 [PASS] Workbench created (DB only)
 [PASS] Infra plan shows correct state
 [PASS] Infra apply creates filesystem
-[PASS] Gatehouse directory exists
+[PASS] Workbench directory exists
 [PASS] Config file exists
 [PASS] TMux session exists
 [PASS] TMux window exists

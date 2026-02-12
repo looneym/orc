@@ -22,7 +22,6 @@ erDiagram
     SHIPMENT ||--o{ NOTE : contains
     TOME ||--o{ NOTE : contains
     TASK ||--o{ PLAN : "planned by"
-    PLAN ||--o| APPROVAL : "approved by"
 
     FACTORY {
         string id PK
@@ -93,13 +92,6 @@ erDiagram
         string status
         text content
     }
-    APPROVAL {
-        string id PK
-        string plan_id FK
-        string task_id FK
-        string mechanism
-        string outcome
-    }
 ```
 
 ---
@@ -117,7 +109,6 @@ erDiagram
 | **tomes** | Knowledge containers | commission_id, title, status |
 | **notes** | Observations, learnings, decisions | shipment_id, tome_id, title, type |
 | **plans** | Implementation plans (1:many with task) | task_id, title, content, status |
-| **approvals** | Plan approvals (1:1 with plan) | plan_id, mechanism, outcome |
 
 ---
 
@@ -130,7 +121,7 @@ Factory → Workshop → Workbench
 
 **Work Tracking:**
 ```
-Commission → Shipment → Task → Plan → Approval
+Commission → Shipment → Task → Plan
                      → Note
           → Tome → Note
 ```

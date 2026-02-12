@@ -221,21 +221,7 @@ orc workbench rename BENCH-XXX new-name
 - Claude Teams messaging (replaces old mail/escalation system)
 - Shared summary bus via `orc summary`
 
-### 5. Context Preservation & Handoffs
-**orc prime & handoff Integration:**
-
-Session boundaries are preserved through:
-- **Handoffs**: Narrative summaries stored in SQLite database
-- **orc prime**: Injects context at session start (commission, epic, tasks, recent handoff)
-- **orc handoff create**: Captures session work, decisions, discoveries at session end
-
-**Key Features:**
-- Cross-session memory preservation via handoff narratives
-- New Claude sessions start with full historical context
-- Zero "cold start" problem
-- Handoffs searchable via CLI (`orc handoff list`, `orc handoff show`)
-
-### 6. TMux Integration
+### 5. TMux Integration
 **One TMux session per workshop:**
 ```
 TMux Session: "Workshop Name" (orc-WORK-XXX)
@@ -287,7 +273,6 @@ This pattern replaces SessionStart hooks (which are broken in Claude Code v2.1.7
 - `shipments` - Work containers with lifecycle
 - `tasks` - Atomic units of work within shipments
 - `workbenches` - Git worktrees registered to workshops
-- `handoffs` - Session handoff narratives for context preservation
 
 **Key Fields:**
 - `shipments.status`: draft | ready | in-progress | closed
@@ -302,8 +287,6 @@ See **[docs/schema.md](schema.md)** for the complete ER diagram.
 **Core Hierarchy:**
 - **Factory** -> Workshop -> Workbench (infrastructure)
 - **Commission** -> Shipment -> Task (work tracking)
-- **Task** -> Plan -> Approval (execution flow)
-
 See `internal/db/schema.sql` for the complete schema
 
 ---
@@ -314,9 +297,8 @@ See `internal/db/schema.sql` for the complete schema
 **Purpose:** Authoritative source for all structured operational data
 
 **Stores:**
-- Commissions, epics, rabbit holes, tasks
+- Commissions, shipments, tasks
 - Workbenches (git worktrees)
-- Handoffs (session narratives)
 - Tags and task-tag associations
 - Current state (status, assignments, timestamps)
 
@@ -325,44 +307,6 @@ See `internal/db/schema.sql` for the complete schema
 - Schema-enforced data integrity
 - Deterministic queries (e.g., "show all ready tasks")
 - Files like config.json are DERIVED from this, never read for decisions
-
-### Handoff System
-
-**Data Flow:**
-```
-Session Work → SQLite (operational state)
-            ↓
-         Handoff (at session end)
-            ↓
-    Narrative stored in SQLite
-            ↓
-    Next session reads via orc prime
-```
-
-**Bootstrap Process:**
-```
-New Session starts
-    ↓
-orc prime queries:
-    - SQLite: Current commission, epic, tasks
-    - SQLite: Recent handoff narrative
-    - Git: Current branch, uncommitted changes
-    ↓
-Full context restored → Work begins
-```
-
-**Handoff Process:**
-```
-Session ending
-    ↓
-orc handoff create:
-    - Handoff record in SQLite (narrative, task_ids, timestamp)
-    - Config updated with current handoff ID
-    ↓
-Next session can bootstrap from this
-```
-
-**Key Insight:** SQLite tells you WHERE YOU ARE. Handoff narratives tell you HOW YOU GOT HERE.
 
 ---
 
@@ -460,15 +404,6 @@ orc task claim TASK-001
 orc task complete TASK-001
 ```
 
-### Session Boundaries
-```bash
-# At session start
-orc prime                     # Restores full context
-
-# At session end
-orc handoff create --note "Session summary..."
-```
-
 ---
 
 ## Architecture Highlights
@@ -476,8 +411,7 @@ orc handoff create --note "Session summary..."
 **What Makes ORC Unique:**
 
 1. **SQLite Source of Truth** - Single authoritative database for all state
-2. **Zero Cold-Start** - Full context preservation via handoff narratives
-3. **Two-Actor Model** - Goblin (coordinator) + IMP (worker via Claude Teams)
+2. **Two-Actor Model** - Goblin (coordinator) + IMP (worker via Claude Teams)
 4. **Git Worktree Native** - First-class support for isolated workspaces
 5. **Simple Lifecycles** - 4-status shipments, 3-status tasks, all manual transitions
 6. **TMux Integration** - One session per workshop, programmatic layout
@@ -518,7 +452,6 @@ orc handoff create --note "Session summary..."
 **Task (TASK-XXX)**: Specific implementation work within a shipment (open, in-progress, closed)
 **Goblin**: Coordinator agent -- human's long-running workbench pane
 **IMP**: Disposable worker agent spawned by Claude Teams
-**Handoff**: Session boundary artifact (narrative + work state)
 **orc prime**: Context injection at session start
 
 ---

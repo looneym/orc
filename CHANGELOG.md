@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Shipment `status` CLI command no longer shows escape hatch warning (all transitions are manual now)
+- Removed dead NudgeSession code from tmux port, adapter, and implementation
+- Cleaned stale comments referencing gatehouse, approval, escalation, and other removed entities
+- Updated docs (architecture.md, schema.md, glossary.md, README.md, CLAUDE.md) to remove approval/escalation/handoff references
+- Fixed orc-self-test skill to remove gatehouse references
 - **Actor model redesign**: Goblin is now the coordinator (human's workbench pane), IMP is a disposable worker (spawned by Claude Teams)
 - Shipment lifecycle simplified to 4 statuses: draft → ready → in-progress → closed (all transitions manual)
 - Task lifecycle simplified to 4 statuses: open → in-progress → closed (blocked as lateral state)

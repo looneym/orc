@@ -9,9 +9,6 @@ A-Z definitions of ORC terminology. For schema details see [schema.md](schema.md
 
 ## Terms
 
-**✅ Approval**
-A sign-off on an implementation plan. Required before code changes.
-
 **📋 Commission**
 A body of work being tracked. Top-level organizational unit. Contains shipments.
 
@@ -23,9 +20,6 @@ A collection of workshops, typically representing a codebase or project area.
 
 **👺 Goblin**
 Coordinator agent. The human's long-running workbench pane. Creates/manages ORC tasks with the human. Memory and policy layer (what and why).
-
-**🤝 Handoff**
-Session context snapshot for continuity between Claude sessions.
 
 **👹 IMP**
 Disposable worker agent spawned by Claude Teams. Executes tasks using Teams primitives. Execution layer (how and who).

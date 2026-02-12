@@ -11,9 +11,6 @@ This file contains essential workflow rules and context for agents working on th
 - **`orc bootstrap`** - Start interactive first-run experience (launches Claude with /orc-first-run)
 - **`/release`** - Cut a new version (bump VERSION, promote CHANGELOG, tag)
 - **`/ship-deploy`** - Deploy shipment to master (see [docs/deployment.md](docs/deployment.md))
-- **`/handoff`** - Create handoff for session continuity
-- **`/bootstrap`** - Load project context from git history and recent handoffs
-
 *Complete documentation available in `docs/` directory*
 
 ## Development Setup
@@ -137,7 +134,7 @@ ORC and Claude Teams have complementary roles:
 The `orc summary` command serves as a shared information bus:
 - Both IMPs and Goblins see the same data structure
 - Filtering varies by role (IMP sees their shipments, Goblin sees all)
-- Task children (plans, approvals) visible to both
+- Task children (plans) visible to both
 - Status indicators show current state
 
 ---

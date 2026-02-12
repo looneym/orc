@@ -51,7 +51,6 @@ ORC follows a structured workflow with simple, manual lifecycles. Shipments prog
 | **Goblin** | Coordinator agent -- human's long-running workbench pane |
 | **IMP** | Disposable worker agent spawned by Claude Teams |
 | **Task** | Deed to be done within a shipment (open -> in-progress -> closed) |
-| **Handoff** | Context passed between sessions |
 
 -> See [docs/glossary.md](docs/glossary.md) for complete terminology.
 

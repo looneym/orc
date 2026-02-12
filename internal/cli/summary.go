@@ -678,7 +678,7 @@ func renderShipment(ship primary.ShipmentSummary, workshopFocus workshopFocusInf
 				statusMark = colorizeStatus(task.Status) + " - "
 			}
 			fmt.Printf("%s%s - %s%s\n", tPrefix, colorizeID(task.ID), statusMark, task.Title)
-			// Render task children (plans, approvals, escalations, receipts)
+			// Render task children (plans)
 			renderTaskChildren(task, taskChildPrefix)
 			childIdx++
 		}
