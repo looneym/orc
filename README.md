@@ -5,7 +5,7 @@
 <em>The factory runs on SQLite and git worktrees (and Anthropic tokens 😅).</em>
 </p>
 
-Orc is a tmux-based development environment for structured AI-assisted work. It provisions isolated workspaces, tracks everything in a persistent ledger, drives shipments from messy ideation to clarity, and coordinates parallel agent swarms — all from your terminal.
+Orc is a tmux-based IDE for structured AI-assisted work. It provisions isolated workspaces, tracks everything in a persistent ledger, drives shipments from messy ideation to clarity, and coordinates parallel agent swarms — all from your terminal.
 
 ## 🎭 The Cast
 
