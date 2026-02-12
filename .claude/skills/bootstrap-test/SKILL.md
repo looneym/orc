@@ -33,11 +33,15 @@ The test validates the full first-run experience:
 3. Copies ORC repo into VM
 4. Runs `make bootstrap`
 5. Verifies `orc` is in PATH and works
-6. Verifies CLI functionality:
+6. Verifies bootstrap artifacts:
+   - FACT-001 (default factory) exists
+   - REPO-001 (ORC repo) exists with correct path
+7. Verifies CLI functionality:
    - Creates a test commission
    - Creates a test workshop
    - Runs `orc summary`
-7. Cleans up VM on success (unless `--keep` specified)
+   - Runs `orc doctor`
+8. Cleans up VM on success (unless `--keep` specified)
 
 ## Flow
 
