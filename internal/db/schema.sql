@@ -103,7 +103,6 @@ CREATE TABLE IF NOT EXISTS shipments (
 	repo_id TEXT,
 	branch TEXT,
 	pinned INTEGER DEFAULT 0,
-	priority INTEGER,
 	spec_note_id TEXT,
 	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 	updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -142,7 +141,6 @@ CREATE TABLE IF NOT EXISTS tasks (
 	status TEXT NOT NULL CHECK(status IN ('open', 'in-progress', 'blocked', 'closed')) DEFAULT 'open',
 	priority TEXT CHECK(priority IN ('low', 'medium', 'high')),
 	assigned_workbench_id TEXT,
-	context_ref TEXT,
 	pinned INTEGER DEFAULT 0,
 	depends_on TEXT,
 	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -153,19 +151,6 @@ CREATE TABLE IF NOT EXISTS tasks (
 	FOREIGN KEY (commission_id) REFERENCES commissions(id),
 	FOREIGN KEY (tome_id) REFERENCES tomes(id) ON DELETE SET NULL,
 	FOREIGN KEY (assigned_workbench_id) REFERENCES workbenches(id)
-);
-
--- Operations (Legacy work units - migrated from missions era)
-CREATE TABLE IF NOT EXISTS operations (
-	id TEXT PRIMARY KEY,
-	commission_id TEXT NOT NULL,
-	title TEXT NOT NULL,
-	description TEXT,
-	status TEXT NOT NULL CHECK(status IN ('ready', 'in_progress', 'complete')) DEFAULT 'ready',
-	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-	updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-	completed_at DATETIME,
-	FOREIGN KEY (commission_id) REFERENCES commissions(id)
 );
 
 -- PRs (Pull requests)
@@ -260,7 +245,6 @@ CREATE INDEX IF NOT EXISTS idx_tasks_commission ON tasks(commission_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
 CREATE INDEX IF NOT EXISTS idx_tasks_workbench ON tasks(assigned_workbench_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_tome ON tasks(tome_id);
-CREATE INDEX IF NOT EXISTS idx_operations_commission ON operations(commission_id);
 CREATE INDEX IF NOT EXISTS idx_prs_shipment ON prs(shipment_id);
 CREATE INDEX IF NOT EXISTS idx_prs_repo ON prs(repo_id);
 CREATE INDEX IF NOT EXISTS idx_prs_commission ON prs(commission_id);

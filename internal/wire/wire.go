@@ -25,7 +25,6 @@ var (
 	taskService                    primary.TaskService
 	noteService                    primary.NoteService
 	tomeService                    primary.TomeService
-	operationService               primary.OperationService
 	planService                    primary.PlanService
 	tagService                     primary.TagService
 	repoService                    primary.RepoService
@@ -71,12 +70,6 @@ func NoteService() primary.NoteService {
 func TomeService() primary.TomeService {
 	once.Do(initServices)
 	return tomeService
-}
-
-// OperationService returns the singleton OperationService instance.
-func OperationService() primary.OperationService {
-	once.Do(initServices)
-	return operationService
 }
 
 // PlanService returns the singleton PlanService instance.
@@ -211,10 +204,6 @@ func initServices() {
 	// Create tome and shipment services
 	tomeService = app.NewTomeService(tomeRepo, noteService)
 	shipmentService = app.NewShipmentService(shipmentRepo, taskRepo, noteService)
-
-	// Create operation service
-	operationRepo := sqlite.NewOperationRepository(database)
-	operationService = app.NewOperationService(operationRepo)
 
 	// Create plan repository
 	planRepo := sqlite.NewPlanRepository(database, logWriter)

@@ -238,9 +238,9 @@ Final validation against known constraints.
 ```
 [Question 1/5]
 
-Deleting ship-tidy and exorcism is a breaking change for anyone using those
-commands. They'll get "skill not found" errors. Since this is an internal
-tool, that's probably fine - users can adapt. But worth confirming.
+Removing a skill that other workflows depend on is a breaking change.
+Since this is an internal tool, that's probably fine - users can adapt.
+But worth confirming before proceeding.
 
 1. Approve - breaking change is acceptable
 2. Add deprecation period

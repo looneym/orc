@@ -244,7 +244,7 @@ Lanes:
   - README.md:23 contains agent instruction
 
 CLI:
-  - docs/troubleshooting.md references 'orc foobar' (doesn't exist)
+  - docs/guide/troubleshooting.md references 'orc foobar' (doesn't exist)
 
 Auto-fixing: [list what will be fixed]
 Escalating: [list what needs human decision]

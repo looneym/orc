@@ -65,7 +65,7 @@ func (a *CommissionAdapter) List(ctx context.Context, status string) error {
 }
 
 // Show displays details for a single commission.
-// Note: Related entities (shipments, groves) are fetched separately by the CLI layer.
+// Note: Related entities (shipments, tomes) are fetched separately by the CLI layer.
 func (a *CommissionAdapter) Show(ctx context.Context, commissionID string) (*primary.Commission, error) {
 	commission, err := a.service.GetCommission(ctx, commissionID)
 	if err != nil {

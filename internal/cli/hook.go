@@ -206,7 +206,7 @@ func runHookStop() error {
 		return nil
 	}
 
-	// 6. Log context and allow stop (auto_implementing mode removed)
+	// 6. Log context and allow stop
 	eventReq.Reason = fmt.Sprintf("shipment %s (%s), %d incomplete tasks", hctx.shipmentID, hctx.shipmentStatus, hctx.incompleteCount)
 	return nil
 }

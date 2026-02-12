@@ -370,7 +370,7 @@ func TestShipmentRepository_AssignWorkbench(t *testing.T) {
 	ctx := context.Background()
 
 	// Insert a test workbench
-	_, _ = db.Exec("INSERT INTO groves (id, commission_id, name, status) VALUES ('BENCH-001', 'COMM-001', 'test-workbench', 'active')")
+	seedWorkbench(t, db, "BENCH-001", "", "test-workbench")
 
 	// Create a shipment
 	shipment := createTestShipment(t, repo, ctx, "COMM-001", "Workbench Test", "")
@@ -405,7 +405,7 @@ func TestShipmentRepository_GetByWorkbench(t *testing.T) {
 	ctx := context.Background()
 
 	// Insert a test workbench
-	_, _ = db.Exec("INSERT INTO groves (id, commission_id, name, status) VALUES ('BENCH-001', 'COMM-001', 'test-workbench', 'active')")
+	seedWorkbench(t, db, "BENCH-001", "", "test-workbench")
 
 	// Create shipments and assign to workbench
 	s1 := createTestShipment(t, repo, ctx, "COMM-001", "Ship 1", "")
@@ -456,7 +456,7 @@ func TestShipmentRepository_WorkbenchAssignedToOther(t *testing.T) {
 	ctx := context.Background()
 
 	// Insert a test workbench
-	_, _ = db.Exec("INSERT INTO groves (id, commission_id, name, status) VALUES ('BENCH-001', 'COMM-001', 'test-workbench', 'active')")
+	seedWorkbench(t, db, "BENCH-001", "", "test-workbench")
 
 	// Create two shipments
 	s1 := createTestShipment(t, repo, ctx, "COMM-001", "Ship 1", "")

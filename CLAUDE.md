@@ -13,8 +13,8 @@ make init       # Install git hooks after cloning
 
 ```bash
 orc prime       # Context injection at session start
-orc status      # Current commission and work order status
-orc summary     # Hierarchical view of work orders with pinned items
+orc status      # Current commission and shipment status
+orc summary     # Hierarchical view of shipments and tomes with pinned items
 orc doctor      # Validate ORC environment and glue deployment
 ```
 

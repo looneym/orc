@@ -422,16 +422,13 @@ func TestIntegration_EntityStatusWorkflows(t *testing.T) {
 
 	shipmentRepo := sqlite.NewShipmentRepository(db, nil)
 	taskRepo := sqlite.NewTaskRepository(db, nil)
-	operationRepo := sqlite.NewOperationRepository(db)
 
 	// Create entities
 	shipment := &secondary.ShipmentRecord{ID: "SHIP-001", CommissionID: "COMM-001", Title: "Shipment"}
 	task := &secondary.TaskRecord{ID: "TASK-001", CommissionID: "COMM-001", Title: "Task"}
-	operation := &secondary.OperationRecord{ID: "OP-001", CommissionID: "COMM-001", Title: "Operation"}
 
 	_ = shipmentRepo.Create(ctx, shipment)
 	_ = taskRepo.Create(ctx, task)
-	_ = operationRepo.Create(ctx, operation)
 
 	// Verify initial status (defaults from table schema)
 	s, _ := shipmentRepo.GetByID(ctx, "SHIP-001")
@@ -444,15 +441,9 @@ func TestIntegration_EntityStatusWorkflows(t *testing.T) {
 		t.Errorf("expected task status 'open', got '%s'", tsk.Status)
 	}
 
-	op, _ := operationRepo.GetByID(ctx, "OP-001")
-	if op.Status != "ready" {
-		t.Errorf("expected operation status 'ready', got '%s'", op.Status)
-	}
-
 	// Transition to in-progress
 	_ = shipmentRepo.UpdateStatus(ctx, "SHIP-001", "in-progress", false)
 	_ = taskRepo.UpdateStatus(ctx, "TASK-001", "in-progress", false, false)
-	_ = operationRepo.UpdateStatus(ctx, "OP-001", "in_progress", false)
 
 	// Verify in-progress
 	s, _ = shipmentRepo.GetByID(ctx, "SHIP-001")
@@ -463,7 +454,6 @@ func TestIntegration_EntityStatusWorkflows(t *testing.T) {
 	// Transition to closed/complete with timestamp
 	_ = shipmentRepo.UpdateStatus(ctx, "SHIP-001", "closed", true)
 	_ = taskRepo.UpdateStatus(ctx, "TASK-001", "closed", false, true)
-	_ = operationRepo.UpdateStatus(ctx, "OP-001", "complete", true)
 
 	// Verify closed with CompletedAt
 	s, _ = shipmentRepo.GetByID(ctx, "SHIP-001")

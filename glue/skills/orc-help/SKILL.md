@@ -27,11 +27,10 @@ ls ~/.claude/skills/
 Filter to ORC prefixes only:
 - `ship-*` - Shipment workflow
 - `orc-*` - Utilities
-- `imp-*` - Implementation helpers
 
 ### Step 2: Check for Argument
 
-If a category argument is provided (ship, orc, imp):
+If a category argument is provided (ship, orc):
 - List all skills in that category
 - For each, read frontmatter and show name + description
 - Skip to Step 4

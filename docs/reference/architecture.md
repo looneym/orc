@@ -379,7 +379,7 @@ Add to `~/.claude/settings.json`:
 
 **Validation**: Run `orc doctor` to verify configuration.
 
-**See**: INSTALL.md for detailed setup instructions.
+**See**: [Getting Started](../guide/getting-started.md) for detailed setup instructions.
 
 ### Initialize ORC
 ```bash

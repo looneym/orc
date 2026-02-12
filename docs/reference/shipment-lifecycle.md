@@ -70,4 +70,4 @@ orc task resume TASK-xxx   # Remove blocked flag
 ## See Also
 
 - [docs/schema.md](schema.md) - Database schema with all valid states
-- [internal/core/shipment/guards.go](../internal/core/shipment/guards.go) - Guard implementations
+- [internal/core/shipment/guards.go](../../internal/core/shipment/guards.go) - Guard implementations

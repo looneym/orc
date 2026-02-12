@@ -222,7 +222,6 @@ Last updated: [date]
 | ship-synthesize | Knowledge compaction |
 | orc-interview | Reusable interview primitive |
 | orc-architecture | Maintain this file |
-| imp-* | IMP workflow skills |
 | ... | |
 
 ### Database (internal/db/, schema/)

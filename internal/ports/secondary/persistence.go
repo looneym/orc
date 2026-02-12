@@ -126,7 +126,7 @@ type ShipmentRecord struct {
 	CommissionID        string
 	Title               string
 	Description         string // Empty string means null
-	Status              string // draft, exploring, specced, tasked, ready_for_imp, implementing, auto_implementing, complete
+	Status              string // draft, ready, in-progress, closed
 	AssignedWorkbenchID string // Empty string means null
 	RepoID              string // Empty string means null - FK to repos table
 	Branch              string // Empty string means null - owned branch (e.g., ml/SHIP-001-feature-name)
@@ -399,46 +399,6 @@ type TomeRecord struct {
 
 // TomeFilters contains filter options for querying tomes.
 type TomeFilters struct {
-	CommissionID string
-	Status       string
-}
-
-// OperationRepository defines the secondary port for operation persistence.
-// Operations are minimal entities with no Delete operation.
-type OperationRepository interface {
-	// Create persists a new operation.
-	Create(ctx context.Context, operation *OperationRecord) error
-
-	// GetByID retrieves an operation by its ID.
-	GetByID(ctx context.Context, id string) (*OperationRecord, error)
-
-	// List retrieves operations matching the given filters.
-	List(ctx context.Context, filters OperationFilters) ([]*OperationRecord, error)
-
-	// UpdateStatus updates the status and optionally completed_at timestamp.
-	UpdateStatus(ctx context.Context, id, status string, setCompleted bool) error
-
-	// GetNextID returns the next available operation ID.
-	GetNextID(ctx context.Context) (string, error)
-
-	// CommissionExists checks if a commission exists (for validation).
-	CommissionExists(ctx context.Context, commissionID string) (bool, error)
-}
-
-// OperationRecord represents an operation as stored in persistence.
-type OperationRecord struct {
-	ID           string
-	CommissionID string
-	Title        string
-	Description  string // Empty string means null
-	Status       string
-	CreatedAt    string
-	UpdatedAt    string
-	CompletedAt  string // Empty string means null
-}
-
-// OperationFilters contains filter options for querying operations.
-type OperationFilters struct {
 	CommissionID string
 	Status       string
 }

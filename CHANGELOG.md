@@ -26,6 +26,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+- Operation entity: table, indexes, model, core guards, service, tests, repo, port, wire
+- `shipments.priority` column (unused)
+- `tasks.context_ref` column (unused)
+- `internal/db/migrations.go` (4464 lines of frozen legacy migrations)
+- Legacy migration machinery from InitSchema (schema_version check, old table detection, RunMigrations call)
 - Approval entity: table, indexes, repo, service, tests, CLI command, port, wire
 - Escalation entity: table, indexes, repo, service, tests, CLI command, port, wire
 - Handoff entity: table, index, repo, service, tests, CLI command, port, model, wire
