@@ -16,15 +16,23 @@ It leans into Claude Code's features wherever possible and provides a "batteries
 
 ## 🎭 The Cast
 
+> See [docs/schema.md](docs/schema.md) for the full glossary.
+
+### Where
+
 **🏭 Orc** is the factory itself — the CLI and its SQLite ledger. It tracks commissions, shipments, tasks, and notes. It provisions workbenches, deploys skills, and remembers everything across sessions. Orc is the source of truth.
 
 **🔨 Workbenches** are where the work happens. Each one is a git worktree — an isolated copy of the repository where a goblin and its imps can make changes without disturbing other workbenches.
 
 **🏗️ Workshops** are collections of workbenches organized around a project or theme. One commission might have several workshops, each focused on different areas of work.
 
+### Who
+
 **👺 Goblins** are coordinators — the human's long-running workbench pane. A goblin manages the big picture: planning shipments, synthesizing ideas, and keeping the ledger honest. Think of them as your foreman on the factory floor.
 
 **👹 Imps** are disposable workers — spawned by Claude Teams to execute tasks in parallel. Give them a task, they hammer it out and report back. Swarm a shipment with three imps and watch the work fly.
+
+### What
 
 **📜 Commissions** are the grand undertakings that give work context and purpose.
 
@@ -122,6 +130,8 @@ Select theme to explore (1-3), or [a]ll:
 An interview walks through each theme — resolving open questions, recording decisions, discarding what's stale. What comes out the other side is a clean summary note.
 
 ### 🗺️ Plan
+
+You are a very busy and important person who can't be expected to pay attention to every little detail. Orc uses the [C4 model](https://c4model.com/) to help you reason about your codebase while mostly thinking about containers and components, leaving imps to worry about code (mostly). This approach rewards clear planning, and works well with clear coding practices, automated tests, and checkpointing.
 
 <p align="center">
 <img src="assets/ship-plan.png" width="380"><br>
