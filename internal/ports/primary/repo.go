@@ -27,6 +27,9 @@ type RepoService interface {
 
 	// DeleteRepo hard-deletes a repository.
 	DeleteRepo(ctx context.Context, repoID string) error
+
+	// ForkRepo configures a repository as a fork, swapping origin and adding upstream.
+	ForkRepo(ctx context.Context, req ForkRepoRequest) (*ForkRepoResponse, error)
 }
 
 // CreateRepoRequest contains parameters for creating a repository.
@@ -65,6 +68,19 @@ type Repo struct {
 	Status         string
 	CreatedAt      string
 	UpdatedAt      string
+}
+
+// ForkRepoRequest contains parameters for forking a repository.
+type ForkRepoRequest struct {
+	RepoID  string
+	ForkURL string // The new fork URL (becomes the repo's origin URL)
+}
+
+// ForkRepoResponse contains the result of forking a repository.
+type ForkRepoResponse struct {
+	RepoID      string
+	UpstreamURL string // The original URL (now upstream)
+	ForkURL     string // The new fork URL (now origin)
 }
 
 // RepoFilters contains filter options for listing repositories.

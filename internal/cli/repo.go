@@ -26,6 +26,7 @@ func RepoCmd() *cobra.Command {
 	cmd.AddCommand(repoArchiveCmd())
 	cmd.AddCommand(repoRestoreCmd())
 	cmd.AddCommand(repoDeleteCmd())
+	cmd.AddCommand(repoForkCmd())
 
 	return cmd
 }
@@ -156,6 +157,10 @@ func repoShowCmd() *cobra.Command {
 			fmt.Printf("  Status: %s\n", repo.Status)
 			if repo.URL != "" {
 				fmt.Printf("  URL: %s\n", repo.URL)
+			}
+			if repo.UpstreamURL != "" {
+				fmt.Printf("  Upstream URL: %s\n", repo.UpstreamURL)
+				fmt.Printf("  Upstream Branch: %s\n", repo.UpstreamBranch)
 			}
 			if repo.LocalPath != "" {
 				fmt.Printf("  Local Path: %s\n", repo.LocalPath)
@@ -289,6 +294,46 @@ Examples:
 	}
 
 	cmd.Flags().BoolVarP(&force, "force", "f", false, "Force delete (reserved for future use)")
+
+	return cmd
+}
+
+func repoForkCmd() *cobra.Command {
+	var forkURL string
+
+	cmd := &cobra.Command{
+		Use:   "fork [repo-id]",
+		Short: "Configure a repository as a fork",
+		Long: `Configure a repository as a fork of an upstream repository.
+
+This swaps the current origin URL with the fork URL and sets up
+the upstream remote pointing to the original repository.
+
+Examples:
+  orc repo fork REPO-001 --url git@github.com:me/my-fork.git`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			ctx := NewContext()
+			repoID := args[0]
+
+			resp, err := wire.RepoService().ForkRepo(ctx, primary.ForkRepoRequest{
+				RepoID:  repoID,
+				ForkURL: forkURL,
+			})
+			if err != nil {
+				return fmt.Errorf("failed to fork repository: %w", err)
+			}
+
+			fmt.Printf("✓ Forked repository %s\n", resp.RepoID)
+			fmt.Printf("  Origin:   %s\n", resp.ForkURL)
+			fmt.Printf("  Upstream: %s\n", resp.UpstreamURL)
+
+			return nil
+		},
+	}
+
+	cmd.Flags().StringVarP(&forkURL, "url", "u", "", "Fork URL (becomes new origin)")
+	_ = cmd.MarkFlagRequired("url")
 
 	return cmd
 }
