@@ -27,7 +27,7 @@ ls ~/.claude/skills/
 Filter to ORC prefixes only:
 - `ship-*` - Shipment workflow
 - `orc-*` - Utilities
-- `imp-*` - Implementation helpers (e.g., imp-escalate)
+- `imp-*` - Implementation helpers
 
 ### Step 2: Check for Argument
 
@@ -51,7 +51,7 @@ ORC Skill Categories
 
 **orc-*** - Utilities
   General ORC commands and maintenance
-  Examples: /orc-interview, /orc-ping, /orc-help
+  Examples: /orc-interview, /orc-help
 
 Want details on a category? Say "tell me about ship" or run /orc-help ship
 ```
@@ -83,9 +83,6 @@ Ship Skills (Shipment Workflow)
 
 /ship-plan
   C2/C3 engineering review that creates tasks
-
-/ship-queue
-  View and manage the shipyard queue
 
 /ship-deploy
   Merge shipment branch to master

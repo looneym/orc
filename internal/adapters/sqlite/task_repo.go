@@ -78,7 +78,7 @@ const taskSelectCols = "id, shipment_id, commission_id, tome_id, conclave_id, ti
 
 // Create persists a new task.
 func (r *TaskRepository) Create(ctx context.Context, task *secondary.TaskRecord) error {
-	var shipmentID, desc, taskType sql.NullString
+	var shipmentID, desc, taskType, dependsOn sql.NullString
 
 	if task.ShipmentID != "" {
 		shipmentID = sql.NullString{String: task.ShipmentID, Valid: true}
@@ -89,6 +89,9 @@ func (r *TaskRepository) Create(ctx context.Context, task *secondary.TaskRecord)
 	if task.Type != "" {
 		taskType = sql.NullString{String: task.Type, Valid: true}
 	}
+	if task.DependsOn != "" {
+		dependsOn = sql.NullString{String: task.DependsOn, Valid: true}
+	}
 
 	status := task.Status
 	if status == "" {
@@ -96,8 +99,8 @@ func (r *TaskRepository) Create(ctx context.Context, task *secondary.TaskRecord)
 	}
 
 	_, err := r.db.ExecContext(ctx,
-		"INSERT INTO tasks (id, shipment_id, commission_id, title, description, type, status) VALUES (?, ?, ?, ?, ?, ?, ?)",
-		task.ID, shipmentID, task.CommissionID, task.Title, desc, taskType, status,
+		"INSERT INTO tasks (id, shipment_id, commission_id, title, description, type, status, depends_on) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+		task.ID, shipmentID, task.CommissionID, task.Title, desc, taskType, status, dependsOn,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create task: %w", err)

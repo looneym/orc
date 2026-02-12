@@ -90,25 +90,12 @@ func (s *SummaryServiceImpl) GetCommissionSummary(ctx context.Context, req prima
 		shipmentSummaries = append(shipmentSummaries, *shipSummary)
 	}
 
-	// Build flat tome list
-	var tomeSummaries []primary.TomeSummary
-	for _, tome := range allTomes {
-		if tome.Status == "closed" {
-			addDebug(fmt.Sprintf("Hidden: %s (%s) - status is closed", tome.ID, tome.Title))
-			continue
-		}
-		expandNotes := tome.ID == req.FocusID
-		tomeSummary, err := s.buildTomeSummary(ctx, tome, req.FocusID, expandNotes)
-		if err != nil {
-			continue // Skip on error
-		}
-		tomeSummaries = append(tomeSummaries, *tomeSummary)
-	}
-
-	// Determine if this is the focused commission
+	// Determine if this is the focused commission (needed before tome expansion)
 	isFocusedCommission := false
+	focusIsCommission := req.FocusID == commission.ID
+	focusIsShipment := false
 	if req.FocusID != "" {
-		if req.FocusID == commission.ID {
+		if focusIsCommission {
 			isFocusedCommission = true
 		}
 		for _, tome := range allTomes {
@@ -120,9 +107,25 @@ func (s *SummaryServiceImpl) GetCommissionSummary(ctx context.Context, req prima
 		for _, ship := range allShipments {
 			if ship.ID == req.FocusID {
 				isFocusedCommission = true
+				focusIsShipment = true
 				break
 			}
 		}
+	}
+
+	// Build flat tome list
+	var tomeSummaries []primary.TomeSummary
+	for _, tome := range allTomes {
+		if tome.Status == "closed" {
+			addDebug(fmt.Sprintf("Hidden: %s (%s) - status is closed", tome.ID, tome.Title))
+			continue
+		}
+		expandNotes := tome.ID == req.FocusID || focusIsCommission || focusIsShipment
+		tomeSummary, err := s.buildTomeSummary(ctx, tome, req.FocusID, expandNotes)
+		if err != nil {
+			continue // Skip on error
+		}
+		tomeSummaries = append(tomeSummaries, *tomeSummary)
 	}
 
 	// Fetch commission-level notes (notes with no container)

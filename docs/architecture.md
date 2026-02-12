@@ -35,7 +35,8 @@ ORC (Orchestrator) is a commission coordination system for managing complex, mul
 |-----------|----------|-------------|
 | CLI | cmd/orc/, internal/ | ORC command-line tool binary |
 | Database | internal/db/, schema/ | SQLite ledger with Atlas migrations |
-| Skills | glue/skills/ | Claude Code skill definitions |
+| Skills (global) | glue/skills/ | Claude Code skill definitions (deployed via glue) |
+| Skills (repo-local) | .claude/skills/ | Repo-specific skills (not deployed globally) |
 | Hooks | glue/hooks/ | Git and Claude Code hooks |
 | Config | .orc/ | Runtime configuration per workspace |
 | Documentation | *.md, docs/ | Project and workflow documentation |
@@ -58,7 +59,9 @@ ORC (Orchestrator) is a commission coordination system for managing complex, mul
 | DB | internal/db/ | Database access layer |
 | TMux | internal/tmux/ | TMux integration |
 
-### Skills (glue/skills/)
+### Global Skills (glue/skills/)
+
+Skills deployed globally via the glue system.
 
 **Shipment Workflow:**
 | Skill | Description |
@@ -66,11 +69,10 @@ ORC (Orchestrator) is a commission coordination system for managing complex, mul
 | ship-new | Create new shipments |
 | ship-synthesize | Knowledge compaction -> summary note |
 | ship-plan | C2/C3 engineering review -> tasks |
-| ship-queue | View shipyard queue |
 | ship-complete | Complete shipments |
+| ship-run | Bridge ship-plan -> Teams execution |
 | ship-deploy | Deploy shipments |
 | ship-freshness | Rebase and validate tasks/notes |
-| release | Cut semantic version releases |
 
 **Setup & Admin:**
 | Skill | Description |
@@ -87,16 +89,7 @@ ORC (Orchestrator) is a commission coordination system for managing complex, mul
 |-------|-------------|
 | orc-first-run | Interactive first-run walkthrough |
 | orc-interview | Reusable interview primitive |
-| orc-architecture | Maintain ARCHITECTURE.md |
 | orc-help | Orientation to ORC skills |
-| orc-ping | Verify ORC is working |
-| orc-self-test | Integration self-testing |
-| bootstrap-exercise | Manual test for first-run flow |
-
-**Agent Integration:**
-| Skill | Description |
-|-------|-------------|
-| imp-escalate | Escalate to coordinator when blocked |
 
 **Exploration:**
 | Skill | Description |
@@ -110,8 +103,12 @@ Skills specific to this repository (not deployed globally):
 
 | Skill | Description |
 |-------|-------------|
+| bootstrap-exercise | Manual test for first-run flow |
 | bootstrap-test | Test make bootstrap in a fresh macOS VM using Tart |
 | docs-doctor | Validate ORC documentation against code reality |
+| orc-architecture | Maintain ARCHITECTURE.md |
+| orc-self-test | Integration self-testing |
+| release | Cut semantic version releases |
 
 ### Database (internal/db/, schema/)
 

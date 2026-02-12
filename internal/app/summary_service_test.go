@@ -861,5 +861,100 @@ func TestSummaryService_GetCommissionSummary_TomeNoteCount(t *testing.T) {
 	}
 }
 
+func TestSummaryService_GetCommissionSummary_TomeExpansion(t *testing.T) {
+	tests := []struct {
+		name             string
+		focusID          string
+		wantNotesLen     int // number of note summaries in TOME-001
+		wantTomeExpanded bool
+	}{
+		{
+			name:             "no focus does not expand tome notes",
+			focusID:          "",
+			wantNotesLen:     0,
+			wantTomeExpanded: false,
+		},
+		{
+			name:             "focus on tome expands its notes",
+			focusID:          "TOME-001",
+			wantNotesLen:     2,
+			wantTomeExpanded: true,
+		},
+		{
+			name:             "focus on commission expands tome notes",
+			focusID:          "COMM-001",
+			wantNotesLen:     2,
+			wantTomeExpanded: false, // tome itself not focused, but notes expanded
+		},
+		{
+			name:             "focus on shipment expands tome notes",
+			focusID:          "SHIP-001",
+			wantNotesLen:     2,
+			wantTomeExpanded: false, // tome itself not focused, but notes expanded
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			commissionSvc := newMockCommissionServiceForSummary()
+			tomeSvc := newMockTomeServiceForSummary()
+			shipmentSvc := newMockShipmentServiceForSummary()
+			taskSvc := newMockTaskServiceForSummary()
+			noteSvc := newMockNoteServiceForSummary()
+			workbenchSvc := newMockWorkbenchServiceForSummary()
+
+			commissionSvc.commissions["COMM-001"] = &primary.Commission{
+				ID:     "COMM-001",
+				Title:  "Test Commission",
+				Status: "active",
+			}
+
+			tomeSvc.tomes["TOME-001"] = &primary.Tome{
+				ID:           "TOME-001",
+				CommissionID: "COMM-001",
+				Title:        "Design Notes",
+				Status:       "open",
+			}
+
+			tomeSvc.tomeNotes["TOME-001"] = []*primary.Note{
+				{ID: "NOTE-001", Title: "Note 1", Status: "open"},
+				{ID: "NOTE-002", Title: "Note 2", Status: "open"},
+				{ID: "NOTE-003", Title: "Note 3", Status: "closed"},
+			}
+
+			shipmentSvc.shipments["SHIP-001"] = &primary.Shipment{
+				ID:           "SHIP-001",
+				CommissionID: "COMM-001",
+				Title:        "Feature Work",
+				Status:       "active",
+			}
+
+			svc := NewSummaryService(commissionSvc, tomeSvc, shipmentSvc, taskSvc, noteSvc, workbenchSvc, nil, nil, nil)
+
+			req := primary.SummaryRequest{
+				CommissionID: "COMM-001",
+				FocusID:      tt.focusID,
+			}
+
+			summary, err := svc.GetCommissionSummary(context.Background(), req)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if len(summary.Tomes) != 1 {
+				t.Fatalf("expected 1 tome, got %d", len(summary.Tomes))
+			}
+
+			tome := summary.Tomes[0]
+			if len(tome.Notes) != tt.wantNotesLen {
+				t.Errorf("expected %d expanded notes, got %d", tt.wantNotesLen, len(tome.Notes))
+			}
+			if tome.IsFocused != tt.wantTomeExpanded {
+				t.Errorf("expected IsFocused=%v, got %v", tt.wantTomeExpanded, tome.IsFocused)
+			}
+		})
+	}
+}
+
 // Ensure interface compliance
 var _ primary.SummaryService = (*SummaryServiceImpl)(nil)

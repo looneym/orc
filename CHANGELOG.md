@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Shipment lifecycle simplified to 4 statuses: draft → ready → in-progress → closed (all transitions manual)
 - Task lifecycle simplified to 4 statuses: open → in-progress → closed (blocked as lateral state)
 - `orc connect` retains `--role` flag but removes place-based autodetection
+- **Skill reorganization**: Dev-only skills (bootstrap-exercise, release, orc-self-test, orc-architecture) moved from glue/ to .claude/skills/ (repo-local)
+- ship-plan now includes dependency analysis guidance for task parallelism
+- Summary display: tomes now expand when their parent entity (shipment or commission) is focused
+- `deploy-glue` Makefile target now cleans orphan skill copies from ~/.claude/skills/
 
 ### Removed
 
@@ -26,9 +30,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CLI commands: shipment auto/manual/ready/should-continue, shipment deploy/verify
 - Skills deleted: imp-poll, imp-start, imp-implement, imp-auto, imp-nudge, imp-respawn, imp-rec, imp-plan-create, imp-plan-submit, goblin-escalation-receive, watchdog-monitor
 - Watchdog state model removed: kennel, patrol, dogbed, stuck, check entities and all related CLI commands, skills, and documentation
+- Skills deleted: orc-ping, ship-queue, imp-escalate
 
 ### Added
 
+- `--depends-on` flag on `orc task create` for expressing task dependency relationships
+- `ship-run` skill: bridges ship-plan → Claude Teams execution (dependency graph, team shape proposal, preflight checks, context injection)
 - `orc backfill lifecycle-statuses` command for migrating existing data to new status values
 - `closed_reason` column on shipments (nullable)
 

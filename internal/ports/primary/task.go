@@ -63,7 +63,8 @@ type CreateTaskRequest struct {
 	CommissionID string
 	Title        string
 	Description  string
-	Type         string // Optional: research, implementation, fix, documentation, maintenance
+	Type         string   // Optional: research, implementation, fix, documentation, maintenance
+	DependsOn    []string // Optional: task IDs this task depends on
 }
 
 // CreateTaskResponse contains the result of creating a task.
@@ -106,6 +107,7 @@ type Task struct {
 	Priority            string
 	AssignedWorkbenchID string
 	Pinned              bool
+	DependsOn           []string // Task IDs this task depends on
 	CreatedAt           string
 	UpdatedAt           string
 	ClaimedAt           string

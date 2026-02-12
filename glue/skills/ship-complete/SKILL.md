@@ -85,7 +85,6 @@ Shipment closed:
 
 Next steps:
   orc summary              - View remaining work
-  /ship-queue claim        - Claim next from queue
   /ship-new "Title"        - Start new shipment
 ```
 
@@ -111,5 +110,4 @@ Agent: Shipment closed:
 
        Next steps:
          orc summary - View remaining work
-         /ship-queue claim - Claim next from queue
 ```

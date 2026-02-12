@@ -318,6 +318,15 @@ deploy-glue:
 		cp -r "$$dir" ~/.claude/skills/$$name; \
 	done
 	@echo "✓ Skills deployed to ~/.claude/skills/"
+	@echo "Checking for orphan skills..."
+	@for deployed in ~/.claude/skills/*/; do \
+		[ -d "$$deployed" ] || continue; \
+		name=$$(basename "$$deployed"); \
+		if [ ! -d "glue/skills/$$name" ]; then \
+			echo "  ✗ Removing orphan: $$name"; \
+			rm -rf "$$deployed"; \
+		fi; \
+	done
 	@if [ -d "glue/hooks" ] && [ "$$(ls -A glue/hooks/*.sh 2>/dev/null)" ]; then \
 		echo "Deploying Claude Code hook scripts..."; \
 		for hook in glue/hooks/*.sh; do \

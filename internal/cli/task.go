@@ -3,6 +3,7 @@ package cli
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -28,6 +29,7 @@ var taskCreateCmd = &cobra.Command{
 		commissionID, _ := cmd.Flags().GetString("commission")
 		description, _ := cmd.Flags().GetString("description")
 		taskType, _ := cmd.Flags().GetString("type")
+		dependsOn, _ := cmd.Flags().GetStringSlice("depends-on")
 
 		// Validate entity IDs
 		if err := validateEntityID(shipmentID, "shipment"); err != nil {
@@ -48,6 +50,7 @@ var taskCreateCmd = &cobra.Command{
 			Title:        title,
 			Description:  description,
 			Type:         taskType,
+			DependsOn:    dependsOn,
 		})
 		if err != nil {
 			return fmt.Errorf("failed to create task: %w", err)
@@ -59,6 +62,9 @@ var taskCreateCmd = &cobra.Command{
 			fmt.Printf("  Under shipment: %s\n", task.ShipmentID)
 		}
 		fmt.Printf("  Commission: %s\n", task.CommissionID)
+		if len(task.DependsOn) > 0 {
+			fmt.Printf("  Depends on: %s\n", strings.Join(task.DependsOn, ", "))
+		}
 		return nil
 	},
 }
@@ -135,6 +141,9 @@ var taskListCmd = &cobra.Command{
 			if task.AssignedWorkbenchID != "" {
 				fmt.Printf("   Workbench: %s\n", task.AssignedWorkbenchID)
 			}
+			if len(task.DependsOn) > 0 {
+				fmt.Printf("   Depends on: %s\n", strings.Join(task.DependsOn, ", "))
+			}
 			fmt.Println()
 		}
 		return nil
@@ -176,6 +185,9 @@ var taskShowCmd = &cobra.Command{
 		}
 		if task.Priority != "" {
 			fmt.Printf("Priority: %s\n", task.Priority)
+		}
+		if len(task.DependsOn) > 0 {
+			fmt.Printf("Depends on: %s\n", strings.Join(task.DependsOn, ", "))
 		}
 		if task.Pinned {
 			fmt.Printf("Pinned: yes\n")
@@ -531,6 +543,7 @@ func init() {
 	taskCreateCmd.Flags().StringP("commission", "c", "", "Commission ID (defaults to context)")
 	taskCreateCmd.Flags().StringP("description", "d", "", "Task description")
 	taskCreateCmd.Flags().String("type", "", "Task type (research, implementation, fix, documentation, maintenance)")
+	taskCreateCmd.Flags().StringSlice("depends-on", nil, "Task IDs this task depends on (comma-separated or repeated)")
 
 	// task list flags
 	taskListCmd.Flags().String("shipment", "", "Filter by shipment")

@@ -354,6 +354,58 @@ func TestCreateTask_CommissionNotFound(t *testing.T) {
 	}
 }
 
+func TestCreateTask_WithDependsOn(t *testing.T) {
+	service, taskRepo, _ := newTestTaskService()
+	ctx := context.Background()
+
+	// Pre-create dependency tasks
+	taskRepo.tasks["TASK-DEP-001"] = &secondary.TaskRecord{
+		ID:           "TASK-DEP-001",
+		CommissionID: "COMM-001",
+		Title:        "Dependency 1",
+		Status:       "open",
+	}
+	taskRepo.tasks["TASK-DEP-002"] = &secondary.TaskRecord{
+		ID:           "TASK-DEP-002",
+		CommissionID: "COMM-001",
+		Title:        "Dependency 2",
+		Status:       "open",
+	}
+
+	resp, err := service.CreateTask(ctx, primary.CreateTaskRequest{
+		CommissionID: "COMM-001",
+		Title:        "Dependent Task",
+		DependsOn:    []string{"TASK-DEP-001", "TASK-DEP-002"},
+	})
+
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if len(resp.Task.DependsOn) != 2 {
+		t.Errorf("expected 2 dependencies, got %d", len(resp.Task.DependsOn))
+	}
+	// Verify the record has serialized JSON
+	record := taskRepo.tasks[resp.TaskID]
+	if record.DependsOn == "" {
+		t.Error("expected DependsOn to be set on record")
+	}
+}
+
+func TestCreateTask_DependsOnNotFound(t *testing.T) {
+	service, _, _ := newTestTaskService()
+	ctx := context.Background()
+
+	_, err := service.CreateTask(ctx, primary.CreateTaskRequest{
+		CommissionID: "COMM-001",
+		Title:        "Dependent Task",
+		DependsOn:    []string{"TASK-NONEXISTENT"},
+	})
+
+	if err == nil {
+		t.Fatal("expected error for non-existent dependency task, got nil")
+	}
+}
+
 func TestCreateTask_ShipmentNotFound(t *testing.T) {
 	service, taskRepo, _ := newTestTaskService()
 	ctx := context.Background()

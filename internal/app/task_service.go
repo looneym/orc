@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/example/orc/internal/core/task"
@@ -51,10 +52,28 @@ func (s *TaskServiceImpl) CreateTask(ctx context.Context, req primary.CreateTask
 		}
 	}
 
+	// Validate depends_on task IDs exist
+	for _, depID := range req.DependsOn {
+		_, err := s.taskRepo.GetByID(ctx, depID)
+		if err != nil {
+			return nil, fmt.Errorf("dependency task %s not found", depID)
+		}
+	}
+
 	// Get next ID
 	nextID, err := s.taskRepo.GetNextID(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate task ID: %w", err)
+	}
+
+	// Serialize depends_on as JSON
+	var dependsOnJSON string
+	if len(req.DependsOn) > 0 {
+		data, err := json.Marshal(req.DependsOn)
+		if err != nil {
+			return nil, fmt.Errorf("failed to serialize depends_on: %w", err)
+		}
+		dependsOnJSON = string(data)
 	}
 
 	// Create record
@@ -66,6 +85,7 @@ func (s *TaskServiceImpl) CreateTask(ctx context.Context, req primary.CreateTask
 		Description:  req.Description,
 		Type:         req.Type,
 		Status:       "open",
+		DependsOn:    dependsOnJSON,
 	}
 
 	if err := s.taskRepo.Create(ctx, record); err != nil {

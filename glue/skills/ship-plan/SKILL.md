@@ -269,6 +269,7 @@ Proposed tasks for SHIP-xxx:
 2. Create ship-synthesize skill
    Containers: Skills
    Components: glue/skills/ship-synthesize/
+   Depends on: #1 (uses orc-interview as a primitive)
    Description: Knowledge compaction skill...
 
 3. Update documentation
@@ -279,12 +280,28 @@ Proposed tasks for SHIP-xxx:
 Create these tasks? [y/n/edit]
 ```
 
+### Dependency Analysis
+
+Before creating tasks, analyze which tasks depend on others:
+
+- **Sequential**: Tasks touching the same compilation units or where one consumes another's output must have `depends_on` set. Example: a skill that imports another skill being created in the same shipment.
+- **Independent**: Tasks touching different directories or components with no shared state can run in parallel. Leave `depends_on` empty.
+- **Tasks with no depends_on are implicitly parallelizable** by IMP workers.
+
+When in doubt, prefer independence. Only add dependencies when one task genuinely cannot start until another completes.
+
 ### Task Creation
 
 For each approved task:
 ```bash
 orc task create "<Title>" \
   --shipment SHIP-xxx \
+  --description "<Description with C2/C3 scope>"
+
+# If task depends on others, specify dependencies:
+orc task create "<Title>" \
+  --shipment SHIP-xxx \
+  --depends-on TASK-001 --depends-on TASK-002 \
   --description "<Description with C2/C3 scope>"
 ```
 
@@ -312,6 +329,8 @@ Ready for implementation:
 - **Check for development docs** (CLAUDE.md, docs/) for existing patterns
 - **Tasks should be self-contained** - IMP can complete without questions
 - **Include C2/C3 scope** in every task description
+- **Set depends_on for sequential tasks** - tasks sharing compilation units or consuming each other's output
+- **Leave depends_on empty for parallel tasks** - tasks touching different components
 - **Don't over-decompose** - 3-10 tasks typical
 - **Validate assumptions** - don't pass uncertainty to IMPs
 
@@ -358,6 +377,11 @@ Proposed tasks for SHIP-276:
 1. Create orc-interview skill
    Containers: Skills
    Components: glue/skills/orc-interview/
+
+2. Create ship-synthesize skill
+   Containers: Skills
+   Components: glue/skills/ship-synthesize/
+   Depends on: #1 (uses orc-interview primitive)
    ...
 
 Create these 8 tasks? [y/n/edit]

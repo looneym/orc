@@ -617,6 +617,72 @@ func TestTaskRepository_ListByTag(t *testing.T) {
 	}
 }
 
+func TestTaskRepository_Create_WithDependsOn(t *testing.T) {
+	db := setupTaskTestDB(t)
+	repo := sqlite.NewTaskRepository(db, nil)
+	ctx := context.Background()
+
+	// Create dependency tasks first
+	dep1 := &secondary.TaskRecord{
+		ID:           "TASK-001",
+		CommissionID: "COMM-001",
+		Title:        "Dependency 1",
+	}
+	dep2 := &secondary.TaskRecord{
+		ID:           "TASK-002",
+		CommissionID: "COMM-001",
+		Title:        "Dependency 2",
+	}
+	if err := repo.Create(ctx, dep1); err != nil {
+		t.Fatalf("Create dep1 failed: %v", err)
+	}
+	if err := repo.Create(ctx, dep2); err != nil {
+		t.Fatalf("Create dep2 failed: %v", err)
+	}
+
+	// Create task with depends_on
+	task := &secondary.TaskRecord{
+		ID:           "TASK-003",
+		CommissionID: "COMM-001",
+		Title:        "Dependent Task",
+		DependsOn:    `["TASK-001","TASK-002"]`,
+	}
+	if err := repo.Create(ctx, task); err != nil {
+		t.Fatalf("Create failed: %v", err)
+	}
+
+	retrieved, err := repo.GetByID(ctx, "TASK-003")
+	if err != nil {
+		t.Fatalf("GetByID failed: %v", err)
+	}
+	if retrieved.DependsOn != `["TASK-001","TASK-002"]` {
+		t.Errorf("expected depends_on '[\"TASK-001\",\"TASK-002\"]', got '%s'", retrieved.DependsOn)
+	}
+}
+
+func TestTaskRepository_Create_WithoutDependsOn(t *testing.T) {
+	db := setupTaskTestDB(t)
+	repo := sqlite.NewTaskRepository(db, nil)
+	ctx := context.Background()
+
+	task := &secondary.TaskRecord{
+		ID:           "TASK-001",
+		CommissionID: "COMM-001",
+		Title:        "No Dependencies",
+	}
+	if err := repo.Create(ctx, task); err != nil {
+		t.Fatalf("Create failed: %v", err)
+	}
+
+	retrieved, err := repo.GetByID(ctx, "TASK-001")
+	if err != nil {
+		t.Fatalf("GetByID failed: %v", err)
+	}
+	if retrieved.DependsOn != "" {
+		t.Errorf("expected empty depends_on, got '%s'", retrieved.DependsOn)
+	}
+}
+
 func TestTaskRepository_GetNextEntityTagID(t *testing.T) {
 	db := setupTaskTestDB(t)
 	repo := sqlite.NewTaskRepository(db, nil)

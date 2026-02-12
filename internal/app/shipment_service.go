@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -303,6 +304,11 @@ func (s *ShipmentServiceImpl) recordToShipment(r *secondary.ShipmentRecord) *pri
 
 // recordToTask converts a TaskRecord to a Task (shared helper).
 func recordToTask(r *secondary.TaskRecord) *primary.Task {
+	var dependsOn []string
+	if r.DependsOn != "" {
+		_ = json.Unmarshal([]byte(r.DependsOn), &dependsOn)
+	}
+
 	return &primary.Task{
 		ID:                  r.ID,
 		ShipmentID:          r.ShipmentID,
@@ -315,6 +321,7 @@ func recordToTask(r *secondary.TaskRecord) *primary.Task {
 		Priority:            r.Priority,
 		AssignedWorkbenchID: r.AssignedWorkbenchID,
 		Pinned:              r.Pinned,
+		DependsOn:           dependsOn,
 		CreatedAt:           r.CreatedAt,
 		UpdatedAt:           r.UpdatedAt,
 		ClaimedAt:           r.ClaimedAt,
