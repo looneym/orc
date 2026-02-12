@@ -31,7 +31,7 @@ make bootstrap
 
 **Note:** ORC expects to live at `~/src/orc`. The `orc doctor` command validates this location, and some Make targets enforce it.
 
-Then run `orc bootstrap` for an interactive walkthrough.
+Then run `orc hello` for an interactive walkthrough.
 
 → See [docs/getting-started.md](docs/getting-started.md) for detailed setup and first-run guide.
 

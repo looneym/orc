@@ -192,7 +192,7 @@ orc summary                    # Hierarchical view with pinned items
 
 **Key Commands:**
 ```bash
-orc workbench create [name] --repos main-app --workshop WORK-001
+orc workbench create --workshop WORK-001 --repo-id REPO-001
 orc workbench list [--workshop WORK-XXX]
 orc workbench show BENCH-XXX
 orc workbench rename BENCH-XXX new-name
@@ -389,7 +389,7 @@ orc init    # Creates ~/.orc/ directory and initializes database
 ```bash
 orc commission create "My Project" --description "Project description"
 orc workshop create my-workshop --commission COMM-001
-orc workbench create project-main --repos my-repo --workshop WORK-001
+orc workbench create --workshop WORK-001 --repo-id REPO-001
 orc shipment create "Initial setup" --commission COMM-001
 orc task create "Setup repository" --shipment SHIP-001
 ```

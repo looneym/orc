@@ -53,12 +53,12 @@ For development dependencies (VM testing, schema migrations):
 make bootstrap-dev
 ```
 
-**What you have after this phase:** A working `orc` binary, database, and infrastructure — but no commissions, workshops, or shipments yet. The install phase prints: *"Next step: Run 'orc bootstrap' to start the first-run experience"*.
+**What you have after this phase:** A working `orc` binary, database, and infrastructure — but no commissions, workshops, or shipments yet. The install phase prints: *"Next step: Run 'orc hello' to start the first-run experience"*.
 
-## Phase 3: Onboard (`orc bootstrap`)
+## Phase 3: Onboard (`orc hello`)
 
 ```bash
-orc bootstrap
+orc hello
 ```
 
 This launches an interactive Claude Code session with the `/orc-first-run` skill. Where `make bootstrap` set up the machine, this phase sets up your workflow — creating the entities you need to start working:
@@ -74,7 +74,7 @@ The skill is adaptive — it checks what already exists before creating anything
 
 ### Manual Alternative
 
-If you prefer to set up your workflow manually instead of running `orc bootstrap` (note: Phase 2 already created FACT-001 and REPO-001):
+If you prefer to set up your workflow manually instead of running `orc hello` (note: Phase 2 already created FACT-001 and REPO-001):
 
 ```bash
 # Create a commission

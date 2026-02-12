@@ -13,7 +13,7 @@ ORC has four integration-level validation skills plus an environment health chec
 
 1. **Preflight** — Runs `orc doctor` to validate environment health. Detects whether Tart is available (needed for bootstrap-test).
 2. **Confirmation** — Presents a summary of which checks will run and asks for human confirmation before proceeding.
-3. **Parallel execution** — Spawns a team of agents that run the individual checks concurrently (infra check, bootstrap-test if Tart available, bootstrap-exercise, docs-doctor).
+3. **Parallel execution** — Spawns a team of agents that run the individual checks concurrently (orc-tmux-check, make-bootstrap-check if Tart available, orc-hello-check, docs-doctor).
 4. **Summary report** — Collects results from all teammates and presents a unified pass/fail summary.
 
 ### When to Use
@@ -84,7 +84,7 @@ Tests `make bootstrap` on a completely fresh system:
 | REPO-001 | ORC repo registered with correct path |
 | Basic CLI smoke | Commission create, workshop create, summary, doctor |
 
-**Not covered:** `orc bootstrap` command (Phase 3), first-run skill, shipment/task workflows.
+**Not covered:** `orc hello` command (Phase 3), first-run skill, shipment/task workflows.
 
 #### Requirements
 
@@ -137,19 +137,19 @@ tart stop orc-bootstrap-test-XXXX
 tart delete orc-bootstrap-test-XXXX
 ```
 
-### bootstrap-exercise
+### hello-exercise
 
-**Skill location:** `.claude/skills/bootstrap-exercise/`
-**Invocation:** `/bootstrap-exercise`
+**Skill location:** `.claude/skills/hello-exercise/`
+**Invocation:** `/hello-exercise`
 **Automated:** Semi-manual (agent creates test factory, human walks through first-run)
 
 > **Note:** This check is now run as a teammate inside `/self-test`, which automates what was previously a semi-manual exercise. The standalone skill still works but the runner is the preferred entry point.
 
-Tests the `orc bootstrap` → `/orc-first-run` skill chain on the dev machine:
+Tests the `orc hello` → `/orc-first-run` skill chain on the dev machine:
 
 | What | Verified |
 |------|----------|
-| orc bootstrap command | Launches Claude with correct directive |
+| orc hello command | Launches Claude with correct directive |
 | orc-first-run skill | Creates commission, workshop, workbench |
 | --factory flag | Isolates test to dedicated factory |
 | Entity creation via skill | Commission, workshop, workbench exist after flow |
@@ -173,7 +173,7 @@ Validates documentation accuracy against code reality:
 | CLI commands | Every `orc <cmd>` in docs/skills/Makefile exists |
 | CLI flags | Flags used in docs match actual `--help` output |
 | Docs schema | Directory structure matches docs/README.md spec |
-| Getting-started coherence | Guide matches Makefile, bootstrap_cmd.go, first-run skill |
+| Getting-started coherence | Guide matches Makefile, hello_cmd.go, first-run skill |
 | ER diagram | Tables and relationships match schema.sql |
 
 **Not covered:** Runtime behavior (docs-doctor validates claims, not execution).
@@ -182,7 +182,7 @@ Validates documentation accuracy against code reality:
 
 What ORC subsystems are exercised by which integration check:
 
-| Subsystem | orc doctor | self-test | bootstrap-test | bootstrap-exercise | docs-doctor |
+| Subsystem | orc doctor | self-test | bootstrap-test | hello-exercise | docs-doctor |
 |-----------|:----------:|:---------:|:--------------:|:------------------:|:-----------:|
 | Environment health | x | | | | |
 | Glue deployment sync | x | | | | |
@@ -199,7 +199,7 @@ What ORC subsystems are exercised by which integration check:
 | Plan CRUD | | | | | |
 | Focus system | | | | | |
 | Status transitions | | | | | |
-| orc bootstrap cmd | | | | x | |
+| orc hello cmd | | | | x | |
 | make bootstrap | | | x | | |
 | First-run skill | | | | x | |
 | CLI surface accuracy | | | | | x |
@@ -233,7 +233,7 @@ Subsystems with no integration-level coverage:
 | `orc doctor` | Quick environment sanity check (also runs as /self-test preflight) |
 | `/orc-self-test` | After changes to infra, plan/apply, tmux, or entity CRUD |
 | `/bootstrap-test` | Before releases, after Makefile/PATH changes (requires Tart) |
-| `/bootstrap-exercise` | After changes to orc-first-run skill or bootstrap command |
+| `/hello-exercise` | After changes to orc-first-run skill or hello command |
 | `/docs-doctor` | Before merging to master (recommended in CLAUDE.md) |
 
 ## Relationship to Unit Tests
