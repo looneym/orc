@@ -5,7 +5,14 @@
 <em>The factory runs on SQLite and git worktrees (and Anthropic tokens 😅).</em>
 </p>
 
-Orc is a tmux-based IDE for structured AI-assisted work. It provisions isolated workspaces, tracks everything in a persistent ledger, drives shipments from messy ideation to clarity, and coordinates parallel agent swarms — all from your terminal.
+Orc is a tmux-based IDE for structured AI-assisted work.
+
+It leans into Claude Code's features wherever possible and provides a "batteries-included" experience for the busy engineer:
+
+- Provisions isolated git worktrees
+- Tracks everything in a persistent ledger
+- Drives shipments from messy ideation to clarity
+- Integrates with Claude Teams for long-running and parallel task execution
 
 ## 🎭 The Cast
 
