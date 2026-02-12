@@ -22,7 +22,7 @@ Validate ORC documentation against code reality using parallel subagent checks.
 - After adding/removing documentation files
 - After changing CLI commands or flags
 - After modifying database schema (ER diagram)
-- After changing the Makefile bootstrap target, `orc bootstrap` command, or orc-first-run skill
+- After changing the Makefile bootstrap target, `orc hello` command, or orc-first-run skill
 
 ## Check Categories
 
@@ -50,7 +50,7 @@ Validate ORC documentation against code reality using parallel subagent checks.
 ### 5. Getting Started Coherence Check
 - `docs/getting-started.md` describes a phased setup flow backed by real code
 - Phase 2 claims (what `make bootstrap` does) match the Makefile `bootstrap` target
-- Phase 3 claims (what `orc bootstrap` does) match `internal/cli/bootstrap_cmd.go` and `glue/skills/orc-first-run/SKILL.md`
+- Phase 3 claims (what `orc hello` does) match `internal/cli/hello_cmd.go` and `glue/skills/orc-first-run/SKILL.md`
 - CLI flags used in examples and skills match actual `--help` output (e.g., `--path` not `--local-path`)
 - The guide's description of what each phase creates/leaves behind matches code reality
 
@@ -168,7 +168,7 @@ Prompt: "Validate that docs/getting-started.md accurately describes the bootstra
 Cross-reference against three source-of-truth files:
 
 1. Read the Makefile 'bootstrap' target (search for '^bootstrap:')
-2. Read internal/cli/bootstrap_cmd.go
+2. Read internal/cli/hello_cmd.go
 3. Read glue/skills/orc-first-run/SKILL.md
 4. Read docs/getting-started.md
 
@@ -180,8 +180,8 @@ a. Phase 2 claims (what 'make bootstrap' does):
    - Artifacts claimed (e.g. FACT-001, REPO-001, directories) match what the Makefile creates
    - CLI flags in examples match actual flag names (check against 'orc repo create --help', etc.)
 
-b. Phase 3 claims (what 'orc bootstrap' does):
-   - Guide's description matches what bootstrap_cmd.go actually does (launches Claude with directive)
+b. Phase 3 claims (what 'orc hello' does):
+   - Guide's description matches what hello_cmd.go actually does (launches Claude with directive)
    - Claims about what the first-run skill creates match glue/skills/orc-first-run/SKILL.md
    - Entity types mentioned (commission, workshop, workbench, shipment) match the skill's flow
 
