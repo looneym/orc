@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Broken link in architecture.md pointing to non-existent `guide/` directory
+- README.md referenced `/orc-first-run` skill directly instead of `orc bootstrap`
+- Stale CLI commands in skills: `orc commission focus`, `orc shipment ready/close/start` updated to match current CLI surface
+- Missing `--name` flag in getting-started.md workshop create example
 - `make bootstrap` used non-existent `--local-path` flag for `orc repo create` (correct flag: `--path`)
 - Same stale `--local-path` flag in orc-first-run and orc-workshop skills
 
