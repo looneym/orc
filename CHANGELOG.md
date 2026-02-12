@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `/self-test` runner skill: unified integration test orchestrator using Claude Teams (infra check, bootstrap check, docs-doctor, optional VM bootstrap test)
+- `docs/dev/git-hooks.md`: comprehensive documentation of pre-commit, post-checkout, and post-merge hooks with exact thresholds and config locations
+- `docs/dev/integration-tests.md`: coverage map, gap analysis, and phased journey through all ORC verification mechanisms
+
 ### Fixed
 
 - Broken link in architecture.md pointing to non-existent `guide/` directory
