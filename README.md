@@ -12,15 +12,15 @@ It leans into Claude Code's features wherever possible and provides a "batteries
 - Provisions isolated git worktrees on demand
 - Tracks everything in a persistent ledger
 - Drives shipments from messy ideation to clarity
-- Integrates with Claude Teams for long-running and parallel task execution
+- Integrates with 🆕🤑 Claude Teams 🤑🆕 for long-running and parallel task execution
 
 ## 🎭 The Cast
 
 **🏭 Orc** is the factory itself — the CLI and its SQLite ledger. It tracks commissions, shipments, tasks, and notes. It provisions workbenches, deploys skills, and remembers everything across sessions. Orc is the source of truth.
 
-**🏗️ Workshops** are collections of workbenches organized around a project or theme. One commission might have several workshops, each focused on different areas of work.
-
 **🔨 Workbenches** are where the work happens. Each one is a git worktree — an isolated copy of the repository where a goblin and its imps can make changes without disturbing other workbenches.
+
+**🏗️ Workshops** are collections of workbenches organized around a project or theme. One commission might have several workshops, each focused on different areas of work.
 
 **👺 Goblins** are coordinators — the human's long-running workbench pane. A goblin manages the big picture: planning shipments, synthesizing ideas, and keeping the ledger honest. Think of them as your foreman on the factory floor.
 
