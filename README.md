@@ -1,17 +1,18 @@
 <h1 align="center">✨🌲🏭 Orc - The Forest Factory 🏭🌲✨</h1>
 
-<table align="center"><tr>
-<td width="380"><img src="assets/orc.png" width="360"></td>
-<td>
+<p align="center">
+<img src="assets/orc.png" width="380"><br>
+The factory runs on SQLite and git worktrees (and Anthropic tokens 😅).
+</p>
 
-Orc is a tmux-based development environment for structured AI-assisted work.
+Orc is a tmux-based IDE for structured AI-assisted work.
 
-It provisions isolated workspaces, tracks everything in a persistent ledger, drives shipments from messy ideation to clarity, and coordinates parallel agent swarms — all from your terminal.
+It leans into Claude Code's features wherever possible and provides a "batteries-included" experience for the busy engineer:
 
-The forest runs on SQLite and git worktrees (and Anthropic tokens 😅).
-
-</td>
-</tr></table>
+- Provisions isolated git worktrees on demand
+- Tracks everything in a persistent ledger
+- Drives shipments from messy ideation to clarity
+- Integrates with Claude Teams for long-running and parallel task execution
 
 ## 🎭 The Cast
 
@@ -173,7 +174,3 @@ Imps fan out across parallel streams, each working through their assigned tasks.
 - [Common Workflows](docs/common-workflows.md) — Shipment and task lifecycles
 - [Schema & Glossary](docs/schema.md) — Complete terminology
 - [Architecture](docs/architecture.md) — Codebase structure (C4 model)
-
----
-
-*🌲 The forest hums with industry. Shipments move through workbenches. Goblins coordinate. Imps hammer at their tasks. The system remembers everything. 🌲*
