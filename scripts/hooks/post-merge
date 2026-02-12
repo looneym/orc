@@ -42,24 +42,5 @@ if [[ "$BRANCH" == "master" || "$BRANCH" == "main" ]]; then
         fi
     fi
 
-    # Release hints
-    if [[ -f "VERSION" ]]; then
-        VERSION=$(cat VERSION)
-        TAG="v$VERSION"
-        if git rev-parse "$TAG" &>/dev/null; then
-            COMMITS=$(git rev-list "$TAG"..HEAD --count)
-            if [[ "$COMMITS" -gt 0 ]]; then
-                TAG_DATE=$(git log -1 --format=%ct "$TAG")
-                NOW=$(date +%s)
-                DAYS=$(( (NOW - TAG_DATE) / 86400 ))
-                echo ""
-                echo "📦 $COMMITS commits since $TAG ($DAYS days ago)"
-                echo "   Run /release to cut a new version"
-            fi
-        else
-            echo ""
-            echo "📦 No release tag found. Run /release to create first release."
-        fi
-    fi
 fi
 echo ""

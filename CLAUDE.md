@@ -18,7 +18,7 @@ orc summary     # Hierarchical view of shipments and tomes with pinned items
 orc doctor      # Validate ORC environment and glue deployment
 ```
 
-Skills: `/release`, `/ship-deploy` (see [docs/dev/deployment.md](docs/dev/deployment.md)), `/docs-doctor`
+Skills: `/ship-deploy` (see [docs/dev/deployment.md](docs/dev/deployment.md)), `/docs-doctor`
 
 ## Pre-Commit Checks (Enforced by Hook)
 
@@ -64,7 +64,6 @@ See [docs/common-workflows.md](docs/common-workflows.md).
 - [docs/dev/git-hooks.md](docs/dev/git-hooks.md) -- Git hook enforcement: what each hook checks and why
 - [docs/dev/config.md](docs/dev/config.md) -- Config format, infrastructure plan/apply
 - [docs/dev/deployment.md](docs/dev/deployment.md) -- Deployment workflow and checks
-- [docs/dev/release.md](docs/dev/release.md) -- Release process
 - [docs/dev/glue.md](docs/dev/glue.md) -- Skills and hooks system
 
 ### General

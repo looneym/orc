@@ -8,10 +8,6 @@ What each git hook enforces and why. Hooks are installed via `make init` (which 
 
 The pre-commit hook is a quality gate. Commits fail if any check does not pass.
 
-### CHANGELOG Check
-
-On feature branches (anything other than `master`/`main`), the hook diffs `CHANGELOG.md` against `master`. If there are no changes, the commit is rejected. This ensures every feature branch documents its changes in the `[Unreleased]` section.
-
 ### `make lint`
 
 The lint target runs six sub-checks in sequence. All must pass.
@@ -157,7 +153,6 @@ Runs after `git merge` (including `git pull`). Does not block.
    - `make deploy-glue` -- Deploy Claude Code glue
    - `make test` -- Verify tests pass
 3. Runs `orc doctor --quiet` for environment health check (if `orc` is installed)
-4. Release freshness hint: if a `VERSION` file exists and commits have landed since the last version tag, prints the commit count, days since tag, and suggests running `/release`
 
 ---
 
@@ -167,7 +162,6 @@ Runs after `git merge` (including `git pull`). Does not block.
 
 | Symptom | Cause | Fix |
 |---------|-------|-----|
-| "CHANGELOG.md has no changes vs master" | Feature branch missing changelog entry | Add changes to `[Unreleased]` section in `CHANGELOG.md` |
 | "Found hardcoded CREATE TABLE in test files" | Test file has inline schema | Replace with `db.GetSchemaSQL()` call |
 | "MISSING: internal/app/foo_service_test.go" | New service file without test | Create the test file, or add to `scripts/test-presence-allowlist.txt` |
 | "FAIL: internal/core/foo: 45.0% < 70%" | Coverage below threshold | Add tests to raise coverage above the threshold |
@@ -190,7 +184,6 @@ Bypasses all pre-commit checks. Use only in emergencies (e.g., time-critical hot
 
 | Check | Config file(s) |
 |-------|----------------|
-| CHANGELOG enforcement | `scripts/hooks/pre-commit` (inline) |
 | schema-check | `Makefile` (inline) |
 | check-test-presence | `scripts/check-test-presence.sh`, `scripts/test-presence-allowlist.txt` |
 | check-coverage | `scripts/check-coverage.sh` (thresholds and exemptions) |
