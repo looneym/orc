@@ -2,7 +2,7 @@
 
 <p align="center">
 <img src="assets/orc.png" width="380"><br>
-<em>The factory runs on SQLite and git worktrees (and Anthropic tokens 😅).</em>
+The factory runs on SQLite and git worktrees (and Anthropic tokens 😅).
 </p>
 
 Orc is a tmux-based IDE for structured AI-assisted work.
@@ -18,15 +18,19 @@ It leans into Claude Code's features wherever possible and provides a "batteries
 
 **🏭 Orc** is the factory itself — the CLI and its SQLite ledger. It tracks commissions, shipments, tasks, and notes. It provisions workbenches, deploys skills, and remembers everything across sessions. Orc is the source of truth.
 
+**🏗️ Workshops** are collections of workbenches organized around a project or theme. One commission might have several workshops, each focused on different areas of work.
+
+**🔨 Workbenches** are where the work happens. Each one is a git worktree — an isolated copy of the repository where a goblin and its imps can make changes without disturbing other workbenches.
+
 **👺 Goblins** are coordinators — the human's long-running workbench pane. A goblin manages the big picture: planning shipments, synthesizing ideas, and keeping the ledger honest. Think of them as your foreman on the factory floor.
 
 **👹 Imps** are disposable workers — spawned by Claude Teams to execute tasks in parallel. Give them a task, they hammer it out and report back. Swarm a shipment with three imps and watch the work fly.
 
-**🔨 Workbenches** are where the work happens. Each one is a git worktree — an isolated copy of the repository where a goblin and its imps can make changes without disturbing other workbenches. One commission might have several workbenches, each focused on different work.
-
 **📜 Commissions** are the grand undertakings that give work context and purpose.
 
 **🚢 Shipments** are bundles of tasks moving through the system — the primary unit of work. They progress through `draft → ready → in-progress → closed`.
+
+**📋 Tasks** are the atomic units of work within a shipment. Each task is a specific thing to build, fix, or document.
 
 ## 🚀 Getting Started
 
