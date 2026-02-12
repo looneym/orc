@@ -84,7 +84,7 @@ orc commission create "My First Project"
 orc workshop create "Development" --factory FACT-001
 
 # Create a workbench (git worktree)
-orc workbench create my-workbench --workshop WORK-001 --repo-id REPO-001
+orc workbench create --workshop WORK-001 --repo-id REPO-001
 
 # Apply infrastructure (creates tmux session and worktree)
 orc infra apply WORK-001

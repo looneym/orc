@@ -169,7 +169,7 @@ Commission (coordination scope)
 **Shipment-based workflow:**
 - Shipments represent units of work with a simple 4-status lifecycle: draft -> ready -> in-progress -> closed
 - Tasks belong to shipments and represent specific implementation work
-- Task lifecycle: open -> in-progress -> closed (+blocked as lateral flag)
+- Task lifecycle: open -> in-progress -> blocked -> closed
 - All transitions are manual (Goblin decides)
 - Type categorization: research, implementation, fix, documentation, maintenance
 - Pinnable items for visibility
@@ -276,8 +276,7 @@ This pattern replaces SessionStart hooks (which are broken in Claude Code v2.1.7
 
 **Key Fields:**
 - `shipments.status`: draft | ready | in-progress | closed
-- `tasks.status`: open | in-progress | closed
-- `tasks.blocked`: Boolean lateral state flag
+- `tasks.status`: open | in-progress | blocked | closed
 - `tasks.type`: research | implementation | fix | documentation | maintenance
 
 ### Entity Relationships (Core)

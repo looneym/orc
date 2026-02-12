@@ -63,7 +63,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `--depends-on` flag on `orc task create` for expressing task dependency relationships
 - `ship-run` skill: bridges ship-plan → Claude Teams execution (dependency graph, team shape proposal, preflight checks, context injection)
-- `orc backfill lifecycle-statuses` command for migrating existing data to new status values
 - `closed_reason` column on shipments (nullable)
 
 ### Fixed

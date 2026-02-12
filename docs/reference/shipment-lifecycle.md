@@ -15,9 +15,11 @@ Shipments and tasks use simple, manual lifecycles. All transitions are decided b
 stateDiagram-v2
     [*] --> draft: create shipment
     draft --> ready: Goblin marks ready
-    ready --> in-progress: Goblin starts work
-    in-progress --> closed: Goblin closes
+    ready --> in_progress: Goblin starts work
+    in_progress --> closed: Goblin closes
     closed --> [*]
+
+    in_progress: in-progress
 ```
 
 ### States
@@ -41,11 +43,12 @@ All transitions are manual. The Goblin decides when to advance.
 stateDiagram-v2
     [*] --> open: create task
     open --> in_progress: start work
+    in_progress --> blocked: pause
+    blocked --> in_progress: resume
     in_progress --> closed: complete work
     closed --> [*]
 
-    state blocked <<choice>>
-    note right of blocked: "blocked" is a lateral flag,\nnot a status
+    in_progress: in-progress
 ```
 
 ### States
@@ -54,15 +57,12 @@ stateDiagram-v2
 |-------|-------------|-----------|
 | `open` | Task created, available for work | Start work |
 | `in-progress` | Actively being worked on | Close when done |
+| `blocked` | Work paused due to external dependency | Resume when unblocked |
 | `closed` | Terminal state | -- |
 
-### Blocked (Lateral State)
-
-`blocked` is a boolean flag, not a status. Any non-closed task can be marked blocked/unblocked independently of its lifecycle status.
-
 ```bash
-orc task pause TASK-xxx     # Mark as blocked
-orc task resume TASK-xxx   # Remove blocked flag
+orc task pause TASK-xxx     # Transition to blocked
+orc task resume TASK-xxx   # Transition back to in-progress
 ```
 
 ---

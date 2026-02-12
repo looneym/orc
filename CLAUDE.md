@@ -50,7 +50,7 @@ Run `make lint` to verify. See [docs/reference/architecture.md](docs/reference/a
 ## Shipment & Task Lifecycles
 
 Shipment: `draft` -> `ready` -> `in-progress` -> `closed` (all transitions manual)
-Task: `open` -> `in-progress` -> `closed` (`blocked` is a lateral state)
+Task: `open` -> `in-progress` -> `blocked` -> `closed` (all transitions manual)
 
 See [docs/reference/shipment-lifecycle.md](docs/reference/shipment-lifecycle.md) and [docs/guide/common-workflows.md](docs/guide/common-workflows.md).
 

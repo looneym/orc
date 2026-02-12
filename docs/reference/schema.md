@@ -66,7 +66,6 @@ erDiagram
         string status
         string type
         string priority
-        boolean blocked
     }
     TOME {
         string id PK
@@ -105,7 +104,7 @@ erDiagram
 | **workbenches** | Git worktrees within a workshop | workshop_id, repo_id, focused_id |
 | **commissions** | Top-level coordination scopes | factory_id, title, status |
 | **shipments** | Work containers with lifecycle | commission_id, title, status, branch |
-| **tasks** | Atomic units of work | shipment_id, title, status, type, priority, blocked |
+| **tasks** | Atomic units of work | shipment_id, title, status, type, priority |
 | **tomes** | Knowledge containers | commission_id, title, status |
 | **notes** | Observations, learnings, decisions | shipment_id, tome_id, title, type |
 | **plans** | Implementation plans (1:many with task) | task_id, title, content, status |
