@@ -131,7 +131,7 @@ An interview walks through each theme — resolving open questions, recording de
 
 ### 🗺️ Plan
 
-You are a very busy and important person who can't be expected to pay attention to every little detail. Orc uses the [C4 model](https://c4model.com/) to help you reason about your codebase while mostly thinking about containers and components, leaving imps to worry about code (mostly). This approach rewards clear planning, and works well with clear coding practices, automated tests, and checkpointing.
+You are a very busy and important person who can't be expected to pay attention to every little detail. Orc uses the [C4 model](https://c4model.com/) to help you reason about your codebase while mostly thinking about `containers` and `components`, leaving imps to worry about `code` (mostly). This approach rewards clear planning, and works well with clear coding practices, automated tests, and checkpointing.
 
 <p align="center">
 <img src="assets/ship-plan.png" width="380"><br>
