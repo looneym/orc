@@ -45,22 +45,26 @@ type CreateRepoResponse struct {
 
 // UpdateRepoRequest contains parameters for updating a repository.
 type UpdateRepoRequest struct {
-	RepoID        string
-	URL           string
-	LocalPath     string
-	DefaultBranch string
+	RepoID         string
+	URL            string
+	LocalPath      string
+	DefaultBranch  string
+	UpstreamURL    string
+	UpstreamBranch string
 }
 
 // Repo represents a repository entity at the port boundary.
 type Repo struct {
-	ID            string
-	Name          string
-	URL           string
-	LocalPath     string
-	DefaultBranch string
-	Status        string
-	CreatedAt     string
-	UpdatedAt     string
+	ID             string
+	Name           string
+	URL            string
+	LocalPath      string
+	DefaultBranch  string
+	UpstreamURL    string // Empty when not a fork
+	UpstreamBranch string // Effective upstream branch (resolved: falls back to DefaultBranch)
+	Status         string
+	CreatedAt      string
+	UpdatedAt      string
 }
 
 // RepoFilters contains filter options for listing repositories.

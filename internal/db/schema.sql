@@ -28,6 +28,8 @@ CREATE TABLE IF NOT EXISTS repos (
 	url TEXT,
 	local_path TEXT,
 	default_branch TEXT DEFAULT 'main',
+	upstream_url TEXT,
+	upstream_branch TEXT,
 	status TEXT NOT NULL CHECK(status IN ('active', 'archived')) DEFAULT 'active',
 	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 	updated_at DATETIME DEFAULT CURRENT_TIMESTAMP

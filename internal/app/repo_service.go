@@ -121,10 +121,12 @@ func (s *RepoServiceImpl) UpdateRepo(ctx context.Context, req primary.UpdateRepo
 	}
 
 	record := &secondary.RepoRecord{
-		ID:            req.RepoID,
-		URL:           req.URL,
-		LocalPath:     req.LocalPath,
-		DefaultBranch: req.DefaultBranch,
+		ID:             req.RepoID,
+		URL:            req.URL,
+		LocalPath:      req.LocalPath,
+		DefaultBranch:  req.DefaultBranch,
+		UpstreamURL:    req.UpstreamURL,
+		UpstreamBranch: req.UpstreamBranch,
 	}
 	return s.repoRepo.Update(ctx, record)
 }
@@ -192,15 +194,21 @@ func (s *RepoServiceImpl) DeleteRepo(ctx context.Context, repoID string) error {
 // Helper methods
 
 func (s *RepoServiceImpl) recordToRepo(r *secondary.RepoRecord) *primary.Repo {
+	upstreamBranch := r.UpstreamBranch
+	if upstreamBranch == "" && r.UpstreamURL != "" {
+		upstreamBranch = r.DefaultBranch
+	}
 	return &primary.Repo{
-		ID:            r.ID,
-		Name:          r.Name,
-		URL:           r.URL,
-		LocalPath:     r.LocalPath,
-		DefaultBranch: r.DefaultBranch,
-		Status:        r.Status,
-		CreatedAt:     r.CreatedAt,
-		UpdatedAt:     r.UpdatedAt,
+		ID:             r.ID,
+		Name:           r.Name,
+		URL:            r.URL,
+		LocalPath:      r.LocalPath,
+		DefaultBranch:  r.DefaultBranch,
+		UpstreamURL:    r.UpstreamURL,
+		UpstreamBranch: upstreamBranch,
+		Status:         r.Status,
+		CreatedAt:      r.CreatedAt,
+		UpdatedAt:      r.UpdatedAt,
 	}
 }
 

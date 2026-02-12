@@ -504,14 +504,16 @@ type RepoRepository interface {
 
 // RepoRecord represents a repository as stored in persistence.
 type RepoRecord struct {
-	ID            string
-	Name          string
-	URL           string // Empty string means null
-	LocalPath     string // Empty string means null
-	DefaultBranch string
-	Status        string
-	CreatedAt     string
-	UpdatedAt     string
+	ID             string
+	Name           string
+	URL            string // Empty string means null
+	LocalPath      string // Empty string means null
+	DefaultBranch  string
+	UpstreamURL    string // Empty string means null - canonical repo URL for forks
+	UpstreamBranch string // Empty string means null - upstream default branch
+	Status         string
+	CreatedAt      string
+	UpdatedAt      string
 }
 
 // RepoFilters contains filter options for querying repositories.
