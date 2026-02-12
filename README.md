@@ -9,7 +9,7 @@ Orc is a tmux-based IDE for structured AI-assisted work.
 
 It leans into Claude Code's features wherever possible and provides a "batteries-included" experience for the busy engineer:
 
-- Provisions isolated git worktrees
+- Provisions isolated git worktrees on demand
 - Tracks everything in a persistent ledger
 - Drives shipments from messy ideation to clarity
 - Integrates with Claude Teams for long-running and parallel task execution
