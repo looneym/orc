@@ -7,7 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `make bootstrap` used non-existent `--local-path` flag for `orc repo create` (correct flag: `--path`)
+- Same stale `--local-path` flag in orc-first-run and orc-workshop skills
+
 ### Changed
+
+- **Getting started guide**: Restructured around three clear phases (clone, install, onboard) with explicit state transitions between each
+- **docs-doctor**: Added Getting Started Coherence Agent that cross-references the guide against Makefile, bootstrap_cmd.go, and orc-first-run skill
+- **docs-doctor**: Widened CLI Validation Agent scope to scan skills and Makefile for stale flags (not just docs/)
+- **bootstrap-test skill**: Updated verification list to include FACT-001, REPO-001, and orc doctor checks
 
 - **Documentation restructure**: CLAUDE.md slimmed from ~800 lines to ~80 lines (constitution only); content extracted to docs/dev/ (checklists, database, testing, config). Docs reorganized into docs/dev/ (for agents), docs/guide/ (for humans), docs/reference/ (shared). All cross-references updated.
 - Shipment `status` CLI command no longer shows escape hatch warning (all transitions are manual now)
