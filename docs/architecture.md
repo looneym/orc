@@ -90,6 +90,7 @@ Skills deployed globally via the glue system.
 | orc-first-run | Interactive first-run walkthrough |
 | orc-interview | Reusable interview primitive |
 | orc-help | Orientation to ORC skills |
+| orc-prime | Bootstrap ORC context for session start |
 
 **Exploration:**
 | Skill | Description |

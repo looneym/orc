@@ -111,10 +111,10 @@ func truncateOutput(output, format string, maxLines int) string {
 func buildGoblinPrimeOutput(cwd string, _ *config.Config) string {
 	var output strings.Builder
 
-	output.WriteString("# Goblin Context (Session Prime)\n\n")
+	output.WriteString("# Session Context\n\n")
 
 	// Identity
-	output.WriteString("## Identity\n\n")
+	output.WriteString("## Current Session\n\n")
 	output.WriteString("**Role**: Goblin (Orchestrator)\n")
 	output.WriteString(fmt.Sprintf("**Location**: `%s`\n\n", cwd))
 
@@ -129,11 +129,11 @@ func buildGoblinPrimeOutput(cwd string, _ *config.Config) string {
 	if err == nil {
 		output.WriteString(welcome)
 	} else {
-		output.WriteString("---\nYou are a Goblin - Orchestrator coordinating commissions and IMPs.\n")
+		output.WriteString("---\nGoblin role: orchestrator coordinating commissions and IMPs.\n")
 	}
 
-	// Call to action - run summary for dynamic context
-	output.WriteString("\n---\n\n**Run `orc summary` now to see active commissions and work.**\n")
+	// Suggest next step
+	output.WriteString("\n---\n\n`orc summary` shows active commissions and current work.\n")
 
 	return output.String()
 }
@@ -142,10 +142,10 @@ func buildGoblinPrimeOutput(cwd string, _ *config.Config) string {
 func buildIMPPrimeOutput(workbenchCtx *ctx.WorkbenchContext, cwd string) string {
 	var output strings.Builder
 
-	output.WriteString("# IMP Boot Context\n\n")
+	output.WriteString("# Session Context\n\n")
 
 	// Section 1: IMP Identity
-	output.WriteString("## Identity\n\n")
+	output.WriteString("## Current Session\n\n")
 	output.WriteString("**Role**: Implementation Agent (IMP)\n")
 	output.WriteString(fmt.Sprintf("**Workbench**: `%s`\n", workbenchCtx.WorkbenchID))
 	output.WriteString(fmt.Sprintf("**Location**: `%s`\n\n", cwd))
@@ -153,29 +153,28 @@ func buildIMPPrimeOutput(workbenchCtx *ctx.WorkbenchContext, cwd string) string 
 	// Git context
 	output.WriteString(getGitInstructions())
 
-	// Section 2: ORC CLI Primer
-	output.WriteString("## ORC CLI Primer\n\n")
-	output.WriteString("**Core Commands**:\n")
-	output.WriteString("- `orc summary` - View commission tree with all containers\n")
-	output.WriteString("- `orc focus ID` - Set focus to a container (SHIP-*, CON-*, TOME-*)\n")
-	output.WriteString("- `orc task list --shipment SHIP-ID` - List tasks for a shipment\n")
-	output.WriteString("- `orc note list --tome TOME-ID` - List notes for a tome\n")
-	output.WriteString("- `orc task complete TASK-ID` - Mark task as completed\n\n")
+	// Section 2: ORC CLI Reference
+	output.WriteString("## Available ORC Commands\n\n")
+	output.WriteString("- `orc summary` — view commission tree with all containers\n")
+	output.WriteString("- `orc focus ID` — set focus to a container (SHIP-*, CON-*, TOME-*)\n")
+	output.WriteString("- `orc task list --shipment SHIP-ID` — list tasks for a shipment\n")
+	output.WriteString("- `orc note list --tome TOME-ID` — list notes for a tome\n")
+	output.WriteString("- `orc task complete TASK-ID` — mark a task as completed\n\n")
 
-	// Section 3: Core Rules (shared across all session types)
+	// Section 3: Project conventions (shared across all session types)
 	output.WriteString(getCoreRules())
-	output.WriteString("- **Stay in workbench territory** - Work within assigned containers only\n\n")
+	output.WriteString("- IMP sessions are scoped to the assigned workbench containers\n\n")
 
 	// Footer (loaded from template)
 	welcome, err := templates.GetWelcomeIMP()
 	if err == nil {
 		output.WriteString(welcome)
 	} else {
-		output.WriteString("---\nYou are an IMP - Implementation agent working within a workbench on assigned shipments.\n")
+		output.WriteString("---\nIMP role: implementation agent working within a workbench on assigned shipments.\n")
 	}
 
-	// Call to action - run summary for dynamic context
-	output.WriteString("\n---\n\n**Run `orc summary` now to see your current assignments and context.**\n")
+	// Suggest next step
+	output.WriteString("\n---\n\n`orc summary` shows current assignments and context.\n")
 
 	return output.String()
 }
@@ -186,7 +185,7 @@ func getGitInstructions() string {
 	content, err := templates.GetGitDiscovery()
 	if err != nil {
 		// Fallback to inline if template fails
-		return "## Git Context Discovery\n\nRun `git status` to see repository state.\n\n"
+		return "## Git Context\n\n`git status` shows the current repository state.\n\n"
 	}
 	return content
 }
@@ -197,7 +196,7 @@ func getCoreRules() string {
 	content, err := templates.GetCoreRules()
 	if err != nil {
 		// Fallback to inline if template fails
-		return "## Core Rules\n\n- Track all work in ORC ledger\n- TodoWrite tool is NOT ALLOWED\n\n"
+		return "## Project Conventions\n\n- All work is tracked in the ORC ledger\n- TodoWrite and TODO.md files are not used in this project\n\n"
 	}
 	return content
 }
