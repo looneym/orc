@@ -8,20 +8,22 @@ import (
 	"github.com/example/orc/internal/ports/secondary"
 )
 
-func TestWorkshopLogRepository_Create(t *testing.T) {
+func TestWorkshopEventRepository_Create(t *testing.T) {
 	db := setupTestDB(t)
-	repo := sqlite.NewWorkshopLogRepository(db)
+	repo := sqlite.NewWorkshopEventRepository(db)
 	ctx := context.Background()
 
 	// Create test fixtures: factory -> workshop
-	db.ExecContext(ctx, "INSERT INTO factories (id, name, status) VALUES (?, ?, ?)", "FACT-001", "Test Factory", "active")
-	db.ExecContext(ctx, "INSERT INTO workshops (id, factory_id, name, status) VALUES (?, ?, ?, ?)", "WORK-001", "FACT-001", "Test Workshop", "active")
+	seedFactory(t, db, "FACT-001", "Test Factory")
+	seedWorkshop(t, db, "WORK-001", "FACT-001", "Test Workshop")
 
-	t.Run("creates log with all fields", func(t *testing.T) {
-		record := &secondary.WorkshopLogRecord{
-			ID:         "WL-0001",
+	t.Run("creates event with all fields", func(t *testing.T) {
+		record := &secondary.AuditEventRecord{
+			ID:         "WE-0001",
 			WorkshopID: "WORK-001",
 			ActorID:    "BENCH-014",
+			Source:     "orc",
+			Version:    "1.0",
 			EntityType: "task",
 			EntityID:   "TASK-001",
 			Action:     "update",
@@ -35,7 +37,7 @@ func TestWorkshopLogRepository_Create(t *testing.T) {
 			t.Fatalf("Create failed: %v", err)
 		}
 
-		got, err := repo.GetByID(ctx, "WL-0001")
+		got, err := repo.GetByID(ctx, "WE-0001")
 		if err != nil {
 			t.Fatalf("GetByID failed: %v", err)
 		}
@@ -45,6 +47,12 @@ func TestWorkshopLogRepository_Create(t *testing.T) {
 		}
 		if got.ActorID != "BENCH-014" {
 			t.Errorf("ActorID = %q, want %q", got.ActorID, "BENCH-014")
+		}
+		if got.Source != "orc" {
+			t.Errorf("Source = %q, want %q", got.Source, "orc")
+		}
+		if got.Version != "1.0" {
+			t.Errorf("Version = %q, want %q", got.Version, "1.0")
 		}
 		if got.EntityType != "task" {
 			t.Errorf("EntityType = %q, want %q", got.EntityType, "task")
@@ -66,14 +74,13 @@ func TestWorkshopLogRepository_Create(t *testing.T) {
 		}
 	})
 
-	t.Run("creates log with nullable fields null", func(t *testing.T) {
-		record := &secondary.WorkshopLogRecord{
-			ID:         "WL-0002",
-			WorkshopID: "WORK-001",
+	t.Run("creates event with nullable fields null", func(t *testing.T) {
+		record := &secondary.AuditEventRecord{
+			ID:         "WE-0002",
 			EntityType: "shipment",
 			EntityID:   "SHIP-001",
 			Action:     "create",
-			// ActorID, FieldName, OldValue, NewValue all empty (null)
+			// WorkshopID, ActorID, Source, Version, FieldName, OldValue, NewValue all empty (null)
 		}
 
 		err := repo.Create(ctx, record)
@@ -81,13 +88,22 @@ func TestWorkshopLogRepository_Create(t *testing.T) {
 			t.Fatalf("Create failed: %v", err)
 		}
 
-		got, err := repo.GetByID(ctx, "WL-0002")
+		got, err := repo.GetByID(ctx, "WE-0002")
 		if err != nil {
 			t.Fatalf("GetByID failed: %v", err)
 		}
 
+		if got.WorkshopID != "" {
+			t.Errorf("WorkshopID = %q, want empty", got.WorkshopID)
+		}
 		if got.ActorID != "" {
 			t.Errorf("ActorID = %q, want empty", got.ActorID)
+		}
+		if got.Source != "" {
+			t.Errorf("Source = %q, want empty", got.Source)
+		}
+		if got.Version != "" {
+			t.Errorf("Version = %q, want empty", got.Version)
 		}
 		if got.FieldName != "" {
 			t.Errorf("FieldName = %q, want empty", got.FieldName)
@@ -101,57 +117,57 @@ func TestWorkshopLogRepository_Create(t *testing.T) {
 	})
 }
 
-func TestWorkshopLogRepository_GetByID(t *testing.T) {
+func TestWorkshopEventRepository_GetByID(t *testing.T) {
 	db := setupTestDB(t)
-	repo := sqlite.NewWorkshopLogRepository(db)
+	repo := sqlite.NewWorkshopEventRepository(db)
 	ctx := context.Background()
 
 	// Setup
-	db.ExecContext(ctx, "INSERT INTO factories (id, name, status) VALUES (?, ?, ?)", "FACT-001", "Test Factory", "active")
-	db.ExecContext(ctx, "INSERT INTO workshops (id, factory_id, name, status) VALUES (?, ?, ?, ?)", "WORK-001", "FACT-001", "Test Workshop", "active")
+	seedFactory(t, db, "FACT-001", "Test Factory")
+	seedWorkshop(t, db, "WORK-001", "FACT-001", "Test Workshop")
 
-	repo.Create(ctx, &secondary.WorkshopLogRecord{
-		ID:         "WL-0001",
+	repo.Create(ctx, &secondary.AuditEventRecord{
+		ID:         "WE-0001",
 		WorkshopID: "WORK-001",
 		EntityType: "task",
 		EntityID:   "TASK-001",
 		Action:     "create",
 	})
 
-	t.Run("finds log by ID", func(t *testing.T) {
-		got, err := repo.GetByID(ctx, "WL-0001")
+	t.Run("finds event by ID", func(t *testing.T) {
+		got, err := repo.GetByID(ctx, "WE-0001")
 		if err != nil {
 			t.Fatalf("GetByID failed: %v", err)
 		}
-		if got.ID != "WL-0001" {
-			t.Errorf("ID = %q, want %q", got.ID, "WL-0001")
+		if got.ID != "WE-0001" {
+			t.Errorf("ID = %q, want %q", got.ID, "WE-0001")
 		}
 	})
 
 	t.Run("returns error for non-existent ID", func(t *testing.T) {
-		_, err := repo.GetByID(ctx, "WL-9999")
+		_, err := repo.GetByID(ctx, "WE-9999")
 		if err == nil {
 			t.Error("expected error, got nil")
 		}
 	})
 }
 
-func TestWorkshopLogRepository_List(t *testing.T) {
+func TestWorkshopEventRepository_List(t *testing.T) {
 	db := setupTestDB(t)
-	repo := sqlite.NewWorkshopLogRepository(db)
+	repo := sqlite.NewWorkshopEventRepository(db)
 	ctx := context.Background()
 
 	// Setup
-	db.ExecContext(ctx, "INSERT INTO factories (id, name, status) VALUES (?, ?, ?)", "FACT-001", "Test Factory", "active")
-	db.ExecContext(ctx, "INSERT INTO workshops (id, factory_id, name, status) VALUES (?, ?, ?, ?)", "WORK-001", "FACT-001", "Workshop 1", "active")
-	db.ExecContext(ctx, "INSERT INTO workshops (id, factory_id, name, status) VALUES (?, ?, ?, ?)", "WORK-002", "FACT-001", "Workshop 2", "active")
+	seedFactory(t, db, "FACT-001", "Test Factory")
+	seedWorkshop(t, db, "WORK-001", "FACT-001", "Workshop 1")
+	seedWorkshop(t, db, "WORK-002", "FACT-001", "Workshop 2")
 
-	repo.Create(ctx, &secondary.WorkshopLogRecord{ID: "WL-0001", WorkshopID: "WORK-001", ActorID: "BENCH-014", EntityType: "task", EntityID: "TASK-001", Action: "create"})
-	repo.Create(ctx, &secondary.WorkshopLogRecord{ID: "WL-0002", WorkshopID: "WORK-001", ActorID: "BENCH-014", EntityType: "task", EntityID: "TASK-001", Action: "update"})
-	repo.Create(ctx, &secondary.WorkshopLogRecord{ID: "WL-0003", WorkshopID: "WORK-002", ActorID: "BENCH-003", EntityType: "shipment", EntityID: "SHIP-001", Action: "delete"})
+	repo.Create(ctx, &secondary.AuditEventRecord{ID: "WE-0001", WorkshopID: "WORK-001", ActorID: "BENCH-014", Source: "orc", EntityType: "task", EntityID: "TASK-001", Action: "create"})
+	repo.Create(ctx, &secondary.AuditEventRecord{ID: "WE-0002", WorkshopID: "WORK-001", ActorID: "BENCH-014", Source: "imp", EntityType: "task", EntityID: "TASK-001", Action: "update"})
+	repo.Create(ctx, &secondary.AuditEventRecord{ID: "WE-0003", WorkshopID: "WORK-002", ActorID: "BENCH-003", Source: "orc", EntityType: "shipment", EntityID: "SHIP-001", Action: "delete"})
 
-	t.Run("lists all logs", func(t *testing.T) {
-		list, err := repo.List(ctx, secondary.WorkshopLogFilters{})
+	t.Run("lists all events", func(t *testing.T) {
+		list, err := repo.List(ctx, secondary.AuditEventFilters{})
 		if err != nil {
 			t.Fatalf("List failed: %v", err)
 		}
@@ -161,7 +177,7 @@ func TestWorkshopLogRepository_List(t *testing.T) {
 	})
 
 	t.Run("filters by workshop_id", func(t *testing.T) {
-		list, err := repo.List(ctx, secondary.WorkshopLogFilters{WorkshopID: "WORK-001"})
+		list, err := repo.List(ctx, secondary.AuditEventFilters{WorkshopID: "WORK-001"})
 		if err != nil {
 			t.Fatalf("List failed: %v", err)
 		}
@@ -171,20 +187,20 @@ func TestWorkshopLogRepository_List(t *testing.T) {
 	})
 
 	t.Run("filters by entity_type", func(t *testing.T) {
-		list, err := repo.List(ctx, secondary.WorkshopLogFilters{EntityType: "shipment"})
+		list, err := repo.List(ctx, secondary.AuditEventFilters{EntityType: "shipment"})
 		if err != nil {
 			t.Fatalf("List failed: %v", err)
 		}
 		if len(list) != 1 {
 			t.Errorf("len = %d, want 1", len(list))
 		}
-		if list[0].ID != "WL-0003" {
-			t.Errorf("ID = %q, want %q", list[0].ID, "WL-0003")
+		if list[0].ID != "WE-0003" {
+			t.Errorf("ID = %q, want %q", list[0].ID, "WE-0003")
 		}
 	})
 
 	t.Run("filters by entity_id", func(t *testing.T) {
-		list, err := repo.List(ctx, secondary.WorkshopLogFilters{EntityID: "TASK-001"})
+		list, err := repo.List(ctx, secondary.AuditEventFilters{EntityID: "TASK-001"})
 		if err != nil {
 			t.Fatalf("List failed: %v", err)
 		}
@@ -194,7 +210,7 @@ func TestWorkshopLogRepository_List(t *testing.T) {
 	})
 
 	t.Run("filters by actor_id", func(t *testing.T) {
-		list, err := repo.List(ctx, secondary.WorkshopLogFilters{ActorID: "BENCH-003"})
+		list, err := repo.List(ctx, secondary.AuditEventFilters{ActorID: "BENCH-003"})
 		if err != nil {
 			t.Fatalf("List failed: %v", err)
 		}
@@ -204,20 +220,30 @@ func TestWorkshopLogRepository_List(t *testing.T) {
 	})
 
 	t.Run("filters by action", func(t *testing.T) {
-		list, err := repo.List(ctx, secondary.WorkshopLogFilters{Action: "update"})
+		list, err := repo.List(ctx, secondary.AuditEventFilters{Action: "update"})
 		if err != nil {
 			t.Fatalf("List failed: %v", err)
 		}
 		if len(list) != 1 {
 			t.Errorf("len = %d, want 1", len(list))
 		}
-		if list[0].ID != "WL-0002" {
-			t.Errorf("ID = %q, want %q", list[0].ID, "WL-0002")
+		if list[0].ID != "WE-0002" {
+			t.Errorf("ID = %q, want %q", list[0].ID, "WE-0002")
+		}
+	})
+
+	t.Run("filters by source", func(t *testing.T) {
+		list, err := repo.List(ctx, secondary.AuditEventFilters{Source: "orc"})
+		if err != nil {
+			t.Fatalf("List failed: %v", err)
+		}
+		if len(list) != 2 {
+			t.Errorf("len = %d, want 2", len(list))
 		}
 	})
 
 	t.Run("applies limit", func(t *testing.T) {
-		list, err := repo.List(ctx, secondary.WorkshopLogFilters{Limit: 2})
+		list, err := repo.List(ctx, secondary.AuditEventFilters{Limit: 2})
 		if err != nil {
 			t.Fatalf("List failed: %v", err)
 		}
@@ -227,41 +253,41 @@ func TestWorkshopLogRepository_List(t *testing.T) {
 	})
 
 	t.Run("combines filters", func(t *testing.T) {
-		list, err := repo.List(ctx, secondary.WorkshopLogFilters{WorkshopID: "WORK-001", Action: "create"})
+		list, err := repo.List(ctx, secondary.AuditEventFilters{WorkshopID: "WORK-001", Action: "create"})
 		if err != nil {
 			t.Fatalf("List failed: %v", err)
 		}
 		if len(list) != 1 {
 			t.Errorf("len = %d, want 1", len(list))
 		}
-		if list[0].ID != "WL-0001" {
-			t.Errorf("ID = %q, want %q", list[0].ID, "WL-0001")
+		if list[0].ID != "WE-0001" {
+			t.Errorf("ID = %q, want %q", list[0].ID, "WE-0001")
 		}
 	})
 }
 
-func TestWorkshopLogRepository_GetNextID(t *testing.T) {
+func TestWorkshopEventRepository_GetNextID(t *testing.T) {
 	db := setupTestDB(t)
-	repo := sqlite.NewWorkshopLogRepository(db)
+	repo := sqlite.NewWorkshopEventRepository(db)
 	ctx := context.Background()
 
-	t.Run("returns WL-0001 for empty table", func(t *testing.T) {
+	t.Run("returns WE-0001 for empty table", func(t *testing.T) {
 		id, err := repo.GetNextID(ctx)
 		if err != nil {
 			t.Fatalf("GetNextID failed: %v", err)
 		}
-		if id != "WL-0001" {
-			t.Errorf("ID = %q, want %q", id, "WL-0001")
+		if id != "WE-0001" {
+			t.Errorf("ID = %q, want %q", id, "WE-0001")
 		}
 	})
 
-	t.Run("increments after creating logs", func(t *testing.T) {
+	t.Run("increments after creating events", func(t *testing.T) {
 		// Setup
-		db.ExecContext(ctx, "INSERT INTO factories (id, name, status) VALUES (?, ?, ?)", "FACT-001", "Test Factory", "active")
-		db.ExecContext(ctx, "INSERT INTO workshops (id, factory_id, name, status) VALUES (?, ?, ?, ?)", "WORK-001", "FACT-001", "Test Workshop", "active")
+		seedFactory(t, db, "FACT-001", "Test Factory")
+		seedWorkshop(t, db, "WORK-001", "FACT-001", "Test Workshop")
 
-		repo.Create(ctx, &secondary.WorkshopLogRecord{
-			ID:         "WL-0001",
+		repo.Create(ctx, &secondary.AuditEventRecord{
+			ID:         "WE-0001",
 			WorkshopID: "WORK-001",
 			EntityType: "task",
 			EntityID:   "TASK-001",
@@ -272,20 +298,20 @@ func TestWorkshopLogRepository_GetNextID(t *testing.T) {
 		if err != nil {
 			t.Fatalf("GetNextID failed: %v", err)
 		}
-		if id != "WL-0002" {
-			t.Errorf("ID = %q, want %q", id, "WL-0002")
+		if id != "WE-0002" {
+			t.Errorf("ID = %q, want %q", id, "WE-0002")
 		}
 	})
 }
 
-func TestWorkshopLogRepository_WorkshopExists(t *testing.T) {
+func TestWorkshopEventRepository_WorkshopExists(t *testing.T) {
 	db := setupTestDB(t)
-	repo := sqlite.NewWorkshopLogRepository(db)
+	repo := sqlite.NewWorkshopEventRepository(db)
 	ctx := context.Background()
 
 	// Setup
-	db.ExecContext(ctx, "INSERT INTO factories (id, name, status) VALUES (?, ?, ?)", "FACT-001", "Test Factory", "active")
-	db.ExecContext(ctx, "INSERT INTO workshops (id, factory_id, name, status) VALUES (?, ?, ?, ?)", "WORK-001", "FACT-001", "Test Workshop", "active")
+	seedFactory(t, db, "FACT-001", "Test Factory")
+	seedWorkshop(t, db, "WORK-001", "FACT-001", "Test Workshop")
 
 	t.Run("returns true for existing workshop", func(t *testing.T) {
 		exists, err := repo.WorkshopExists(ctx, "WORK-001")

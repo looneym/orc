@@ -759,35 +759,37 @@ type WorkbenchRecord struct {
 	UpdatedAt     string
 }
 
-// WorkshopLogRepository defines the secondary port for workshop log (audit trail) persistence.
-// Logs are immutable - no Update operations, but old entries can be pruned.
-type WorkshopLogRepository interface {
-	// Create persists a new workshop log entry.
-	Create(ctx context.Context, log *WorkshopLogRecord) error
+// WorkshopEventRepository defines the secondary port for workshop event (audit trail) persistence.
+// Events are immutable - no Update operations, but old entries can be pruned.
+type WorkshopEventRepository interface {
+	// Create persists a new audit event.
+	Create(ctx context.Context, event *AuditEventRecord) error
 
-	// GetByID retrieves a log entry by its ID.
-	GetByID(ctx context.Context, id string) (*WorkshopLogRecord, error)
+	// GetByID retrieves an audit event by its ID.
+	GetByID(ctx context.Context, id string) (*AuditEventRecord, error)
 
-	// List retrieves log entries matching the given filters.
-	List(ctx context.Context, filters WorkshopLogFilters) ([]*WorkshopLogRecord, error)
+	// List retrieves audit events matching the given filters.
+	List(ctx context.Context, filters AuditEventFilters) ([]*AuditEventRecord, error)
 
-	// GetNextID returns the next available log ID.
+	// GetNextID returns the next available audit event ID.
 	GetNextID(ctx context.Context) (string, error)
 
 	// WorkshopExists checks if a workshop exists (for validation).
 	WorkshopExists(ctx context.Context, workshopID string) (bool, error)
 
-	// PruneOlderThan deletes log entries older than the given number of days.
+	// PruneOlderThan deletes audit events older than the given number of days.
 	// Returns the number of deleted entries.
 	PruneOlderThan(ctx context.Context, days int) (int, error)
 }
 
-// WorkshopLogRecord represents a workshop log entry as stored in persistence.
-type WorkshopLogRecord struct {
+// AuditEventRecord represents an audit event (entity CRUD) as stored in persistence.
+type AuditEventRecord struct {
 	ID         string
 	WorkshopID string
 	Timestamp  string
 	ActorID    string // Empty string means null
+	Source     string // Event source (e.g., "orc", "imp", "hook")
+	Version    string // Schema version for forward compatibility
 	EntityType string
 	EntityID   string
 	Action     string // 'create', 'update', 'delete'
@@ -797,13 +799,53 @@ type WorkshopLogRecord struct {
 	CreatedAt  string
 }
 
-// WorkshopLogFilters contains filter options for querying logs.
-type WorkshopLogFilters struct {
+// AuditEventFilters contains filter options for querying audit events.
+type AuditEventFilters struct {
 	WorkshopID string
 	EntityType string
 	EntityID   string
 	ActorID    string
 	Action     string
+	Source     string
+	Limit      int
+}
+
+// OperationalEventRepository defines the secondary port for operational event persistence.
+// Operational events capture runtime/system events (hook invocations, lifecycle, diagnostics).
+type OperationalEventRepository interface {
+	// Create persists a new operational event.
+	Create(ctx context.Context, event *OperationalEventRecord) error
+
+	// List retrieves operational events matching the given filters.
+	List(ctx context.Context, filters OperationalEventFilters) ([]*OperationalEventRecord, error)
+
+	// GetNextID returns the next available operational event ID.
+	GetNextID(ctx context.Context) (string, error)
+
+	// PruneOlderThan deletes operational events older than the given number of days.
+	// Returns the number of deleted entries.
+	PruneOlderThan(ctx context.Context, days int) (int, error)
+}
+
+// OperationalEventRecord represents an operational event as stored in persistence.
+type OperationalEventRecord struct {
+	ID         string
+	WorkshopID string
+	Timestamp  string
+	ActorID    string // Empty string means null
+	Source     string // Event source (e.g., "hook", "system", "glue")
+	Version    string // Schema version for forward compatibility
+	Level      string // "debug", "info", "warn", "error"
+	Message    string
+	DataJSON   string // Empty string means null - arbitrary JSON payload
+	CreatedAt  string
+}
+
+// OperationalEventFilters contains filter options for querying operational events.
+type OperationalEventFilters struct {
+	WorkshopID string
+	Source     string
+	Level      string
 	Limit      int
 }
 

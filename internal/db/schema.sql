@@ -254,10 +254,10 @@ CREATE INDEX IF NOT EXISTS idx_plans_task ON plans(task_id);
 CREATE INDEX IF NOT EXISTS idx_plans_status ON plans(status);
 CREATE INDEX IF NOT EXISTS idx_notes_commission ON notes(commission_id);
 CREATE INDEX IF NOT EXISTS idx_notes_shipment ON notes(shipment_id);
--- Workshop Logs (audit trail for workshop changes)
-CREATE TABLE IF NOT EXISTS workshop_logs (
+-- Workshop Events (audit trail for workshop changes)
+CREATE TABLE IF NOT EXISTS workshop_events (
 	id TEXT PRIMARY KEY,
-	workshop_id TEXT NOT NULL,
+	workshop_id TEXT,
 	timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
 	actor_id TEXT,
 	entity_type TEXT NOT NULL,
@@ -266,13 +266,33 @@ CREATE TABLE IF NOT EXISTS workshop_logs (
 	field_name TEXT,
 	old_value TEXT,
 	new_value TEXT,
+	source TEXT,
+	version TEXT,
 	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (workshop_id) REFERENCES workshops(id) ON DELETE CASCADE
 );
-CREATE INDEX IF NOT EXISTS idx_workshop_logs_workshop ON workshop_logs(workshop_id);
-CREATE INDEX IF NOT EXISTS idx_workshop_logs_timestamp ON workshop_logs(timestamp DESC);
-CREATE INDEX IF NOT EXISTS idx_workshop_logs_actor ON workshop_logs(actor_id);
-CREATE INDEX IF NOT EXISTS idx_workshop_logs_entity ON workshop_logs(entity_type, entity_id);
+CREATE INDEX IF NOT EXISTS idx_workshop_events_workshop ON workshop_events(workshop_id);
+CREATE INDEX IF NOT EXISTS idx_workshop_events_timestamp ON workshop_events(timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_workshop_events_actor ON workshop_events(actor_id);
+CREATE INDEX IF NOT EXISTS idx_workshop_events_entity ON workshop_events(entity_type, entity_id);
+
+-- Operational Events (system and operational event log)
+CREATE TABLE IF NOT EXISTS operational_events (
+	id TEXT PRIMARY KEY,
+	workshop_id TEXT,
+	timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+	actor_id TEXT,
+	source TEXT NOT NULL,
+	version TEXT,
+	level TEXT NOT NULL CHECK(level IN ('debug', 'info', 'warn', 'error')),
+	message TEXT NOT NULL,
+	data_json TEXT,
+	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+	FOREIGN KEY (workshop_id) REFERENCES workshops(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_operational_events_timestamp ON operational_events(timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_operational_events_source ON operational_events(source);
+CREATE INDEX IF NOT EXISTS idx_operational_events_level ON operational_events(level);
 
 -- Hook Events (audit trail for Claude Code hook invocations)
 CREATE TABLE IF NOT EXISTS hook_events (

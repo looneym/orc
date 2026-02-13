@@ -10,11 +10,11 @@ import (
 
 // LogServiceImpl implements the LogService interface.
 type LogServiceImpl struct {
-	logRepo secondary.WorkshopLogRepository
+	logRepo secondary.WorkshopEventRepository
 }
 
 // NewLogService creates a new LogService with injected dependencies.
-func NewLogService(logRepo secondary.WorkshopLogRepository) *LogServiceImpl {
+func NewLogService(logRepo secondary.WorkshopEventRepository) *LogServiceImpl {
 	return &LogServiceImpl{
 		logRepo: logRepo,
 	}
@@ -22,7 +22,7 @@ func NewLogService(logRepo secondary.WorkshopLogRepository) *LogServiceImpl {
 
 // ListLogs retrieves log entries matching the given filters.
 func (s *LogServiceImpl) ListLogs(ctx context.Context, filters primary.LogFilters) ([]*primary.LogEntry, error) {
-	records, err := s.logRepo.List(ctx, secondary.WorkshopLogFilters{
+	records, err := s.logRepo.List(ctx, secondary.AuditEventFilters{
 		WorkshopID: filters.WorkshopID,
 		EntityType: filters.EntityType,
 		EntityID:   filters.EntityID,
@@ -57,7 +57,7 @@ func (s *LogServiceImpl) PruneLogs(ctx context.Context, olderThanDays int) (int,
 
 // Helper methods
 
-func (s *LogServiceImpl) recordToLogEntry(r *secondary.WorkshopLogRecord) *primary.LogEntry {
+func (s *LogServiceImpl) recordToLogEntry(r *secondary.AuditEventRecord) *primary.LogEntry {
 	return &primary.LogEntry{
 		ID:         r.ID,
 		WorkshopID: r.WorkshopID,

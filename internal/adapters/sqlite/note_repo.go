@@ -12,14 +12,14 @@ import (
 
 // NoteRepository implements secondary.NoteRepository with SQLite.
 type NoteRepository struct {
-	db        *sql.DB
-	logWriter secondary.LogWriter
+	db          *sql.DB
+	eventWriter secondary.EventWriter
 }
 
 // NewNoteRepository creates a new SQLite note repository.
-// logWriter is optional - if nil, no audit logging is performed.
-func NewNoteRepository(db *sql.DB, logWriter secondary.LogWriter) *NoteRepository {
-	return &NoteRepository{db: db, logWriter: logWriter}
+// eventWriter is optional - if nil, no audit logging is performed.
+func NewNoteRepository(db *sql.DB, eventWriter secondary.EventWriter) *NoteRepository {
+	return &NoteRepository{db: db, eventWriter: eventWriter}
 }
 
 // Create persists a new note.
@@ -54,8 +54,8 @@ func (r *NoteRepository) Create(ctx context.Context, note *secondary.NoteRecord)
 	}
 
 	// Log create operation
-	if r.logWriter != nil {
-		_ = r.logWriter.LogCreate(ctx, "note", note.ID)
+	if r.eventWriter != nil {
+		_ = r.eventWriter.EmitAuditCreate(ctx, "note", note.ID)
 	}
 
 	return nil

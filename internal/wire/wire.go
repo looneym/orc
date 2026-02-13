@@ -17,6 +17,7 @@ import (
 	"github.com/example/orc/internal/db"
 	"github.com/example/orc/internal/ports/primary"
 	"github.com/example/orc/internal/ports/secondary"
+	"github.com/example/orc/internal/version"
 )
 
 var (
@@ -33,7 +34,7 @@ var (
 	workshopService                primary.WorkshopService
 	workbenchService               primary.WorkbenchService
 	summaryService                 primary.SummaryService
-	logService                     primary.LogService
+	eventService                   primary.EventService
 	hookEventService               primary.HookEventService
 	commissionOrchestrationService *app.CommissionOrchestrationService
 	tmuxService                    secondary.TMuxAdapter
@@ -119,10 +120,10 @@ func SummaryService() primary.SummaryService {
 	return summaryService
 }
 
-// LogService returns the singleton LogService instance.
-func LogService() primary.LogService {
+// EventService returns the singleton EventService instance.
+func EventService() primary.EventService {
 	once.Do(initServices)
-	return logService
+	return eventService
 }
 
 // HookEventService returns the singleton HookEventService instance.
@@ -158,14 +159,15 @@ func initServices() {
 		log.Fatalf("failed to initialize database: %v", err)
 	}
 
-	// Create LogWriter infrastructure early (needed by most repositories)
-	// Order matters: workshopLogRepo needs DB, workbenchRepo needs DB, logWriter needs both
-	workshopLogRepo := sqlite.NewWorkshopLogRepository(database)
-	workbenchRepo := sqlite.NewWorkbenchRepository(database, nil) // nil LogWriter: circular dependency (LogWriter needs workbenchRepo)
-	logWriter := sqlite.NewLogWriterAdapter(workshopLogRepo, workbenchRepo)
+	// Create EventWriter infrastructure early (needed by most repositories)
+	// Order matters: workshopEventRepo needs DB, workbenchRepo needs DB, eventWriter needs both
+	workshopEventRepo := sqlite.NewWorkshopEventRepository(database)
+	operationalEventRepo := sqlite.NewOperationalEventRepository(database)
+	workbenchRepo := sqlite.NewWorkbenchRepository(database, nil) // nil EventWriter: circular dependency (EventWriter needs workbenchRepo)
+	eventWriter := sqlite.NewEventWriterAdapter(workshopEventRepo, operationalEventRepo, workbenchRepo, version.Commit)
 
 	// Create repository adapters (secondary ports) - sqlite adapters with injected DB
-	commissionRepo := sqlite.NewCommissionRepository(database, logWriter)
+	commissionRepo := sqlite.NewCommissionRepository(database, eventWriter)
 	agentProvider := persistence.NewAgentIdentityProvider()
 	tmuxAdapter := tmuxadapter.NewAdapter()
 	tmuxService = tmuxAdapter // Store for getter
@@ -184,14 +186,14 @@ func initServices() {
 	commissionService = app.NewCommissionService(commissionRepo, agentProvider, executor)
 
 	// Create shipment and task services
-	shipmentRepo = sqlite.NewShipmentRepository(database, logWriter)
-	taskRepo := sqlite.NewTaskRepository(database, logWriter)
+	shipmentRepo = sqlite.NewShipmentRepository(database, eventWriter)
+	taskRepo := sqlite.NewTaskRepository(database, eventWriter)
 	tagRepo := sqlite.NewTagRepository(database)
 	taskService = app.NewTaskService(taskRepo, tagRepo, shipmentRepo)
 
 	// Create note and tome services
-	noteRepo := sqlite.NewNoteRepository(database, logWriter)
-	tomeRepo := sqlite.NewTomeRepository(database, logWriter)
+	noteRepo := sqlite.NewNoteRepository(database, eventWriter)
+	tomeRepo := sqlite.NewTomeRepository(database, eventWriter)
 	noteService = app.NewNoteService(noteRepo)
 
 	// Create tome and shipment services
@@ -199,7 +201,7 @@ func initServices() {
 	shipmentService = app.NewShipmentService(shipmentRepo, taskRepo, noteService)
 
 	// Create plan repository
-	planRepo := sqlite.NewPlanRepository(database, logWriter)
+	planRepo := sqlite.NewPlanRepository(database, eventWriter)
 
 	// Create tag service
 	tagService = app.NewTagService(tagRepo)
@@ -213,7 +215,7 @@ func initServices() {
 	// Create factory, workshop, and workbench services
 	factoryRepo := sqlite.NewFactoryRepository(database)
 	workshopRepo := sqlite.NewWorkshopRepository(database)
-	// workbenchRepo already created early for LogWriter (with nil LogWriter due to circular dependency)
+	// workbenchRepo already created early for EventWriter (with nil EventWriter due to circular dependency)
 	factoryService = app.NewFactoryService(factoryRepo)
 	workshopService = app.NewWorkshopService(factoryRepo, workshopRepo, workbenchRepo, repoRepo, tmuxService, workspaceAdapter, executor)
 	workbenchService = app.NewWorkbenchService(workbenchRepo, workshopRepo, repoRepo, agentProvider, executor, workspaceAdapter)
@@ -221,8 +223,8 @@ func initServices() {
 	// Create plan service
 	planService = app.NewPlanService(planRepo)
 
-	// Create log service for activity logs (workshopLogRepo created early for LogWriter)
-	logService = app.NewLogService(workshopLogRepo)
+	// Create event service (unified audit + operational events)
+	eventService = app.NewEventService(workshopEventRepo, operationalEventRepo)
 
 	// Create hook event service for hook invocation tracking
 	hookEventRepo := sqlite.NewHookEventRepository(database)
