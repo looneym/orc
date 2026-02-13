@@ -201,6 +201,11 @@ func (a *Adapter) SetupGoblinPane(ctx context.Context, sessionName, windowName s
 	return tmuxpkg.SetupGoblinPane(target)
 }
 
+// IsOrcSession returns true if the current tmux session has ORC_WORKSHOP_ID set.
+func IsOrcSession() bool {
+	return tmuxpkg.IsOrcSession()
+}
+
 // ApplyGlobalBindings sets up ORC's global tmux key bindings.
 // Safe to call repeatedly (idempotent). Silently ignores errors (tmux may not be running).
 func ApplyGlobalBindings() {

@@ -439,6 +439,18 @@ func GetCurrentSessionName() string {
 	return strings.TrimSpace(string(output))
 }
 
+// IsOrcSession returns true if the current tmux session has ORC_WORKSHOP_ID set,
+// indicating this is an ORC-managed workshop session.
+// Returns false if not in tmux, session name unavailable, or env var not set.
+func IsOrcSession() bool {
+	session := GetCurrentSessionName()
+	if session == "" {
+		return false
+	}
+	val, err := GetEnvironment(session, "ORC_WORKSHOP_ID")
+	return err == nil && val != ""
+}
+
 // SetOption sets a tmux option for a session.
 func SetOption(session, option, value string) error {
 	cmd := exec.Command("tmux", "set-option", "-t", session, option, value)

@@ -1,0 +1,9 @@
+#!/bin/bash
+# ORC dev shim - uses workbench-local DB
+if [[ ! -f ".orc/workbench.db" ]]; then
+  echo "Error: No workbench DB found at .orc/workbench.db" >&2
+  echo "Run: make setup-workbench" >&2
+  exit 1
+fi
+export ORC_DB_PATH=".orc/workbench.db"
+exec "$(dirname "$0")/orc" "$@"

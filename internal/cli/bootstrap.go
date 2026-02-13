@@ -3,6 +3,7 @@ package cli
 
 import (
 	gocontext "context"
+	"os"
 
 	"github.com/example/orc/internal/agent"
 	orccontext "github.com/example/orc/internal/context"
@@ -44,6 +45,14 @@ func NewContext() gocontext.Context {
 // ApplyGlobalBindings sets up ORC's global tmux key bindings.
 // Safe to call repeatedly (idempotent). Silently ignores errors (tmux may not be running).
 // This should be called on every orc command invocation via PersistentPreRun.
+// Only applies bindings when running inside an ORC workshop session to avoid
+// side effects outside ORC (e.g., bare tmux sessions, CI).
 func ApplyGlobalBindings() {
+	if os.Getenv("TMUX") == "" {
+		return
+	}
+	if !wire.IsOrcSession() {
+		return
+	}
 	wire.ApplyGlobalTMuxBindings()
 }
