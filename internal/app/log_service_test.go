@@ -11,52 +11,55 @@ import (
 	"github.com/example/orc/internal/ports/secondary"
 )
 
-// mockWorkshopLogRepository implements secondary.WorkshopLogRepository for testing.
-type mockWorkshopLogRepository struct {
-	logs           map[string]*secondary.WorkshopLogRecord
+// mockWorkshopEventRepository implements secondary.WorkshopEventRepository for testing.
+type mockWorkshopEventRepository struct {
+	events         map[string]*secondary.AuditEventRecord
 	workshopExists map[string]bool
 	nextID         int
 }
 
-func newMockWorkshopLogRepository() *mockWorkshopLogRepository {
-	return &mockWorkshopLogRepository{
-		logs:           make(map[string]*secondary.WorkshopLogRecord),
+func newMockWorkshopEventRepository() *mockWorkshopEventRepository {
+	return &mockWorkshopEventRepository{
+		events:         make(map[string]*secondary.AuditEventRecord),
 		workshopExists: make(map[string]bool),
 		nextID:         1,
 	}
 }
 
-func (m *mockWorkshopLogRepository) Create(ctx context.Context, log *secondary.WorkshopLogRecord) error {
-	m.logs[log.ID] = log
+func (m *mockWorkshopEventRepository) Create(ctx context.Context, event *secondary.AuditEventRecord) error {
+	m.events[event.ID] = event
 	return nil
 }
 
-func (m *mockWorkshopLogRepository) GetByID(ctx context.Context, id string) (*secondary.WorkshopLogRecord, error) {
-	if l, ok := m.logs[id]; ok {
-		return l, nil
+func (m *mockWorkshopEventRepository) GetByID(ctx context.Context, id string) (*secondary.AuditEventRecord, error) {
+	if e, ok := m.events[id]; ok {
+		return e, nil
 	}
 	return nil, errors.New("not found")
 }
 
-func (m *mockWorkshopLogRepository) List(ctx context.Context, filters secondary.WorkshopLogFilters) ([]*secondary.WorkshopLogRecord, error) {
-	var result []*secondary.WorkshopLogRecord
-	for _, l := range m.logs {
-		if filters.WorkshopID != "" && l.WorkshopID != filters.WorkshopID {
+func (m *mockWorkshopEventRepository) List(ctx context.Context, filters secondary.AuditEventFilters) ([]*secondary.AuditEventRecord, error) {
+	var result []*secondary.AuditEventRecord
+	for _, e := range m.events {
+		if filters.WorkshopID != "" && e.WorkshopID != filters.WorkshopID {
 			continue
 		}
-		if filters.EntityType != "" && l.EntityType != filters.EntityType {
+		if filters.EntityType != "" && e.EntityType != filters.EntityType {
 			continue
 		}
-		if filters.EntityID != "" && l.EntityID != filters.EntityID {
+		if filters.EntityID != "" && e.EntityID != filters.EntityID {
 			continue
 		}
-		if filters.ActorID != "" && l.ActorID != filters.ActorID {
+		if filters.ActorID != "" && e.ActorID != filters.ActorID {
 			continue
 		}
-		if filters.Action != "" && l.Action != filters.Action {
+		if filters.Action != "" && e.Action != filters.Action {
 			continue
 		}
-		result = append(result, l)
+		if filters.Source != "" && e.Source != filters.Source {
+			continue
+		}
+		result = append(result, e)
 	}
 
 	// Apply limit
@@ -67,35 +70,34 @@ func (m *mockWorkshopLogRepository) List(ctx context.Context, filters secondary.
 	return result, nil
 }
 
-func (m *mockWorkshopLogRepository) GetNextID(ctx context.Context) (string, error) {
+func (m *mockWorkshopEventRepository) GetNextID(ctx context.Context) (string, error) {
 	id := m.nextID
 	m.nextID++
-	return fmt.Sprintf("WL-%04d", id), nil
+	return fmt.Sprintf("WE-%04d", id), nil
 }
 
-func (m *mockWorkshopLogRepository) WorkshopExists(ctx context.Context, workshopID string) (bool, error) {
+func (m *mockWorkshopEventRepository) WorkshopExists(ctx context.Context, workshopID string) (bool, error) {
 	return m.workshopExists[workshopID], nil
 }
 
-func (m *mockWorkshopLogRepository) PruneOlderThan(ctx context.Context, days int) (int, error) {
-	// For testing, just pretend to prune
+func (m *mockWorkshopEventRepository) PruneOlderThan(ctx context.Context, days int) (int, error) {
 	count := 0
 	cutoff := time.Now().AddDate(0, 0, -days)
-	for id, log := range m.logs {
-		ts, err := time.Parse(time.RFC3339, log.Timestamp)
+	for id, event := range m.events {
+		ts, err := time.Parse(time.RFC3339, event.Timestamp)
 		if err != nil {
 			continue
 		}
 		if ts.Before(cutoff) {
-			delete(m.logs, id)
+			delete(m.events, id)
 			count++
 		}
 	}
 	return count, nil
 }
 
-func newTestLogService() (*LogServiceImpl, *mockWorkshopLogRepository) {
-	repo := newMockWorkshopLogRepository()
+func newTestLogService() (*LogServiceImpl, *mockWorkshopEventRepository) {
+	repo := newMockWorkshopEventRepository()
 	service := NewLogService(repo)
 	return service, repo
 }
@@ -104,8 +106,8 @@ func TestLogService_GetLog(t *testing.T) {
 	service, repo := newTestLogService()
 	ctx := context.Background()
 
-	repo.logs["WL-0001"] = &secondary.WorkshopLogRecord{
-		ID:         "WL-0001",
+	repo.events["WE-0001"] = &secondary.AuditEventRecord{
+		ID:         "WE-0001",
 		WorkshopID: "SHOP-001",
 		Timestamp:  "2024-01-01T12:00:00Z",
 		ActorID:    "IMP-BENCH-001",
@@ -114,7 +116,7 @@ func TestLogService_GetLog(t *testing.T) {
 		Action:     "create",
 	}
 
-	log, err := service.GetLog(ctx, "WL-0001")
+	log, err := service.GetLog(ctx, "WE-0001")
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -127,7 +129,7 @@ func TestLogService_GetLog_NotFound(t *testing.T) {
 	service, _ := newTestLogService()
 	ctx := context.Background()
 
-	_, err := service.GetLog(ctx, "WL-9999")
+	_, err := service.GetLog(ctx, "WE-9999")
 	if err == nil {
 		t.Error("expected error for non-existent log")
 	}
@@ -137,8 +139,8 @@ func TestLogService_ListLogs(t *testing.T) {
 	service, repo := newTestLogService()
 	ctx := context.Background()
 
-	repo.logs["WL-0001"] = &secondary.WorkshopLogRecord{ID: "WL-0001", WorkshopID: "SHOP-001", EntityType: "task", EntityID: "TASK-001", Action: "create", Timestamp: "2024-01-01T12:00:00Z"}
-	repo.logs["WL-0002"] = &secondary.WorkshopLogRecord{ID: "WL-0002", WorkshopID: "SHOP-001", EntityType: "task", EntityID: "TASK-002", Action: "create", Timestamp: "2024-01-01T12:01:00Z"}
+	repo.events["WE-0001"] = &secondary.AuditEventRecord{ID: "WE-0001", WorkshopID: "SHOP-001", EntityType: "task", EntityID: "TASK-001", Action: "create", Timestamp: "2024-01-01T12:00:00Z"}
+	repo.events["WE-0002"] = &secondary.AuditEventRecord{ID: "WE-0002", WorkshopID: "SHOP-001", EntityType: "task", EntityID: "TASK-002", Action: "create", Timestamp: "2024-01-01T12:01:00Z"}
 
 	logs, err := service.ListLogs(ctx, primary.LogFilters{})
 	if err != nil {
@@ -153,8 +155,8 @@ func TestLogService_ListLogs_WithFilters(t *testing.T) {
 	service, repo := newTestLogService()
 	ctx := context.Background()
 
-	repo.logs["WL-0001"] = &secondary.WorkshopLogRecord{ID: "WL-0001", WorkshopID: "SHOP-001", EntityType: "task", EntityID: "TASK-001", Action: "create", ActorID: "IMP-BENCH-001", Timestamp: "2024-01-01T12:00:00Z"}
-	repo.logs["WL-0002"] = &secondary.WorkshopLogRecord{ID: "WL-0002", WorkshopID: "SHOP-001", EntityType: "task", EntityID: "TASK-002", Action: "create", ActorID: "IMP-BENCH-002", Timestamp: "2024-01-01T12:01:00Z"}
+	repo.events["WE-0001"] = &secondary.AuditEventRecord{ID: "WE-0001", WorkshopID: "SHOP-001", EntityType: "task", EntityID: "TASK-001", Action: "create", ActorID: "IMP-BENCH-001", Timestamp: "2024-01-01T12:00:00Z"}
+	repo.events["WE-0002"] = &secondary.AuditEventRecord{ID: "WE-0002", WorkshopID: "SHOP-001", EntityType: "task", EntityID: "TASK-002", Action: "create", ActorID: "IMP-BENCH-002", Timestamp: "2024-01-01T12:01:00Z"}
 
 	logs, err := service.ListLogs(ctx, primary.LogFilters{ActorID: "IMP-BENCH-001"})
 	if err != nil {
@@ -172,12 +174,12 @@ func TestLogService_PruneLogs(t *testing.T) {
 	service, repo := newTestLogService()
 	ctx := context.Background()
 
-	// Add old and new logs
+	// Add old and new events
 	oldTime := time.Now().AddDate(0, 0, -60).Format(time.RFC3339) // 60 days old
 	newTime := time.Now().Format(time.RFC3339)
 
-	repo.logs["WL-0001"] = &secondary.WorkshopLogRecord{ID: "WL-0001", WorkshopID: "SHOP-001", EntityType: "task", Timestamp: oldTime}
-	repo.logs["WL-0002"] = &secondary.WorkshopLogRecord{ID: "WL-0002", WorkshopID: "SHOP-001", EntityType: "task", Timestamp: newTime}
+	repo.events["WE-0001"] = &secondary.AuditEventRecord{ID: "WE-0001", WorkshopID: "SHOP-001", EntityType: "task", Timestamp: oldTime}
+	repo.events["WE-0002"] = &secondary.AuditEventRecord{ID: "WE-0002", WorkshopID: "SHOP-001", EntityType: "task", Timestamp: newTime}
 
 	count, err := service.PruneLogs(ctx, 30)
 	if err != nil {
@@ -186,7 +188,7 @@ func TestLogService_PruneLogs(t *testing.T) {
 	if count != 1 {
 		t.Errorf("expected 1 pruned, got %d", count)
 	}
-	if len(repo.logs) != 1 {
-		t.Errorf("expected 1 log remaining, got %d", len(repo.logs))
+	if len(repo.events) != 1 {
+		t.Errorf("expected 1 event remaining, got %d", len(repo.events))
 	}
 }

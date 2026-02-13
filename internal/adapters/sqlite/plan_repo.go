@@ -12,14 +12,14 @@ import (
 
 // PlanRepository implements secondary.PlanRepository with SQLite.
 type PlanRepository struct {
-	db        *sql.DB
-	logWriter secondary.LogWriter
+	db          *sql.DB
+	eventWriter secondary.EventWriter
 }
 
 // NewPlanRepository creates a new SQLite plan repository.
-// logWriter is optional - if nil, no audit logging is performed.
-func NewPlanRepository(db *sql.DB, logWriter secondary.LogWriter) *PlanRepository {
-	return &PlanRepository{db: db, logWriter: logWriter}
+// eventWriter is optional - if nil, no audit logging is performed.
+func NewPlanRepository(db *sql.DB, eventWriter secondary.EventWriter) *PlanRepository {
+	return &PlanRepository{db: db, eventWriter: eventWriter}
 }
 
 // Create persists a new plan.
@@ -43,8 +43,8 @@ func (r *PlanRepository) Create(ctx context.Context, plan *secondary.PlanRecord)
 	}
 
 	// Log create operation
-	if r.logWriter != nil {
-		_ = r.logWriter.LogCreate(ctx, "plan", plan.ID)
+	if r.eventWriter != nil {
+		_ = r.eventWriter.EmitAuditCreate(ctx, "plan", plan.ID)
 	}
 
 	return nil

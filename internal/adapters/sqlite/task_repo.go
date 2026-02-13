@@ -12,14 +12,14 @@ import (
 
 // TaskRepository implements secondary.TaskRepository with SQLite.
 type TaskRepository struct {
-	db        *sql.DB
-	logWriter secondary.LogWriter
+	db          *sql.DB
+	eventWriter secondary.EventWriter
 }
 
 // NewTaskRepository creates a new SQLite task repository.
-// logWriter is optional - if nil, no audit logging is performed.
-func NewTaskRepository(db *sql.DB, logWriter secondary.LogWriter) *TaskRepository {
-	return &TaskRepository{db: db, logWriter: logWriter}
+// eventWriter is optional - if nil, no audit logging is performed.
+func NewTaskRepository(db *sql.DB, eventWriter secondary.EventWriter) *TaskRepository {
+	return &TaskRepository{db: db, eventWriter: eventWriter}
 }
 
 // scanTask scans a task row into a TaskRecord.
@@ -105,8 +105,8 @@ func (r *TaskRepository) Create(ctx context.Context, task *secondary.TaskRecord)
 	}
 
 	// Log create operation
-	if r.logWriter != nil {
-		_ = r.logWriter.LogCreate(ctx, "task", task.ID)
+	if r.eventWriter != nil {
+		_ = r.eventWriter.EmitAuditCreate(ctx, "task", task.ID)
 	}
 
 	return nil
@@ -224,8 +224,8 @@ func (r *TaskRepository) Delete(ctx context.Context, id string) error {
 	}
 
 	// Log delete operation
-	if r.logWriter != nil {
-		_ = r.logWriter.LogDelete(ctx, "task", id)
+	if r.eventWriter != nil {
+		_ = r.eventWriter.EmitAuditDelete(ctx, "task", id)
 	}
 
 	return nil
@@ -326,7 +326,7 @@ func (r *TaskRepository) GetByShipment(ctx context.Context, shipmentID string) (
 func (r *TaskRepository) UpdateStatus(ctx context.Context, id, status string, setClaimed, setCompleted bool) error {
 	// Get old status for logging
 	var oldStatus string
-	if r.logWriter != nil {
+	if r.eventWriter != nil {
 		_ = r.db.QueryRowContext(ctx, "SELECT status FROM tasks WHERE id = ?", id).Scan(&oldStatus)
 	}
 
@@ -354,8 +354,8 @@ func (r *TaskRepository) UpdateStatus(ctx context.Context, id, status string, se
 	}
 
 	// Log status change
-	if r.logWriter != nil && oldStatus != status {
-		_ = r.logWriter.LogUpdate(ctx, "task", id, "status", oldStatus, status)
+	if r.eventWriter != nil && oldStatus != status {
+		_ = r.eventWriter.EmitAuditUpdate(ctx, "task", id, "status", oldStatus, status)
 	}
 
 	return nil

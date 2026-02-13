@@ -12,14 +12,14 @@ import (
 
 // ShipmentRepository implements secondary.ShipmentRepository with SQLite.
 type ShipmentRepository struct {
-	db        *sql.DB
-	logWriter secondary.LogWriter
+	db          *sql.DB
+	eventWriter secondary.EventWriter
 }
 
 // NewShipmentRepository creates a new SQLite shipment repository.
-// logWriter is optional - if nil, no audit logging is performed.
-func NewShipmentRepository(db *sql.DB, logWriter secondary.LogWriter) *ShipmentRepository {
-	return &ShipmentRepository{db: db, logWriter: logWriter}
+// eventWriter is optional - if nil, no audit logging is performed.
+func NewShipmentRepository(db *sql.DB, eventWriter secondary.EventWriter) *ShipmentRepository {
+	return &ShipmentRepository{db: db, eventWriter: eventWriter}
 }
 
 // Create persists a new shipment.
@@ -54,8 +54,8 @@ func (r *ShipmentRepository) Create(ctx context.Context, shipment *secondary.Shi
 	}
 
 	// Log create operation
-	if r.logWriter != nil {
-		_ = r.logWriter.LogCreate(ctx, "shipment", shipment.ID)
+	if r.eventWriter != nil {
+		_ = r.eventWriter.EmitAuditCreate(ctx, "shipment", shipment.ID)
 	}
 
 	return nil

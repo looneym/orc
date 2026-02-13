@@ -68,7 +68,7 @@ It coordinates IMPs (Implementation Agents) working in isolated workbenches (wor
 	// Developer tools
 	rootCmd.AddCommand(cli.ScaffoldCmd())
 	rootCmd.AddCommand(cli.DebugCmd())
-	rootCmd.AddCommand(cli.LogCmd())
+	rootCmd.AddCommand(cli.EventsCmd())
 
 	// Claude Code integration
 	rootCmd.AddCommand(cli.HookCmd())
