@@ -1,9 +1,97 @@
 #!/bin/bash
-# ORC dev shim - uses workbench-local DB
-if [[ ! -f ".orc/workbench.db" ]]; then
-  echo "Error: No workbench DB found at .orc/workbench.db" >&2
-  echo "Run: make setup-workbench" >&2
-  exit 1
+# ORC dev shim - CLI gateway for development with explicit DB and binary selection
+#
+# Usage: orc-dev [--db local|prod] [--bin local|installed] <orc-args...>
+#
+# Options (must come before orc subcommand):
+#   --db local       Use workbench DB (.orc/workbench.db) [default]
+#   --db prod        Use production DB (~/.orc/orc.db)
+#   --bin local      Use local build (./orc) [default if ./orc exists]
+#   --bin installed  Use installed binary (GOBIN/orc)
+#
+# Examples:
+#   orc-dev summary                    # local DB, local binary
+#   orc-dev --db prod summary --poll   # production DB, local binary
+#   orc-dev --bin installed doctor     # local DB, installed binary
+
+set -euo pipefail
+
+DB_MODE="local"
+BIN_MODE=""
+
+# Parse shim options (before orc subcommand)
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --db)
+      if [[ $# -lt 2 ]]; then
+        echo "Error: --db requires a value (local|prod)" >&2
+        exit 1
+      fi
+      DB_MODE="$2"
+      if [[ "$DB_MODE" != "local" && "$DB_MODE" != "prod" ]]; then
+        echo "Error: --db must be 'local' or 'prod' (got '$DB_MODE')" >&2
+        exit 1
+      fi
+      shift 2
+      ;;
+    --bin)
+      if [[ $# -lt 2 ]]; then
+        echo "Error: --bin requires a value (local|installed)" >&2
+        exit 1
+      fi
+      BIN_MODE="$2"
+      if [[ "$BIN_MODE" != "local" && "$BIN_MODE" != "installed" ]]; then
+        echo "Error: --bin must be 'local' or 'installed' (got '$BIN_MODE')" >&2
+        exit 1
+      fi
+      shift 2
+      ;;
+    *)
+      break  # First non-option arg — rest goes to orc
+      ;;
+  esac
+done
+
+# Smart default for --bin: local if ./orc exists, installed otherwise
+if [[ -z "$BIN_MODE" ]]; then
+  if [[ -x "./orc" ]]; then
+    BIN_MODE="local"
+  else
+    BIN_MODE="installed"
+  fi
 fi
-export ORC_DB_PATH=".orc/workbench.db"
-exec "$(dirname "$0")/orc" "$@"
+
+# Resolve binary path
+if [[ "$BIN_MODE" == "local" ]]; then
+  ORC_BIN="./orc"
+  if [[ ! -x "$ORC_BIN" ]]; then
+    echo "Error: No local binary found at ./orc" >&2
+    echo "Run: make dev" >&2
+    exit 1
+  fi
+else
+  GOBIN="${GOBIN:-$(go env GOPATH)/bin}"
+  ORC_BIN="$GOBIN/orc"
+  if [[ ! -x "$ORC_BIN" ]]; then
+    echo "Error: No installed binary found at $ORC_BIN" >&2
+    echo "Run: make install" >&2
+    exit 1
+  fi
+fi
+
+# Resolve database path
+if [[ "$DB_MODE" == "local" ]]; then
+  if [[ ! -f ".orc/workbench.db" ]]; then
+    echo "Error: No workbench DB found at .orc/workbench.db" >&2
+    echo "Run: make setup-workbench" >&2
+    exit 1
+  fi
+  export ORC_DB_PATH=".orc/workbench.db"
+else
+  export ORC_DB_PATH="$HOME/.orc/orc.db"
+fi
+
+# Signal to the Go binary that we came through the shim
+export ORC_VIA_SHIM=1
+
+exec "$ORC_BIN" "$@"

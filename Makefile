@@ -68,11 +68,11 @@ install-dev-shim:
 # Development (local binary)
 #---------------------------------------------------------------------------
 
-# Build local binary for development (preferred command)
+# Build local binary for development (use orc-dev to run)
 dev:
 	@echo "Building local ./orc..."
-	@go build -ldflags "$(LDFLAGS)" -o orc ./cmd/orc
-	@echo "✓ Built ./orc (local development binary)"
+	@go build -ldflags "$(LDFLAGS) -X 'github.com/example/orc/internal/version.DevBuild=true'" -o orc ./cmd/orc
+	@echo "✓ Built ./orc (use orc-dev to run)"
 
 # Alias for backwards compatibility
 build: dev

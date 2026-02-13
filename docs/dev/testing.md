@@ -62,7 +62,7 @@ Use `testutil_test.go` helpers in `internal/adapters/sqlite/` where available to
 When developing changes that affect CLI display (summary, containers, leafs, etc.), use the test commission to validate output:
 
 ```bash
-./orc summary --commission COMM-003
+orc-dev summary --commission COMM-003
 ```
 
 ### What's in COMM-003

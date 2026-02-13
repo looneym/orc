@@ -26,6 +26,17 @@ func main() {
 		Long: `ORC is a CLI tool for managing commissions, shipments, and tasks.
 It coordinates IMPs (Implementation Agents) working in isolated workbenches (worktrees).`,
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
+			// Dev-build gate: ./orc (built by make dev) must be run through orc-dev
+			if version.DevBuild == "true" && os.Getenv("ORC_VIA_SHIM") != "1" {
+				fmt.Fprintln(os.Stderr, "Error: This is a dev build of orc and must be run through orc-dev.")
+				fmt.Fprintln(os.Stderr, "")
+				fmt.Fprintln(os.Stderr, "  orc-dev <command>    Run with workbench DB (development)")
+				fmt.Fprintln(os.Stderr, "  make install         Install production binary (no gate)")
+				fmt.Fprintln(os.Stderr, "")
+				fmt.Fprintln(os.Stderr, "See: orc-dev --help")
+				os.Exit(1)
+			}
+
 			// Detect actor identity at CLI startup
 			cli.DetectAndStoreActor()
 			// Apply global tmux bindings (idempotent, no-op if tmux not running)

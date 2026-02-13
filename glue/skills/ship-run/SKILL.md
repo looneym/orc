@@ -104,17 +104,7 @@ Workers needed: 2
 - Minimize the number of workers (each has overhead)
 - A single worker can handle 2-4 tasks sequentially
 
-Present to Goblin:
-```
-Proposed team: 2 IMPs
-
-  imp-alpha:  TASK-001 -> TASK-003
-  imp-bravo:  TASK-002 -> TASK-004
-
-Approve team shape? [y/n/edit]
-```
-
-Wait for explicit Goblin approval before proceeding.
+Present the proposed shape to the Goblin and proceed with spawning workers. The lead has sufficient context to make good team shape decisions autonomously.
 
 ### Step 5: Prepare Worker Context
 
@@ -142,7 +132,7 @@ Your mission: <stream description> -- tasks <task-list>.
 ## Important context
 
 - Working directory: <workbench-path>
-- Use `./orc` (local binary) for any ORC commands
+- Use `orc-dev` for smoke-testing CLI changes (workbench DB). Do NOT run orc ledger commands (task complete, note create, etc.)
 - Use `make dev` to rebuild if needed, `make test` and `make lint` to verify
 - Branch: <branch-name>
 
@@ -168,7 +158,26 @@ Workers launched:
 Monitor with: orc task list --shipment SHIP-xxx
 ```
 
-### Step 7: Transition Shipment
+### Step 7: Lead Reconciliation
+
+Workers are ORC-unaware -- they do not update the ORC ledger directly. As the lead monitors worker progress:
+
+1. When a worker marks a Claude task as completed, the lead updates the corresponding ORC task:
+   ```bash
+   orc task status TASK-xxx --set closed
+   ```
+2. Add notes capturing key decisions or implementation details:
+   ```bash
+   orc note create --task TASK-xxx "Implemented X using Y approach"
+   ```
+3. If a worker reports being blocked, update the ORC task:
+   ```bash
+   orc task status TASK-xxx --set blocked
+   ```
+
+The lead is the single point of truth for ORC ledger updates during a ship-run.
+
+### Step 8: Transition Shipment
 
 If shipment is in `ready` status, transition to `in-progress`:
 ```bash
@@ -177,12 +186,12 @@ orc shipment status SHIP-xxx --set in-progress
 
 ## Guidelines
 
-- **Always get Goblin approval** before spawning workers
 - **Preflight is mandatory** -- never skip build/test checks
 - **Prefer fewer workers** -- each worker has context overhead
 - **Include spec note** in every worker's context injection
 - **Tasks with no depends_on are parallelizable** -- assign to separate streams
 - **Don't split fine-grained** -- let each worker handle a full stream
+- **Lead owns the ledger** -- workers do not update ORC directly; the lead reconciles
 
 ## Error Handling
 
@@ -192,7 +201,6 @@ orc shipment status SHIP-xxx --set in-progress
 | All tasks closed | "All tasks already closed. Nothing to run." |
 | Preflight fails | Show failure, do not spawn workers |
 | Circular dependency | "Circular dependency detected. Fix task graph." |
-| Goblin rejects shape | Ask for edits, re-propose |
 
 ## Example Session
 
@@ -221,9 +229,6 @@ Proposed team: 3 IMPs
   imp-bravo:   TASK-1001 -> TASK-1002
   imp-charlie:  TASK-999
 
-Approve team shape? [y/n/edit]
-> y
-
 [spawns 3 workers with context]
 
 Workers launched:
@@ -232,4 +237,9 @@ Workers launched:
   imp-charlie:  TASK-999 (1 task)
 
 Monitor with: orc task list --shipment SHIP-381
+
+[later, as workers complete tasks]
+orc task status TASK-999 --set closed
+orc task status TASK-998 --set closed
+...
 ```

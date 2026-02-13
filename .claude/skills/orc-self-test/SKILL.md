@@ -18,7 +18,7 @@ with `=` prefix. Always run cleanup even on failure.
 
 ## Prerequisites
 
-- `./orc` must be available (use `make dev` to build)
+- `orc-dev` must be available (use `make dev` to build, `make install` for the shim)
 - tmux must be installed
 - Test repository `orc-canary` must exist (check `orc repo list`)
 
@@ -41,7 +41,7 @@ SESSION_NAME=<workshop name>
 ### 1. Detect Test Repository
 
 ```bash
-TEST_REPO_ID=$(./orc repo list | grep orc-canary | awk '{print $1}')
+TEST_REPO_ID=$(orc-dev repo list | grep orc-canary | awk '{print $1}')
 if [ -z "$TEST_REPO_ID" ]; then
   echo "[FAIL] orc-canary repo not registered. Run: orc repo create orc-canary --path ~/src/orc-canary --default-branch master"
   exit 1
@@ -52,13 +52,13 @@ echo "[PASS] Test repo found: $TEST_REPO_ID"
 ### 2. Create Test Entities
 
 ```bash
-FACTORY_ID=$(./orc factory create "orc-self-test" 2>&1 | grep -o 'FACT-[0-9]*')
+FACTORY_ID=$(orc-dev factory create "orc-self-test" 2>&1 | grep -o 'FACT-[0-9]*')
 echo "Created factory: $FACTORY_ID"
 
-WORKSHOP_ID=$(./orc workshop create --factory "$FACTORY_ID" --name "orc-self-test" 2>&1 | grep -o 'WORK-[0-9]*')
+WORKSHOP_ID=$(orc-dev workshop create --factory "$FACTORY_ID" --name "orc-self-test" 2>&1 | grep -o 'WORK-[0-9]*')
 echo "Created workshop: $WORKSHOP_ID"
 
-./orc workbench create --workshop "$WORKSHOP_ID" --repo-id "$TEST_REPO_ID"
+orc-dev workbench create --workshop "$WORKSHOP_ID" --repo-id "$TEST_REPO_ID"
 # Parse output for BENCH ID, name, path
 ```
 
@@ -85,7 +85,7 @@ Use `orc tmux apply --yes` to create the session. This replaces the old `orc tmu
 
 ```bash
 # Apply session via ORC (creates session + windows + enrichment in one command)
-./orc tmux apply "$WORKSHOP_ID" --yes
+orc-dev tmux apply "$WORKSHOP_ID" --yes
 
 SESSION_NAME="orc-self-test"
 
@@ -223,7 +223,7 @@ fi
 echo "[PASS] Guest pane created (4 panes total)"
 
 # Run apply again -- it should relocate guest panes
-./orc tmux apply "$WORKSHOP_ID" --yes
+orc-dev tmux apply "$WORKSHOP_ID" --yes
 
 # Verify guest pane relocated (back to 3 in main window)
 PANE_COUNT_AFTER=$(tmux list-panes -t "=$SESSION_NAME:$WORKBENCH_NAME" | wc -l | tr -d ' ')
@@ -250,7 +250,7 @@ tmux send-keys -t "=$SESSION_NAME:$IMPS_WINDOW" C-c
 sleep 1
 
 # Run apply again -- it should detect and prune the dead pane (or kill the -imps window)
-./orc tmux apply "$WORKSHOP_ID" --yes
+orc-dev tmux apply "$WORKSHOP_ID" --yes
 
 # The -imps window should be gone (it only had the one dead pane)
 if tmux list-windows -t "=$SESSION_NAME" -F "#{window_name}" | grep -q "^${IMPS_WINDOW}$"; then
@@ -264,7 +264,7 @@ echo "[PASS] Dead pane pruned, empty -imps window killed"
 
 ```bash
 # Run apply again -- should be a no-op (except enrichment and layout reconciliation)
-./orc tmux apply "$WORKSHOP_ID" --yes
+orc-dev tmux apply "$WORKSHOP_ID" --yes
 
 # Verify session still exists and has correct pane count
 if ! tmux has-session -t "=$SESSION_NAME" 2>/dev/null; then
@@ -319,7 +319,7 @@ else
 fi
 
 # Archive workbench and clean up worktree
-./orc workbench archive "$WORKBENCH_ID"
+orc-dev workbench archive "$WORKBENCH_ID"
 rm -rf "$WORKBENCH_PATH"
 
 # Prune git worktrees
@@ -373,11 +373,11 @@ If ANY step fails, you MUST still run cleanup:
 2. **Always** attempt cleanup:
    ```bash
    tmux kill-session -t "=orc-self-test" 2>/dev/null
-   ./orc workbench archive $WORKBENCH_ID 2>/dev/null
+   orc-dev workbench archive $WORKBENCH_ID 2>/dev/null
    rm -rf $WORKBENCH_PATH 2>/dev/null
    (cd ~/src/orc-canary && git worktree prune 2>/dev/null)
    ```
-3. Suggest running `./orc doctor` for diagnostics
+3. Suggest running `orc-dev doctor` for diagnostics
 
 ## Safety Rules for Agents
 
@@ -386,7 +386,7 @@ If ANY step fails, you MUST still run cleanup:
 3. **Never `orc tmux enrich`**: It mutates global tmux bindings on the user's live server
 4. **Never `cd` in main shell**: Use subshells `(cd ... && cmd)` to avoid changing agent working directory
 5. **Always cleanup**: Even on failure. Kill session, archive workbench, remove worktree
-6. **Use `./orc`**: The local binary in the workbench, not global `orc` or `orc-dev`
+6. **Use `orc-dev`**: The dev shim runs the local binary with workbench DB
 
 ## Key Architecture Notes
 

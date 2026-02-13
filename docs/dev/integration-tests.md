@@ -38,7 +38,7 @@ Validates the ORC environment and glue deployment. This is also run as the prefl
 | TMux scripts sync | `glue/tmux/` matches `~/.orc/tmux/` (missing or stale) |
 | Hook configuration | `glue/hooks.json` matches hooks in `~/.claude/settings.json` |
 | Binary installation | `orc` found in PATH |
-| Binary freshness | Local `./orc` built from current git commit (when in ORC repo) |
+| Binary freshness | Local `./orc` built from current git commit (when in ORC repo, via `orc-dev`) |
 
 **Flags:** `--quiet` (exit code only), `--strict` (treat warnings as errors).
 

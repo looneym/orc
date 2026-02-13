@@ -16,7 +16,7 @@ Orchestrate all ORC integration checks. This is a **team-lead skill** that runs 
 ## Prerequisites
 
 - ORC installed and working (`orc --version`)
-- `./orc` local binary built (`make dev`)
+- `orc-dev` available (`make dev` to build, `make install` for shim)
 
 ## Flow
 
@@ -25,7 +25,7 @@ Orchestrate all ORC integration checks. This is a **team-lead skill** that runs 
 #### Step 1: Run orc doctor
 
 ```bash
-./orc doctor
+orc-dev doctor
 ```
 
 If `orc doctor` reports any unhealthy checks, **stop immediately** and report the failures to the user. Do not proceed to Phase 2 until the environment is healthy.
@@ -74,7 +74,7 @@ If the user selects check 4 but tart/sshpass are missing, warn them and exclude 
 
 After user confirms, create a Claude Team and spawn one teammate per selected check. All teammates run in parallel.
 
-**Important:** Each teammate should use `./orc` (local binary) for all ORC commands.
+**Important:** Each teammate should use `orc-dev` for all ORC commands.
 
 ---
 
@@ -83,28 +83,28 @@ After user confirms, create a Claude Team and spawn one teammate per selected ch
 Spawn a teammate with this prompt:
 
 ```
-You are running the ORC infra integration check. Use ./orc (local binary) for all commands.
+You are running the ORC infra integration check. Use orc-dev for all commands.
 
 Follow these steps exactly:
 
 1. CREATE TEST FACTORY
-   ./orc factory create "[TEST] Self-Test Infra $(date +%s)"
+   orc-dev factory create "[TEST] Self-Test Infra $(date +%s)"
    Capture the factory ID (FACT-xxx).
 
 2. CREATE TEST WORKSHOP
-   ./orc workshop create --factory FACT-xxx --name "[TEST] Self-Test Workshop"
+   orc-dev workshop create --factory FACT-xxx --name "[TEST] Self-Test Workshop"
    Capture workshop ID (WORK-xxx).
 
 3. CREATE TEST WORKBENCH
-   ./orc workbench create --workshop WORK-xxx --repo-id REPO-001
+   orc-dev workbench create --workshop WORK-xxx --repo-id REPO-001
    Capture workbench ID (BENCH-xxx).
 
 4. CHECK INFRASTRUCTURE PLAN
-   ./orc infra plan WORK-xxx
+   orc-dev infra plan WORK-xxx
    Verify plan shows CREATE actions for workbench, tmux session, and tmux windows.
 
 5. APPLY INFRASTRUCTURE
-   ./orc infra apply WORK-xxx --yes
+   orc-dev infra apply WORK-xxx --yes
    Verify output shows workbenches and tmux session created.
 
 6. VERIFY FILESYSTEM STATE
@@ -117,13 +117,13 @@ Follow these steps exactly:
    Confirm session and window exist.
 
 8. ARCHIVE AND CLEANUP
-   ./orc workbench archive BENCH-xxx
-   ./orc workshop archive WORK-xxx
-   ./orc infra apply WORK-xxx --yes
+   orc-dev workbench archive BENCH-xxx
+   orc-dev workshop archive WORK-xxx
+   orc-dev infra apply WORK-xxx --yes
    Verify worktree directory removed and tmux window removed.
 
 9. DELETE DB ENTITIES
-   ./orc factory delete FACT-xxx --force
+   orc-dev factory delete FACT-xxx --force
 
 10. VERIFY CLEANUP
     ls ~/wb/BENCH-xxx-* 2>/dev/null && echo "ERROR: Orphan directory found" || echo "OK: No orphans"
@@ -145,45 +145,45 @@ Final summary format:
 Spawn a teammate with this prompt:
 
 ```
-You are running the ORC hello integration check. Use ./orc (local binary) for all commands.
+You are running the ORC hello integration check. Use orc-dev for all commands.
 This is an AUTOMATED version of the hello exercise -- no user interaction required.
 
 Follow these steps exactly:
 
 1. CREATE TEST FACTORY
    TEST_SUFFIX=$(date +%s)
-   ./orc factory create "Hello Check $TEST_SUFFIX"
+   orc-dev factory create "Hello Check $TEST_SUFFIX"
    Capture factory ID (FACT-xxx).
 
 2. CREATE TEST COMMISSION
-   ./orc commission create "Hello Test $TEST_SUFFIX"
+   orc-dev commission create "Hello Test $TEST_SUFFIX"
    Capture commission ID (COMM-xxx).
 
 3. CREATE TEST WORKSHOP
-   ./orc workshop create --factory FACT-xxx --name "Hello Workshop $TEST_SUFFIX"
+   orc-dev workshop create --factory FACT-xxx --name "Hello Workshop $TEST_SUFFIX"
    Capture workshop ID (WORK-xxx).
 
 4. CREATE TEST WORKBENCH
-   ./orc workbench create --workshop WORK-xxx --repo-id REPO-001
+   orc-dev workbench create --workshop WORK-xxx --repo-id REPO-001
    Capture workbench ID (BENCH-xxx).
 
 5. APPLY INFRASTRUCTURE
-   ./orc infra apply WORK-xxx --yes
+   orc-dev infra apply WORK-xxx --yes
    Verify infrastructure is created.
 
 6. RUN SUMMARY
-   ./orc summary
+   orc-dev summary
    Verify the summary output shows the test entities and system is interactive.
    This is the success criterion: reaching this point means the hello flow works.
 
 7. CLEANUP
    # Archive in correct order
-   ./orc workbench archive BENCH-xxx
-   ./orc workshop archive WORK-xxx
-   ./orc infra apply WORK-xxx --yes
-   ./orc commission archive COMM-xxx
+   orc-dev workbench archive BENCH-xxx
+   orc-dev workshop archive WORK-xxx
+   orc-dev infra apply WORK-xxx --yes
+   orc-dev commission archive COMM-xxx
    # Delete remaining DB entities
-   ./orc factory delete FACT-xxx --force
+   orc-dev factory delete FACT-xxx --force
 
 Report results as:
   [PASS] or [FAIL] for each step with details.
@@ -211,7 +211,7 @@ You should follow that pattern: spawn haiku subagents for each check category
 (structural, lane, CLI, schema, getting started coherence, ER diagram),
 collect findings, and synthesize a report.
 
-Use ./orc (local binary) for any ORC commands (e.g., validating CLI commands).
+Use orc-dev for any ORC commands (e.g., validating CLI commands).
 
 Final summary format:
   Docs Doctor: PASS or FAIL

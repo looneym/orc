@@ -5,7 +5,7 @@ Essential rules and pointers for agents working on the ORC codebase.
 ## Essential Commands
 
 ```bash
-make dev        # Build local ./orc (always use ./orc for development)
+make dev        # Build local ./orc (run via orc-dev, not directly)
 make test       # Run all tests
 make lint       # golangci-lint + go-arch-lint (architecture boundaries)
 make init       # Install git hooks after cloning
