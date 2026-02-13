@@ -1,6 +1,6 @@
 # ORC Architecture
 
-**Updated:** 2026-02-11
+**Updated:** 2026-02-13
 
 ---
 
@@ -58,6 +58,39 @@ ORC (Orchestrator) is a commission coordination system for managing complex, mul
 | Ports | internal/ports/ | Port interfaces |
 | DB | internal/db/ | Database access layer |
 | TMux | internal/tmux/ | TMux integration |
+
+**CLI Commands (internal/cli/):**
+
+| Command | Location | Description |
+|---------|----------|-------------|
+| events.go | internal/cli/events.go | Event system commands (tail, show, prune) |
+
+**Core (internal/core/):**
+
+| Component | Location | Description |
+|-----------|----------|-------------|
+| event/ | internal/core/event/ | Event source and level constants |
+
+**App (internal/app/):**
+
+| Component | Location | Description |
+|-----------|----------|-------------|
+| event_service.go | internal/app/event_service.go | Event service use cases |
+
+**Adapters (internal/adapters/):**
+
+| Component | Location | Description |
+|-----------|----------|-------------|
+| event_writer.go | internal/adapters/sqlite/event_writer.go | Event writer adapter (emits audit and operational events) |
+| audit_event_repo.go | internal/adapters/sqlite/audit_event_repo.go | Audit event repository (workshop_events table) |
+| operational_event_repo.go | internal/adapters/sqlite/operational_event_repo.go | Operational event repository (operational_events table) |
+
+**Ports (internal/ports/):**
+
+| Port | Type | Description |
+|------|------|-------------|
+| EventWriter | Secondary | EmitAuditCreate/Update/Delete + EmitOperational |
+| EventService | Primary | ListEvents, GetEvent, PruneEvents |
 
 ### Global Skills (glue/skills/)
 
@@ -181,6 +214,7 @@ orc shipment create "Title" --commission COMM-XXX
 orc task create "Task description" --shipment SHIP-XXX
 orc task complete TASK-XXX
 orc summary                    # Hierarchical view with pinned items
+orc events tail                # Stream audit and operational events
 ```
 
 ### 3. Workbench Management (Git Worktree Integration)
@@ -274,6 +308,8 @@ This pattern replaces SessionStart hooks (which are broken in Claude Code v2.1.7
 - `shipments` - Work containers with lifecycle
 - `tasks` - Atomic units of work within shipments
 - `workbenches` - Git worktrees registered to workshops
+- `workshop_events` - Audit trail (entity CRUD): source, level, entity_type, entity_id, action, message
+- `operational_events` - Runtime diagnostics: source, level, message, metadata
 
 **Key Fields:**
 - `shipments.status`: draft | ready | in-progress | closed
@@ -301,6 +337,8 @@ See `internal/db/schema.sql` for the complete schema
 - Workbenches (git worktrees)
 - Tags and task-tag associations
 - Current state (status, assignments, timestamps)
+- Audit events (entity CRUD trail)
+- Operational events (runtime diagnostics)
 
 **Characteristics:**
 - Fast, local, transactional

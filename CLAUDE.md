@@ -16,6 +16,7 @@ orc prime       # Context injection at session start
 orc status      # Current commission and shipment status
 orc summary     # Hierarchical view of shipments and tomes with pinned items
 orc doctor      # Validate ORC environment and glue deployment
+orc events tail # View audit and operational events
 ```
 
 Skills: `/ship-deploy` (see [docs/dev/deployment.md](docs/dev/deployment.md)), `/docs-doctor`
@@ -65,6 +66,7 @@ See [docs/common-workflows.md](docs/common-workflows.md).
 - [docs/dev/config.md](docs/dev/config.md) -- Config format, infrastructure plan/apply
 - [docs/dev/deployment.md](docs/dev/deployment.md) -- Deployment workflow and checks
 - [docs/dev/glue.md](docs/dev/glue.md) -- Skills and hooks system
+- [docs/dev/events.md](docs/dev/events.md) -- Event system — operational events, debugging with orc events
 
 ### General
 - [docs/getting-started.md](docs/getting-started.md) -- Setup and first-run
