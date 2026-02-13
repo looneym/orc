@@ -13,17 +13,16 @@ func ConnectCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "connect",
 		Short: "Launch Claude agent with boot instructions",
-		Long: `Launch Claude Code with immediate directive to run 'orc prime'.
+		Long: `Launch Claude Code with the /orc-prime skill for context bootstrapping.
 
 This command is designed to be the root command for agent TMux panes, ensuring
 that every time a pane spawns or respawns, Claude boots with proper context.
 
 The boot sequence:
   1. orc connect (launches claude)
-  2. Claude receives directive: "Run the orc prime shell command IMMEDIATELY"
-  3. Claude executes: orc prime
-  4. Agent receives full context (identity, assignments, rules)
-  5. Agent is ready to work
+  2. SessionStart hook injects ORC context automatically
+  3. Claude runs /orc-prime skill for full orientation
+  4. Agent is ready to work
 
 Usage:
   orc connect                    # Launch Claude (role from place_id)
@@ -47,9 +46,9 @@ func runConnect(cmd *cobra.Command, args []string) error {
 
 	cwd, _ := os.Getwd()
 
-	// The prime directive: Claude must run orc prime immediately upon boot
-	// Note: settings.local.json ensures Claude starts in normal mode (not plan mode)
-	primeDirective := "Run the 'orc prime' shell command IMMEDIATELY. Do not greet the user, do not explain what you're doing - just execute the command and show the output."
+	// The prime directive: Claude must run /orc-prime skill upon boot
+	// The SessionStart hook also injects context, but /orc-prime ensures full orientation
+	primeDirective := "Run /orc-prime to bootstrap project context. Do not greet the user first - just run the skill immediately."
 
 	// Build claude command
 	// Using "claude" assumes it's in PATH (standard Claude Code installation)
