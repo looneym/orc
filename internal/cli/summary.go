@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"path/filepath"
 	"sort"
 	"strings"
 	"syscall"
@@ -125,20 +126,64 @@ Examples:
 	return cmd
 }
 
+// openPollLog opens (or creates) ~/.orc/logs/poll.log in append mode.
+// Returns the file handle or nil if the log cannot be opened (logging is best-effort).
+func openPollLog() *os.File {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return nil
+	}
+	logDir := filepath.Join(home, ".orc", "logs")
+	if err := os.MkdirAll(logDir, 0755); err != nil {
+		return nil
+	}
+	f, err := os.OpenFile(filepath.Join(logDir, "poll.log"), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return nil
+	}
+	return f
+}
+
+// pollLog writes a timestamped line to the poll log file. No-op if logFile is nil.
+func pollLog(logFile *os.File, format string, args ...any) {
+	if logFile == nil {
+		return
+	}
+	ts := time.Now().Format("2006-01-02 15:04:05")
+	msg := fmt.Sprintf(format, args...)
+	fmt.Fprintf(logFile, "%s %s\n", ts, msg)
+}
+
 // runSummaryPoll runs the summary in a polling loop with countdown, keystroke controls, and animation.
 // Falls back to a simple ticker if stdin is not a TTY.
 func runSummaryPoll(cmd *cobra.Command, opts summaryOpts) error {
+	logFile := openPollLog()
+	if logFile != nil {
+		defer logFile.Close()
+	}
+
 	fd := int(os.Stdin.Fd())
+	isTTY := term.IsTerminal(fd)
 
 	// If stdin is not a TTY, fall back to simple polling (no keystrokes, no animation)
-	if !term.IsTerminal(fd) {
-		return runSummaryPollSimple(cmd, opts)
+	if !isTTY {
+		pollLog(logFile, "[start] TTY fallback: stdin is not a terminal")
+		if logFile != nil {
+			fmt.Fprintf(logFile, "=== POLL SESSION START %s ===\n", time.Now().Format("2006-01-02 15:04:05"))
+		}
+		pollLog(logFile, "[config] interval=%ds utils_detected=%v tty=false", opts.pollSeconds, isInsideUtilsSession())
+		return runSummaryPollSimple(cmd, opts, logFile)
 	}
 
 	// Put terminal in raw mode for single-keystroke reading
 	oldState, err := term.MakeRaw(fd)
 	if err != nil {
-		return runSummaryPollSimple(cmd, opts) // fall back on raw mode failure too
+		pollLog(logFile, "[start] TTY fallback: MakeRaw failed: %v", err)
+		if logFile != nil {
+			fmt.Fprintf(logFile, "=== POLL SESSION START %s ===\n", time.Now().Format("2006-01-02 15:04:05"))
+		}
+		pollLog(logFile, "[config] interval=%ds utils_detected=%v tty=false", opts.pollSeconds, isInsideUtilsSession())
+		return runSummaryPollSimple(cmd, opts, logFile)
 	}
 	defer func() {
 		term.Restore(fd, oldState)
@@ -147,6 +192,12 @@ func runSummaryPoll(cmd *cobra.Command, opts summaryOpts) error {
 
 	// Detect if running inside a utils tmux session (set by orc-utils-popup.sh)
 	isUtilsSession := isInsideUtilsSession()
+
+	// Log session start
+	if logFile != nil {
+		fmt.Fprintf(logFile, "=== POLL SESSION START %s ===\n", time.Now().Format("2006-01-02 15:04:05"))
+	}
+	pollLog(logFile, "[config] interval=%ds utils_detected=%v tty=true", opts.pollSeconds, isUtilsSession)
 
 	// Handle SIGTERM from outside (Ctrl+C won't generate SIGINT in raw mode)
 	sigCh := make(chan os.Signal, 1)
@@ -175,8 +226,13 @@ func runSummaryPoll(cmd *cobra.Command, opts summaryOpts) error {
 	// Initial render: clear screen and show summary
 	rawWrite("\033[H\033[2J")
 	if err := renderPollOutput(cmd, opts); err != nil {
+		pollLog(logFile, "[refresh] error: %v", err)
+		if logFile != nil {
+			fmt.Fprintf(logFile, "=== POLL SESSION END %s ===\n", time.Now().Format("2006-01-02 15:04:05"))
+		}
 		return err
 	}
+	pollLog(logFile, "[refresh] ok")
 
 	interval := opts.pollSeconds
 	for {
@@ -190,12 +246,21 @@ func runSummaryPoll(cmd *cobra.Command, opts summaryOpts) error {
 
 			select {
 			case <-sigCh:
+				pollLog(logFile, "[quit] SIGTERM received")
+				if logFile != nil {
+					fmt.Fprintf(logFile, "=== POLL SESSION END %s ===\n", time.Now().Format("2006-01-02 15:04:05"))
+				}
 				return nil
 			case key := <-keyCh:
 				switch key {
 				case 'r', 'R':
+					pollLog(logFile, "[key] r (manual refresh)")
 					refreshNow = true
 				case 'q', 'Q', 3, 27: // q, Ctrl+C, Escape
+					pollLog(logFile, "[key] quit (key=%d)", key)
+					if logFile != nil {
+						fmt.Fprintf(logFile, "=== POLL SESSION END %s ===\n", time.Now().Format("2006-01-02 15:04:05"))
+					}
 					if isUtilsSession {
 						detachUtilsSession()
 					}
@@ -213,8 +278,13 @@ func runSummaryPoll(cmd *cobra.Command, opts summaryOpts) error {
 		playRefreshAnimation()
 		rawWrite("\033[H") // cursor home
 		if err := renderPollOutput(cmd, opts); err != nil {
+			pollLog(logFile, "[refresh] error: %v", err)
+			if logFile != nil {
+				fmt.Fprintf(logFile, "=== POLL SESSION END %s ===\n", time.Now().Format("2006-01-02 15:04:05"))
+			}
 			return err
 		}
+		pollLog(logFile, "[refresh] ok")
 	}
 }
 
@@ -322,7 +392,9 @@ func abs(x int) int {
 
 // runSummaryPollSimple is a fallback poll loop for non-interactive terminals.
 // No raw mode, no keystrokes, no animation — just clear-and-redraw with a countdown.
-func runSummaryPollSimple(cmd *cobra.Command, opts summaryOpts) error {
+// The caller provides an already-opened log file (which may be nil) and is responsible
+// for writing the session start marker and closing the file.
+func runSummaryPollSimple(cmd *cobra.Command, opts summaryOpts, logFile *os.File) error {
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGTERM, syscall.SIGINT)
 	defer signal.Stop(sigCh)
@@ -330,8 +402,13 @@ func runSummaryPollSimple(cmd *cobra.Command, opts summaryOpts) error {
 	// Initial render
 	fmt.Print("\033[H\033[2J")
 	if err := runSummaryOnce(cmd, opts); err != nil {
+		pollLog(logFile, "[refresh] error: %v", err)
+		if logFile != nil {
+			fmt.Fprintf(logFile, "=== POLL SESSION END %s ===\n", time.Now().Format("2006-01-02 15:04:05"))
+		}
 		return err
 	}
+	pollLog(logFile, "[refresh] ok")
 
 	interval := opts.pollSeconds
 	for {
@@ -339,14 +416,23 @@ func runSummaryPollSimple(cmd *cobra.Command, opts summaryOpts) error {
 
 		select {
 		case <-sigCh:
+			pollLog(logFile, "[quit] signal received")
+			if logFile != nil {
+				fmt.Fprintf(logFile, "=== POLL SESSION END %s ===\n", time.Now().Format("2006-01-02 15:04:05"))
+			}
 			return nil
 		case <-time.After(time.Duration(interval) * time.Second):
 		}
 
 		fmt.Print("\033[H\033[2J")
 		if err := runSummaryOnce(cmd, opts); err != nil {
+			pollLog(logFile, "[refresh] error: %v", err)
+			if logFile != nil {
+				fmt.Fprintf(logFile, "=== POLL SESSION END %s ===\n", time.Now().Format("2006-01-02 15:04:05"))
+			}
 			return err
 		}
+		pollLog(logFile, "[refresh] ok")
 	}
 }
 

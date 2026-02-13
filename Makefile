@@ -385,9 +385,17 @@ deploy-glue:
 	fi; \
 	\
 	TMUX_SCRIPTS=""; \
+	TMUX_CHANGED=false; \
 	if [ -d "glue/tmux" ] && [ "$$(ls -A glue/tmux 2>/dev/null)" ]; then \
 		echo "Deploying tmux scripts..."; \
 		mkdir -p $$HOME/.orc/tmux; \
+		for script in glue/tmux/*.sh; do \
+			[ -f "$$script" ] || continue; \
+			name=$$(basename "$$script"); \
+			if [ ! -f "$$HOME/.orc/tmux/$$name" ] || ! diff -q "$$script" "$$HOME/.orc/tmux/$$name" >/dev/null 2>&1; then \
+				TMUX_CHANGED=true; \
+			fi; \
+		done; \
 		for script in glue/tmux/*.sh; do \
 			[ -f "$$script" ] || continue; \
 			name=$$(basename "$$script"); \
@@ -397,6 +405,10 @@ deploy-glue:
 			TMUX_SCRIPTS="$$TMUX_SCRIPTS $$HOME/.orc/tmux/$$name"; \
 		done; \
 		echo "✓ TMux scripts deployed to ~/.orc/tmux/"; \
+		if [ "$$TMUX_CHANGED" = "true" ]; then \
+			command -v orc >/dev/null 2>&1 && orc utils-sessions kill --all || true; \
+			echo "✓ Killed utils sessions (tmux scripts changed)"; \
+		fi; \
 	fi; \
 	\
 	echo "Writing host manifest..."; \
