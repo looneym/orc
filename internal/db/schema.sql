@@ -278,7 +278,7 @@ CREATE INDEX IF NOT EXISTS idx_workshop_logs_entity ON workshop_logs(entity_type
 CREATE TABLE IF NOT EXISTS hook_events (
 	id TEXT PRIMARY KEY,
 	workbench_id TEXT NOT NULL,
-	hook_type TEXT NOT NULL CHECK(hook_type IN ('Stop', 'UserPromptSubmit')),
+	hook_type TEXT NOT NULL CHECK(hook_type IN ('Stop', 'UserPromptSubmit', 'SessionStart')),
 	timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
 	payload_json TEXT,
 	cwd TEXT,

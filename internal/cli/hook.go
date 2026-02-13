@@ -29,6 +29,7 @@ Each event has a specific handler subcommand.
 Available events:
   Stop              - Called when Claude wants to stop the session (logs context)
   UserPromptSubmit  - Called when user submits a prompt (logs event)
+  SessionStart      - Called when a new session begins (auto-detects workbench)
 
 Example:
   echo '{"session_id":"abc"}' | orc hook Stop`,
@@ -37,6 +38,7 @@ Example:
 	// Add event handlers as subcommands
 	cmd.AddCommand(hookStopCmd())
 	cmd.AddCommand(hookUserPromptSubmitCmd())
+	cmd.AddCommand(hookSessionStartCmd())
 
 	// Add event viewing commands
 	cmd.AddCommand(hookTailCmd())
@@ -58,6 +60,14 @@ type UserPromptSubmitHookEvent struct {
 	Cwd            string `json:"cwd"`
 	SessionID      string `json:"session_id"`
 	Prompt         string `json:"prompt"`
+	TranscriptPath string `json:"transcript_path"`
+}
+
+// SessionStartHookEvent represents the JSON payload from Claude Code SessionStart hook
+type SessionStartHookEvent struct {
+	Cwd            string `json:"cwd"`
+	SessionID      string `json:"session_id"`
+	Source         string `json:"source"` // "startup", "resume", "clear", "compact"
 	TranscriptPath string `json:"transcript_path"`
 }
 
@@ -272,6 +282,91 @@ func runHookUserPromptSubmit() error {
 	return nil
 }
 
+// hookSessionStartCmd handles the SessionStart event
+func hookSessionStartCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "SessionStart",
+		Short: "Handle SessionStart event (workbench auto-detection)",
+		Long:  "Called when a new session begins. Detects ORC workbench and instructs agent to run /orc-prime.",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runHookSessionStart()
+		},
+	}
+}
+
+func runHookSessionStart() error {
+	ctx := NewContext()
+	startTime := time.Now()
+
+	// Initialize event request
+	eventReq := primary.LogHookEventRequest{
+		HookType:            primary.HookTypeSessionStart,
+		Decision:            primary.HookDecisionAllow,
+		TaskCountIncomplete: -1,
+		DurationMs:          -1,
+	}
+
+	// Defer event logging
+	defer func() {
+		eventReq.DurationMs = int(time.Since(startTime).Milliseconds())
+		logHookEvent(ctx, eventReq)
+	}()
+
+	// 1. Read stdin JSON
+	data, err := io.ReadAll(os.Stdin)
+	if err != nil {
+		eventReq.Error = fmt.Sprintf("failed to read stdin: %v", err)
+		return nil //nolint:nilerr // intentional fail-open design
+	}
+	eventReq.PayloadJSON = string(data)
+
+	// 2. Parse hook event
+	var event SessionStartHookEvent
+	if err := json.Unmarshal(data, &event); err != nil {
+		eventReq.Error = fmt.Sprintf("failed to parse JSON: %v", err)
+		return nil //nolint:nilerr // intentional fail-open design
+	}
+
+	eventReq.Cwd = event.Cwd
+	eventReq.SessionID = event.SessionID
+
+	// 3. Skip resume and compact (those preserve session state)
+	if event.Source == "resume" || event.Source == "compact" {
+		eventReq.Reason = fmt.Sprintf("skipped: source=%s", event.Source)
+		return nil
+	}
+
+	// 4. Look up ORC context
+	hctx := lookupORCContext(ctx, event.Cwd)
+	eventReq.WorkbenchID = hctx.workbenchID
+	eventReq.ShipmentID = hctx.shipmentID
+	eventReq.ShipmentStatus = hctx.shipmentStatus
+	eventReq.TaskCountIncomplete = hctx.incompleteCount
+
+	// 5. Not a workbench — silent pass-through
+	if hctx.workbenchID == "" {
+		eventReq.Reason = "no workbench context"
+		return nil
+	}
+
+	// 6. Workbench detected — output context for Claude Code
+	eventReq.Reason = fmt.Sprintf("workbench %s detected, instructing /orc-prime", hctx.workbenchID)
+
+	output := map[string]any{
+		"hookSpecificOutput": map[string]any{
+			"hookEventName":     "SessionStart",
+			"additionalContext": fmt.Sprintf("You are in ORC workbench %s. Run /orc-prime to bootstrap project context.", hctx.workbenchID),
+		},
+	}
+
+	encoder := json.NewEncoder(os.Stdout)
+	if err := encoder.Encode(output); err != nil {
+		eventReq.Error = fmt.Sprintf("failed to encode output: %v", err)
+	}
+
+	return nil
+}
+
 // hookTailCmd shows recent hook events
 func hookTailCmd() *cobra.Command {
 	cmd := &cobra.Command{
@@ -285,7 +380,7 @@ func hookTailCmd() *cobra.Command {
 
 	cmd.Flags().IntP("limit", "n", 50, "Number of events to show")
 	cmd.Flags().StringP("workbench", "w", "", "Filter by workbench ID (auto-detects from cwd)")
-	cmd.Flags().StringP("type", "t", "", "Filter by hook type (Stop, UserPromptSubmit)")
+	cmd.Flags().StringP("type", "t", "", "Filter by hook type (Stop, UserPromptSubmit, SessionStart)")
 	cmd.Flags().BoolP("follow", "f", false, "Follow mode: poll for new events")
 
 	return cmd

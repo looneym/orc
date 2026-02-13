@@ -17,7 +17,7 @@ type HookEventService interface {
 // LogHookEventRequest contains parameters for logging a hook event.
 type LogHookEventRequest struct {
 	WorkbenchID         string
-	HookType            string // 'Stop', 'UserPromptSubmit'
+	HookType            string // 'Stop', 'UserPromptSubmit', 'SessionStart'
 	PayloadJSON         string
 	Cwd                 string
 	SessionID           string
@@ -66,6 +66,7 @@ type HookEventFilters struct {
 const (
 	HookTypeStop             = "Stop"
 	HookTypeUserPromptSubmit = "UserPromptSubmit"
+	HookTypeSessionStart     = "SessionStart"
 )
 
 // Hook decision constants.
