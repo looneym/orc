@@ -198,6 +198,16 @@ Examples:
 				return err
 			}
 
+			// Kill utils servers for all workbenches in this workshop
+			workbenches, _ := wire.WorkbenchService().ListWorkbenches(ctx, primary.WorkbenchFilters{
+				WorkshopID: workshopID,
+			})
+			for _, wb := range workbenches {
+				if err := wire.KillUtilsServer(wb.Name); err == nil {
+					fmt.Printf("  Killed utils server for %s\n", wb.Name)
+				}
+			}
+
 			fmt.Printf("✓ Workshop %s archived\n", workshopID)
 			fmt.Printf("  Name: %s\n", workshop.Name)
 			fmt.Printf("\nTo remove physical infrastructure, run:\n")

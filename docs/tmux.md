@@ -166,15 +166,77 @@ Navigation:
 - `Enter` or `l` to select
 - `q` to cancel
 
-## Summary Menu
+## Utils Popup
 
-### Double-Click on Window
+The utils popup is a persistent, per-workbench overlay that provides an auto-refreshing
+summary dashboard and a scratch shell. It runs in its own tmux server, separate from the
+main workshop session.
 
-Double-click a window name in the statusline to open `orc summary` in a popup:
+### Opening and Closing
 
-- Shows commission tree
-- 100 columns x 30 rows
-- Press `q` to close
+| Action | How |
+|--------|-----|
+| Open | Double-click the status bar, or `prefix+u` |
+| Close | Double-click the inner status bar, click the inner session name, or `prefix+d` (detach) |
+
+When opened for the first time, the popup lazily creates a dedicated tmux server and session.
+Subsequent opens reattach to the existing session, preserving shell history and scroll position.
+
+### What's Inside
+
+The utils session has two windows:
+
+| Window | Content |
+|--------|---------|
+| `summary` | `orc summary --poll` -- auto-refreshing dashboard (default 5s) |
+| `shell` | Plain shell for scratch work (ad-hoc commands, grep, etc.) |
+
+The summary window uses `orc summary --poll` as its root process, which clears and redraws
+the commission/shipment tree on a timer. Use `--poll 10` for a 10-second interval.
+SIGTERM/SIGINT exit cleanly with no stack trace.
+
+### Separate Server Architecture
+
+Each workbench gets its own tmux server via the `-L` (socket) flag:
+
+```
+Socket: {bench-name}-utils     (e.g., orc-45-utils)
+Path:   /tmp/tmux-{uid}/orc-45-utils
+```
+
+**Why a separate server?**
+
+- **No prefix collision** -- the utils session can have its own key bindings (e.g., double-click
+  to detach) without conflicting with the main session's bindings.
+- **No session list pollution** -- `tmux list-sessions` and `prefix+s` only show workshop
+  sessions, not utils sessions.
+- **Isolation** -- killing or restarting the utils server has no effect on the main workshop
+  session or any running agents.
+
+The popup script (`orc-utils-popup.sh`) handles lazy creation: if the server/session doesn't
+exist, it creates it with the summary and shell windows. If it already exists, it simply
+reattaches.
+
+### Managing Utils Servers
+
+Use `orc utils-sessions` to inspect and clean up utils servers:
+
+```bash
+orc utils-sessions list              # Show all utils servers and status
+orc utils-sessions kill orc-45       # Kill a specific utils server
+orc utils-sessions kill --all        # Kill all utils servers
+```
+
+Example output of `list`:
+
+```
+WORKBENCH  SOCKET        STATUS
+orc-45     orc-45-utils  alive
+myproj     myproj-utils  dead
+```
+
+Utils servers are also automatically killed when archiving a workshop via
+`orc workshop archive`.
 
 ### Right-Click Context Menu
 
@@ -182,14 +244,29 @@ Right-click the statusline for a context menu:
 
 | Option | Action |
 |--------|--------|
-| Show Summary | `orc summary \| less` |
-| Archive Workbench | `orc infra archive-workbench` |
-| Swap Window | Standard TMux swap |
+| Show Summary | Opens the utils popup |
+| Swap Left/Right | Standard TMux swap |
 | Mark Pane | Standard TMux mark |
 | Kill Window | Standard TMux kill |
-| Respawn Pane | Restart pane with start command |
-| Rename Window | Standard TMux rename |
+| Respawn | Restart window with start command |
+| Rename | Standard TMux rename |
 | New Window | Standard TMux new window |
+
+## Summary Auto-Refresh
+
+The `--poll` flag on `orc summary` enables auto-refresh mode:
+
+```bash
+orc summary --poll        # Refresh every 5 seconds (default)
+orc summary --poll 10     # Refresh every 10 seconds
+```
+
+This is primarily used inside the utils popup's summary window, but can also be run
+standalone in any terminal. The command clears the screen and redraws the full summary
+on each tick. SIGTERM and SIGINT are handled cleanly for graceful shutdown.
+
+Color output is preserved in poll mode via `CLICOLOR_FORCE=1`, which is set by the
+utils popup environment.
 
 ## Session Click
 
