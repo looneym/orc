@@ -6,6 +6,7 @@ import "fmt"
 var (
 	Commit    = "unknown"
 	BuildTime = "unknown"
+	DevBuild  = "" // Set to "true" by `make dev`; empty for installed builds
 )
 
 // String returns the version string (commit-hash based, no semver)

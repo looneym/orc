@@ -355,8 +355,8 @@ For current development work, see `orc summary` output.
 ### Installation
 ```bash
 cd ~/src/orc
-go build -o orc cmd/orc/main.go
-# Binary available at: ./orc
+make dev          # Build local ./orc
+# Run via: orc-dev <command> (uses workbench DB, sets ORC_VIA_SHIM)
 ```
 
 ### Prerequisites

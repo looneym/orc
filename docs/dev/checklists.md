@@ -38,7 +38,7 @@ When adding a new state or transition to an entity's state machine:
 - [ ] Create: `internal/cli/<command>.go`
 - [ ] Keep it thin: parse args/flags, call services, render output
 - [ ] Inject dependencies via wire (no globals)
-- [ ] Manual smoke: `make dev && ./orc <command> --help`
+- [ ] Manual smoke: `make dev && orc-dev <command> --help`
 - [ ] Run: `make test && make lint`
 
 ## Add New Entity (with Repository)
