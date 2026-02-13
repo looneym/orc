@@ -39,6 +39,7 @@ var (
 	commissionOrchestrationService *app.CommissionOrchestrationService
 	tmuxService                    secondary.TMuxAdapter
 	shipmentRepo                   secondary.ShipmentRepository
+	eventWriterInstance            secondary.EventWriter
 	once                           sync.Once
 )
 
@@ -150,6 +151,12 @@ func ShipmentRepository() secondary.ShipmentRepository {
 	return shipmentRepo
 }
 
+// EventWriter returns the singleton EventWriter instance.
+func EventWriter() secondary.EventWriter {
+	once.Do(initServices)
+	return eventWriterInstance
+}
+
 // initServices initializes all services and their dependencies.
 // This is called once via sync.Once.
 func initServices() {
@@ -165,6 +172,7 @@ func initServices() {
 	operationalEventRepo := sqlite.NewOperationalEventRepository(database)
 	workbenchRepo := sqlite.NewWorkbenchRepository(database, nil) // nil EventWriter: circular dependency (EventWriter needs workbenchRepo)
 	eventWriter := sqlite.NewEventWriterAdapter(workshopEventRepo, operationalEventRepo, workbenchRepo, version.Commit)
+	eventWriterInstance = eventWriter
 
 	// Create repository adapters (secondary ports) - sqlite adapters with injected DB
 	commissionRepo := sqlite.NewCommissionRepository(database, eventWriter)

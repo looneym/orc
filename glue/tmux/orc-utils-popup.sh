@@ -40,5 +40,10 @@ if ! tmux -L "$SOCKET" has-session -t "$SESSION" 2>/dev/null; then
     tmux -L "$SOCKET" bind-key -T root MouseDown1StatusLeft detach-client
 fi
 
+# Respawn summary pane if it died (e.g., after q-quit or crash)
+if tmux -L "$SOCKET" list-panes -t "$SESSION:summary" -F '#{pane_dead}' 2>/dev/null | grep -q 1; then
+    tmux -L "$SOCKET" respawn-pane -k -t "$SESSION:summary" "orc summary --poll"
+fi
+
 # Attach — when user detaches (prefix+d), the popup closes via -E
 exec tmux -L "$SOCKET" attach -t "$SESSION"
