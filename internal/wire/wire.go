@@ -243,6 +243,12 @@ func initServices() {
 	)
 }
 
+// IsOrcSession returns true if the current tmux session has ORC_WORKSHOP_ID set,
+// indicating this is an ORC-managed workshop session.
+func IsOrcSession() bool {
+	return tmuxadapter.IsOrcSession()
+}
+
 // ApplyGlobalTMuxBindings sets up ORC's global tmux key bindings.
 // Safe to call repeatedly (idempotent). Silently ignores errors (tmux may not be running).
 // This is called on every orc command invocation to ensure bindings are always current.

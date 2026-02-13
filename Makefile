@@ -1,4 +1,4 @@
-.PHONY: install install-orc install-dev-shim dev build test lint lint-fix schema-check check-test-presence check-coverage check-skills init install-hooks clean help deploy-glue schema-diff schema-apply schema-inspect setup-workbench schema-diff-workbench schema-apply-workbench bootstrap bootstrap-dev bootstrap-test bootstrap-shell
+.PHONY: install install-orc install-dev-shim dev build test lint lint-fix schema-check check-test-presence check-coverage check-skills init install-hooks clean help deploy-glue schema-diff schema-apply schema-inspect setup-workbench schema-diff-workbench schema-apply-workbench bootstrap bootstrap-dev bootstrap-test bootstrap-shell uninstall
 
 # Go binary location (handles empty GOBIN)
 GOBIN := $(shell go env GOPATH)/bin
@@ -38,6 +38,15 @@ endef
 # Full install: binary + dev shim
 install: install-orc install-dev-shim
 	$(call check-dir)
+	@# Register binaries in host manifest
+	@mkdir -p ~/.orc
+	@MANIFEST="$(HOST_MANIFEST)"; \
+	if [ ! -f "$$MANIFEST" ]; then \
+		echo '{}' > "$$MANIFEST"; \
+	fi; \
+	jq --arg orc "$(GOBIN)/orc" --arg dev "$(GOBIN)/orc-dev" \
+		'.binaries = [$$orc, $$dev]' "$$MANIFEST" > /tmp/host-manifest.json && \
+		mv /tmp/host-manifest.json "$$MANIFEST"
 	@echo ""
 	@echo "Installed:"
 	@echo "  orc      - global binary (production DB)"
@@ -51,15 +60,7 @@ install-orc:
 # Install orc-dev shim for development (requires workbench DB)
 install-dev-shim:
 	@echo "Installing orc-dev shim..."
-	@echo '#!/bin/bash' > $(GOBIN)/orc-dev
-	@echo '# ORC dev shim - uses workbench-local DB' >> $(GOBIN)/orc-dev
-	@echo 'if [[ ! -f ".orc/workbench.db" ]]; then' >> $(GOBIN)/orc-dev
-	@echo '  echo "Error: No workbench DB found at .orc/workbench.db" >&2' >> $(GOBIN)/orc-dev
-	@echo '  echo "Run: make setup-workbench" >&2' >> $(GOBIN)/orc-dev
-	@echo '  exit 1' >> $(GOBIN)/orc-dev
-	@echo 'fi' >> $(GOBIN)/orc-dev
-	@echo 'export ORC_DB_PATH=".orc/workbench.db"' >> $(GOBIN)/orc-dev
-	@echo 'exec "$$(dirname "$$0")/orc" "$$@"' >> $(GOBIN)/orc-dev
+	@cp glue/bin/orc-dev $(GOBIN)/orc-dev
 	@chmod +x $(GOBIN)/orc-dev
 	@echo "orc-dev installed"
 
@@ -230,19 +231,28 @@ bootstrap:
 		echo "Configuring PATH..."; \
 		GOBIN="$$(go env GOPATH)/bin"; \
 		PATH_EXPORT="export PATH=\"\$$PATH:\$$(go env GOPATH)/bin\""; \
+		PROFILE_ENTRIES=""; \
 		if ! grep -q 'GOPATH.*bin' ~/.zprofile 2>/dev/null; then \
 			echo "$$PATH_EXPORT" >> ~/.zprofile; \
 			echo "  Added to ~/.zprofile (login shells)"; \
+			PROFILE_ENTRIES="$$PROFILE_ENTRIES $$HOME/.zprofile"; \
 		else \
 			echo "  Already in ~/.zprofile"; \
 		fi; \
 		if ! grep -q 'GOPATH.*bin' ~/.zshrc 2>/dev/null; then \
 			echo "$$PATH_EXPORT" >> ~/.zshrc; \
 			echo "  Added to ~/.zshrc (interactive shells)"; \
+			PROFILE_ENTRIES="$$PROFILE_ENTRIES $$HOME/.zshrc"; \
 		else \
 			echo "  Already in ~/.zshrc"; \
 		fi; \
 		export PATH="$$PATH:$$GOBIN"; \
+		MANIFEST="$(HOST_MANIFEST)"; \
+		if [ -f "$$MANIFEST" ] && [ -n "$$PROFILE_ENTRIES" ]; then \
+			PROFILES_JSON=$$(echo "$$PROFILE_ENTRIES" | tr ' ' '\n' | sed '/^$$/d' | jq -R '{file: ., line: "export PATH=...GOPATH/bin"}' | jq -s .); \
+			jq --argjson profiles "$$PROFILES_JSON" '.shell_profiles = $$profiles' "$$MANIFEST" > /tmp/host-manifest.json && \
+				mv /tmp/host-manifest.json "$$MANIFEST"; \
+		fi; \
 		echo ""; \
 		echo "Creating default factory..."; \
 		orc factory create default; \
@@ -301,29 +311,36 @@ clean:
 # Claude Code Integration (Glue)
 #---------------------------------------------------------------------------
 
-# Manifest path for tracking deployed glue artifacts
-GLUE_MANIFEST := $(HOME)/.orc/glue-manifest.json
+# Manifest path for tracking all ORC host artifacts
+HOST_MANIFEST := $(HOME)/.orc/host-manifest.json
 
 # Deploy skills and hooks to Claude Code
 deploy-glue:
 	$(call check-dir)
 	@mkdir -p ~/.claude/skills ~/.claude/hooks ~/.orc
-	@# --- Read old manifest ---
+	@# --- Read old manifest (supports both legacy and new format) ---
 	@OLD_SKILLS=""; \
 	OLD_HOOKS=""; \
-	if [ -f "$(GLUE_MANIFEST)" ]; then \
-		OLD_SKILLS=$$(jq -r '.skills // [] | .[]' "$(GLUE_MANIFEST)" 2>/dev/null); \
-		OLD_HOOKS=$$(jq -r '.hooks // [] | .[]' "$(GLUE_MANIFEST)" 2>/dev/null); \
+	MANIFEST="$(HOST_MANIFEST)"; \
+	LEGACY_MANIFEST="$$HOME/.orc/glue-manifest.json"; \
+	if [ -f "$$MANIFEST" ]; then \
+		OLD_SKILLS=$$(jq -r '.skills // [] | .[]' "$$MANIFEST" 2>/dev/null); \
+		OLD_HOOKS=$$(jq -r '.hooks // [] | .[]' "$$MANIFEST" 2>/dev/null); \
+	elif [ -f "$$LEGACY_MANIFEST" ]; then \
+		OLD_SKILLS=$$(jq -r '.skills // [] | .[]' "$$LEGACY_MANIFEST" 2>/dev/null); \
+		OLD_HOOKS=$$(jq -r '.hooks // [] | .[]' "$$LEGACY_MANIFEST" 2>/dev/null); \
 	fi; \
 	\
 	echo "Deploying Claude Code skills..."; \
 	CURRENT_SKILLS=""; \
+	SKILLS_PATHS=""; \
 	for dir in glue/skills/*/; do \
 		name=$$(basename "$$dir"); \
 		echo "  → $$name"; \
 		rm -rf ~/.claude/skills/$$name; \
 		cp -r "$$dir" ~/.claude/skills/$$name; \
 		CURRENT_SKILLS="$$CURRENT_SKILLS $$name"; \
+		SKILLS_PATHS="$$SKILLS_PATHS $$HOME/.claude/skills/$$name"; \
 	done; \
 	echo "✓ Skills deployed to ~/.claude/skills/"; \
 	\
@@ -341,18 +358,6 @@ deploy-glue:
 			rm -rf "$$HOME/.claude/skills/$$old_skill"; \
 		fi; \
 	done; \
-	\
-	if [ -d "glue/hooks" ] && [ "$$(ls -A glue/hooks/*.sh 2>/dev/null)" ]; then \
-		echo "Deploying Claude Code hook scripts..."; \
-		for hook in glue/hooks/*.sh; do \
-			[ -f "$$hook" ] || continue; \
-			name=$$(basename "$$hook"); \
-			echo "  → $$name"; \
-			cp "$$hook" $$HOME/.claude/hooks/$$name; \
-			chmod +x $$HOME/.claude/hooks/$$name; \
-		done; \
-		echo "✓ Hook scripts deployed to ~/.claude/hooks/"; \
-	fi; \
 	\
 	CURRENT_HOOKS=""; \
 	if [ -f "glue/hooks.json" ]; then \
@@ -379,6 +384,7 @@ deploy-glue:
 		echo "✓ Hooks configured in settings.json"; \
 	fi; \
 	\
+	TMUX_SCRIPTS=""; \
 	if [ -d "glue/tmux" ] && [ "$$(ls -A glue/tmux 2>/dev/null)" ]; then \
 		echo "Deploying tmux scripts..."; \
 		mkdir -p $$HOME/.orc/tmux; \
@@ -388,16 +394,134 @@ deploy-glue:
 			echo "  → $$name"; \
 			cp "$$script" $$HOME/.orc/tmux/$$name; \
 			chmod +x $$HOME/.orc/tmux/$$name; \
+			TMUX_SCRIPTS="$$TMUX_SCRIPTS $$HOME/.orc/tmux/$$name"; \
 		done; \
 		echo "✓ TMux scripts deployed to ~/.orc/tmux/"; \
 	fi; \
 	\
-	echo "Writing glue manifest..."; \
+	echo "Writing host manifest..."; \
 	SKILLS_JSON=$$(echo "$$CURRENT_SKILLS" | tr ' ' '\n' | sed '/^$$/d' | jq -R . | jq -s .); \
 	HOOKS_JSON=$$(echo "$$CURRENT_HOOKS" | tr ' ' '\n' | sed '/^$$/d' | jq -R . | jq -s .); \
-	jq -n --argjson skills "$$SKILLS_JSON" --argjson hooks "$$HOOKS_JSON" \
-		'{skills: $$skills, hooks: $$hooks}' > "$(GLUE_MANIFEST)"; \
-	echo "✓ Manifest written to $(GLUE_MANIFEST)"
+	SKILLS_PATHS_JSON=$$(echo "$$SKILLS_PATHS" | tr ' ' '\n' | sed '/^$$/d' | jq -R . | jq -s .); \
+	TMUX_JSON=$$(echo "$$TMUX_SCRIPTS" | tr ' ' '\n' | sed '/^$$/d' | jq -R . | jq -s .); \
+	EXISTING="{}"; \
+	if [ -f "$$MANIFEST" ]; then \
+		EXISTING=$$(cat "$$MANIFEST"); \
+	fi; \
+	echo "$$EXISTING" | jq \
+		--argjson skills "$$SKILLS_JSON" \
+		--argjson hooks "$$HOOKS_JSON" \
+		--argjson skill_paths "$$SKILLS_PATHS_JSON" \
+		--argjson tmux_scripts "$$TMUX_JSON" \
+		'. + {skills: $$skills, hooks: $$hooks, skill_paths: $$skill_paths, tmux_scripts: $$tmux_scripts, directories: (((.directories // []) + ["'"$$HOME"'/.orc", "'"$$HOME"'/.orc/tmux"]) | unique)}' \
+		> /tmp/host-manifest.json && \
+		mv /tmp/host-manifest.json "$$MANIFEST"; \
+	echo "✓ Manifest written to $$MANIFEST"; \
+	\
+	if [ -f "$$LEGACY_MANIFEST" ]; then \
+		rm -f "$$LEGACY_MANIFEST"; \
+		echo "✓ Removed legacy glue-manifest.json"; \
+	fi
+
+#---------------------------------------------------------------------------
+# Uninstall
+#---------------------------------------------------------------------------
+
+# Remove all ORC host artifacts tracked in the manifest
+uninstall:
+	@MANIFEST="$(HOST_MANIFEST)"; \
+	if [ ! -f "$$MANIFEST" ]; then \
+		echo "No host manifest found at $$MANIFEST"; \
+		echo "Nothing to uninstall."; \
+		exit 0; \
+	fi; \
+	echo "Uninstalling ORC..."; \
+	echo ""; \
+	\
+	echo "Removing binaries..."; \
+	for bin in $$(jq -r '.binaries // [] | .[]' "$$MANIFEST" 2>/dev/null); do \
+		if [ -f "$$bin" ]; then \
+			rm -f "$$bin"; \
+			echo "  ✗ $$bin"; \
+		fi; \
+	done; \
+	\
+	echo "Removing skill directories..."; \
+	for skill_path in $$(jq -r '.skill_paths // [] | .[]' "$$MANIFEST" 2>/dev/null); do \
+		if [ -d "$$skill_path" ]; then \
+			rm -rf "$$skill_path"; \
+			echo "  ✗ $$skill_path"; \
+		fi; \
+	done; \
+	\
+	echo "Removing tmux scripts..."; \
+	for script in $$(jq -r '.tmux_scripts // [] | .[]' "$$MANIFEST" 2>/dev/null); do \
+		if [ -f "$$script" ]; then \
+			rm -f "$$script"; \
+			echo "  ✗ $$script"; \
+		fi; \
+	done; \
+	\
+	echo "Cleaning ORC hooks from settings.json..."; \
+	SETTINGS="$$HOME/.claude/settings.json"; \
+	if [ -f "$$SETTINGS" ]; then \
+		for hook_key in $$(jq -r '.hooks // [] | .[]' "$$MANIFEST" 2>/dev/null); do \
+			if jq -e ".hooks[\"$$hook_key\"]" "$$SETTINGS" >/dev/null 2>&1; then \
+				jq "(.hooks[\"$$hook_key\"] // []) |= [.[] | select((.hooks // []) | all(.command | test(\"orc hook\") | not))] | if .hooks[\"$$hook_key\"] == [] then del(.hooks[\"$$hook_key\"]) else . end" \
+					"$$SETTINGS" > /tmp/settings.json && \
+					mv /tmp/settings.json "$$SETTINGS"; \
+				echo "  ✗ Filtered orc hooks from $$hook_key"; \
+			fi; \
+		done; \
+	fi; \
+	\
+	echo "Removing orphan hook scripts..."; \
+	for orphan in \
+		"$$HOME/.claude/hooks/session-start.sh" \
+		"$$HOME/.claude/hooks/session-start-prime.sh" \
+		"$$HOME/.claude/hooks/session-end-logger.sh"; do \
+		if [ -f "$$orphan" ]; then \
+			rm -f "$$orphan"; \
+			echo "  ✗ $$orphan"; \
+		fi; \
+	done; \
+	\
+	echo "Cleaning shell profile..."; \
+	for profile_entry in $$(jq -r '.shell_profiles // [] | .[].file' "$$MANIFEST" 2>/dev/null); do \
+		if [ -f "$$profile_entry" ]; then \
+			sed -i '' '/GOPATH.*bin/d' "$$profile_entry" 2>/dev/null || true; \
+			echo "  ✗ Removed PATH line from $$profile_entry"; \
+		fi; \
+	done; \
+	\
+	echo "Unbinding tmux keys..."; \
+	tmux unbind-key -T prefix s 2>/dev/null; tmux bind-key -T prefix s choose-tree -sZ 2>/dev/null || true; \
+	tmux unbind-key -T prefix S 2>/dev/null || true; \
+	tmux unbind-key -T prefix u 2>/dev/null || true; \
+	tmux unbind-key -T root DoubleClick1Status 2>/dev/null || true; \
+	tmux unbind-key -T root MouseDown3Status 2>/dev/null || true; \
+	echo "✓ TMux keys unbound"; \
+	\
+	echo ""; \
+	if [ -f "$$HOME/.orc/orc.db" ]; then \
+		echo "WARNING: ~/.orc/orc.db contains your data and was NOT deleted."; \
+		echo "  Remove it manually if you want a full cleanup:"; \
+		echo "    rm ~/.orc/orc.db"; \
+		echo ""; \
+	fi; \
+	\
+	rm -f "$$MANIFEST"; \
+	rm -f "$$HOME/.orc/glue-manifest.json"; \
+	echo "  ✗ Removed host manifest"; \
+	\
+	if [ -d "$$HOME/.orc" ] && [ -z "$$(ls -A "$$HOME/.orc" 2>/dev/null | grep -v '^orc\.db$$' | grep -v '^\.')" ]; then \
+		if [ ! -f "$$HOME/.orc/orc.db" ]; then \
+			rmdir "$$HOME/.orc" 2>/dev/null && echo "  ✗ Removed empty ~/.orc/" || true; \
+		fi; \
+	fi; \
+	\
+	echo ""; \
+	echo "✓ ORC uninstalled"
 
 #---------------------------------------------------------------------------
 # Help
@@ -429,6 +553,7 @@ help:
 	@echo "Installation:"
 	@echo "  make install       Install orc binary and orc-dev shim"
 	@echo "  make install-orc   Install only the orc binary"
+	@echo "  make uninstall     Remove all ORC host artifacts"
 	@echo "  make init          Refresh git hooks (after pull)"
 	@echo ""
 	@echo "Claude Code Integration:"

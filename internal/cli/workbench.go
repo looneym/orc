@@ -250,6 +250,12 @@ Examples:
 			fmt.Printf("✓ Workbench %s archived\n", workbenchID)
 			fmt.Printf("  Name: %s\n", workbench.Name)
 			fmt.Printf("  Path: %s\n", workbench.Path)
+
+			// Kill utils tmux server for this workbench (no-op if not running)
+			if err := wire.KillUtilsServer(workbench.Name); err == nil {
+				fmt.Printf("  Killed utils server for %s\n", workbench.Name)
+			}
+
 			fmt.Printf("\nTo remove the worktree, run:\n")
 			fmt.Printf("  orc tmux apply %s\n", workbench.WorkshopID)
 

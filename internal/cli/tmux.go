@@ -322,7 +322,13 @@ func archiveWorkbenchRunE(ctx context.Context, getwd func() (string, error), exe
 	if err := wire.WorkbenchService().ArchiveWorkbench(ctx, workbench.ID); err != nil {
 		return fmt.Errorf("failed to archive workbench: %w", err)
 	}
-	fmt.Printf("✓ Workbench %s archived\n\n", workbench.ID)
+	fmt.Printf("✓ Workbench %s archived\n", workbench.ID)
+
+	// Kill utils tmux server for this workbench (no-op if not running)
+	if err := wire.KillUtilsServer(workbench.Name); err == nil {
+		fmt.Printf("  Killed utils server for %s\n", workbench.Name)
+	}
+	fmt.Println()
 
 	fmt.Println("Applying tmux changes...")
 	applyCmd := execCommand("orc", "tmux", "apply", workbench.WorkshopID, "--yes")

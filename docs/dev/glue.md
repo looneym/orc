@@ -30,7 +30,7 @@ glue/
 ├── hooks.json              # Hook configuration
 │
 ├── tmux/                   # TMux integration
-│   └── orc-session-picker.sh
+│   └── orc-utils-popup.sh
 │
 └── README.md
 ```
