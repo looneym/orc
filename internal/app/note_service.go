@@ -242,11 +242,20 @@ func (s *NoteServiceImpl) MoveNote(ctx context.Context, req primary.MoveNoteRequ
 	}
 
 	if req.ToCommissionID != "" {
-		// Validate the note belongs to this commission (can't move between commissions)
 		if note.CommissionID != req.ToCommissionID {
-			return fmt.Errorf("note belongs to commission %s, cannot move to %s", note.CommissionID, req.ToCommissionID)
+			// Cross-commission move: validate target commission exists,
+			// update commission_id and promote to commission level
+			exists, err := s.noteRepo.CommissionExists(ctx, req.ToCommissionID)
+			if err != nil {
+				return fmt.Errorf("failed to validate target commission: %w", err)
+			}
+			if !exists {
+				return fmt.Errorf("target commission %s not found", req.ToCommissionID)
+			}
+			record.CommissionID = req.ToCommissionID
+			record.MoveToCommission = true
 		}
-		// Mark for promotion to commission level (clear all container associations)
+		// In both cases (same or cross-commission), promote to commission level
 		record.PromoteToCommission = true
 	}
 

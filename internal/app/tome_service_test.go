@@ -16,6 +16,8 @@ import (
 // mockTomeRepository implements secondary.TomeRepository for testing.
 type mockTomeRepository struct {
 	tomes                  map[string]*secondary.TomeRecord
+	tasks                  map[string]*secondary.TaskRecord // tasks keyed by ID, for cascade tracking
+	notes                  map[string]*secondary.NoteRecord // notes keyed by ID, for cascade tracking
 	createErr              error
 	getErr                 error
 	updateErr              error
@@ -23,6 +25,7 @@ type mockTomeRepository struct {
 	listErr                error
 	updateStatusErr        error
 	assignWorkbenchErr     error
+	updateCommissionIDErr  error
 	commissionExistsResult bool
 	commissionExistsErr    error
 }
@@ -30,6 +33,8 @@ type mockTomeRepository struct {
 func newMockTomeRepository() *mockTomeRepository {
 	return &mockTomeRepository{
 		tomes:                  make(map[string]*secondary.TomeRecord),
+		tasks:                  make(map[string]*secondary.TaskRecord),
+		notes:                  make(map[string]*secondary.NoteRecord),
 		commissionExistsResult: true,
 	}
 }
@@ -148,6 +153,37 @@ func (m *mockTomeRepository) CommissionExists(ctx context.Context, commissionID 
 		return false, m.commissionExistsErr
 	}
 	return m.commissionExistsResult, nil
+}
+
+func (m *mockTomeRepository) UpdateCommissionID(ctx context.Context, tomeID, commissionID string) (int, int, error) {
+	if m.updateCommissionIDErr != nil {
+		return 0, 0, m.updateCommissionIDErr
+	}
+	tome, ok := m.tomes[tomeID]
+	if !ok {
+		return 0, 0, errors.New("tome not found")
+	}
+	tome.CommissionID = commissionID
+
+	// Count and update cascaded tasks
+	tasksUpdated := 0
+	for _, task := range m.tasks {
+		if task.TomeID == tomeID {
+			task.CommissionID = commissionID
+			tasksUpdated++
+		}
+	}
+
+	// Count and update cascaded notes
+	notesUpdated := 0
+	for _, note := range m.notes {
+		if note.TomeID == tomeID {
+			note.CommissionID = commissionID
+			notesUpdated++
+		}
+	}
+
+	return tasksUpdated, notesUpdated, nil
 }
 
 // mockNoteServiceForTome implements minimal NoteService for tome tests.
@@ -592,6 +628,110 @@ func TestGetTomesByWorkbench_Success(t *testing.T) {
 	}
 	if len(tomes) != 1 {
 		t.Errorf("expected 1 tome, got %d", len(tomes))
+	}
+}
+
+// ============================================================================
+// MoveTomeToCommission Tests
+// ============================================================================
+
+func TestMoveTomeToCommission_Success(t *testing.T) {
+	service, tomeRepo, _ := newTestTomeService()
+	ctx := context.Background()
+
+	tomeRepo.tomes["TOME-001"] = &secondary.TomeRecord{
+		ID:           "TOME-001",
+		CommissionID: "COMM-001",
+		Title:        "Test Tome",
+		Status:       "open",
+	}
+
+	result, err := service.MoveTomeToCommission(ctx, "TOME-001", "COMM-002")
+
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if result == nil {
+		t.Fatal("expected result, got nil")
+	}
+	if tomeRepo.tomes["TOME-001"].CommissionID != "COMM-002" {
+		t.Errorf("expected commission ID 'COMM-002', got '%s'", tomeRepo.tomes["TOME-001"].CommissionID)
+	}
+}
+
+func TestMoveTomeToCommission_WithCascade(t *testing.T) {
+	service, tomeRepo, _ := newTestTomeService()
+	ctx := context.Background()
+
+	tomeRepo.tomes["TOME-001"] = &secondary.TomeRecord{
+		ID:           "TOME-001",
+		CommissionID: "COMM-001",
+		Title:        "Test Tome",
+		Status:       "open",
+	}
+	tomeRepo.tasks["TASK-001"] = &secondary.TaskRecord{
+		ID:           "TASK-001",
+		TomeID:       "TOME-001",
+		CommissionID: "COMM-001",
+	}
+	tomeRepo.tasks["TASK-002"] = &secondary.TaskRecord{
+		ID:           "TASK-002",
+		TomeID:       "TOME-001",
+		CommissionID: "COMM-001",
+	}
+	tomeRepo.notes["NOTE-001"] = &secondary.NoteRecord{
+		ID:           "NOTE-001",
+		TomeID:       "TOME-001",
+		CommissionID: "COMM-001",
+	}
+
+	result, err := service.MoveTomeToCommission(ctx, "TOME-001", "COMM-002")
+
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if result.TasksUpdated != 2 {
+		t.Errorf("expected 2 tasks updated, got %d", result.TasksUpdated)
+	}
+	if result.NotesUpdated != 1 {
+		t.Errorf("expected 1 note updated, got %d", result.NotesUpdated)
+	}
+	// Verify cascade applied
+	if tomeRepo.tasks["TASK-001"].CommissionID != "COMM-002" {
+		t.Errorf("expected task COMM-002, got '%s'", tomeRepo.tasks["TASK-001"].CommissionID)
+	}
+	if tomeRepo.notes["NOTE-001"].CommissionID != "COMM-002" {
+		t.Errorf("expected note COMM-002, got '%s'", tomeRepo.notes["NOTE-001"].CommissionID)
+	}
+}
+
+func TestMoveTomeToCommission_TomeNotFound(t *testing.T) {
+	service, _, _ := newTestTomeService()
+	ctx := context.Background()
+
+	_, err := service.MoveTomeToCommission(ctx, "TOME-NONEXISTENT", "COMM-002")
+
+	if err == nil {
+		t.Fatal("expected error for non-existent tome, got nil")
+	}
+}
+
+func TestMoveTomeToCommission_CommissionNotFound(t *testing.T) {
+	service, tomeRepo, _ := newTestTomeService()
+	ctx := context.Background()
+
+	tomeRepo.tomes["TOME-001"] = &secondary.TomeRecord{
+		ID:           "TOME-001",
+		CommissionID: "COMM-001",
+		Title:        "Test Tome",
+		Status:       "open",
+	}
+	tomeRepo.commissionExistsResult = false
+
+	_, err := service.MoveTomeToCommission(ctx, "TOME-001", "COMM-NONEXISTENT")
+
+	if err == nil {
+		t.Fatal("expected error for non-existent commission, got nil")
 	}
 }
 

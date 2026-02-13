@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/example/orc/internal/ports/primary"
@@ -160,6 +161,17 @@ func (m *mockShipmentRepository) WorkbenchAssignedToOther(ctx context.Context, w
 		return otherID, nil
 	}
 	return "", nil
+}
+
+func (m *mockShipmentRepository) MoveToCommission(ctx context.Context, shipmentID, targetCommissionID string) (int, int, int, error) {
+	if m.updateErr != nil {
+		return 0, 0, 0, m.updateErr
+	}
+	if shipment, ok := m.shipments[shipmentID]; ok {
+		shipment.CommissionID = targetCommissionID
+		return 1, 0, 0, nil // Return mock counts
+	}
+	return 0, 0, 0, fmt.Errorf("shipment %s not found", shipmentID)
 }
 
 // mockTaskRepositoryForShipment implements minimal TaskRepository for shipment tests.
@@ -954,5 +966,82 @@ func TestCompleteShipment_WithoutSpecNote(t *testing.T) {
 	// Verify no notes were closed
 	if len(noteService.closedNotes) != 0 {
 		t.Errorf("expected no notes to be closed, got %d", len(noteService.closedNotes))
+	}
+}
+
+// ============================================================================
+// MoveShipmentToCommission Tests
+// ============================================================================
+
+func TestMoveShipmentToCommission_Success(t *testing.T) {
+	service, shipmentRepo, _ := newTestShipmentService()
+	ctx := context.Background()
+
+	shipmentRepo.shipments["SHIP-001"] = &secondary.ShipmentRecord{
+		ID:           "SHIP-001",
+		CommissionID: "COMM-001",
+		Title:        "Test Shipment",
+		Status:       "draft",
+	}
+
+	result, err := service.MoveShipmentToCommission(ctx, "SHIP-001", "COMM-002")
+
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if result == nil {
+		t.Fatal("expected result, got nil")
+	}
+	if shipmentRepo.shipments["SHIP-001"].CommissionID != "COMM-002" {
+		t.Errorf("expected commission ID 'COMM-002', got '%s'", shipmentRepo.shipments["SHIP-001"].CommissionID)
+	}
+}
+
+func TestMoveShipmentToCommission_ShipmentNotFound(t *testing.T) {
+	service, _, _ := newTestShipmentService()
+	ctx := context.Background()
+
+	_, err := service.MoveShipmentToCommission(ctx, "SHIP-NONEXISTENT", "COMM-002")
+
+	if err == nil {
+		t.Fatal("expected error for non-existent shipment, got nil")
+	}
+}
+
+func TestMoveShipmentToCommission_CommissionNotFound(t *testing.T) {
+	service, shipmentRepo, _ := newTestShipmentService()
+	ctx := context.Background()
+
+	shipmentRepo.shipments["SHIP-001"] = &secondary.ShipmentRecord{
+		ID:           "SHIP-001",
+		CommissionID: "COMM-001",
+		Title:        "Test Shipment",
+		Status:       "draft",
+	}
+	shipmentRepo.commissionExistsResult = false
+
+	_, err := service.MoveShipmentToCommission(ctx, "SHIP-001", "COMM-NONEXISTENT")
+
+	if err == nil {
+		t.Fatal("expected error for non-existent commission, got nil")
+	}
+}
+
+func TestMoveShipmentToCommission_RepoError(t *testing.T) {
+	service, shipmentRepo, _ := newTestShipmentService()
+	ctx := context.Background()
+
+	shipmentRepo.shipments["SHIP-001"] = &secondary.ShipmentRecord{
+		ID:           "SHIP-001",
+		CommissionID: "COMM-001",
+		Title:        "Test Shipment",
+		Status:       "draft",
+	}
+	shipmentRepo.updateErr = errors.New("database error")
+
+	_, err := service.MoveShipmentToCommission(ctx, "SHIP-001", "COMM-002")
+
+	if err == nil {
+		t.Fatal("expected error for repo failure, got nil")
 	}
 }

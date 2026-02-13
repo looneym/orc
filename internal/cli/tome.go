@@ -250,6 +250,33 @@ var tomeDeleteCmd = &cobra.Command{
 	},
 }
 
+func tomeMoveCmd() *cobra.Command {
+	var toCommission string
+	cmd := &cobra.Command{
+		Use:   "move [tome-id]",
+		Short: "Move tome to a different commission",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			ctx := NewContext()
+			tomeID := args[0]
+
+			result, err := wire.TomeService().MoveTomeToCommission(ctx, tomeID, toCommission)
+			if err != nil {
+				return fmt.Errorf("failed to move tome: %w", err)
+			}
+
+			fmt.Printf("✓ Moved tome %s to commission %s\n", tomeID, toCommission)
+			if result.TasksUpdated > 0 || result.NotesUpdated > 0 {
+				fmt.Printf("  Cascaded: %d tasks, %d notes\n", result.TasksUpdated, result.NotesUpdated)
+			}
+			return nil
+		},
+	}
+	cmd.Flags().StringVar(&toCommission, "to", "", "Target commission ID (required)")
+	cmd.MarkFlagRequired("to") //nolint:errcheck
+	return cmd
+}
+
 func init() {
 	// tome create flags
 	tomeCreateCmd.Flags().StringP("commission", "c", "", "Commission ID (defaults to context)")
@@ -272,6 +299,7 @@ func init() {
 	tomeCmd.AddCommand(tomePinCmd)
 	tomeCmd.AddCommand(tomeUnpinCmd)
 	tomeCmd.AddCommand(tomeDeleteCmd)
+	tomeCmd.AddCommand(tomeMoveCmd())
 }
 
 // TomeCmd returns the tome command

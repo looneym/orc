@@ -155,6 +155,10 @@ func (m *mockTomeServiceForSummary) UnparkTome(_ context.Context, _, _ string) e
 	return nil
 }
 
+func (m *mockTomeServiceForSummary) MoveTomeToCommission(_ context.Context, _, _ string) (*primary.MoveTomeResult, error) {
+	return &primary.MoveTomeResult{}, nil
+}
+
 // mockShipmentServiceForSummary implements primary.ShipmentService for testing.
 type mockShipmentServiceForSummary struct {
 	shipments     map[string]*primary.Shipment
@@ -251,6 +255,10 @@ func (m *mockShipmentServiceForSummary) VerifyShipment(_ context.Context, _ stri
 
 func (m *mockShipmentServiceForSummary) SetStatus(_ context.Context, _, _ string, _ bool) error {
 	return nil
+}
+
+func (m *mockShipmentServiceForSummary) MoveShipmentToCommission(_ context.Context, _, _ string) (*primary.MoveShipmentResult, error) {
+	return &primary.MoveShipmentResult{}, nil
 }
 
 // mockTaskServiceForSummary implements primary.TaskService for testing.

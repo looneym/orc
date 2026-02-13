@@ -78,6 +78,19 @@ func (m *mockNoteRepository) Update(ctx context.Context, note *secondary.NoteRec
 		if note.Content != "" {
 			existing.Content = note.Content
 		}
+		if note.MoveToCommission && note.CommissionID != "" {
+			existing.CommissionID = note.CommissionID
+		}
+		if note.PromoteToCommission {
+			existing.ShipmentID = ""
+			existing.TomeID = ""
+		} else if note.ShipmentID != "" {
+			existing.ShipmentID = note.ShipmentID
+			existing.TomeID = ""
+		} else if note.TomeID != "" {
+			existing.TomeID = note.TomeID
+			existing.ShipmentID = ""
+		}
 	}
 	return nil
 }
@@ -606,5 +619,150 @@ func TestSetNoteInFlight_NotFound(t *testing.T) {
 
 	if err == nil {
 		t.Fatal("expected error for non-existent note")
+	}
+}
+
+// ============================================================================
+// MoveNote Tests
+// ============================================================================
+
+func TestMoveNote_CrossCommission(t *testing.T) {
+	service, noteRepo := newTestNoteService()
+	ctx := context.Background()
+
+	noteRepo.notes["NOTE-001"] = &secondary.NoteRecord{
+		ID:           "NOTE-001",
+		CommissionID: "COMM-001",
+		Title:        "Note to move",
+		ShipmentID:   "SHIP-001",
+		Status:       "open",
+	}
+
+	err := service.MoveNote(ctx, primary.MoveNoteRequest{
+		NoteID:         "NOTE-001",
+		ToCommissionID: "COMM-002",
+	})
+
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	moved := noteRepo.notes["NOTE-001"]
+	if moved.CommissionID != "COMM-002" {
+		t.Errorf("expected commission_id 'COMM-002', got '%s'", moved.CommissionID)
+	}
+	if moved.ShipmentID != "" {
+		t.Errorf("expected shipment_id to be cleared, got '%s'", moved.ShipmentID)
+	}
+	if moved.TomeID != "" {
+		t.Errorf("expected tome_id to be cleared, got '%s'", moved.TomeID)
+	}
+}
+
+func TestMoveNote_CrossCommission_ClearsTomeID(t *testing.T) {
+	service, noteRepo := newTestNoteService()
+	ctx := context.Background()
+
+	noteRepo.notes["NOTE-001"] = &secondary.NoteRecord{
+		ID:           "NOTE-001",
+		CommissionID: "COMM-001",
+		Title:        "Tome note to move",
+		TomeID:       "TOME-001",
+		Status:       "open",
+	}
+
+	err := service.MoveNote(ctx, primary.MoveNoteRequest{
+		NoteID:         "NOTE-001",
+		ToCommissionID: "COMM-002",
+	})
+
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	moved := noteRepo.notes["NOTE-001"]
+	if moved.CommissionID != "COMM-002" {
+		t.Errorf("expected commission_id 'COMM-002', got '%s'", moved.CommissionID)
+	}
+	if moved.TomeID != "" {
+		t.Errorf("expected tome_id to be cleared, got '%s'", moved.TomeID)
+	}
+}
+
+func TestMoveNote_CrossCommission_TargetNotFound(t *testing.T) {
+	service, noteRepo := newTestNoteService()
+	ctx := context.Background()
+
+	noteRepo.notes["NOTE-001"] = &secondary.NoteRecord{
+		ID:           "NOTE-001",
+		CommissionID: "COMM-001",
+		Title:        "Note to move",
+		Status:       "open",
+	}
+	noteRepo.commissionExistsResult = false
+
+	err := service.MoveNote(ctx, primary.MoveNoteRequest{
+		NoteID:         "NOTE-001",
+		ToCommissionID: "COMM-NONEXISTENT",
+	})
+
+	if err == nil {
+		t.Fatal("expected error for non-existent target commission, got nil")
+	}
+}
+
+func TestMoveNote_SameCommission_PromotesOnly(t *testing.T) {
+	service, noteRepo := newTestNoteService()
+	ctx := context.Background()
+
+	noteRepo.notes["NOTE-001"] = &secondary.NoteRecord{
+		ID:           "NOTE-001",
+		CommissionID: "COMM-001",
+		Title:        "Note in shipment",
+		ShipmentID:   "SHIP-001",
+		Status:       "open",
+	}
+
+	err := service.MoveNote(ctx, primary.MoveNoteRequest{
+		NoteID:         "NOTE-001",
+		ToCommissionID: "COMM-001",
+	})
+
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	moved := noteRepo.notes["NOTE-001"]
+	if moved.CommissionID != "COMM-001" {
+		t.Errorf("expected commission_id to remain 'COMM-001', got '%s'", moved.CommissionID)
+	}
+	if moved.ShipmentID != "" {
+		t.Errorf("expected shipment_id to be cleared, got '%s'", moved.ShipmentID)
+	}
+}
+
+func TestMoveNote_ToShipment(t *testing.T) {
+	service, noteRepo := newTestNoteService()
+	ctx := context.Background()
+
+	noteRepo.notes["NOTE-001"] = &secondary.NoteRecord{
+		ID:           "NOTE-001",
+		CommissionID: "COMM-001",
+		Title:        "Note to move to shipment",
+		Status:       "open",
+	}
+
+	err := service.MoveNote(ctx, primary.MoveNoteRequest{
+		NoteID:       "NOTE-001",
+		ToShipmentID: "SHIP-002",
+	})
+
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	moved := noteRepo.notes["NOTE-001"]
+	if moved.ShipmentID != "SHIP-002" {
+		t.Errorf("expected shipment_id 'SHIP-002', got '%s'", moved.ShipmentID)
 	}
 }

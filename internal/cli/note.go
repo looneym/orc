@@ -412,6 +412,15 @@ var noteMoveCmd = &cobra.Command{
 		toTome, _ := cmd.Flags().GetString("to-tome")
 		toShipment, _ := cmd.Flags().GetString("to-shipment")
 		toCommission, _ := cmd.Flags().GetString("to-commission")
+		toTarget, _ := cmd.Flags().GetString("to")
+
+		// --to is a cross-commission move shorthand that sets ToCommissionID
+		if toTarget != "" {
+			if toCommission != "" {
+				return fmt.Errorf("cannot specify both --to and --to-commission")
+			}
+			toCommission = toTarget
+		}
 
 		// Validate exactly one target specified
 		targetCount := 0
@@ -426,7 +435,7 @@ var noteMoveCmd = &cobra.Command{
 		}
 
 		if targetCount == 0 {
-			return fmt.Errorf("must specify exactly one target: --to-tome, --to-shipment, or --to-commission")
+			return fmt.Errorf("must specify exactly one target: --to-tome, --to-shipment, --to-commission, or --to")
 		}
 		if targetCount > 1 {
 			return fmt.Errorf("cannot specify multiple targets")
@@ -504,6 +513,7 @@ func init() {
 	noteMoveCmd.Flags().String("to-tome", "", "Move to tome")
 	noteMoveCmd.Flags().String("to-shipment", "", "Move to shipment")
 	noteMoveCmd.Flags().String("to-commission", "", "Promote to commission level (clears container associations)")
+	noteMoveCmd.Flags().String("to", "", "Move to a different commission (cross-commission move, promotes to commission level)")
 
 	// note close flags
 	noteCloseCmd.Flags().StringP("reason", "r", "", "Close reason (required): superseded, synthesized, resolved, deferred, duplicate, stale")

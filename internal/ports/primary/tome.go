@@ -36,6 +36,15 @@ type TomeService interface {
 
 	// GetTomeNotes retrieves all notes in a tome.
 	GetTomeNotes(ctx context.Context, tomeID string) ([]*Note, error)
+
+	// MoveTomeToCommission moves a tome and its children to a different commission.
+	MoveTomeToCommission(ctx context.Context, tomeID, targetCommissionID string) (*MoveTomeResult, error)
+}
+
+// MoveTomeResult contains the result of moving a tome to a different commission.
+type MoveTomeResult struct {
+	TasksUpdated int
+	NotesUpdated int
 }
 
 // CreateTomeRequest contains parameters for creating a tome.

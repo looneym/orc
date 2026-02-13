@@ -164,6 +164,35 @@ func (s *TomeServiceImpl) GetTomeNotes(ctx context.Context, tomeID string) ([]*p
 	return s.noteService.GetNotesByContainer(ctx, "tome", tomeID)
 }
 
+// MoveTomeToCommission moves a tome and its children to a different commission.
+func (s *TomeServiceImpl) MoveTomeToCommission(ctx context.Context, tomeID, targetCommissionID string) (*primary.MoveTomeResult, error) {
+	// Validate tome exists
+	_, err := s.tomeRepo.GetByID(ctx, tomeID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Validate target commission exists
+	exists, err := s.tomeRepo.CommissionExists(ctx, targetCommissionID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to validate commission: %w", err)
+	}
+	if !exists {
+		return nil, fmt.Errorf("commission %s not found", targetCommissionID)
+	}
+
+	// Perform the move with cascade
+	tasksUpdated, notesUpdated, err := s.tomeRepo.UpdateCommissionID(ctx, tomeID, targetCommissionID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to move tome: %w", err)
+	}
+
+	return &primary.MoveTomeResult{
+		TasksUpdated: tasksUpdated,
+		NotesUpdated: notesUpdated,
+	}, nil
+}
+
 // Helper methods
 
 func (s *TomeServiceImpl) recordToTome(r *secondary.TomeRecord) *primary.Tome {

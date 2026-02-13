@@ -200,6 +200,12 @@ func (r *NoteRepository) Update(ctx context.Context, note *secondary.NoteRecord)
 		args = append(args, note.Type)
 	}
 
+	// Cross-commission move: update commission_id
+	if note.MoveToCommission && note.CommissionID != "" {
+		query += ", commission_id = ?"
+		args = append(args, note.CommissionID)
+	}
+
 	// Container move: when moving to a new container, clear the other container ID
 	// to maintain mutual exclusivity (a note can only belong to one container)
 	if note.PromoteToCommission {

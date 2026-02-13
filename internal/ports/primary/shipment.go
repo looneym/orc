@@ -44,6 +44,16 @@ type ShipmentService interface {
 	// SetStatus sets a shipment's status with escape hatch protection.
 	// If force is true, allows backwards transitions.
 	SetStatus(ctx context.Context, shipmentID, status string, force bool) error
+
+	// MoveShipmentToCommission moves a shipment and its children to a different commission.
+	MoveShipmentToCommission(ctx context.Context, shipmentID, targetCommissionID string) (*MoveShipmentResult, error)
+}
+
+// MoveShipmentResult contains the counts of cascaded children updated during a move.
+type MoveShipmentResult struct {
+	TasksUpdated int
+	NotesUpdated int
+	PRsUpdated   int
 }
 
 // CreateShipmentRequest contains parameters for creating a shipment.

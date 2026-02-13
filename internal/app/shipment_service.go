@@ -329,6 +329,36 @@ func recordToTask(r *secondary.TaskRecord) *primary.Task {
 	}
 }
 
+// MoveShipmentToCommission moves a shipment and its children to a different commission.
+func (s *ShipmentServiceImpl) MoveShipmentToCommission(ctx context.Context, shipmentID, targetCommissionID string) (*primary.MoveShipmentResult, error) {
+	// Validate shipment exists
+	_, err := s.shipmentRepo.GetByID(ctx, shipmentID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Validate target commission exists
+	exists, err := s.shipmentRepo.CommissionExists(ctx, targetCommissionID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to validate commission: %w", err)
+	}
+	if !exists {
+		return nil, fmt.Errorf("commission %s not found", targetCommissionID)
+	}
+
+	// Move shipment and cascade to children
+	tasksUpdated, notesUpdated, prsUpdated, err := s.shipmentRepo.MoveToCommission(ctx, shipmentID, targetCommissionID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to move shipment: %w", err)
+	}
+
+	return &primary.MoveShipmentResult{
+		TasksUpdated: tasksUpdated,
+		NotesUpdated: notesUpdated,
+		PRsUpdated:   prsUpdated,
+	}, nil
+}
+
 // Ensure ShipmentServiceImpl implements the interface
 var _ primary.ShipmentService = (*ShipmentServiceImpl)(nil)
 

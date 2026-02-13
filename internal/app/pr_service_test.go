@@ -218,6 +218,10 @@ func (m *mockShipmentServiceForPR) SetStatus(ctx context.Context, shipmentID, st
 	return nil
 }
 
+func (m *mockShipmentServiceForPR) MoveShipmentToCommission(ctx context.Context, shipmentID, targetCommissionID string) (*primary.MoveShipmentResult, error) {
+	return &primary.MoveShipmentResult{}, nil
+}
+
 func TestPRService_CreatePR(t *testing.T) {
 	ctx := context.Background()
 

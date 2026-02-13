@@ -326,5 +326,54 @@ func (r *TomeRepository) CommissionExists(ctx context.Context, commissionID stri
 	return count > 0, nil
 }
 
+// UpdateCommissionID moves a tome and its children to a different commission.
+// Updates commission_id on the tome, plus cascades to tasks and notes belonging to this tome.
+func (r *TomeRepository) UpdateCommissionID(ctx context.Context, tomeID, commissionID string) (tasksUpdated, notesUpdated int, err error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return 0, 0, fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback() //nolint:errcheck
+
+	// Update the tome itself
+	result, err := tx.ExecContext(ctx,
+		"UPDATE tomes SET commission_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+		commissionID, tomeID,
+	)
+	if err != nil {
+		return 0, 0, fmt.Errorf("failed to update tome commission: %w", err)
+	}
+	rowsAffected, _ := result.RowsAffected()
+	if rowsAffected == 0 {
+		return 0, 0, fmt.Errorf("tome %s not found", tomeID)
+	}
+
+	// Cascade: update tasks belonging to this tome
+	taskResult, err := tx.ExecContext(ctx,
+		"UPDATE tasks SET commission_id = ?, updated_at = CURRENT_TIMESTAMP WHERE tome_id = ?",
+		commissionID, tomeID,
+	)
+	if err != nil {
+		return 0, 0, fmt.Errorf("failed to cascade to tasks: %w", err)
+	}
+	taskRows, _ := taskResult.RowsAffected()
+
+	// Cascade: update notes belonging to this tome
+	noteResult, err := tx.ExecContext(ctx,
+		"UPDATE notes SET commission_id = ?, updated_at = CURRENT_TIMESTAMP WHERE tome_id = ?",
+		commissionID, tomeID,
+	)
+	if err != nil {
+		return 0, 0, fmt.Errorf("failed to cascade to notes: %w", err)
+	}
+	noteRows, _ := noteResult.RowsAffected()
+
+	if err := tx.Commit(); err != nil {
+		return 0, 0, fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	return int(taskRows), int(noteRows), nil
+}
+
 // Ensure TomeRepository implements the interface
 var _ secondary.TomeRepository = (*TomeRepository)(nil)

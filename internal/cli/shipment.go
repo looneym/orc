@@ -289,6 +289,31 @@ Backwards transitions require --force flag.`,
 	},
 }
 
+func shipmentMoveCmd() *cobra.Command {
+	var toCommission string
+	cmd := &cobra.Command{
+		Use:   "move [shipment-id]",
+		Short: "Move shipment to a different commission",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			ctx := NewContext()
+			shipmentID := args[0]
+
+			result, err := wire.ShipmentService().MoveShipmentToCommission(ctx, shipmentID, toCommission)
+			if err != nil {
+				return fmt.Errorf("failed to move shipment: %w", err)
+			}
+
+			fmt.Printf("Moved %s to %s\n", shipmentID, toCommission)
+			fmt.Printf("  Cascaded: %d tasks, %d notes, %d PRs updated\n", result.TasksUpdated, result.NotesUpdated, result.PRsUpdated)
+			return nil
+		},
+	}
+	cmd.Flags().StringVar(&toCommission, "to", "", "Target commission ID (required)")
+	cmd.MarkFlagRequired("to") //nolint:errcheck
+	return cmd
+}
+
 func init() {
 	// shipment create flags
 	shipmentCreateCmd.Flags().StringP("commission", "c", "", "Commission ID (defaults to context)")
@@ -322,6 +347,7 @@ func init() {
 	shipmentCmd.AddCommand(shipmentUnpinCmd)
 	shipmentCmd.AddCommand(shipmentAssignCmd)
 	shipmentCmd.AddCommand(shipmentStatusCmd)
+	shipmentCmd.AddCommand(shipmentMoveCmd())
 }
 
 // ShipmentCmd returns the shipment command

@@ -397,5 +397,64 @@ func (r *ShipmentRepository) WorkbenchAssignedToOther(ctx context.Context, workb
 	return shipmentID, nil
 }
 
+// MoveToCommission moves a shipment to a different commission and cascades
+// the commission_id update to tasks, notes, and PRs.
+func (r *ShipmentRepository) MoveToCommission(ctx context.Context, shipmentID, targetCommissionID string) (tasksUpdated, notesUpdated, prsUpdated int, err error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return 0, 0, 0, fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback() //nolint:errcheck
+
+	// Update the shipment's commission_id
+	result, err := tx.ExecContext(ctx,
+		"UPDATE shipments SET commission_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+		targetCommissionID, shipmentID,
+	)
+	if err != nil {
+		return 0, 0, 0, fmt.Errorf("failed to update shipment commission: %w", err)
+	}
+	rowsAffected, _ := result.RowsAffected()
+	if rowsAffected == 0 {
+		return 0, 0, 0, fmt.Errorf("shipment %s not found", shipmentID)
+	}
+
+	// Cascade: update tasks
+	result, err = tx.ExecContext(ctx,
+		"UPDATE tasks SET commission_id = ?, updated_at = CURRENT_TIMESTAMP WHERE shipment_id = ?",
+		targetCommissionID, shipmentID,
+	)
+	if err != nil {
+		return 0, 0, 0, fmt.Errorf("failed to cascade to tasks: %w", err)
+	}
+	tasks, _ := result.RowsAffected()
+
+	// Cascade: update notes
+	result, err = tx.ExecContext(ctx,
+		"UPDATE notes SET commission_id = ?, updated_at = CURRENT_TIMESTAMP WHERE shipment_id = ?",
+		targetCommissionID, shipmentID,
+	)
+	if err != nil {
+		return 0, 0, 0, fmt.Errorf("failed to cascade to notes: %w", err)
+	}
+	notes, _ := result.RowsAffected()
+
+	// Cascade: update PRs
+	result, err = tx.ExecContext(ctx,
+		"UPDATE prs SET commission_id = ?, updated_at = CURRENT_TIMESTAMP WHERE shipment_id = ?",
+		targetCommissionID, shipmentID,
+	)
+	if err != nil {
+		return 0, 0, 0, fmt.Errorf("failed to cascade to PRs: %w", err)
+	}
+	prs, _ := result.RowsAffected()
+
+	if err := tx.Commit(); err != nil {
+		return 0, 0, 0, fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	return int(tasks), int(notes), int(prs), nil
+}
+
 // Ensure ShipmentRepository implements the interface
 var _ secondary.ShipmentRepository = (*ShipmentRepository)(nil)

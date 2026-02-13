@@ -118,6 +118,11 @@ type ShipmentRepository interface {
 
 	// WorkbenchAssignedToOther checks if workbench is assigned to another shipment.
 	WorkbenchAssignedToOther(ctx context.Context, workbenchID, excludeShipmentID string) (string, error)
+
+	// MoveToCommission moves a shipment to a different commission and cascades
+	// the commission_id update to tasks, notes, and PRs.
+	// Returns the counts of cascaded children updated.
+	MoveToCommission(ctx context.Context, shipmentID, targetCommissionID string) (tasksUpdated, notesUpdated, prsUpdated int, err error)
 }
 
 // ShipmentRecord represents a shipment as stored in persistence.
@@ -336,6 +341,7 @@ type NoteRecord struct {
 	CloseReason         string // Empty string means null
 	ClosedByNoteID      string // Empty string means null
 	PromoteToCommission bool   // When true, clear all container associations to make commission-level
+	MoveToCommission    bool   // When true, update commission_id (used with PromoteToCommission for cross-commission moves)
 }
 
 // NoteFilters contains filter options for querying notes.
@@ -381,6 +387,10 @@ type TomeRepository interface {
 
 	// CommissionExists checks if a commission exists (for validation).
 	CommissionExists(ctx context.Context, commissionID string) (bool, error)
+
+	// UpdateCommissionID moves a tome and its children to a different commission.
+	// Returns the number of cascaded tasks and notes updated.
+	UpdateCommissionID(ctx context.Context, tomeID, commissionID string) (tasksUpdated, notesUpdated int, err error)
 }
 
 // TomeRecord represents a tome as stored in persistence.
