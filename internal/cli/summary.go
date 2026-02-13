@@ -1,19 +1,13 @@
 package cli
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"hash/fnv"
-	"io"
-	"math/rand/v2"
 	"os"
 	"os/exec"
-	"os/signal"
 	"sort"
 	"strings"
-	"syscall"
-	"time"
 
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
@@ -74,7 +68,7 @@ type summaryOpts struct {
 	expandAll            bool
 	debugMode            bool
 	expandAllCommissions bool
-	pollSeconds          int
+	tuiMode              bool
 }
 
 // SummaryCmd returns the summary command
@@ -88,6 +82,7 @@ Display modes:
   Default: Show only focused container's commission (if focus is set)
   --all: Show all commissions and containers
   --commission [id]: Show specific commission (or 'current' for focus/context)
+  --tui: Interactive TUI with keyboard navigation (requires TTY)
 
 Structure:
   Commission
@@ -98,20 +93,28 @@ Examples:
   orc summary                          # focused container's commission only
   orc summary --all                    # all commissions
   orc summary --commission COMM-001    # specific commission
-  orc summary --poll                   # auto-refresh every 30s (press 'r' to refresh, 'q' to quit)
-  orc summary --poll 10               # auto-refresh every 10s`,
+  orc summary --tui                    # interactive TUI`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts := summaryOpts{}
 			opts.commissionFilter, _ = cmd.Flags().GetString("commission")
 			opts.expandAll, _ = cmd.Flags().GetBool("all")
 			opts.debugMode, _ = cmd.Flags().GetBool("debug")
 			opts.expandAllCommissions, _ = cmd.Flags().GetBool("expand-all-commissions")
-			opts.pollSeconds, _ = cmd.Flags().GetInt("poll")
+			opts.tuiMode, _ = cmd.Flags().GetBool("tui")
 
-			if opts.pollSeconds > 0 {
-				return runSummaryPoll(cmd, opts)
+			if opts.tuiMode {
+				fd := int(os.Stdin.Fd())
+				if !term.IsTerminal(fd) {
+					return fmt.Errorf("--tui requires a TTY (interactive terminal)")
+				}
+				return runSummaryTUI(cmd, opts)
 			}
-			return runSummaryOnce(cmd, opts)
+			output, err := runSummaryOnce(cmd, opts)
+			if err != nil {
+				return err
+			}
+			fmt.Print(output)
+			return nil
 		},
 	}
 
@@ -119,294 +122,15 @@ Examples:
 	cmd.Flags().Bool("all", false, "Show all containers (default: only show focused container if set)")
 	cmd.Flags().Bool("debug", false, "Show debug info about hidden/filtered content")
 	cmd.Flags().Bool("expand-all-commissions", false, "Expand all commissions (default: only focused commission expanded)")
-	cmd.Flags().Int("poll", 0, "Auto-refresh interval in seconds (default 30 when flag is present)")
-	cmd.Flag("poll").NoOptDefVal = "30"
+	cmd.Flags().Bool("tui", false, "Interactive TUI with keyboard navigation (requires TTY)")
 
 	return cmd
 }
 
-// emitPollEvent emits an operational event through the EventWriter.
-// Best-effort: silently ignores any errors (same semantics as the old file-based pollLog).
-func emitPollEvent(ctx context.Context, level, message string, data map[string]string) {
-	_ = wire.EventWriter().EmitOperational(ctx, "poll", level, message, data)
-}
+// runSummaryOnce renders the summary a single time and returns the output string.
+func runSummaryOnce(cmd *cobra.Command, opts summaryOpts) (string, error) {
+	var w strings.Builder
 
-// runSummaryPoll runs the summary in a polling loop with countdown, keystroke controls, and animation.
-// Falls back to a simple ticker if stdin is not a TTY.
-func runSummaryPoll(cmd *cobra.Command, opts summaryOpts) error {
-	ctx := cmd.Context()
-
-	fd := int(os.Stdin.Fd())
-	isTTY := term.IsTerminal(fd)
-
-	// If stdin is not a TTY, fall back to simple polling (no keystrokes, no animation)
-	if !isTTY {
-		emitPollEvent(ctx, "info", "poll session start", map[string]string{"tty_fallback": "stdin not a terminal"})
-		emitPollEvent(ctx, "info", "poll config", map[string]string{
-			"interval":       fmt.Sprintf("%d", opts.pollSeconds),
-			"utils_detected": fmt.Sprintf("%v", isInsideUtilsSession()),
-			"tty":            "false",
-		})
-		return runSummaryPollSimple(cmd, opts)
-	}
-
-	// Put terminal in raw mode for single-keystroke reading
-	oldState, err := term.MakeRaw(fd)
-	if err != nil {
-		emitPollEvent(ctx, "info", "poll session start", map[string]string{"tty_fallback": fmt.Sprintf("MakeRaw failed: %v", err)})
-		emitPollEvent(ctx, "info", "poll config", map[string]string{
-			"interval":       fmt.Sprintf("%d", opts.pollSeconds),
-			"utils_detected": fmt.Sprintf("%v", isInsideUtilsSession()),
-			"tty":            "false",
-		})
-		return runSummaryPollSimple(cmd, opts)
-	}
-	defer func() {
-		term.Restore(fd, oldState)
-		rawWrite("\033[?25h\r\n") // restore cursor, newline
-	}()
-
-	// Detect if running inside a utils tmux session (set by orc-utils-popup.sh)
-	isUtilsSession := isInsideUtilsSession()
-
-	// Log session start
-	emitPollEvent(ctx, "info", "poll session start", nil)
-	emitPollEvent(ctx, "info", "poll config", map[string]string{
-		"interval":       fmt.Sprintf("%d", opts.pollSeconds),
-		"utils_detected": fmt.Sprintf("%v", isUtilsSession),
-		"tty":            "true",
-	})
-
-	// Handle SIGTERM from outside (Ctrl+C won't generate SIGINT in raw mode)
-	sigCh := make(chan os.Signal, 1)
-	signal.Notify(sigCh, syscall.SIGTERM)
-	defer signal.Stop(sigCh)
-
-	// Key reader goroutine
-	keyCh := make(chan byte, 1)
-	go func() {
-		buf := make([]byte, 1)
-		for {
-			n, err := os.Stdin.Read(buf)
-			if err != nil || n == 0 {
-				return
-			}
-			select {
-			case keyCh <- buf[0]:
-			default:
-			}
-		}
-	}()
-
-	// Hide cursor during poll mode
-	rawWrite("\033[?25l")
-
-	// Initial render: clear screen and show summary
-	rawWrite("\033[H\033[2J")
-	if err := renderPollOutput(cmd, opts); err != nil {
-		emitPollEvent(ctx, "error", "refresh error", map[string]string{"error": err.Error()})
-		emitPollEvent(ctx, "info", "poll session end", nil)
-		return err
-	}
-	emitPollEvent(ctx, "debug", "refresh ok", nil)
-
-	interval := opts.pollSeconds
-	for {
-		// Print blank line before status
-		rawWrite("\r\n")
-
-		refreshNow := false
-		for remaining := interval; remaining > 0; remaining-- {
-			// Overwrite status line in-place
-			quitHint := "[q]uit"
-			if isUtilsSession {
-				quitHint = "[q] hide utils tmux session"
-			}
-			rawWrite(fmt.Sprintf("\r\033[K  \033[2mPolling. Refresh in %ds. [r]efresh %s\033[0m", remaining, quitHint))
-
-			select {
-			case <-sigCh:
-				emitPollEvent(ctx, "info", "quit: SIGTERM received", nil)
-				emitPollEvent(ctx, "info", "poll session end", nil)
-				return nil
-			case key := <-keyCh:
-				switch key {
-				case 'r', 'R':
-					emitPollEvent(ctx, "debug", "keystroke", map[string]string{"key": "r"})
-					refreshNow = true
-				case 'q', 'Q', 3, 27: // q, Ctrl+C, Escape
-					emitPollEvent(ctx, "debug", "keystroke", map[string]string{"key": fmt.Sprintf("%d", key)})
-					emitPollEvent(ctx, "info", "poll session end", nil)
-					if isUtilsSession {
-						detachUtilsSession()
-					}
-					return nil
-				}
-			case <-time.After(time.Second):
-			}
-
-			if refreshNow {
-				break
-			}
-		}
-
-		// Clear screen, animate on black, then clear again before re-render
-		rawWrite("\033[H\033[2J") // instant black
-		playRefreshAnimation()
-		rawWrite("\033[H\033[2J") // clear animation artifacts
-		if err := renderPollOutput(cmd, opts); err != nil {
-			emitPollEvent(ctx, "error", "refresh error", map[string]string{"error": err.Error()})
-			emitPollEvent(ctx, "info", "poll session end", nil)
-			return err
-		}
-		emitPollEvent(ctx, "debug", "refresh ok", nil)
-	}
-}
-
-// rawWrite writes directly to stdout, bypassing fmt (for use in raw terminal mode).
-func rawWrite(s string) {
-	os.Stdout.WriteString(s)
-}
-
-// isInsideUtilsSession checks if we're running inside an ORC utils tmux session
-// by querying the ORC_UTILS_SESSION environment variable set by orc-utils-popup.sh.
-func isInsideUtilsSession() bool {
-	out, err := exec.Command("tmux", "show-environment", "ORC_UTILS_SESSION").Output()
-	if err != nil {
-		return false
-	}
-	return strings.Contains(string(out), "ORC_UTILS_SESSION=")
-}
-
-// detachUtilsSession detaches the tmux client, which closes the utils popup.
-func detachUtilsSession() {
-	_ = exec.Command("tmux", "detach-client").Run()
-}
-
-// renderPollOutput captures runSummaryOnce output and writes it with \r\n for raw terminal mode.
-func renderPollOutput(cmd *cobra.Command, opts summaryOpts) error {
-	// Capture stdout into a pipe
-	origStdout := os.Stdout
-	r, w, err := os.Pipe()
-	if err != nil {
-		return err
-	}
-
-	// Force color output even though stdout is temporarily a pipe
-	origNoColor := color.NoColor
-	color.NoColor = false
-
-	os.Stdout = w
-	summaryErr := runSummaryOnce(cmd, opts)
-	w.Close()
-	os.Stdout = origStdout
-	color.NoColor = origNoColor
-
-	// Read captured output
-	var buf bytes.Buffer
-	io.Copy(&buf, r)
-	r.Close()
-
-	// Convert \n to \r\n for raw terminal mode
-	output := strings.ReplaceAll(buf.String(), "\n", "\r\n")
-	rawWrite(output)
-
-	// Clear any leftover content below from previous render
-	rawWrite("\033[J")
-
-	return summaryErr
-}
-
-// playRefreshAnimation renders a 1-second starfield rain effect.
-// Stars cascade down the screen in a wave, accumulating as the wave progresses.
-func playRefreshAnimation() {
-	w, h, err := term.GetSize(int(os.Stdout.Fd()))
-	if err != nil || w <= 0 || h <= 0 {
-		w, h = 80, 24
-	}
-	h -= 2 // reserve space for status line area
-
-	sparkles := []string{"✨", "★", "✦", "✧", "·"}
-	numFrames := 8
-	frameDuration := 125 * time.Millisecond
-	starsPerFrame := max(w/10, 6)
-
-	for frame := range numFrames {
-		// Wave front sweeps from top to bottom
-		waveFront := (frame + 1) * h / numFrames
-
-		for range starsPerFrame + frame*2 {
-			// Cluster stars around the wave front (±3 rows)
-			row := waveFront + rand.IntN(7) - 3
-			if row < 1 || row > h {
-				continue
-			}
-			col := rand.IntN(w-2) + 1
-
-			// Brighter characters near wave front, dimmer further away
-			dist := abs(row - waveFront)
-			charIdx := dist
-			if charIdx >= len(sparkles) {
-				charIdx = len(sparkles) - 1
-			}
-
-			rawWrite(fmt.Sprintf("\033[%d;%dH%s", row, col, sparkles[charIdx]))
-		}
-
-		time.Sleep(frameDuration)
-	}
-}
-
-// abs returns the absolute value of an integer.
-func abs(x int) int {
-	if x < 0 {
-		return -x
-	}
-	return x
-}
-
-// runSummaryPollSimple is a fallback poll loop for non-interactive terminals.
-// No raw mode, no keystrokes, no animation — just clear-and-redraw with a countdown.
-func runSummaryPollSimple(cmd *cobra.Command, opts summaryOpts) error {
-	ctx := cmd.Context()
-
-	sigCh := make(chan os.Signal, 1)
-	signal.Notify(sigCh, syscall.SIGTERM, syscall.SIGINT)
-	defer signal.Stop(sigCh)
-
-	// Initial render
-	fmt.Print("\033[H\033[2J")
-	if err := runSummaryOnce(cmd, opts); err != nil {
-		emitPollEvent(ctx, "error", "refresh error", map[string]string{"error": err.Error()})
-		emitPollEvent(ctx, "info", "poll session end", nil)
-		return err
-	}
-	emitPollEvent(ctx, "debug", "refresh ok", nil)
-
-	interval := opts.pollSeconds
-	for {
-		fmt.Printf("\n  Polling. Refresh in %ds...\n", interval)
-
-		select {
-		case <-sigCh:
-			emitPollEvent(ctx, "info", "quit: signal received", nil)
-			emitPollEvent(ctx, "info", "poll session end", nil)
-			return nil
-		case <-time.After(time.Duration(interval) * time.Second):
-		}
-
-		fmt.Print("\033[H\033[2J")
-		if err := runSummaryOnce(cmd, opts); err != nil {
-			emitPollEvent(ctx, "error", "refresh error", map[string]string{"error": err.Error()})
-			emitPollEvent(ctx, "info", "poll session end", nil)
-			return err
-		}
-		emitPollEvent(ctx, "debug", "refresh ok", nil)
-	}
-}
-
-// runSummaryOnce renders the summary a single time.
-func runSummaryOnce(cmd *cobra.Command, opts summaryOpts) error {
 	// Get current working directory for config
 	cwd, err := os.Getwd()
 	if err != nil {
@@ -443,7 +167,7 @@ func runSummaryOnce(cmd *cobra.Command, opts summaryOpts) error {
 			commissionID = resolveContainerCommission(focusID)
 		}
 		if commissionID == "" {
-			return fmt.Errorf("--commission current requires a focused container or being in a commission context")
+			return "", fmt.Errorf("--commission current requires a focused container or being in a commission context")
 		}
 		filterCommissionID = commissionID
 	} else if opts.commissionFilter != "" {
@@ -452,7 +176,7 @@ func runSummaryOnce(cmd *cobra.Command, opts summaryOpts) error {
 
 		// Validate commission exists
 		if _, err := wire.CommissionService().GetCommission(cmd.Context(), resolved); err != nil {
-			return fmt.Errorf("commission %q not found", opts.commissionFilter)
+			return "", fmt.Errorf("commission %q not found", opts.commissionFilter)
 		}
 		filterCommissionID = resolved
 	}
@@ -467,7 +191,7 @@ func runSummaryOnce(cmd *cobra.Command, opts summaryOpts) error {
 	// Get list of commissions to display
 	commissions, err := wire.CommissionService().ListCommissions(context.Background(), primary.CommissionFilters{})
 	if err != nil {
-		return fmt.Errorf("failed to list commissions: %w", err)
+		return "", fmt.Errorf("failed to list commissions: %w", err)
 	}
 
 	// Build set of active commission IDs for efficient lookup
@@ -495,11 +219,11 @@ func runSummaryOnce(cmd *cobra.Command, opts summaryOpts) error {
 
 	if len(openCommissions) == 0 {
 		if filterCommissionID != "" {
-			fmt.Printf("No open containers for %s\n", filterCommissionID)
+			fmt.Fprintf(&w, "No open containers for %s\n", filterCommissionID)
 		} else {
-			fmt.Println("No open commissions")
+			fmt.Fprintln(&w, "No open commissions")
 		}
-		return nil
+		return w.String(), nil
 	}
 
 	// Determine which commission is "focused" based on focusID
@@ -519,7 +243,7 @@ func runSummaryOnce(cmd *cobra.Command, opts summaryOpts) error {
 	})
 
 	// Render header based on role
-	renderHeader(role, workbenchID, workshopID, focusID, filterCommissionID)
+	renderHeader(&w, role, workbenchID, workshopID, focusID, filterCommissionID)
 
 	// Build map of focused containers across all workbenches in this workshop
 	workshopFocus := buildWorkshopFocusMap(cmd.Context(), workshopID, workbenchID)
@@ -540,34 +264,34 @@ func runSummaryOnce(cmd *cobra.Command, opts summaryOpts) error {
 
 		summary, err := wire.SummaryService().GetCommissionSummary(context.Background(), req)
 		if err != nil {
-			fmt.Printf("Error getting summary for %s: %v\n", commission.ID, err)
+			fmt.Fprintf(&w, "Error getting summary for %s: %v\n", commission.ID, err)
 			continue
 		}
 
 		if shouldExpand {
 			// Render full summary for focused or expanded commissions
-			renderSummary(summary, focusID, workshopFocus)
+			renderSummary(&w, summary, focusID, workshopFocus)
 
 			// Render debug info if present
 			if summary.DebugInfo != nil && len(summary.DebugInfo.Messages) > 0 {
-				fmt.Println()
-				renderDebugInfo(summary.DebugInfo)
+				fmt.Fprintln(&w)
+				renderDebugInfo(&w, summary.DebugInfo)
 			}
 		} else {
 			// Render collapsed summary for non-focused commissions
-			renderCollapsedCommission(summary)
+			renderCollapsedCommission(&w, summary)
 		}
 
 		if i < len(openCommissions)-1 {
-			fmt.Println()
+			fmt.Fprintln(&w)
 		}
 	}
 
-	return nil
+	return w.String(), nil
 }
 
-// renderHeader prints the header line based on role
-func renderHeader(role, workbenchID, workshopID, _, commissionID string) {
+// renderHeader writes the header line based on role
+func renderHeader(w *strings.Builder, role, workbenchID, workshopID, _, commissionID string) {
 	// Show workshop context
 	if workshopID != "" {
 		// Fetch workshop name
@@ -576,21 +300,21 @@ func renderHeader(role, workbenchID, workshopID, _, commissionID string) {
 			workshopName = ws.Name
 		}
 
-		fmt.Printf("Workshop %s", workshopID)
+		fmt.Fprintf(w, "Workshop %s", workshopID)
 		if workshopName != "" {
-			fmt.Printf(" (%s)", workshopName)
+			fmt.Fprintf(w, " (%s)", workshopName)
 		}
-		fmt.Println()
+		fmt.Fprintln(w)
 
 		// Show workbenches in workshop with tree format
-		renderWorkshopBenches(workshopID, workbenchID)
+		renderWorkshopBenches(w, workshopID, workbenchID)
 	}
 
-	fmt.Println()
+	fmt.Fprintln(w)
 }
 
-// renderWorkshopBenches displays workbenches in the workshop with tree formatting
-func renderWorkshopBenches(workshopID, currentWorkbenchID string) {
+// renderWorkshopBenches writes workbenches in the workshop with tree formatting
+func renderWorkshopBenches(w *strings.Builder, workshopID, currentWorkbenchID string) {
 	ctx := NewContext()
 
 	allWorkbenches, err := wire.WorkbenchService().ListWorkbenches(ctx, primary.WorkbenchFilters{
@@ -613,7 +337,7 @@ func renderWorkshopBenches(workshopID, currentWorkbenchID string) {
 		return
 	}
 
-	fmt.Println("|")
+	fmt.Fprintln(w, "|")
 	itemIdx := 0
 
 	// Render workbenches
@@ -648,7 +372,7 @@ func renderWorkshopBenches(workshopID, currentWorkbenchID string) {
 			line += color.New(color.FgCyan).Sprintf(" → %s", focusedID)
 		}
 
-		fmt.Printf("%s%s\n", prefix, line)
+		fmt.Fprintf(w, "%s%s\n", prefix, line)
 		itemIdx++
 	}
 }
@@ -773,8 +497,8 @@ func formatFocusActors(actors []string, isMeFocused bool) string {
 	return fmt.Sprintf(" [focused by %s]", strings.Join(parts, ", "))
 }
 
-// renderCollapsedCommission renders a commission as a single collapsed line with counts
-func renderCollapsedCommission(summary *primary.CommissionSummary) {
+// renderCollapsedCommission writes a commission as a single collapsed line with counts
+func renderCollapsedCommission(w *strings.Builder, summary *primary.CommissionSummary) {
 	// Count items
 	shipmentCount := len(summary.Shipments)
 	noteCount := len(summary.Notes)
@@ -797,17 +521,17 @@ func renderCollapsedCommission(summary *primary.CommissionSummary) {
 		countsStr = fmt.Sprintf(" (%s)", strings.Join(counts, ", "))
 	}
 
-	fmt.Printf("%s - %s%s\n", colorizeID(summary.ID), summary.Title, countsStr)
+	fmt.Fprintf(w, "%s - %s%s\n", colorizeID(summary.ID), summary.Title, countsStr)
 }
 
-// renderSummary renders the commission with notes, shipments, and tomes in tree format
-func renderSummary(summary *primary.CommissionSummary, _ string, workshopFocus workshopFocusInfo) {
+// renderSummary writes the commission with notes, shipments, and tomes in tree format
+func renderSummary(w *strings.Builder, summary *primary.CommissionSummary, _ string, workshopFocus workshopFocusInfo) {
 	// Commission header with focused marker
 	focusedMarker := ""
 	if summary.IsFocusedCommission {
 		focusedMarker = fmt.Sprintf(" [focused by ✨ %s ✨]", color.New(color.FgHiMagenta).Sprint("you"))
 	}
-	fmt.Printf("%s%s - %s\n", colorizeID(summary.ID), focusedMarker, summary.Title)
+	fmt.Fprintf(w, "%s%s - %s\n", colorizeID(summary.ID), focusedMarker, summary.Title)
 
 	// Split shipments into focused and non-focused groups
 	var focusedShips, otherShips []primary.ShipmentSummary
@@ -834,22 +558,22 @@ func renderSummary(summary *primary.CommissionSummary, _ string, workshopFocus w
 		return
 	}
 
-	fmt.Println("│")
+	fmt.Fprintln(w, "│")
 	itemIdx := 0
 
 	// 1. Render focused shipments
 	for _, ship := range focusedShips {
-		renderShipment(ship, workshopFocus, &itemIdx, totalItems)
+		renderShipment(w, ship, workshopFocus, &itemIdx, totalItems)
 	}
 
 	// Visual gap between focused and non-focused shipments
 	if len(focusedShips) > 0 && (len(otherShips) > 0 || len(summary.Tomes) > 0 || len(summary.Notes) > 0) {
-		fmt.Println("│")
+		fmt.Fprintln(w, "│")
 	}
 
 	// 2. Render non-focused shipments
 	for _, ship := range otherShips {
-		renderShipment(ship, workshopFocus, &itemIdx, totalItems)
+		renderShipment(w, ship, workshopFocus, &itemIdx, totalItems)
 	}
 
 	// 3. Render tomes
@@ -872,7 +596,7 @@ func renderSummary(summary *primary.CommissionSummary, _ string, workshopFocus w
 		}
 		focusMark := formatFocusActors(workshopFocus.containerToWorkbench[tome.ID], tome.IsFocused)
 
-		fmt.Printf("%s%s%s%s - %s%s\n", tomePrefix, colorizeID(tome.ID), focusMark, pinnedMark, tome.Title, noteInfo)
+		fmt.Fprintf(w, "%s%s%s%s - %s%s\n", tomePrefix, colorizeID(tome.ID), focusMark, pinnedMark, tome.Title, noteInfo)
 
 		// Expand notes for focused tome
 		if len(tome.Notes) > 0 {
@@ -886,7 +610,7 @@ func renderSummary(summary *primary.CommissionSummary, _ string, workshopFocus w
 				if note.Type != "" {
 					typeMarker = color.New(color.FgYellow).Sprintf("[%s] ", note.Type)
 				}
-				fmt.Printf("%s%s %s- %s\n", notePrefix, colorizeID(note.ID), typeMarker, truncate(note.Title, 60))
+				fmt.Fprintf(w, "%s%s %s- %s\n", notePrefix, colorizeID(note.ID), typeMarker, truncate(note.Title, 60))
 			}
 		}
 
@@ -895,7 +619,7 @@ func renderSummary(summary *primary.CommissionSummary, _ string, workshopFocus w
 
 	// Visual gap before commission-level notes
 	if len(summary.Notes) > 0 && (len(focusedShips) > 0 || len(otherShips) > 0 || len(summary.Tomes) > 0) {
-		fmt.Println("│")
+		fmt.Fprintln(w, "│")
 	}
 
 	// 4. Render commission-level notes as tree items (after shipments and tomes)
@@ -913,13 +637,13 @@ func renderSummary(summary *primary.CommissionSummary, _ string, workshopFocus w
 		if note.Type != "" {
 			typeMarker = color.New(color.FgYellow).Sprintf(" [%s]", note.Type)
 		}
-		fmt.Printf("%s%s%s%s - %s\n", prefix, colorizeID(note.ID), typeMarker, pinnedMark, truncate(note.Title, 60))
+		fmt.Fprintf(w, "%s%s%s%s - %s\n", prefix, colorizeID(note.ID), typeMarker, pinnedMark, truncate(note.Title, 60))
 		itemIdx++
 	}
 }
 
-// renderShipment renders a single shipment with its children if focused
-func renderShipment(ship primary.ShipmentSummary, workshopFocus workshopFocusInfo, itemIdx *int, totalItems int) {
+// renderShipment writes a single shipment with its children if focused
+func renderShipment(w *strings.Builder, ship primary.ShipmentSummary, workshopFocus workshopFocusInfo, itemIdx *int, totalItems int) {
 	isLast := *itemIdx == totalItems-1
 	prefix := "├── "
 	taskPrefix := "│   "
@@ -951,7 +675,7 @@ func renderShipment(ship primary.ShipmentSummary, workshopFocus workshopFocusInf
 	}
 	focusMark := formatFocusActors(workshopFocus.containerToWorkbench[ship.ID], ship.IsFocused)
 
-	fmt.Printf("%s%s%s%s%s%s - %s%s\n", prefix, colorizeID(ship.ID), statusBadge, benchMarker, focusMark, pinnedMark, ship.Title, taskInfo)
+	fmt.Fprintf(w, "%s%s%s%s%s%s - %s%s\n", prefix, colorizeID(ship.ID), statusBadge, benchMarker, focusMark, pinnedMark, ship.Title, taskInfo)
 
 	// Expand children for focused shipment (notes first, then tasks)
 	if ship.IsFocused {
@@ -969,7 +693,7 @@ func renderShipment(ship primary.ShipmentSummary, workshopFocus workshopFocusInf
 			if note.Type != "" {
 				typeMarker = color.New(color.FgYellow).Sprintf("[%s] ", note.Type)
 			}
-			fmt.Printf("%s%s %s- %s\n", nPrefix, colorizeID(note.ID), typeMarker, truncate(note.Title, 60))
+			fmt.Fprintf(w, "%s%s %s- %s\n", nPrefix, colorizeID(note.ID), typeMarker, truncate(note.Title, 60))
 			childIdx++
 		}
 
@@ -986,9 +710,9 @@ func renderShipment(ship primary.ShipmentSummary, workshopFocus workshopFocusInf
 			if task.Status != "" && task.Status != "open" {
 				statusMark = colorizeStatus(task.Status) + " - "
 			}
-			fmt.Printf("%s%s - %s%s\n", tPrefix, colorizeID(task.ID), statusMark, task.Title)
+			fmt.Fprintf(w, "%s%s - %s%s\n", tPrefix, colorizeID(task.ID), statusMark, task.Title)
 			// Render task children (plans)
-			renderTaskChildren(task, taskChildPrefix)
+			renderTaskChildren(w, task, taskChildPrefix)
 			childIdx++
 		}
 	}
@@ -1076,8 +800,8 @@ func colorizePlanStatus(status string) string {
 	}
 }
 
-// renderTaskChildren renders the child entities (plans) under a task
-func renderTaskChildren(task primary.TaskSummary, prefix string) {
+// renderTaskChildren writes the child entities (plans) under a task
+func renderTaskChildren(w *strings.Builder, task primary.TaskSummary, prefix string) {
 	totalChildren := len(task.Plans)
 	if totalChildren == 0 {
 		return
@@ -1088,15 +812,15 @@ func renderTaskChildren(task primary.TaskSummary, prefix string) {
 		if i == totalChildren-1 {
 			childPrefix = prefix + "└── "
 		}
-		fmt.Printf("%s%s %s\n", childPrefix, colorizeID(plan.ID), colorizePlanStatus(plan.Status))
+		fmt.Fprintf(w, "%s%s %s\n", childPrefix, colorizeID(plan.ID), colorizePlanStatus(plan.Status))
 	}
 }
 
-// renderDebugInfo renders the debug information section
-func renderDebugInfo(info *primary.DebugInfo) {
+// renderDebugInfo writes the debug information section
+func renderDebugInfo(w *strings.Builder, info *primary.DebugInfo) {
 	debugColor := color.New(color.FgHiBlack)
-	debugColor.Println("─── Debug Info ───")
+	fmt.Fprintln(w, debugColor.Sprint("─── Debug Info ───"))
 	for _, msg := range info.Messages {
-		debugColor.Printf("  %s\n", msg)
+		fmt.Fprintf(w, "%s\n", debugColor.Sprintf("  %s", msg))
 	}
 }
