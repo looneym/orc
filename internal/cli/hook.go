@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"strings"
 	"time"
 
@@ -349,13 +350,49 @@ func runHookSessionStart() error {
 		return nil
 	}
 
-	// 6. Workbench detected — output context for Claude Code
-	eventReq.Reason = fmt.Sprintf("workbench %s detected, instructing /orc-prime", hctx.workbenchID)
+	// 6. Workbench detected — gather context and inject it
+	eventReq.Reason = fmt.Sprintf("workbench %s detected, injecting context", hctx.workbenchID)
+
+	// Run orc prime and orc summary to gather full context
+	cwd := event.Cwd
+	if cwd == "" {
+		cwd, _ = os.Getwd()
+	}
+
+	var contextParts []string
+
+	primeCmd := exec.Command("orc", "prime")
+	primeCmd.Dir = cwd
+	if primeOut, err := primeCmd.Output(); err == nil {
+		contextParts = append(contextParts, string(primeOut))
+	}
+
+	summaryCmd := exec.Command("orc", "summary")
+	summaryCmd.Dir = cwd
+	if summaryOut, err := summaryCmd.Output(); err == nil {
+		contextParts = append(contextParts, "## Current Summary\n\n"+string(summaryOut))
+	}
+
+	if len(contextParts) == 0 {
+		eventReq.Reason = fmt.Sprintf("workbench %s detected but failed to gather context", hctx.workbenchID)
+		return nil
+	}
+
+	instruction := fmt.Sprintf(
+		"This is an ORC workbench (%s). ORC is the project management tool for this workspace. "+
+			"The context below was gathered automatically at session start.\n\n"+
+			"Greet the user with a brief welcome message that references their current workbench and "+
+			"summarizes their active work (focused shipment, task status). "+
+			"Keep it natural and concise — something like reporting for duty with a quick status overview. "+
+			"If you need to refresh context later, use the /orc-prime skill.\n\n"+
+			"---\n\n%s",
+		hctx.workbenchID, strings.Join(contextParts, "\n\n"),
+	)
 
 	output := map[string]any{
 		"hookSpecificOutput": map[string]any{
 			"hookEventName":     "SessionStart",
-			"additionalContext": fmt.Sprintf("You are in ORC workbench %s. Run /orc-prime to bootstrap project context.", hctx.workbenchID),
+			"additionalContext": instruction,
 		},
 	}
 
