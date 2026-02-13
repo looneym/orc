@@ -14,6 +14,8 @@ It leans into Claude Code's features wherever possible and provides a "batteries
 - Drives shipments from messy ideation to clarity
 - Integrates with 🆕🤑 Claude Teams 🤑🆕 for long-running and parallel task execution
 
+Welcome to the Forest Factory! Whether you are a seasoned goblin or a fresh imp, this guide will help you get started.
+
 ## 🎭 The Cast
 
 > See [docs/schema.md](docs/schema.md) for the full glossary.
