@@ -62,3 +62,13 @@ When adding a new entity that requires persistence (e.g., CycleWorkOrder):
 - [ ] Run: `make test && make lint`
 
 **Hard rule:** Repository tests are NOT optional. Every `*_repo.go` MUST have a corresponding `*_repo_test.go`.
+
+## Emit Operational Events
+
+When adding operational event emission to a new subsystem:
+
+- [ ] Choose source constant in internal/core/event/sources.go (or add new one)
+- [ ] Inject EventWriter into your app service via wire
+- [ ] Call eventWriter.EmitOperational(ctx, source, level, message, data)
+- [ ] Test with: make dev && ./orc events tail --source <your-source> --level debug
+- [ ] Run: make test && make lint
