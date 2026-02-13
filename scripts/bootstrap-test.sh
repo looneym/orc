@@ -330,18 +330,31 @@ else
     exit 1
 fi
 
+# --- Post-deploy verification ---
+log ""
+log "=== Phase 1b: Post-Deploy Verification ==="
+log ""
+
+log "Verifying orc-session-picker.sh NOT deployed..."
+if run_ssh "! test -f ~/.orc/tmux/orc-session-picker.sh"; then
+    log "✓ orc-session-picker.sh not deployed (removed experiment)"
+else
+    error "orc-session-picker.sh still deployed after make deploy-glue"
+    exit 1
+fi
+
 # --- Uninstall verification ---
 log ""
 log "=== Phase 2: Uninstall Verification ==="
 log ""
 
-log "Running 'make uninstall'..."
-if run_ssh "cd ~/src/orc && make uninstall"; then
-    log "✓ make uninstall PASSED"
-else
+log "Running 'make uninstall' (capturing output)..."
+UNINSTALL_OUTPUT=$(sshpass -p "$VM_PASS" ssh $SSH_OPTS "$VM_USER@$VM_IP" "zsh -l -c 'cd ~/src/orc && make uninstall'" 2>&1) || {
     error "make uninstall FAILED"
+    echo "$UNINSTALL_OUTPUT"
     exit 1
-fi
+}
+log "✓ make uninstall PASSED"
 
 log "Verifying orc binary removed from PATH..."
 if run_ssh "! command -v orc"; then
@@ -396,6 +409,31 @@ if run_ssh "test -f ~/.orc/orc.db"; then
     log "✓ orc.db preserved (user data intact)"
 else
     error "orc.db was deleted by uninstall (should be preserved)"
+    exit 1
+fi
+
+log "Verifying uninstall output includes tmux unbind..."
+if echo "$UNINSTALL_OUTPUT" | grep -q "Unbinding tmux keys"; then
+    log "✓ Uninstall output includes tmux unbind"
+else
+    error "Uninstall output missing tmux unbind message"
+    echo "--- Uninstall output ---"
+    echo "$UNINSTALL_OUTPUT"
+    echo "------------------------"
+    exit 1
+fi
+
+log "Verifying no orphan hook scripts after uninstall..."
+ORPHAN_HOOKS=false
+for hook in session-start.sh session-start-prime.sh session-end-logger.sh; do
+    if sshpass -p "$VM_PASS" ssh $SSH_OPTS "$VM_USER@$VM_IP" "zsh -l -c 'test -f ~/.claude/hooks/$hook'" 2>/dev/null; then
+        error "Orphan hook script found: ~/.claude/hooks/$hook"
+        ORPHAN_HOOKS=true
+    fi
+done
+if [[ "$ORPHAN_HOOKS" == "false" ]]; then
+    log "✓ No orphan hook scripts remain"
+else
     exit 1
 fi
 

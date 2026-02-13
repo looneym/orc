@@ -359,18 +359,6 @@ deploy-glue:
 		fi; \
 	done; \
 	\
-	if [ -d "glue/hooks" ] && [ "$$(ls -A glue/hooks/*.sh 2>/dev/null)" ]; then \
-		echo "Deploying Claude Code hook scripts..."; \
-		for hook in glue/hooks/*.sh; do \
-			[ -f "$$hook" ] || continue; \
-			name=$$(basename "$$hook"); \
-			echo "  → $$name"; \
-			cp "$$hook" $$HOME/.claude/hooks/$$name; \
-			chmod +x $$HOME/.claude/hooks/$$name; \
-		done; \
-		echo "✓ Hook scripts deployed to ~/.claude/hooks/"; \
-	fi; \
-	\
 	CURRENT_HOOKS=""; \
 	if [ -f "glue/hooks.json" ]; then \
 		echo "Configuring hooks in settings.json..."; \
@@ -487,6 +475,17 @@ uninstall:
 		done; \
 	fi; \
 	\
+	echo "Removing orphan hook scripts..."; \
+	for orphan in \
+		"$$HOME/.claude/hooks/session-start.sh" \
+		"$$HOME/.claude/hooks/session-start-prime.sh" \
+		"$$HOME/.claude/hooks/session-end-logger.sh"; do \
+		if [ -f "$$orphan" ]; then \
+			rm -f "$$orphan"; \
+			echo "  ✗ $$orphan"; \
+		fi; \
+	done; \
+	\
 	echo "Cleaning shell profile..."; \
 	for profile_entry in $$(jq -r '.shell_profiles // [] | .[].file' "$$MANIFEST" 2>/dev/null); do \
 		if [ -f "$$profile_entry" ]; then \
@@ -494,6 +493,14 @@ uninstall:
 			echo "  ✗ Removed PATH line from $$profile_entry"; \
 		fi; \
 	done; \
+	\
+	echo "Unbinding tmux keys..."; \
+	tmux unbind-key -T prefix s 2>/dev/null; tmux bind-key -T prefix s choose-tree -sZ 2>/dev/null || true; \
+	tmux unbind-key -T prefix S 2>/dev/null || true; \
+	tmux unbind-key -T prefix u 2>/dev/null || true; \
+	tmux unbind-key -T root DoubleClick1Status 2>/dev/null || true; \
+	tmux unbind-key -T root MouseDown3Status 2>/dev/null || true; \
+	echo "✓ TMux keys unbound"; \
 	\
 	echo ""; \
 	if [ -f "$$HOME/.orc/orc.db" ]; then \
