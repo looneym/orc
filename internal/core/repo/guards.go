@@ -4,6 +4,7 @@ package repo
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 )
 
@@ -105,6 +106,68 @@ func CanDeleteRepo(ctx DeleteRepoContext) GuardResult {
 		return GuardResult{
 			Allowed: false,
 			Reason:  fmt.Sprintf("cannot delete repository %s with active pull requests", ctx.RepoID),
+		}
+	}
+
+	return GuardResult{Allowed: true}
+}
+
+// ValidateUpstreamURLContext provides context for upstream URL validation.
+type ValidateUpstreamURLContext struct {
+	URL string
+}
+
+// Patterns for valid git remote URLs.
+var (
+	sshURLPattern   = regexp.MustCompile(`^git@[\w.\-]+:[\w.\-]+/[\w.\-]+\.git$`)
+	httpsURLPattern = regexp.MustCompile(`^https://[\w.\-]+/[\w.\-]+/[\w.\-]+\.git$`)
+)
+
+// ValidateUpstreamURL evaluates whether an upstream URL is valid.
+// Rules:
+// - URL must not be empty
+// - URL must match SSH format (git@host:owner/repo.git) or HTTPS format (https://host/owner/repo.git)
+func ValidateUpstreamURL(ctx ValidateUpstreamURLContext) GuardResult {
+	if strings.TrimSpace(ctx.URL) == "" {
+		return GuardResult{
+			Allowed: false,
+			Reason:  "upstream URL cannot be empty",
+		}
+	}
+
+	if sshURLPattern.MatchString(ctx.URL) || httpsURLPattern.MatchString(ctx.URL) {
+		return GuardResult{Allowed: true}
+	}
+
+	return GuardResult{
+		Allowed: false,
+		Reason:  fmt.Sprintf("invalid upstream URL %q: must be SSH (git@host:owner/repo.git) or HTTPS (https://host/owner/repo.git)", ctx.URL),
+	}
+}
+
+// ForkContext provides context for fork eligibility guards.
+type ForkContext struct {
+	HasUpstream bool   // true if upstream_url is already set
+	ForkURL     string // the origin/fork URL
+	UpstreamURL string // the upstream URL being configured
+}
+
+// CanFork evaluates whether a repository can be configured as a fork.
+// Rules:
+// - Repository must not already have an upstream (no double-forking)
+// - Fork URL must differ from upstream URL
+func CanFork(ctx ForkContext) GuardResult {
+	if ctx.HasUpstream {
+		return GuardResult{
+			Allowed: false,
+			Reason:  "repository already has an upstream configured (cannot double-fork)",
+		}
+	}
+
+	if ctx.ForkURL == ctx.UpstreamURL {
+		return GuardResult{
+			Allowed: false,
+			Reason:  "fork URL must differ from upstream URL",
 		}
 	}
 

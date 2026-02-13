@@ -176,6 +176,129 @@ func TestCanDeleteRepo(t *testing.T) {
 	}
 }
 
+func TestValidateUpstreamURL(t *testing.T) {
+	tests := []struct {
+		name        string
+		ctx         ValidateUpstreamURLContext
+		wantAllowed bool
+		wantReason  string
+	}{
+		{
+			name:        "valid SSH URL",
+			ctx:         ValidateUpstreamURLContext{URL: "git@github.com:owner/repo.git"},
+			wantAllowed: true,
+		},
+		{
+			name:        "valid HTTPS URL",
+			ctx:         ValidateUpstreamURLContext{URL: "https://github.com/owner/repo.git"},
+			wantAllowed: true,
+		},
+		{
+			name:        "valid SSH URL with hyphens and dots",
+			ctx:         ValidateUpstreamURLContext{URL: "git@gitlab.my-company.com:my-org/my-repo.git"},
+			wantAllowed: true,
+		},
+		{
+			name:        "valid HTTPS URL with hyphens and dots",
+			ctx:         ValidateUpstreamURLContext{URL: "https://gitlab.my-company.com/my-org/my-repo.git"},
+			wantAllowed: true,
+		},
+		{
+			name:        "empty URL",
+			ctx:         ValidateUpstreamURLContext{URL: ""},
+			wantAllowed: false,
+			wantReason:  "upstream URL cannot be empty",
+		},
+		{
+			name:        "whitespace-only URL",
+			ctx:         ValidateUpstreamURLContext{URL: "   "},
+			wantAllowed: false,
+			wantReason:  "upstream URL cannot be empty",
+		},
+		{
+			name:        "missing .git suffix",
+			ctx:         ValidateUpstreamURLContext{URL: "git@github.com:owner/repo"},
+			wantAllowed: false,
+			wantReason:  `invalid upstream URL "git@github.com:owner/repo": must be SSH (git@host:owner/repo.git) or HTTPS (https://host/owner/repo.git)`,
+		},
+		{
+			name:        "HTTP instead of HTTPS",
+			ctx:         ValidateUpstreamURLContext{URL: "http://github.com/owner/repo.git"},
+			wantAllowed: false,
+			wantReason:  `invalid upstream URL "http://github.com/owner/repo.git": must be SSH (git@host:owner/repo.git) or HTTPS (https://host/owner/repo.git)`,
+		},
+		{
+			name:        "random string",
+			ctx:         ValidateUpstreamURLContext{URL: "not-a-url"},
+			wantAllowed: false,
+			wantReason:  `invalid upstream URL "not-a-url": must be SSH (git@host:owner/repo.git) or HTTPS (https://host/owner/repo.git)`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := ValidateUpstreamURL(tt.ctx)
+			if result.Allowed != tt.wantAllowed {
+				t.Errorf("Allowed = %v, want %v", result.Allowed, tt.wantAllowed)
+			}
+			if !tt.wantAllowed && result.Reason != tt.wantReason {
+				t.Errorf("Reason = %q, want %q", result.Reason, tt.wantReason)
+			}
+		})
+	}
+}
+
+func TestCanFork(t *testing.T) {
+	tests := []struct {
+		name        string
+		ctx         ForkContext
+		wantAllowed bool
+		wantReason  string
+	}{
+		{
+			name: "can fork when no upstream and URLs differ",
+			ctx: ForkContext{
+				HasUpstream: false,
+				ForkURL:     "git@github.com:myuser/repo.git",
+				UpstreamURL: "git@github.com:upstream-org/repo.git",
+			},
+			wantAllowed: true,
+		},
+		{
+			name: "cannot fork when upstream already set",
+			ctx: ForkContext{
+				HasUpstream: true,
+				ForkURL:     "git@github.com:myuser/repo.git",
+				UpstreamURL: "git@github.com:upstream-org/repo.git",
+			},
+			wantAllowed: false,
+			wantReason:  "repository already has an upstream configured (cannot double-fork)",
+		},
+		{
+			name: "cannot fork when fork URL equals upstream URL",
+			ctx: ForkContext{
+				HasUpstream: false,
+				ForkURL:     "git@github.com:owner/repo.git",
+				UpstreamURL: "git@github.com:owner/repo.git",
+			},
+			wantAllowed: false,
+			wantReason:  "fork URL must differ from upstream URL",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := CanFork(tt.ctx)
+			if result.Allowed != tt.wantAllowed {
+				t.Errorf("Allowed = %v, want %v", result.Allowed, tt.wantAllowed)
+			}
+			if !tt.wantAllowed && result.Reason != tt.wantReason {
+				t.Errorf("Reason = %q, want %q", result.Reason, tt.wantReason)
+			}
+		})
+	}
+}
+
 func TestGuardResult_Error(t *testing.T) {
 	t.Run("allowed result returns nil error", func(t *testing.T) {
 		result := GuardResult{Allowed: true}

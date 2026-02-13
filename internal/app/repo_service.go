@@ -11,13 +11,15 @@ import (
 
 // RepoServiceImpl implements the RepoService interface.
 type RepoServiceImpl struct {
-	repoRepo secondary.RepoRepository
+	repoRepo   secondary.RepoRepository
+	gitService *GitService
 }
 
 // NewRepoService creates a new RepoService with injected dependencies.
 func NewRepoService(repoRepo secondary.RepoRepository) *RepoServiceImpl {
 	return &RepoServiceImpl{
-		repoRepo: repoRepo,
+		repoRepo:   repoRepo,
+		gitService: NewGitService(),
 	}
 }
 
@@ -121,10 +123,12 @@ func (s *RepoServiceImpl) UpdateRepo(ctx context.Context, req primary.UpdateRepo
 	}
 
 	record := &secondary.RepoRecord{
-		ID:            req.RepoID,
-		URL:           req.URL,
-		LocalPath:     req.LocalPath,
-		DefaultBranch: req.DefaultBranch,
+		ID:             req.RepoID,
+		URL:            req.URL,
+		LocalPath:      req.LocalPath,
+		DefaultBranch:  req.DefaultBranch,
+		UpstreamURL:    req.UpstreamURL,
+		UpstreamBranch: req.UpstreamBranch,
 	}
 	return s.repoRepo.Update(ctx, record)
 }
@@ -189,18 +193,93 @@ func (s *RepoServiceImpl) DeleteRepo(ctx context.Context, repoID string) error {
 	return s.repoRepo.Delete(ctx, repoID)
 }
 
+// ForkRepo configures a repository as a fork, swapping origin and adding upstream.
+func (s *RepoServiceImpl) ForkRepo(ctx context.Context, req primary.ForkRepoRequest) (*primary.ForkRepoResponse, error) {
+	// Fetch current repo
+	record, err := s.repoRepo.GetByID(ctx, req.RepoID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Validate upstream URL
+	urlResult := repo.ValidateUpstreamURL(repo.ValidateUpstreamURLContext{
+		URL: record.URL,
+	})
+	if err := urlResult.Error(); err != nil {
+		return nil, fmt.Errorf("current repo URL is invalid for upstream: %w", err)
+	}
+
+	// Validate fork URL
+	forkURLResult := repo.ValidateUpstreamURL(repo.ValidateUpstreamURLContext{
+		URL: req.ForkURL,
+	})
+	if err := forkURLResult.Error(); err != nil {
+		return nil, fmt.Errorf("fork URL is invalid: %w", err)
+	}
+
+	// Evaluate fork guard
+	result := repo.CanFork(repo.ForkContext{
+		HasUpstream: record.UpstreamURL != "",
+		ForkURL:     req.ForkURL,
+		UpstreamURL: record.URL,
+	})
+	if err := result.Error(); err != nil {
+		return nil, err
+	}
+
+	// Swap URLs: current url -> upstream_url, fork url -> new url
+	oldURL := record.URL
+	updateRecord := &secondary.RepoRecord{
+		ID:          record.ID,
+		URL:         req.ForkURL,
+		UpstreamURL: oldURL,
+	}
+	if err := s.repoRepo.Update(ctx, updateRecord); err != nil {
+		return nil, fmt.Errorf("failed to update repository for fork: %w", err)
+	}
+
+	// Execute git remote operations (if local path exists)
+	if record.LocalPath != "" {
+		// git remote set-url origin <fork-url>
+		if err := s.gitService.runGitCommand(record.LocalPath, "remote", "set-url", "origin", req.ForkURL); err != nil {
+			return nil, fmt.Errorf("failed to set origin URL: %w", err)
+		}
+		// git remote add upstream <old-url>
+		if err := s.gitService.runGitCommand(record.LocalPath, "remote", "add", "upstream", oldURL); err != nil {
+			// upstream remote might already exist; try set-url instead
+			if err2 := s.gitService.runGitCommand(record.LocalPath, "remote", "set-url", "upstream", oldURL); err2 != nil {
+				return nil, fmt.Errorf("failed to add/set upstream remote: %w", err2)
+			}
+		}
+		// git fetch upstream (best-effort)
+		_ = s.gitService.FetchUpstream(record.LocalPath)
+	}
+
+	return &primary.ForkRepoResponse{
+		RepoID:      record.ID,
+		UpstreamURL: oldURL,
+		ForkURL:     req.ForkURL,
+	}, nil
+}
+
 // Helper methods
 
 func (s *RepoServiceImpl) recordToRepo(r *secondary.RepoRecord) *primary.Repo {
+	upstreamBranch := r.UpstreamBranch
+	if upstreamBranch == "" && r.UpstreamURL != "" {
+		upstreamBranch = r.DefaultBranch
+	}
 	return &primary.Repo{
-		ID:            r.ID,
-		Name:          r.Name,
-		URL:           r.URL,
-		LocalPath:     r.LocalPath,
-		DefaultBranch: r.DefaultBranch,
-		Status:        r.Status,
-		CreatedAt:     r.CreatedAt,
-		UpdatedAt:     r.UpdatedAt,
+		ID:             r.ID,
+		Name:           r.Name,
+		URL:            r.URL,
+		LocalPath:      r.LocalPath,
+		DefaultBranch:  r.DefaultBranch,
+		UpstreamURL:    r.UpstreamURL,
+		UpstreamBranch: upstreamBranch,
+		Status:         r.Status,
+		CreatedAt:      r.CreatedAt,
+		UpdatedAt:      r.UpdatedAt,
 	}
 }
 
