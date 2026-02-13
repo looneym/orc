@@ -1,9 +1,12 @@
 package cli
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"hash/fnv"
+	"io"
+	"math/rand/v2"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -14,6 +17,7 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
+	"golang.org/x/term"
 
 	"github.com/example/orc/internal/config"
 	orcctx "github.com/example/orc/internal/context"
@@ -94,7 +98,7 @@ Examples:
   orc summary                          # focused container's commission only
   orc summary --all                    # all commissions
   orc summary --commission COMM-001    # specific commission
-  orc summary --poll                   # auto-refresh every 5s
+  orc summary --poll                   # auto-refresh every 30s (press 'r' to refresh, 'q' to quit)
   orc summary --poll 10               # auto-refresh every 10s`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts := summaryOpts{}
@@ -115,43 +119,178 @@ Examples:
 	cmd.Flags().Bool("all", false, "Show all containers (default: only show focused container if set)")
 	cmd.Flags().Bool("debug", false, "Show debug info about hidden/filtered content")
 	cmd.Flags().Bool("expand-all-commissions", false, "Expand all commissions (default: only focused commission expanded)")
-	cmd.Flags().Int("poll", 0, "Auto-refresh interval in seconds (default 5 when flag is present)")
-	cmd.Flag("poll").NoOptDefVal = "5"
+	cmd.Flags().Int("poll", 0, "Auto-refresh interval in seconds (default 30 when flag is present)")
+	cmd.Flag("poll").NoOptDefVal = "30"
 
 	return cmd
 }
 
-// runSummaryPoll runs the summary in a polling loop, clearing and redrawing at each interval.
+// runSummaryPoll runs the summary in a polling loop with countdown, keystroke controls, and animation.
 func runSummaryPoll(cmd *cobra.Command, opts summaryOpts) error {
+	fd := int(os.Stdin.Fd())
+
+	// Put terminal in raw mode for single-keystroke reading
+	oldState, err := term.MakeRaw(fd)
+	if err != nil {
+		return fmt.Errorf("failed to set raw terminal mode: %w", err)
+	}
+	defer func() {
+		term.Restore(fd, oldState)
+		rawWrite("\033[?25h\r\n") // restore cursor, newline
+	}()
+
+	// Handle SIGTERM from outside (Ctrl+C won't generate SIGINT in raw mode)
 	sigCh := make(chan os.Signal, 1)
-	signal.Notify(sigCh, syscall.SIGTERM, syscall.SIGINT)
+	signal.Notify(sigCh, syscall.SIGTERM)
 	defer signal.Stop(sigCh)
 
-	ticker := time.NewTicker(time.Duration(opts.pollSeconds) * time.Second)
-	defer ticker.Stop()
+	// Key reader goroutine
+	keyCh := make(chan byte, 1)
+	go func() {
+		buf := make([]byte, 1)
+		for {
+			n, err := os.Stdin.Read(buf)
+			if err != nil || n == 0 {
+				return
+			}
+			select {
+			case keyCh <- buf[0]:
+			default:
+			}
+		}
+	}()
 
-	// Render once immediately
-	clearScreen()
-	if err := runSummaryOnce(cmd, opts); err != nil {
+	// Hide cursor during poll mode
+	rawWrite("\033[?25l")
+
+	// Initial render: clear screen and show summary
+	rawWrite("\033[H\033[2J")
+	if err := renderPollOutput(cmd, opts); err != nil {
 		return err
 	}
 
+	interval := opts.pollSeconds
 	for {
-		select {
-		case <-sigCh:
-			return nil
-		case <-ticker.C:
-			clearScreen()
-			if err := runSummaryOnce(cmd, opts); err != nil {
-				return err
+		// Print blank line before status
+		rawWrite("\r\n")
+
+		refreshNow := false
+		for remaining := interval; remaining > 0; remaining-- {
+			// Overwrite status line in-place
+			rawWrite(fmt.Sprintf("\r\033[K  \033[2mPolling. Refresh in %ds. [r]efresh [q]uit\033[0m", remaining))
+
+			select {
+			case <-sigCh:
+				return nil
+			case key := <-keyCh:
+				switch key {
+				case 'r', 'R':
+					refreshNow = true
+				case 'q', 'Q', 3, 27: // q, Ctrl+C, Escape
+					return nil
+				}
+			case <-time.After(time.Second):
 			}
+
+			if refreshNow {
+				break
+			}
+		}
+
+		// Animate and refresh
+		playRefreshAnimation()
+		rawWrite("\033[H") // cursor home
+		if err := renderPollOutput(cmd, opts); err != nil {
+			return err
 		}
 	}
 }
 
-// clearScreen clears the terminal using ANSI escape sequences.
-func clearScreen() {
-	fmt.Print("\033[H\033[2J")
+// rawWrite writes directly to stdout, bypassing fmt (for use in raw terminal mode).
+func rawWrite(s string) {
+	os.Stdout.WriteString(s)
+}
+
+// renderPollOutput captures runSummaryOnce output and writes it with \r\n for raw terminal mode.
+func renderPollOutput(cmd *cobra.Command, opts summaryOpts) error {
+	// Capture stdout into a pipe
+	origStdout := os.Stdout
+	r, w, err := os.Pipe()
+	if err != nil {
+		return err
+	}
+
+	// Force color output even though stdout is temporarily a pipe
+	origNoColor := color.NoColor
+	color.NoColor = false
+
+	os.Stdout = w
+	summaryErr := runSummaryOnce(cmd, opts)
+	w.Close()
+	os.Stdout = origStdout
+	color.NoColor = origNoColor
+
+	// Read captured output
+	var buf bytes.Buffer
+	io.Copy(&buf, r)
+	r.Close()
+
+	// Convert \n to \r\n for raw terminal mode
+	output := strings.ReplaceAll(buf.String(), "\n", "\r\n")
+	rawWrite(output)
+
+	// Clear any leftover content below from previous render
+	rawWrite("\033[J")
+
+	return summaryErr
+}
+
+// playRefreshAnimation renders a 1-second starfield rain effect.
+// Stars cascade down the screen in a wave, accumulating as the wave progresses.
+func playRefreshAnimation() {
+	w, h, err := term.GetSize(int(os.Stdout.Fd()))
+	if err != nil || w <= 0 || h <= 0 {
+		w, h = 80, 24
+	}
+	h -= 2 // reserve space for status line area
+
+	sparkles := []string{"✨", "★", "✦", "✧", "·"}
+	numFrames := 8
+	frameDuration := 125 * time.Millisecond
+	starsPerFrame := max(w/10, 6)
+
+	for frame := range numFrames {
+		// Wave front sweeps from top to bottom
+		waveFront := (frame + 1) * h / numFrames
+
+		for range starsPerFrame + frame*2 {
+			// Cluster stars around the wave front (±3 rows)
+			row := waveFront + rand.IntN(7) - 3
+			if row < 1 || row > h {
+				continue
+			}
+			col := rand.IntN(w-2) + 1
+
+			// Brighter characters near wave front, dimmer further away
+			dist := abs(row - waveFront)
+			charIdx := dist
+			if charIdx >= len(sparkles) {
+				charIdx = len(sparkles) - 1
+			}
+
+			rawWrite(fmt.Sprintf("\033[%d;%dH%s", row, col, sparkles[charIdx]))
+		}
+
+		time.Sleep(frameDuration)
+	}
+}
+
+// abs returns the absolute value of an integer.
+func abs(x int) int {
+	if x < 0 {
+		return -x
+	}
+	return x
 }
 
 // runSummaryOnce renders the summary a single time.
