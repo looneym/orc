@@ -220,7 +220,7 @@ func runSummaryPoll(cmd *cobra.Command, opts summaryOpts) error {
 			// Overwrite status line in-place
 			quitHint := "[q]uit"
 			if isUtilsSession {
-				quitHint = "[q] close"
+				quitHint = "[q] hide utils tmux session"
 			}
 			rawWrite(fmt.Sprintf("\r\033[K  \033[2mPolling. Refresh in %ds. [r]efresh %s\033[0m", remaining, quitHint))
 
@@ -250,9 +250,10 @@ func runSummaryPoll(cmd *cobra.Command, opts summaryOpts) error {
 			}
 		}
 
-		// Animate and refresh
+		// Clear screen, animate on black, then clear again before re-render
+		rawWrite("\033[H\033[2J") // instant black
 		playRefreshAnimation()
-		rawWrite("\033[H\033[2J") // cursor home + clear screen (removes star animation artifacts)
+		rawWrite("\033[H\033[2J") // clear animation artifacts
 		if err := renderPollOutput(cmd, opts); err != nil {
 			emitPollEvent(ctx, "error", "refresh error", map[string]string{"error": err.Error()})
 			emitPollEvent(ctx, "info", "poll session end", nil)
