@@ -330,6 +330,75 @@ else
     exit 1
 fi
 
+# --- Uninstall verification ---
+log ""
+log "=== Phase 2: Uninstall Verification ==="
+log ""
+
+log "Running 'make uninstall'..."
+if run_ssh "cd ~/src/orc && make uninstall"; then
+    log "✓ make uninstall PASSED"
+else
+    error "make uninstall FAILED"
+    exit 1
+fi
+
+log "Verifying orc binary removed from PATH..."
+if run_ssh "! command -v orc"; then
+    log "✓ orc binary removed from PATH"
+else
+    error "orc still in PATH after uninstall"
+    exit 1
+fi
+
+log "Verifying orc-dev binary removed from PATH..."
+if run_ssh "! command -v orc-dev"; then
+    log "✓ orc-dev binary removed from PATH"
+else
+    error "orc-dev still in PATH after uninstall"
+    exit 1
+fi
+
+log "Verifying skill directories removed..."
+if run_ssh "! ls -d ~/.claude/skills/orc-* 2>/dev/null"; then
+    log "✓ No orc skill directories remain"
+else
+    error "orc skill directories still exist after uninstall"
+    exit 1
+fi
+
+log "Verifying tmux scripts removed..."
+if run_ssh "! ls ~/.orc/tmux/*.sh 2>/dev/null"; then
+    log "✓ No tmux scripts remain"
+else
+    error "tmux scripts still exist after uninstall"
+    exit 1
+fi
+
+log "Verifying settings.json hooks cleaned..."
+if run_ssh "! grep -q 'orc hook' ~/.claude/settings.json 2>/dev/null"; then
+    log "✓ No orc hook entries in settings.json"
+else
+    error "orc hook entries still present in settings.json"
+    exit 1
+fi
+
+log "Verifying host manifest removed..."
+if run_ssh "! test -f ~/.orc/host-manifest.json"; then
+    log "✓ Host manifest removed"
+else
+    error "host-manifest.json still exists after uninstall"
+    exit 1
+fi
+
+log "Verifying orc.db preserved..."
+if run_ssh "test -f ~/.orc/orc.db"; then
+    log "✓ orc.db preserved (user data intact)"
+else
+    error "orc.db was deleted by uninstall (should be preserved)"
+    exit 1
+fi
+
 # Final timing
 ELAPSED=$(($(date +%s) - START_TIME))
 log ""
