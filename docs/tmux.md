@@ -168,8 +168,8 @@ Navigation:
 
 ## Utils Popup
 
-The utils popup is a persistent, per-workbench overlay that provides an auto-refreshing
-summary dashboard and a scratch shell. It runs in its own tmux server, separate from the
+The utils popup is a persistent, per-workbench overlay that provides an interactive
+summary TUI and a scratch shell. It runs in its own tmux server, separate from the
 main workshop session.
 
 ### Opening and Closing
@@ -188,11 +188,11 @@ The utils session has two windows:
 
 | Window | Content |
 |--------|---------|
-| `summary` | `orc summary --poll` -- auto-refreshing dashboard (default 5s) |
+| `summary` | `orc summary --tui` -- interactive TUI dashboard with keyboard navigation |
 | `shell` | Plain shell for scratch work (ad-hoc commands, grep, etc.) |
 
-The summary window uses `orc summary --poll` as its root process, which clears and redraws
-the commission/shipment tree on a timer. Use `--poll 10` for a 10-second interval.
+The summary window uses `orc summary --tui` as its root process, which runs an interactive
+Bubble Tea TUI for browsing the commission/shipment tree. Use `r` to refresh on demand.
 SIGTERM/SIGINT exit cleanly with no stack trace.
 
 ### Separate Server Architecture
@@ -252,20 +252,31 @@ Right-click the statusline for a context menu:
 | Rename | Standard TMux rename |
 | New Window | Standard TMux new window |
 
-## Summary Auto-Refresh
+## Summary TUI Mode
 
-The `--poll` flag on `orc summary` enables auto-refresh mode:
+The `--tui` flag on `orc summary` launches an interactive Bubble Tea TUI:
 
 ```bash
-orc summary --poll        # Refresh every 5 seconds (default)
-orc summary --poll 10     # Refresh every 10 seconds
+orc summary --tui
 ```
 
 This is primarily used inside the utils popup's summary window, but can also be run
-standalone in any terminal. The command clears the screen and redraws the full summary
-on each tick. SIGTERM and SIGINT are handled cleanly for graceful shutdown.
+standalone in any terminal. The TUI renders the commission/shipment tree with keyboard
+navigation instead of a timer-based refresh loop.
 
-Color output is preserved in poll mode via `CLICOLOR_FORCE=1`, which is set by the
+### TUI Keybinds
+
+| Key | Action |
+|-----|--------|
+| `j` / `k` | Navigate up/down through items |
+| `Enter` | Expand or collapse a section |
+| `y` | Yank (copy) the ID of the selected item |
+| `f` | Focus on the selected shipment |
+| `o` | Open the selected item in vim |
+| `r` | Refresh the summary data |
+| `q` | Quit the TUI |
+
+Color output is preserved in TUI mode via `CLICOLOR_FORCE=1`, which is set by the
 utils popup environment.
 
 ## Session Click
