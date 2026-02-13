@@ -126,18 +126,27 @@ Examples:
 }
 
 // runSummaryPoll runs the summary in a polling loop with countdown, keystroke controls, and animation.
+// Falls back to a simple ticker if stdin is not a TTY.
 func runSummaryPoll(cmd *cobra.Command, opts summaryOpts) error {
 	fd := int(os.Stdin.Fd())
+
+	// If stdin is not a TTY, fall back to simple polling (no keystrokes, no animation)
+	if !term.IsTerminal(fd) {
+		return runSummaryPollSimple(cmd, opts)
+	}
 
 	// Put terminal in raw mode for single-keystroke reading
 	oldState, err := term.MakeRaw(fd)
 	if err != nil {
-		return fmt.Errorf("failed to set raw terminal mode: %w", err)
+		return runSummaryPollSimple(cmd, opts) // fall back on raw mode failure too
 	}
 	defer func() {
 		term.Restore(fd, oldState)
 		rawWrite("\033[?25h\r\n") // restore cursor, newline
 	}()
+
+	// Detect if running inside a utils tmux session (set by orc-utils-popup.sh)
+	isUtilsSession := isInsideUtilsSession()
 
 	// Handle SIGTERM from outside (Ctrl+C won't generate SIGINT in raw mode)
 	sigCh := make(chan os.Signal, 1)
@@ -187,6 +196,9 @@ func runSummaryPoll(cmd *cobra.Command, opts summaryOpts) error {
 				case 'r', 'R':
 					refreshNow = true
 				case 'q', 'Q', 3, 27: // q, Ctrl+C, Escape
+					if isUtilsSession {
+						detachUtilsSession()
+					}
 					return nil
 				}
 			case <-time.After(time.Second):
@@ -209,6 +221,21 @@ func runSummaryPoll(cmd *cobra.Command, opts summaryOpts) error {
 // rawWrite writes directly to stdout, bypassing fmt (for use in raw terminal mode).
 func rawWrite(s string) {
 	os.Stdout.WriteString(s)
+}
+
+// isInsideUtilsSession checks if we're running inside an ORC utils tmux session
+// by querying the ORC_UTILS_SESSION environment variable set by orc-utils-popup.sh.
+func isInsideUtilsSession() bool {
+	out, err := exec.Command("tmux", "show-environment", "ORC_UTILS_SESSION").Output()
+	if err != nil {
+		return false
+	}
+	return strings.Contains(string(out), "ORC_UTILS_SESSION=")
+}
+
+// detachUtilsSession detaches the tmux client, which closes the utils popup.
+func detachUtilsSession() {
+	_ = exec.Command("tmux", "detach-client").Run()
 }
 
 // renderPollOutput captures runSummaryOnce output and writes it with \r\n for raw terminal mode.
@@ -291,6 +318,36 @@ func abs(x int) int {
 		return -x
 	}
 	return x
+}
+
+// runSummaryPollSimple is a fallback poll loop for non-interactive terminals.
+// No raw mode, no keystrokes, no animation — just clear-and-redraw with a countdown.
+func runSummaryPollSimple(cmd *cobra.Command, opts summaryOpts) error {
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, syscall.SIGTERM, syscall.SIGINT)
+	defer signal.Stop(sigCh)
+
+	// Initial render
+	fmt.Print("\033[H\033[2J")
+	if err := runSummaryOnce(cmd, opts); err != nil {
+		return err
+	}
+
+	interval := opts.pollSeconds
+	for {
+		fmt.Printf("\n  Polling. Refresh in %ds...\n", interval)
+
+		select {
+		case <-sigCh:
+			return nil
+		case <-time.After(time.Duration(interval) * time.Second):
+		}
+
+		fmt.Print("\033[H\033[2J")
+		if err := runSummaryOnce(cmd, opts); err != nil {
+			return err
+		}
+	}
 }
 
 // runSummaryOnce renders the summary a single time.

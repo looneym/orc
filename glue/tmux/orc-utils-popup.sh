@@ -31,6 +31,9 @@ if ! tmux -L "$SOCKET" has-session -t "$SESSION" 2>/dev/null; then
     tmux -L "$SOCKET" new-window -t "$SESSION" -n shell -c "$BENCH_DIR"
     tmux -L "$SOCKET" select-window -t "$SESSION:summary"
 
+    # Mark this as a utils session so orc summary --poll can detect it
+    tmux -L "$SOCKET" set-environment -t "$SESSION" ORC_UTILS_SESSION 1
+
     # Any click/double-click on status bar inside utils → detach (closes popup)
     tmux -L "$SOCKET" bind-key -T root DoubleClick1Status detach-client
     tmux -L "$SOCKET" bind-key -T root DoubleClick1StatusLeft detach-client
