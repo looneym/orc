@@ -2,13 +2,22 @@
 # orc-utils-popup.sh — Lazy-create and attach to a workbench utils session
 # Runs inside a display-popup. Creates the utils server/session on first open.
 #
-# Usage: orc-utils-popup.sh <workbench-name> <workbench-dir>
-# Example: orc-utils-popup.sh orc-45 /Users/looneym/wb/orc-45
+# Note: display-popup does NOT expand #{} format variables in shell-command,
+# so we query the main tmux server directly via TMUX env var.
 
 set -euo pipefail
 
-BENCH_NAME="${1:?Usage: orc-utils-popup.sh <bench-name> <bench-dir>}"
-BENCH_DIR="${2:?Usage: orc-utils-popup.sh <bench-name> <bench-dir>}"
+# Query the main tmux server for the current window name and pane path.
+# Inside a display-popup, TMUX is set and display-message targets the popup's parent pane.
+BENCH_NAME="$(tmux display-message -p '#{window_name}')"
+BENCH_DIR="$(tmux display-message -p '#{pane_current_path}')"
+
+if [[ -z "$BENCH_NAME" || -z "$BENCH_DIR" ]]; then
+    echo "ERROR: could not resolve window_name or pane_current_path from tmux"
+    sleep 3
+    exit 1
+fi
+
 SOCKET="${BENCH_NAME}-utils"
 SESSION="utils"
 

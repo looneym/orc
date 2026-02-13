@@ -522,7 +522,9 @@ func ApplyGlobalBindings() {
 		"display-popup", "-E", "-w", "90%", "-h", "90%", "$HOME/.orc/tmux/orc-session-picker.sh").Run()
 
 	// Utils popup command — shared by double-click, prefix+u, and context menu
-	utilsPopup := "$HOME/.orc/tmux/orc-utils-popup.sh #{window_name} #{pane_current_path}"
+	// Note: display-popup does NOT expand #{} formats in shell-command,
+	// so the script queries the main tmux server directly via TMUX env var.
+	utilsPopup := "$HOME/.orc/tmux/orc-utils-popup.sh"
 	utilsPopupArgs := []string{
 		"display-popup", "-E", "-w", "80%", "-h", "80%",
 		"-T", " ORC Utils ", utilsPopup,
