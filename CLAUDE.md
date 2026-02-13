@@ -21,6 +21,16 @@ orc events tail # View audit and operational events
 
 Skills: `/ship-deploy` (see [docs/dev/deployment.md](docs/dev/deployment.md)), `/docs-doctor`
 
+## Development Binary (Two-Database Model)
+
+ORC uses two databases. `orc` (installed) hits production (`~/.orc/orc.db`). `orc-dev` (shim) hits the workbench-local DB (`.orc/workbench.db`).
+
+- **Testing CLI changes**: `make dev && orc-dev <command>`
+- **Ledger operations** (task complete, note create): use production `orc` (leads only)
+- **IMPs should not run orc ledger commands** — the lead reconciles
+
+`./orc` (dev build) is gated — it refuses to run without the shim. See [docs/dev/database.md](docs/dev/database.md) for full details.
+
 ## Pre-Commit Checks (Enforced by Hook)
 
 All commits must pass `make lint` (check-test-presence, check-coverage, schema-check, check-skills, golangci-lint, go-arch-lint). Emergency bypass: `git commit --no-verify` (audited). Before merging to master, run `/docs-doctor`. See [docs/dev/git-hooks.md](docs/dev/git-hooks.md) for full details on what each hook checks and why.
