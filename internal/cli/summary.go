@@ -6,8 +6,11 @@ import (
 	"hash/fnv"
 	"os"
 	"os/exec"
+	"os/signal"
 	"sort"
 	"strings"
+	"syscall"
+	"time"
 
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
@@ -61,6 +64,15 @@ func resolveContainerCommission(containerID string) string {
 	return ""
 }
 
+// summaryOpts holds parsed flags for the summary command
+type summaryOpts struct {
+	commissionFilter     string
+	expandAll            bool
+	debugMode            bool
+	expandAllCommissions bool
+	pollSeconds          int
+}
+
 // SummaryCmd returns the summary command
 func SummaryCmd() *cobra.Command {
 	cmd := &cobra.Command{
@@ -81,171 +93,21 @@ Structure:
 Examples:
   orc summary                          # focused container's commission only
   orc summary --all                    # all commissions
-  orc summary --commission COMM-001    # specific commission`,
+  orc summary --commission COMM-001    # specific commission
+  orc summary --poll                   # auto-refresh every 5s
+  orc summary --poll 10               # auto-refresh every 10s`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Get current working directory for config
-			cwd, err := os.Getwd()
-			if err != nil {
-				cwd = ""
+			opts := summaryOpts{}
+			opts.commissionFilter, _ = cmd.Flags().GetString("commission")
+			opts.expandAll, _ = cmd.Flags().GetBool("all")
+			opts.debugMode, _ = cmd.Flags().GetBool("debug")
+			opts.expandAllCommissions, _ = cmd.Flags().GetBool("expand-all-commissions")
+			opts.pollSeconds, _ = cmd.Flags().GetInt("poll")
+
+			if opts.pollSeconds > 0 {
+				return runSummaryPoll(cmd, opts)
 			}
-
-			// Get flags
-			commissionFilter, _ := cmd.Flags().GetString("commission")
-			expandAll, _ := cmd.Flags().GetBool("all")
-			debugMode, _ := cmd.Flags().GetBool("debug")
-			expandAllCommissions, _ := cmd.Flags().GetBool("expand-all-commissions")
-
-			// Load config for role detection
-			cfg, _ := MigrateGoblinConfigIfNeeded(cmd.Context(), cwd)
-			role := config.RoleIMP // Default to IMP
-			workbenchID := ""
-			workshopID := ""
-
-			if cfg != nil && cfg.PlaceID != "" {
-				role = config.GetRoleFromPlaceID(cfg.PlaceID)
-				if config.IsWorkbench(cfg.PlaceID) {
-					workbenchID = cfg.PlaceID
-					// Look up workshop from workbench
-					if wb, err := wire.WorkbenchService().GetWorkbench(cmd.Context(), cfg.PlaceID); err == nil {
-						workshopID = wb.WorkshopID
-					}
-				}
-			}
-
-			// Get current focus
-			focusID := GetCurrentFocus(cfg)
-
-			// Determine which commission to show
-			var filterCommissionID string
-			if commissionFilter == "current" {
-				// First try config in cwd
-				commissionID := orcctx.GetContextCommissionID()
-				// Fall back to resolving from focus
-				if commissionID == "" && focusID != "" {
-					commissionID = resolveContainerCommission(focusID)
-				}
-				if commissionID == "" {
-					return fmt.Errorf("--commission current requires a focused container or being in a commission context")
-				}
-				filterCommissionID = commissionID
-			} else if commissionFilter != "" {
-				// Resolve aliases first (e.g., "test" -> "COMM-003")
-				resolved := resolveCommissionAlias(commissionFilter)
-
-				// Validate commission exists
-				if _, err := wire.CommissionService().GetCommission(cmd.Context(), resolved); err != nil {
-					return fmt.Errorf("commission %q not found", commissionFilter)
-				}
-				filterCommissionID = resolved
-			}
-
-			// DEFAULT BEHAVIOR: When not --all, scope to active commissions derived from focus
-			// Active commissions = commissions with focused shipments/tomes/direct focus
-			var activeCommissionIDs []string
-			if !expandAll && filterCommissionID == "" && workshopID != "" {
-				activeCommissionIDs, _ = wire.WorkshopService().GetActiveCommissions(cmd.Context(), workshopID)
-			}
-
-			// Get list of commissions to display
-			commissions, err := wire.CommissionService().ListCommissions(context.Background(), primary.CommissionFilters{})
-			if err != nil {
-				return fmt.Errorf("failed to list commissions: %w", err)
-			}
-
-			// Build set of active commission IDs for efficient lookup
-			activeSet := make(map[string]bool)
-			for _, id := range activeCommissionIDs {
-				activeSet[id] = true
-			}
-
-			// Filter to open commissions
-			var openCommissions []*primary.Commission
-			for _, m := range commissions {
-				if m.Status == "complete" || m.Status == "archived" {
-					continue
-				}
-				// Apply explicit filter if specified
-				if filterCommissionID != "" && m.ID != filterCommissionID {
-					continue
-				}
-				// Apply active commissions filter if derived from focus
-				if len(activeCommissionIDs) > 0 && !activeSet[m.ID] {
-					continue
-				}
-				openCommissions = append(openCommissions, m)
-			}
-
-			if len(openCommissions) == 0 {
-				if filterCommissionID != "" {
-					fmt.Printf("No open containers for %s\n", filterCommissionID)
-				} else {
-					fmt.Println("No open commissions")
-				}
-				return nil
-			}
-
-			// Determine which commission is "focused" based on focusID
-			focusedCommissionID := ""
-			if focusID != "" {
-				focusedCommissionID = resolveContainerCommission(focusID)
-			}
-
-			// Sort commissions: focused commission first, then others by ID
-			sort.SliceStable(openCommissions, func(i, j int) bool {
-				isFocusedI := openCommissions[i].ID == focusedCommissionID
-				isFocusedJ := openCommissions[j].ID == focusedCommissionID
-				if isFocusedI != isFocusedJ {
-					return isFocusedI // Focused commission first
-				}
-				return openCommissions[i].ID < openCommissions[j].ID
-			})
-
-			// Render header based on role
-			renderHeader(role, workbenchID, workshopID, focusID, filterCommissionID)
-
-			// Build map of focused containers across all workbenches in this workshop
-			workshopFocus := buildWorkshopFocusMap(cmd.Context(), workshopID, workbenchID)
-
-			// Display each commission
-			for i, commission := range openCommissions {
-				isFocusedCommission := commission.ID == focusedCommissionID
-				shouldExpand := isFocusedCommission || expandAllCommissions
-
-				// Build summary request
-				req := primary.SummaryRequest{
-					CommissionID: commission.ID,
-					WorkbenchID:  workbenchID,
-					WorkshopID:   workshopID,
-					FocusID:      focusID,
-					DebugMode:    debugMode,
-				}
-
-				summary, err := wire.SummaryService().GetCommissionSummary(context.Background(), req)
-				if err != nil {
-					fmt.Printf("Error getting summary for %s: %v\n", commission.ID, err)
-					continue
-				}
-
-				if shouldExpand {
-					// Render full summary for focused or expanded commissions
-					renderSummary(summary, focusID, workshopFocus)
-
-					// Render debug info if present
-					if summary.DebugInfo != nil && len(summary.DebugInfo.Messages) > 0 {
-						fmt.Println()
-						renderDebugInfo(summary.DebugInfo)
-					}
-				} else {
-					// Render collapsed summary for non-focused commissions
-					renderCollapsedCommission(summary)
-				}
-
-				if i < len(openCommissions)-1 {
-					fmt.Println()
-				}
-			}
-
-			return nil
+			return runSummaryOnce(cmd, opts)
 		},
 	}
 
@@ -253,8 +115,204 @@ Examples:
 	cmd.Flags().Bool("all", false, "Show all containers (default: only show focused container if set)")
 	cmd.Flags().Bool("debug", false, "Show debug info about hidden/filtered content")
 	cmd.Flags().Bool("expand-all-commissions", false, "Expand all commissions (default: only focused commission expanded)")
+	cmd.Flags().Int("poll", 0, "Auto-refresh interval in seconds (default 5 when flag is present)")
+	cmd.Flag("poll").NoOptDefVal = "5"
 
 	return cmd
+}
+
+// runSummaryPoll runs the summary in a polling loop, clearing and redrawing at each interval.
+func runSummaryPoll(cmd *cobra.Command, opts summaryOpts) error {
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, syscall.SIGTERM, syscall.SIGINT)
+	defer signal.Stop(sigCh)
+
+	ticker := time.NewTicker(time.Duration(opts.pollSeconds) * time.Second)
+	defer ticker.Stop()
+
+	// Render once immediately
+	clearScreen()
+	if err := runSummaryOnce(cmd, opts); err != nil {
+		return err
+	}
+
+	for {
+		select {
+		case <-sigCh:
+			return nil
+		case <-ticker.C:
+			clearScreen()
+			if err := runSummaryOnce(cmd, opts); err != nil {
+				return err
+			}
+		}
+	}
+}
+
+// clearScreen clears the terminal using ANSI escape sequences.
+func clearScreen() {
+	fmt.Print("\033[H\033[2J")
+}
+
+// runSummaryOnce renders the summary a single time.
+func runSummaryOnce(cmd *cobra.Command, opts summaryOpts) error {
+	// Get current working directory for config
+	cwd, err := os.Getwd()
+	if err != nil {
+		cwd = ""
+	}
+
+	// Load config for role detection
+	cfg, _ := MigrateGoblinConfigIfNeeded(cmd.Context(), cwd)
+	role := config.RoleIMP // Default to IMP
+	workbenchID := ""
+	workshopID := ""
+
+	if cfg != nil && cfg.PlaceID != "" {
+		role = config.GetRoleFromPlaceID(cfg.PlaceID)
+		if config.IsWorkbench(cfg.PlaceID) {
+			workbenchID = cfg.PlaceID
+			// Look up workshop from workbench
+			if wb, err := wire.WorkbenchService().GetWorkbench(cmd.Context(), cfg.PlaceID); err == nil {
+				workshopID = wb.WorkshopID
+			}
+		}
+	}
+
+	// Get current focus
+	focusID := GetCurrentFocus(cfg)
+
+	// Determine which commission to show
+	var filterCommissionID string
+	if opts.commissionFilter == "current" {
+		// First try config in cwd
+		commissionID := orcctx.GetContextCommissionID()
+		// Fall back to resolving from focus
+		if commissionID == "" && focusID != "" {
+			commissionID = resolveContainerCommission(focusID)
+		}
+		if commissionID == "" {
+			return fmt.Errorf("--commission current requires a focused container or being in a commission context")
+		}
+		filterCommissionID = commissionID
+	} else if opts.commissionFilter != "" {
+		// Resolve aliases first (e.g., "test" -> "COMM-003")
+		resolved := resolveCommissionAlias(opts.commissionFilter)
+
+		// Validate commission exists
+		if _, err := wire.CommissionService().GetCommission(cmd.Context(), resolved); err != nil {
+			return fmt.Errorf("commission %q not found", opts.commissionFilter)
+		}
+		filterCommissionID = resolved
+	}
+
+	// DEFAULT BEHAVIOR: When not --all, scope to active commissions derived from focus
+	// Active commissions = commissions with focused shipments/tomes/direct focus
+	var activeCommissionIDs []string
+	if !opts.expandAll && filterCommissionID == "" && workshopID != "" {
+		activeCommissionIDs, _ = wire.WorkshopService().GetActiveCommissions(cmd.Context(), workshopID)
+	}
+
+	// Get list of commissions to display
+	commissions, err := wire.CommissionService().ListCommissions(context.Background(), primary.CommissionFilters{})
+	if err != nil {
+		return fmt.Errorf("failed to list commissions: %w", err)
+	}
+
+	// Build set of active commission IDs for efficient lookup
+	activeSet := make(map[string]bool)
+	for _, id := range activeCommissionIDs {
+		activeSet[id] = true
+	}
+
+	// Filter to open commissions
+	var openCommissions []*primary.Commission
+	for _, m := range commissions {
+		if m.Status == "complete" || m.Status == "archived" {
+			continue
+		}
+		// Apply explicit filter if specified
+		if filterCommissionID != "" && m.ID != filterCommissionID {
+			continue
+		}
+		// Apply active commissions filter if derived from focus
+		if len(activeCommissionIDs) > 0 && !activeSet[m.ID] {
+			continue
+		}
+		openCommissions = append(openCommissions, m)
+	}
+
+	if len(openCommissions) == 0 {
+		if filterCommissionID != "" {
+			fmt.Printf("No open containers for %s\n", filterCommissionID)
+		} else {
+			fmt.Println("No open commissions")
+		}
+		return nil
+	}
+
+	// Determine which commission is "focused" based on focusID
+	focusedCommissionID := ""
+	if focusID != "" {
+		focusedCommissionID = resolveContainerCommission(focusID)
+	}
+
+	// Sort commissions: focused commission first, then others by ID
+	sort.SliceStable(openCommissions, func(i, j int) bool {
+		isFocusedI := openCommissions[i].ID == focusedCommissionID
+		isFocusedJ := openCommissions[j].ID == focusedCommissionID
+		if isFocusedI != isFocusedJ {
+			return isFocusedI // Focused commission first
+		}
+		return openCommissions[i].ID < openCommissions[j].ID
+	})
+
+	// Render header based on role
+	renderHeader(role, workbenchID, workshopID, focusID, filterCommissionID)
+
+	// Build map of focused containers across all workbenches in this workshop
+	workshopFocus := buildWorkshopFocusMap(cmd.Context(), workshopID, workbenchID)
+
+	// Display each commission
+	for i, commission := range openCommissions {
+		isFocusedCommission := commission.ID == focusedCommissionID
+		shouldExpand := isFocusedCommission || opts.expandAllCommissions
+
+		// Build summary request
+		req := primary.SummaryRequest{
+			CommissionID: commission.ID,
+			WorkbenchID:  workbenchID,
+			WorkshopID:   workshopID,
+			FocusID:      focusID,
+			DebugMode:    opts.debugMode,
+		}
+
+		summary, err := wire.SummaryService().GetCommissionSummary(context.Background(), req)
+		if err != nil {
+			fmt.Printf("Error getting summary for %s: %v\n", commission.ID, err)
+			continue
+		}
+
+		if shouldExpand {
+			// Render full summary for focused or expanded commissions
+			renderSummary(summary, focusID, workshopFocus)
+
+			// Render debug info if present
+			if summary.DebugInfo != nil && len(summary.DebugInfo.Messages) > 0 {
+				fmt.Println()
+				renderDebugInfo(summary.DebugInfo)
+			}
+		} else {
+			// Render collapsed summary for non-focused commissions
+			renderCollapsedCommission(summary)
+		}
+
+		if i < len(openCommissions)-1 {
+			fmt.Println()
+		}
+	}
+
+	return nil
 }
 
 // renderHeader prints the header line based on role

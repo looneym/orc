@@ -288,3 +288,21 @@ type ApplyPlan = tmuxadapter.ApplyPlan
 func NewGotmuxAdapter() (*GotmuxAdapter, error) {
 	return tmuxadapter.NewGotmuxAdapter()
 }
+
+// UtilsServerInfo re-exports the utils server info type.
+type UtilsServerInfo = tmuxadapter.UtilsServerInfo
+
+// ListUtilsServers scans for *-utils tmux server sockets.
+func ListUtilsServers() ([]UtilsServerInfo, error) {
+	return tmuxadapter.ListUtilsServers()
+}
+
+// KillUtilsServer kills a specific utils server by workbench name.
+func KillUtilsServer(benchName string) error {
+	return tmuxadapter.KillUtilsServer(benchName)
+}
+
+// KillAllUtilsServers kills all discoverable utils servers.
+func KillAllUtilsServers() (int, error) {
+	return tmuxadapter.KillAllUtilsServers()
+}

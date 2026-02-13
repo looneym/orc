@@ -2,7 +2,9 @@ package tmux
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 )
@@ -519,15 +521,23 @@ func ApplyGlobalBindings() {
 	_ = exec.Command("tmux", "bind-key", "-T", "prefix", "S",
 		"display-popup", "-E", "-w", "90%", "-h", "90%", "$HOME/.orc/tmux/orc-session-picker.sh").Run()
 
-	// Double-click status bar → orc summary popup
-	_ = BindKeyPopup("", "DoubleClick1Status",
-		"CLICOLOR_FORCE=1 orc summary | less -R -X",
-		100, 30, "ORC Summary", "#{pane_current_path}")
+	// Utils popup command — shared by double-click, prefix+u, and context menu
+	utilsPopup := "$HOME/.orc/tmux/orc-utils-popup.sh #{window_name} #{pane_current_path}"
+	utilsPopupArgs := []string{
+		"display-popup", "-E", "-w", "80%", "-h", "80%",
+		"-T", " ORC Utils ", utilsPopup,
+	}
+
+	// Double-click status bar → utils popup
+	_ = exec.Command("tmux", append([]string{"bind-key", "-T", "root", "DoubleClick1Status"}, utilsPopupArgs...)...).Run()
+
+	// prefix+u → utils popup
+	_ = exec.Command("tmux", append([]string{"bind-key", "-T", "prefix", "u"}, utilsPopupArgs...)...).Run()
 
 	// Right-click status bar → context menu
 	_ = BindContextMenu("MouseDown3Status", " ORC ", []MenuItem{
 		// ORC custom options
-		{Label: "Show Summary", Key: "s", Command: "display-popup -E -w 100 -h 30 -T 'ORC Summary' 'cd #{pane_current_path} && CLICOLOR_FORCE=1 orc summary | less -R -X'"},
+		{Label: "Show Summary", Key: "s", Command: "display-popup -E -w 80% -h 80% -T ' ORC Utils ' '" + utilsPopup + "'"},
 		{Label: "Archive Workbench", Key: "a", Command: "display-popup -E -w 80 -h 20 -T 'Archive Workbench' 'cd #{pane_current_path} && orc tmux archive-workbench'"},
 		// Separator
 		{Label: "", Key: "", Command: ""},
@@ -861,4 +871,89 @@ func enrichWindow(sessionName, windowName string) error {
 	_ = SetWindowOption(target, "@orc_enriched", "1")
 
 	return nil
+}
+
+// UtilsServerInfo describes a discovered utils tmux server.
+type UtilsServerInfo struct {
+	Socket    string // socket name (e.g., "orc-45-utils")
+	BenchName string // workbench name derived from socket (e.g., "orc-45")
+	Alive     bool   // whether the server responds to commands
+}
+
+// ListUtilsServers scans the tmux socket directory for *-utils sockets
+// and probes each to determine if it's alive.
+func ListUtilsServers() ([]UtilsServerInfo, error) {
+	uid := os.Getuid()
+	socketDir := fmt.Sprintf("/tmp/tmux-%d", uid)
+
+	entries, err := os.ReadDir(socketDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to read socket directory: %w", err)
+	}
+
+	var servers []UtilsServerInfo
+	for _, entry := range entries {
+		name := entry.Name()
+		if !strings.HasSuffix(name, "-utils") {
+			continue
+		}
+
+		benchName := strings.TrimSuffix(name, "-utils")
+		alive := isUtilsServerAlive(name)
+
+		servers = append(servers, UtilsServerInfo{
+			Socket:    name,
+			BenchName: benchName,
+			Alive:     alive,
+		})
+	}
+
+	return servers, nil
+}
+
+// isUtilsServerAlive probes a utils server socket to check if it responds.
+func isUtilsServerAlive(socket string) bool {
+	cmd := exec.Command("tmux", "-L", socket, "list-sessions")
+	return cmd.Run() == nil
+}
+
+// KillUtilsServer kills a specific utils server by workbench name.
+func KillUtilsServer(benchName string) error {
+	socket := benchName + "-utils"
+
+	// Verify socket exists
+	uid := os.Getuid()
+	socketPath := filepath.Join(fmt.Sprintf("/tmp/tmux-%d", uid), socket)
+	if _, err := os.Stat(socketPath); os.IsNotExist(err) {
+		return fmt.Errorf("utils server not found for workbench %q", benchName)
+	}
+
+	cmd := exec.Command("tmux", "-L", socket, "kill-server")
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("failed to kill utils server %s: %w", socket, err)
+	}
+	return nil
+}
+
+// KillAllUtilsServers kills all discoverable utils servers.
+func KillAllUtilsServers() (int, error) {
+	servers, err := ListUtilsServers()
+	if err != nil {
+		return 0, err
+	}
+
+	killed := 0
+	for _, s := range servers {
+		if !s.Alive {
+			continue
+		}
+		cmd := exec.Command("tmux", "-L", s.Socket, "kill-server")
+		if err := cmd.Run(); err == nil {
+			killed++
+		}
+	}
+	return killed, nil
 }

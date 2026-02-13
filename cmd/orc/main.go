@@ -63,6 +63,7 @@ It coordinates IMPs (Implementation Agents) working in isolated workbenches (wor
 	rootCmd.AddCommand(cli.WorkshopCmd())
 	rootCmd.AddCommand(cli.WorkbenchCmd())
 	rootCmd.AddCommand(cli.TmuxCmd())
+	rootCmd.AddCommand(cli.UtilsSessionsCmd())
 
 	// Developer tools
 	rootCmd.AddCommand(cli.ScaffoldCmd())
