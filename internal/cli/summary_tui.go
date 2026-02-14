@@ -454,33 +454,33 @@ func closeEntity(entityID string) tea.Cmd {
 // so that the tmux CLI doesn't target the utils server socket.
 func (m summaryModel) sendToGoblin(entityID string) tea.Cmd {
 	return func() tea.Msg {
-		// Read ORC_BENCH_NAME from the utils tmux server environment.
-		// This env var was set by orc-utils-popup.sh at session creation time.
+		// Read ORC_BENCH_ID from the utils tmux server environment.
+		// This env var was set by orc-utils-popup.sh from the parent pane's @bench_id.
 		// We do NOT unset TMUX here — show-environment should target the utils server.
-		benchName := ""
-		if envOut, err := exec.Command("tmux", "show-environment", "ORC_BENCH_NAME").Output(); err == nil {
-			// Output format: "ORC_BENCH_NAME=BENCH-044\n"
+		benchID := ""
+		if envOut, err := exec.Command("tmux", "show-environment", "ORC_BENCH_ID").Output(); err == nil {
+			// Output format: "ORC_BENCH_ID=BENCH-044\n"
 			line := strings.TrimSpace(string(envOut))
 			if parts := strings.SplitN(line, "=", 2); len(parts) == 2 {
-				benchName = parts[1]
+				benchID = parts[1]
 			}
 		}
 
-		// Build the pane filter. If we have a bench name, scope to that bench's
+		// Build the pane filter. If we have a bench ID, scope to that bench's
 		// goblin pane using a compound filter on @pane_role AND @bench_id.
 		// Otherwise fall back to the unscoped @pane_role=goblin filter.
 		var filter string
-		if benchName != "" {
-			filter = fmt.Sprintf("#{&&:#{==:#{@pane_role},goblin},#{==:#{@bench_id},%s}}", benchName)
+		if benchID != "" {
+			filter = fmt.Sprintf("#{&&:#{==:#{@pane_role},goblin},#{==:#{@bench_id},%s}}", benchID)
 		} else {
-			m.emitEvent("warn", "ORC_BENCH_NAME not set, using unscoped goblin filter", map[string]string{
+			m.emitEvent("warn", "ORC_BENCH_ID not set, using unscoped goblin filter", map[string]string{
 				"action": "goblin", "entity_id": entityID,
 			})
 			filter = "#{==:#{@pane_role},goblin}"
 		}
 
 		m.emitEvent("debug", "goblin pane lookup", map[string]string{
-			"bench_name": benchName, "filter": filter, "entity_id": entityID,
+			"bench_id": benchID, "filter": filter, "entity_id": entityID,
 		})
 
 		// Find the goblin pane on the default (parent) tmux server.
@@ -492,14 +492,14 @@ func (m summaryModel) sendToGoblin(entityID string) tea.Cmd {
 		out, err := listCmd.Output()
 		if err != nil {
 			m.emitEvent("error", "goblin pane lookup failed", map[string]string{
-				"error": err.Error(), "bench_name": benchName, "entity_id": entityID,
+				"error": err.Error(), "bench_id": benchID, "entity_id": entityID,
 			})
 			return goblinResultMsg{entityID: entityID, err: fmt.Errorf("find goblin pane: %w", err)}
 		}
 		paneID := strings.TrimSpace(string(out))
 		if paneID == "" {
 			m.emitEvent("error", "no goblin pane found", map[string]string{
-				"bench_name": benchName, "filter": filter, "entity_id": entityID,
+				"bench_id": benchID, "filter": filter, "entity_id": entityID,
 			})
 			return goblinResultMsg{entityID: entityID, err: fmt.Errorf("no goblin pane found")}
 		}
@@ -509,7 +509,7 @@ func (m summaryModel) sendToGoblin(entityID string) tea.Cmd {
 		}
 
 		m.emitEvent("info", "sending to goblin", map[string]string{
-			"pane_id": paneID, "bench_name": benchName, "entity_id": entityID,
+			"pane_id": paneID, "bench_id": benchID, "entity_id": entityID,
 		})
 
 		// Send the entity ID followed by Space to separate from existing input

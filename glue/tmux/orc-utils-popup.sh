@@ -35,6 +35,12 @@ if ! tmux -L "$SOCKET" has-session -t "$SESSION" 2>/dev/null; then
     tmux -L "$SOCKET" set-environment -t "$SESSION" ORC_UTILS_SESSION 1
     tmux -L "$SOCKET" set-environment -t "$SESSION" ORC_BENCH_NAME "$BENCH_NAME"
 
+    # Propagate bench ID from parent pane's @bench_id option for goblin targeting
+    BENCH_ID="$(tmux display-message -p '#{@bench_id}')"
+    if [[ -n "$BENCH_ID" ]]; then
+        tmux -L "$SOCKET" set-environment -t "$SESSION" ORC_BENCH_ID "$BENCH_ID"
+    fi
+
     # Any click/double-click on status bar inside utils → detach (closes popup)
     tmux -L "$SOCKET" bind-key -T root DoubleClick1Status detach-client
     tmux -L "$SOCKET" bind-key -T root DoubleClick1StatusLeft detach-client
