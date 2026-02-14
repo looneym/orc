@@ -517,6 +517,123 @@ func TestStatusBarDuringAnimation(t *testing.T) {
 	}
 }
 
+func TestDeskModeQuitBehavior(t *testing.T) {
+	m := summaryModel{
+		expanded:      make(map[string]bool),
+		entityIndices: []int{},
+		isDeskSession: true,
+	}
+
+	t.Run("q in desk mode returns nil cmd (detach)", func(t *testing.T) {
+		_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'q'}})
+		if cmd != nil {
+			t.Error("q in desk mode should return nil cmd (detach), not tea.Quit")
+		}
+	})
+
+	t.Run("esc in desk mode returns nil cmd (detach)", func(t *testing.T) {
+		_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+		if cmd != nil {
+			t.Error("esc in desk mode should return nil cmd (detach), not tea.Quit")
+		}
+	})
+
+	t.Run("ctrl+c in desk mode returns tea.Quit", func(t *testing.T) {
+		_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyCtrlC})
+		if cmd == nil {
+			t.Error("ctrl+c in desk mode should still return tea.Quit")
+		}
+	})
+
+	t.Run("q in standalone mode returns tea.Quit", func(t *testing.T) {
+		standalone := summaryModel{
+			expanded:      make(map[string]bool),
+			entityIndices: []int{},
+			isDeskSession: false,
+		}
+		_, cmd := standalone.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'q'}})
+		if cmd == nil {
+			t.Error("q in standalone mode should return tea.Quit")
+		}
+	})
+}
+
+func TestQuitHintLabel(t *testing.T) {
+	t.Run("desk mode shows close", func(t *testing.T) {
+		m := summaryModel{isDeskSession: true}
+		if got := m.quitHintLabel(); got != "close" {
+			t.Errorf("expected 'close', got %q", got)
+		}
+	})
+
+	t.Run("standalone mode shows quit", func(t *testing.T) {
+		m := summaryModel{isDeskSession: false}
+		if got := m.quitHintLabel(); got != "quit" {
+			t.Errorf("expected 'quit', got %q", got)
+		}
+	})
+}
+
+func TestStatusBarNoteHintLabel(t *testing.T) {
+	content := "SHIP-412 - Shipment\n"
+	lines, entityIndices := parseLines(content)
+
+	m := summaryModel{
+		lines:         lines,
+		entityIndices: entityIndices,
+		cursor:        0,
+		expanded:      map[string]bool{},
+		width:         120,
+	}
+
+	bar := m.renderStatusBar()
+	if !strings.Contains(bar, "+note") {
+		t.Error("status bar should show '+note' instead of 'note'")
+	}
+}
+
+// TestEntityActionMatrixCompleteness verifies the entity-action matrix has an entry
+// for every known entity type and every known action is represented.
+func TestEntityActionMatrixCompleteness(t *testing.T) {
+	allEntityTypes := []string{"COMM", "SHIP", "TASK", "NOTE", "TOME", "PLAN", "WORK", "BENCH"}
+	allActions := []string{"yank", "open", "focus", "close", "goblin", "note", "review", "run", "deploy", "expand"}
+
+	// Every entity type must have a matrix entry
+	for _, etype := range allEntityTypes {
+		if _, ok := entityActionMatrix[etype]; !ok {
+			t.Errorf("entityActionMatrix missing entry for entity type %q", etype)
+		}
+	}
+
+	// Every action must appear at least once across all entity types
+	for _, action := range allActions {
+		found := false
+		for _, actions := range entityActionMatrix {
+			if actions[action] {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("action %q not found in any entity type in entityActionMatrix", action)
+		}
+	}
+
+	// No unknown entity types in the matrix
+	for etype := range entityActionMatrix {
+		known := false
+		for _, et := range allEntityTypes {
+			if etype == et {
+				known = true
+				break
+			}
+		}
+		if !known {
+			t.Errorf("entityActionMatrix contains unknown entity type %q", etype)
+		}
+	}
+}
+
 // newTestRand creates a deterministic RNG for tests.
 func newTestRand() *rand.Rand {
 	return rand.New(rand.NewPCG(42, 0))

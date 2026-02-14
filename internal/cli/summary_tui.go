@@ -170,14 +170,14 @@ var dimKeyStyle = lipgloss.NewStyle().
 	Foreground(lipgloss.Color("240"))
 
 // entityActionMatrix maps entity type prefixes to their available context-sensitive actions.
-// Actions listed here are: yank, open, focus, close, goblin.
-// Global actions (refresh, expand/collapse, quit, navigate) are always available.
+// Actions listed here are: yank, open, focus, close, goblin, note, review, run, deploy, expand.
+// Global actions (refresh, quit, navigate) are always available.
 var entityActionMatrix = map[string]map[string]bool{
-	"COMM":  {"yank": true, "open": true, "focus": true, "goblin": true},
-	"SHIP":  {"yank": true, "open": true, "focus": true, "close": true, "goblin": true},
+	"COMM":  {"yank": true, "open": true, "focus": true, "goblin": true, "expand": true},
+	"SHIP":  {"yank": true, "open": true, "focus": true, "close": true, "goblin": true, "note": true, "run": true, "deploy": true, "expand": true},
 	"TASK":  {"yank": true, "open": true, "close": true, "goblin": true},
-	"NOTE":  {"yank": true, "open": true, "focus": true, "goblin": true},
-	"TOME":  {"yank": true, "open": true, "focus": true, "goblin": true},
+	"NOTE":  {"yank": true, "open": true, "focus": true, "goblin": true, "review": true},
+	"TOME":  {"yank": true, "open": true, "focus": true, "goblin": true, "note": true, "expand": true},
 	"PLAN":  {"yank": true, "open": true, "goblin": true},
 	"WORK":  {"yank": true, "goblin": true},
 	"BENCH": {"yank": true, "goblin": true},
@@ -299,14 +299,10 @@ func treeDepth(stripped string) int {
 	return depth
 }
 
-// isExpandable returns whether an entity type can have children in the tree.
+// isExpandable checks whether an entity type can have children in the tree.
+// Delegates to the entity-action matrix.
 func isExpandable(entityID string) bool {
-	switch entityPrefix(entityID) {
-	case "COMM", "SHIP", "TOME":
-		return true
-	default:
-		return false
-	}
+	return entityHasAction(entityID, "expand")
 }
 
 // initExpandState sets initial expand/collapse state for entities after loading data.
@@ -583,11 +579,6 @@ func envWithoutTMUX() []string {
 	return env
 }
 
-// isShipment returns whether an entity is a shipment (eligible for workflow triggers).
-func isShipment(entityID string) bool {
-	return entityPrefix(entityID) == "SHIP"
-}
-
 // workflowResultMsg carries the result of a workflow trigger (ship-run/ship-deploy clipboard copy).
 type workflowResultMsg struct {
 	action string // "ship-run" or "ship-deploy"
@@ -613,25 +604,6 @@ func triggerWorkflow(action, entityID string) tea.Cmd {
 		err := cmd.Run()
 		return workflowResultMsg{action: action, err: err}
 	}
-}
-
-// noteParentFlag returns the CLI flag name and entity ID for attaching a note to a parent entity.
-// Returns ("", "") if the entity type doesn't support child notes.
-func noteParentFlag(entityID string) (string, string) {
-	switch entityPrefix(entityID) {
-	case "SHIP":
-		return "--shipment", entityID
-	case "TOME":
-		return "--tome", entityID
-	default:
-		return "", ""
-	}
-}
-
-// hasNoteParent returns whether an entity type supports child notes.
-func hasNoteParent(entityID string) bool {
-	flag, _ := noteParentFlag(entityID)
-	return flag != ""
 }
 
 // createNoteForEntity launches an interactive orc note create via tea.ExecProcess.
@@ -768,12 +740,6 @@ func currentBenchName() string {
 		return ""
 	}
 	return wb.Name
-}
-
-// isReviewable returns whether an entity can be opened for desk review.
-// Only notes are reviewable (editable content).
-func isReviewable(entityID string) bool {
-	return entityPrefix(entityID) == "NOTE"
 }
 
 // openDeskReview creates an ephemeral review window in the desk tmux server.
@@ -1145,8 +1111,12 @@ func (m summaryModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				orcBin = "orc"
 			}
 			args := []string{"note", "create", title}
-			if flag, id := noteParentFlag(entityID); flag != "" {
-				args = append(args, flag, id)
+			// Map entity type to note parent flag (SHIP->--shipment, TOME->--tome)
+			switch entityPrefix(entityID) {
+			case "SHIP":
+				args = append(args, "--shipment", entityID)
+			case "TOME":
+				args = append(args, "--tome", entityID)
 			}
 			out, errRun := exec.Command(orcBin, args...).CombinedOutput()
 			if errRun != nil {
@@ -1206,11 +1176,17 @@ func (m summaryModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		switch msg.String() {
-		case "q", "ctrl+c", "esc":
-			m.emitEvent("info", "tui closed", map[string]string{"action": "quit", "key": msg.String()})
+		case "q", "esc":
 			if m.isDeskSession {
+				m.emitEvent("info", "desk detached", map[string]string{"action": "detach", "key": msg.String()})
 				detachDeskSession()
+				return m, nil
 			}
+			m.emitEvent("info", "tui closed", map[string]string{"action": "quit", "key": msg.String()})
+			return m, tea.Quit
+
+		case "ctrl+c":
+			m.emitEvent("info", "tui closed", map[string]string{"action": "quit", "key": msg.String()})
 			return m, tea.Quit
 
 		case "j", "down":
@@ -1288,14 +1264,14 @@ func (m summaryModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case "n":
 			entityID := m.cursorEntityID()
-			if entityID != "" && hasNoteParent(entityID) {
+			if entityID != "" && entityHasAction(entityID, "note") {
 				return m, createNoteForEntity(entityID)
 			}
 			return m, nil
 
 		case "R":
 			entityID := m.cursorEntityID()
-			if entityID != "" && isShipment(entityID) {
+			if entityID != "" && entityHasAction(entityID, "run") {
 				m.statusMsg = "Copying /ship-run command..."
 				return m, triggerWorkflow("ship-run", entityID)
 			}
@@ -1303,7 +1279,7 @@ func (m summaryModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case "D":
 			entityID := m.cursorEntityID()
-			if entityID != "" && isShipment(entityID) {
+			if entityID != "" && entityHasAction(entityID, "deploy") {
 				m.statusMsg = "Copying /ship-deploy command..."
 				return m, triggerWorkflow("ship-deploy", entityID)
 			}
@@ -1311,20 +1287,23 @@ func (m summaryModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case "d":
 			entityID := m.cursorEntityID()
-			if entityID != "" && isReviewable(entityID) {
+			if entityID != "" && entityHasAction(entityID, "review") {
 				m.statusMsg = fmt.Sprintf("Opening review for %s...", entityID)
 				return m, m.openDeskReview(entityID)
 			}
 			return m, nil
 
 		case "g":
+			entityID := m.cursorEntityID()
+			if entityID == "" || !entityHasAction(entityID, "goblin") {
+				return m, nil
+			}
 			// Send freeform text to goblin pane (opens editor)
 			if m.workshopSession != "" {
 				return m, m.composeGoblinMessage()
 			}
 			// Fallback: send entity ID to goblin via bench ID injection (desk session)
-			entityID := m.cursorEntityID()
-			if m.isDeskSession && entityID != "" && entityHasAction(entityID, "goblin") {
+			if m.isDeskSession {
 				m.emitEvent("info", "goblin send", map[string]string{"action": "goblin", "entity_id": entityID})
 				return m, m.sendToGoblinByBenchID(entityID)
 			}
@@ -1502,16 +1481,25 @@ func (m summaryModel) renderStatusBar() string {
 		formatHint("o", "open", entityHasAction(entityID, "open")) + "  " +
 		formatHint("f", "focus", entityHasAction(entityID, "focus")) + "  " +
 		formatHint("c", "close", entityHasAction(entityID, "close")) + "  " +
-		formatHint("n", "note", hasNoteParent(entityID)) + "  " +
-		formatHint("d", "review", isReviewable(entityID)) + "  " +
-		formatHint("R", "run", isShipment(entityID)) + "  " +
-		formatHint("D", "deploy", isShipment(entityID)) + "  " +
-		formatHint("g", "goblin", m.workshopSession != "" || (m.isDeskSession && entityHasAction(entityID, "goblin"))) + "  " +
+		formatHint("n", "+note", entityHasAction(entityID, "note")) + "  " +
+		formatHint("d", "review", entityHasAction(entityID, "review")) + "  " +
+		formatHint("R", "run", entityHasAction(entityID, "run")) + "  " +
+		formatHint("D", "deploy", entityHasAction(entityID, "deploy")) + "  " +
+		formatHint("g", "goblin", entityHasAction(entityID, "goblin") && (m.workshopSession != "" || m.isDeskSession)) + "  " +
 		formatHint("r", "refresh", true) + "  " +
 		formatHint("l", "expand", true) + "  " +
-		formatHint("q", "quit", true)
+		formatHint("q", m.quitHintLabel(), true)
 
 	return statusBarStyle.Width(m.width).Render(hints)
+}
+
+// quitHintLabel returns the label for the q key hint.
+// In desk mode, q detaches (closes the popup) rather than quitting.
+func (m summaryModel) quitHintLabel() string {
+	if m.isDeskSession {
+		return "close"
+	}
+	return "quit"
 }
 
 // formatHint formats a single keybind hint for the status bar.
