@@ -67,7 +67,6 @@ func (s *ShipmentServiceImpl) CreateShipment(ctx context.Context, req primary.Cr
 		Description:  req.Description,
 		RepoID:       req.RepoID,
 		Branch:       branch,
-		SpecNoteID:   req.SpecNoteID,
 	}
 
 	if err := s.shipmentRepo.Create(ctx, record); err != nil {
@@ -114,7 +113,7 @@ func (s *ShipmentServiceImpl) ListShipments(ctx context.Context, filters primary
 
 // CloseShipment marks a shipment as closed.
 // If force is true, closes even if tasks are not closed.
-// If shipment has a SpecNoteID, the spec note is closed with reason "resolved".
+// Closes any type=spec notes attached to this shipment with reason "resolved".
 func (s *ShipmentServiceImpl) CloseShipment(ctx context.Context, shipmentID string, force bool) error {
 	record, err := s.shipmentRepo.GetByID(ctx, shipmentID)
 	if err != nil {
@@ -152,15 +151,23 @@ func (s *ShipmentServiceImpl) CloseShipment(ctx context.Context, shipmentID stri
 		return err
 	}
 
-	// Close spec note if shipment was generated from one
-	if record.SpecNoteID != "" && s.noteService != nil {
-		closeReq := primary.CloseNoteRequest{
-			NoteID: record.SpecNoteID,
-			Reason: "resolved",
+	// Close any spec notes attached to this shipment
+	if s.noteService != nil {
+		notes, err := s.noteService.GetNotesByContainer(ctx, "shipment", shipmentID)
+		if err != nil {
+			fmt.Printf("Warning: failed to query notes for shipment %s: %v\n", shipmentID, err)
+			return nil
 		}
-		if err := s.noteService.CloseNote(ctx, closeReq); err != nil {
-			// Log but don't fail - shipment is already closed
-			fmt.Printf("Warning: failed to close spec note %s: %v\n", record.SpecNoteID, err)
+		for _, note := range notes {
+			if note.Type == "spec" && note.Status != "closed" {
+				closeReq := primary.CloseNoteRequest{
+					NoteID: note.ID,
+					Reason: "resolved",
+				}
+				if err := s.noteService.CloseNote(ctx, closeReq); err != nil {
+					fmt.Printf("Warning: failed to close spec note %s: %v\n", note.ID, err)
+				}
+			}
 		}
 	}
 
@@ -295,7 +302,6 @@ func (s *ShipmentServiceImpl) recordToShipment(r *secondary.ShipmentRecord) *pri
 		RepoID:              r.RepoID,
 		Branch:              r.Branch,
 		Pinned:              r.Pinned,
-		SpecNoteID:          r.SpecNoteID,
 		CreatedAt:           r.CreatedAt,
 		UpdatedAt:           r.UpdatedAt,
 		CompletedAt:         r.CompletedAt,

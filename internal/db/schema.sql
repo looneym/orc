@@ -103,14 +103,12 @@ CREATE TABLE IF NOT EXISTS shipments (
 	repo_id TEXT,
 	branch TEXT,
 	pinned INTEGER DEFAULT 0,
-	spec_note_id TEXT,
 	created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 	updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 	completed_at DATETIME,
 	FOREIGN KEY (commission_id) REFERENCES commissions(id),
 	FOREIGN KEY (assigned_workbench_id) REFERENCES workbenches(id),
-	FOREIGN KEY (repo_id) REFERENCES repos(id),
-	FOREIGN KEY (spec_note_id) REFERENCES notes(id) ON DELETE SET NULL
+	FOREIGN KEY (repo_id) REFERENCES repos(id)
 );
 
 -- Tomes (Knowledge containers)
