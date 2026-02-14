@@ -147,6 +147,34 @@ var statusMsgStyle = lipgloss.NewStyle().
 	Foreground(lipgloss.Color("114")).
 	Bold(true)
 
+// dimKeyStyle renders unavailable key hints in dark gray (dimmed).
+var dimKeyStyle = lipgloss.NewStyle().
+	Background(lipgloss.Color("236")).
+	Foreground(lipgloss.Color("240"))
+
+// entityActionMatrix maps entity type prefixes to their available context-sensitive actions.
+// Actions listed here are: yank, open, focus, close, goblin.
+// Global actions (refresh, expand/collapse, quit, navigate) are always available.
+var entityActionMatrix = map[string]map[string]bool{
+	"COMM":  {"yank": true, "open": true, "focus": true, "goblin": true},
+	"SHIP":  {"yank": true, "open": true, "focus": true, "close": true, "goblin": true},
+	"TASK":  {"yank": true, "open": true, "close": true, "goblin": true},
+	"NOTE":  {"yank": true, "open": true, "focus": true, "goblin": true},
+	"TOME":  {"yank": true, "open": true, "focus": true, "goblin": true},
+	"PLAN":  {"yank": true, "open": true, "goblin": true},
+	"WORK":  {"yank": true, "goblin": true},
+	"BENCH": {"yank": true, "goblin": true},
+}
+
+// entityHasAction checks whether the given entity ID supports the named action.
+func entityHasAction(entityID, action string) bool {
+	actions, ok := entityActionMatrix[entityPrefix(entityID)]
+	if !ok {
+		return false
+	}
+	return actions[action]
+}
+
 // runSummaryTUI launches the interactive Bubble Tea TUI for summary.
 func runSummaryTUI(cmd *cobra.Command, opts summaryOpts, eventWriter secondary.EventWriter) error {
 	m := summaryModel{
@@ -332,26 +360,6 @@ func entityPrefix(id string) string {
 	return ""
 }
 
-// isFocusable returns whether an entity type can be focused with orc focus.
-func isFocusable(entityID string) bool {
-	switch entityPrefix(entityID) {
-	case "COMM", "SHIP", "TOME", "NOTE":
-		return true
-	default:
-		return false
-	}
-}
-
-// isCloseable returns whether an entity type can be closed/completed.
-func isCloseable(entityID string) bool {
-	switch entityPrefix(entityID) {
-	case "TASK", "SHIP":
-		return true
-	default:
-		return false
-	}
-}
-
 // entityShowCommand returns the orc subcommand for showing an entity's details.
 func entityShowCommand(entityID string) string {
 	switch entityPrefix(entityID) {
@@ -424,24 +432,58 @@ func closeEntity(entityID string) tea.Cmd {
 }
 
 // sendToGoblin sends an entity ID to the goblin pane in the parent tmux server
-// by finding the pane with @pane_role=goblin and using send-keys.
+// by finding the pane with @pane_role=goblin scoped to the current bench via @bench_id.
 // The parent server is the default tmux server; we reach it by unsetting TMUX
 // so that the tmux CLI doesn't target the utils server socket.
-func sendToGoblin(entityID string) tea.Cmd {
+func (m summaryModel) sendToGoblin(entityID string) tea.Cmd {
 	return func() tea.Msg {
+		// Read ORC_BENCH_NAME from the utils tmux server environment.
+		// This env var was set by orc-utils-popup.sh at session creation time.
+		// We do NOT unset TMUX here — show-environment should target the utils server.
+		benchName := ""
+		if envOut, err := exec.Command("tmux", "show-environment", "ORC_BENCH_NAME").Output(); err == nil {
+			// Output format: "ORC_BENCH_NAME=BENCH-044\n"
+			line := strings.TrimSpace(string(envOut))
+			if parts := strings.SplitN(line, "=", 2); len(parts) == 2 {
+				benchName = parts[1]
+			}
+		}
+
+		// Build the pane filter. If we have a bench name, scope to that bench's
+		// goblin pane using a compound filter on @pane_role AND @bench_id.
+		// Otherwise fall back to the unscoped @pane_role=goblin filter.
+		var filter string
+		if benchName != "" {
+			filter = fmt.Sprintf("#{&&:#{==:#{@pane_role},goblin},#{==:#{@bench_id},%s}}", benchName)
+		} else {
+			m.emitEvent("warn", "ORC_BENCH_NAME not set, using unscoped goblin filter", map[string]string{
+				"action": "goblin", "entity_id": entityID,
+			})
+			filter = "#{==:#{@pane_role},goblin}"
+		}
+
+		m.emitEvent("debug", "goblin pane lookup", map[string]string{
+			"bench_name": benchName, "filter": filter, "entity_id": entityID,
+		})
+
 		// Find the goblin pane on the default (parent) tmux server.
-		// list-panes -a with a format filter finds panes with @pane_role=goblin.
 		listCmd := exec.Command("tmux", "list-panes", "-a",
-			"-f", "#{==:#{@pane_role},goblin}",
+			"-f", filter,
 			"-F", "#{pane_id}")
 		// Unset TMUX so the tmux CLI targets the default server, not the utils server.
 		listCmd.Env = envWithoutTMUX()
 		out, err := listCmd.Output()
 		if err != nil {
+			m.emitEvent("error", "goblin pane lookup failed", map[string]string{
+				"error": err.Error(), "bench_name": benchName, "entity_id": entityID,
+			})
 			return goblinResultMsg{entityID: entityID, err: fmt.Errorf("find goblin pane: %w", err)}
 		}
 		paneID := strings.TrimSpace(string(out))
 		if paneID == "" {
+			m.emitEvent("error", "no goblin pane found", map[string]string{
+				"bench_name": benchName, "filter": filter, "entity_id": entityID,
+			})
 			return goblinResultMsg{entityID: entityID, err: fmt.Errorf("no goblin pane found")}
 		}
 		// If multiple goblin panes, take the first one
@@ -449,10 +491,17 @@ func sendToGoblin(entityID string) tea.Cmd {
 			paneID = lines[0]
 		}
 
+		m.emitEvent("info", "sending to goblin", map[string]string{
+			"pane_id": paneID, "bench_name": benchName, "entity_id": entityID,
+		})
+
 		// Send the entity ID followed by Space to separate from existing input
 		sendCmd := exec.Command("tmux", "send-keys", "-t", paneID, entityID, "Space")
 		sendCmd.Env = envWithoutTMUX()
 		if err := sendCmd.Run(); err != nil {
+			m.emitEvent("error", "send-keys to goblin failed", map[string]string{
+				"error": err.Error(), "pane_id": paneID, "entity_id": entityID,
+			})
 			return goblinResultMsg{entityID: entityID, err: fmt.Errorf("send-keys to goblin: %w", err)}
 		}
 		return goblinResultMsg{entityID: entityID}
@@ -771,7 +820,7 @@ func (m summaryModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case "y":
 			entityID := m.cursorEntityID()
-			if entityID != "" {
+			if entityID != "" && entityHasAction(entityID, "yank") {
 				m.emitEvent("info", "yank", map[string]string{"action": "yank", "entity_id": entityID})
 				return m, yankToClipboard(entityID)
 			}
@@ -779,7 +828,7 @@ func (m summaryModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case "f":
 			entityID := m.cursorEntityID()
-			if entityID != "" && isFocusable(entityID) {
+			if entityID != "" && entityHasAction(entityID, "focus") {
 				m.emitEvent("info", "focus", map[string]string{"action": "focus", "entity_id": entityID})
 				cmd := setStatusMsg(&m, fmt.Sprintf("Focusing %s...", entityID))
 				_ = cmd // timer will fire but fetchSummary will also run
@@ -789,7 +838,7 @@ func (m summaryModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case "o":
 			entityID := m.cursorEntityID()
-			if entityID != "" {
+			if entityID != "" && entityHasAction(entityID, "open") {
 				m.emitEvent("info", "vim open", map[string]string{"action": "open", "entity_id": entityID})
 				return m, m.openInVim(entityID)
 			}
@@ -802,7 +851,7 @@ func (m summaryModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case "c":
 			entityID := m.cursorEntityID()
-			if entityID != "" && isCloseable(entityID) {
+			if entityID != "" && entityHasAction(entityID, "close") {
 				m.emitEvent("info", "close", map[string]string{"action": "close", "entity_id": entityID})
 				m.confirming = true
 				m.confirmEntityID = entityID
@@ -811,12 +860,10 @@ func (m summaryModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 
 		case "g":
-			if m.isUtilsSession {
-				entityID := m.cursorEntityID()
-				if entityID != "" {
-					m.emitEvent("info", "goblin send", map[string]string{"action": "goblin", "entity_id": entityID})
-					return m, sendToGoblin(entityID)
-				}
+			entityID := m.cursorEntityID()
+			if m.isUtilsSession && entityID != "" && entityHasAction(entityID, "goblin") {
+				m.emitEvent("info", "goblin send", map[string]string{"action": "goblin", "entity_id": entityID})
+				return m, m.sendToGoblin(entityID)
 			}
 			return m, nil
 		}
@@ -958,7 +1005,7 @@ func (m summaryModel) renderContent() string {
 	return b.String()
 }
 
-// renderStatusBar builds the context-sensitive status bar based on the entity under cursor.
+// renderStatusBar builds the fixed-layout status bar with dimming for unavailable actions.
 func (m summaryModel) renderStatusBar() string {
 	// During animation, show a minimal status bar
 	if m.animating {
@@ -979,43 +1026,29 @@ func (m summaryModel) renderStatusBar() string {
 	}
 
 	entityID := m.cursorEntityID()
-	if entityID == "" {
-		return statusBarStyle.Width(m.width).Render(
-			formatHint("j/k", "navigate") + "  " +
-				formatHint("r", "refresh") + "  " +
-				formatHint("q", "quit"),
-		)
-	}
 
-	hints := formatHint("j/k", "navigate") + "  " +
-		formatHint("y", "yank ID") + "  " +
-		formatHint("o", "open in vim") + "  " +
-		formatHint("r", "refresh")
-
-	if isExpandable(entityID) {
-		hints += "  " + formatHint("enter", "expand/collapse")
-	}
-
-	if isCloseable(entityID) {
-		hints += "  " + formatHint("c", "close")
-	}
-
-	if isFocusable(entityID) {
-		hints += "  " + formatHint("f", "focus")
-	}
-
-	if m.isUtilsSession {
-		hints += "  " + formatHint("g", "goblin")
-	}
-
-	hints += "  " + formatHint("q", "quit")
+	// Fixed layout: always render all hints in stable order.
+	// Context-sensitive actions are bright when available, dim when not.
+	hints := formatHint("j/k", "navigate", true) + "  " +
+		formatHint("y", "yank", entityHasAction(entityID, "yank")) + "  " +
+		formatHint("o", "open", entityHasAction(entityID, "open")) + "  " +
+		formatHint("f", "focus", entityHasAction(entityID, "focus")) + "  " +
+		formatHint("c", "close", entityHasAction(entityID, "close")) + "  " +
+		formatHint("g", "goblin", m.isUtilsSession && entityHasAction(entityID, "goblin")) + "  " +
+		formatHint("r", "refresh", true) + "  " +
+		formatHint("enter", "expand", true) + "  " +
+		formatHint("q", "quit", true)
 
 	return statusBarStyle.Width(m.width).Render(hints)
 }
 
 // formatHint formats a single keybind hint for the status bar.
-func formatHint(key, action string) string {
-	return statusKeyStyle.Render(key) + " " + action
+// When active is true, the key uses bright styling; when false, it uses dim styling.
+func formatHint(key, action string, active bool) string {
+	if active {
+		return statusKeyStyle.Render(key) + " " + action
+	}
+	return dimKeyStyle.Render(key + " " + action)
 }
 
 // View renders the current model state as a string.

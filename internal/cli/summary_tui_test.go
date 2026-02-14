@@ -299,7 +299,7 @@ func TestEnterKeyNonExpandable(t *testing.T) {
 	}
 }
 
-func TestStatusBarShowsExpandCollapseHint(t *testing.T) {
+func TestStatusBarFixedLayout(t *testing.T) {
 	content := strings.Join([]string{
 		"COMM-001 - Commission",
 		"├── SHIP-412 - Shipment",
@@ -308,7 +308,7 @@ func TestStatusBarShowsExpandCollapseHint(t *testing.T) {
 
 	lines, entityIndices := parseLines(content)
 
-	t.Run("shows expand/collapse for SHIP", func(t *testing.T) {
+	t.Run("always shows all hints in fixed layout", func(t *testing.T) {
 		m := summaryModel{
 			lines:         lines,
 			entityIndices: entityIndices,
@@ -318,12 +318,15 @@ func TestStatusBarShowsExpandCollapseHint(t *testing.T) {
 		}
 
 		bar := m.renderStatusBar()
-		if !strings.Contains(bar, "expand/collapse") {
-			t.Error("status bar should show expand/collapse hint for SHIP entity")
+		// Fixed layout: all hints always present regardless of entity type
+		for _, hint := range []string{"yank", "open", "focus", "close", "expand", "refresh", "quit"} {
+			if !strings.Contains(bar, hint) {
+				t.Errorf("status bar should always contain %q hint", hint)
+			}
 		}
 	})
 
-	t.Run("no expand/collapse for TASK", func(t *testing.T) {
+	t.Run("fixed layout for TASK too", func(t *testing.T) {
 		m := summaryModel{
 			lines:         lines,
 			entityIndices: entityIndices,
@@ -333,8 +336,11 @@ func TestStatusBarShowsExpandCollapseHint(t *testing.T) {
 		}
 
 		bar := m.renderStatusBar()
-		if strings.Contains(bar, "expand/collapse") {
-			t.Error("status bar should NOT show expand/collapse hint for TASK entity")
+		// All hints present even for TASK (unavailable ones are dimmed, not hidden)
+		for _, hint := range []string{"yank", "open", "focus", "close", "expand", "refresh", "quit"} {
+			if !strings.Contains(bar, hint) {
+				t.Errorf("status bar should always contain %q hint even for TASK", hint)
+			}
 		}
 	})
 }
