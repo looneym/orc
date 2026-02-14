@@ -356,7 +356,7 @@ func newTestShipmentService() (*ShipmentServiceImpl, *mockShipmentRepository, *m
 	shipmentRepo := newMockShipmentRepository()
 	taskRepo := newMockTaskRepositoryForShipment()
 	noteService := newMockNoteServiceForShipment()
-	service := NewShipmentService(shipmentRepo, taskRepo, noteService)
+	service := NewShipmentService(shipmentRepo, taskRepo, noteService, &mockTransactor{})
 	return service, shipmentRepo, taskRepo
 }
 
@@ -857,7 +857,7 @@ func TestCompleteShipment_ClosesSpecNote(t *testing.T) {
 	shipmentRepo := newMockShipmentRepository()
 	taskRepo := newMockTaskRepositoryForShipment()
 	noteService := newMockNoteServiceForShipment()
-	service := NewShipmentService(shipmentRepo, taskRepo, noteService)
+	service := NewShipmentService(shipmentRepo, taskRepo, noteService, &mockTransactor{})
 	ctx := context.Background()
 
 	// Create a shipment
@@ -898,7 +898,7 @@ func TestCompleteShipment_WithoutSpecNote(t *testing.T) {
 	shipmentRepo := newMockShipmentRepository()
 	taskRepo := newMockTaskRepositoryForShipment()
 	noteService := newMockNoteServiceForShipment()
-	service := NewShipmentService(shipmentRepo, taskRepo, noteService)
+	service := NewShipmentService(shipmentRepo, taskRepo, noteService, &mockTransactor{})
 	ctx := context.Background()
 
 	// Create a shipment with no notes attached

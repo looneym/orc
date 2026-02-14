@@ -16,6 +16,7 @@ type ShipmentServiceImpl struct {
 	shipmentRepo secondary.ShipmentRepository
 	taskRepo     secondary.TaskRepository
 	noteService  primary.NoteService
+	transactor   secondary.Transactor
 }
 
 // NewShipmentService creates a new ShipmentService with injected dependencies.
@@ -23,11 +24,13 @@ func NewShipmentService(
 	shipmentRepo secondary.ShipmentRepository,
 	taskRepo secondary.TaskRepository,
 	noteService primary.NoteService,
+	transactor secondary.Transactor,
 ) *ShipmentServiceImpl {
 	return &ShipmentServiceImpl{
 		shipmentRepo: shipmentRepo,
 		taskRepo:     taskRepo,
 		noteService:  noteService,
+		transactor:   transactor,
 	}
 }
 
@@ -42,35 +45,43 @@ func (s *ShipmentServiceImpl) CreateShipment(ctx context.Context, req primary.Cr
 		return nil, fmt.Errorf("commission %s not found", req.CommissionID)
 	}
 
-	// Get next ID
-	nextID, err := s.shipmentRepo.GetNextID(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate shipment ID: %w", err)
-	}
-
-	// Generate branch name if repo is specified
-	var branch string
-	if req.RepoID != "" {
-		if req.Branch != "" {
-			branch = req.Branch // Use provided branch name
-		} else {
-			// Auto-generate branch name: {initials}/SHIP-{id}-{slug}
-			branch = GenerateShipmentBranchName(UserInitials, nextID, req.Title)
+	var nextID string
+	err = s.transactor.WithImmediateTx(ctx, func(txCtx context.Context) error {
+		// Get next ID
+		var err error
+		nextID, err = s.shipmentRepo.GetNextID(txCtx)
+		if err != nil {
+			return fmt.Errorf("failed to generate shipment ID: %w", err)
 		}
-	}
 
-	// Create record - shipments go directly under commissions
-	record := &secondary.ShipmentRecord{
-		ID:           nextID,
-		CommissionID: req.CommissionID,
-		Title:        req.Title,
-		Description:  req.Description,
-		RepoID:       req.RepoID,
-		Branch:       branch,
-	}
+		// Generate branch name if repo is specified
+		var branch string
+		if req.RepoID != "" {
+			if req.Branch != "" {
+				branch = req.Branch // Use provided branch name
+			} else {
+				// Auto-generate branch name: {initials}/SHIP-{id}-{slug}
+				branch = GenerateShipmentBranchName(UserInitials, nextID, req.Title)
+			}
+		}
 
-	if err := s.shipmentRepo.Create(ctx, record); err != nil {
-		return nil, fmt.Errorf("failed to create shipment: %w", err)
+		// Create record - shipments go directly under commissions
+		record := &secondary.ShipmentRecord{
+			ID:           nextID,
+			CommissionID: req.CommissionID,
+			Title:        req.Title,
+			Description:  req.Description,
+			RepoID:       req.RepoID,
+			Branch:       branch,
+		}
+
+		if err := s.shipmentRepo.Create(txCtx, record); err != nil {
+			return fmt.Errorf("failed to create shipment: %w", err)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 
 	// Fetch created shipment

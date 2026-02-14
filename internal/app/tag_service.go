@@ -10,33 +10,43 @@ import (
 
 // TagServiceImpl implements the TagService interface.
 type TagServiceImpl struct {
-	tagRepo secondary.TagRepository
+	tagRepo    secondary.TagRepository
+	transactor secondary.Transactor
 }
 
 // NewTagService creates a new TagService with injected dependencies.
-func NewTagService(tagRepo secondary.TagRepository) *TagServiceImpl {
+func NewTagService(tagRepo secondary.TagRepository, transactor secondary.Transactor) *TagServiceImpl {
 	return &TagServiceImpl{
-		tagRepo: tagRepo,
+		tagRepo:    tagRepo,
+		transactor: transactor,
 	}
 }
 
 // CreateTag creates a new tag.
 func (s *TagServiceImpl) CreateTag(ctx context.Context, req primary.CreateTagRequest) (*primary.CreateTagResponse, error) {
-	// Get next ID
-	nextID, err := s.tagRepo.GetNextID(ctx)
+	var nextID string
+	err := s.transactor.WithImmediateTx(ctx, func(txCtx context.Context) error {
+		// Get next ID
+		var err error
+		nextID, err = s.tagRepo.GetNextID(txCtx)
+		if err != nil {
+			return fmt.Errorf("failed to generate tag ID: %w", err)
+		}
+
+		// Create record
+		record := &secondary.TagRecord{
+			ID:          nextID,
+			Name:        req.Name,
+			Description: req.Description,
+		}
+
+		if err := s.tagRepo.Create(txCtx, record); err != nil {
+			return fmt.Errorf("failed to create tag: %w", err)
+		}
+		return nil
+	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate tag ID: %w", err)
-	}
-
-	// Create record
-	record := &secondary.TagRecord{
-		ID:          nextID,
-		Name:        req.Name,
-		Description: req.Description,
-	}
-
-	if err := s.tagRepo.Create(ctx, record); err != nil {
-		return nil, fmt.Errorf("failed to create tag: %w", err)
+		return nil, err
 	}
 
 	// Fetch created tag

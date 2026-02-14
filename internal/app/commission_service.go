@@ -15,6 +15,7 @@ type CommissionServiceImpl struct {
 	commissionRepo secondary.CommissionRepository
 	agentProvider  secondary.AgentIdentityProvider
 	executor       EffectExecutor
+	transactor     secondary.Transactor
 }
 
 // NewCommissionService creates a new CommissionService with injected dependencies.
@@ -22,35 +23,44 @@ func NewCommissionService(
 	commissionRepo secondary.CommissionRepository,
 	agentProvider secondary.AgentIdentityProvider,
 	executor EffectExecutor,
+	transactor secondary.Transactor,
 ) *CommissionServiceImpl {
 	return &CommissionServiceImpl{
 		commissionRepo: commissionRepo,
 		agentProvider:  agentProvider,
 		executor:       executor,
+		transactor:     transactor,
 	}
 }
 
 // CreateCommission creates a new commission.
 func (s *CommissionServiceImpl) CreateCommission(ctx context.Context, req primary.CreateCommissionRequest) (*primary.CreateCommissionResponse, error) {
-	// 1. Generate ID using core business rule
-	nextID, err := s.commissionRepo.GetNextID(ctx)
+	var record *secondary.CommissionRecord
+
+	err := s.transactor.WithImmediateTx(ctx, func(txCtx context.Context) error {
+		// 1. Generate ID using core business rule
+		nextID, err := s.commissionRepo.GetNextID(txCtx)
+		if err != nil {
+			return fmt.Errorf("failed to generate commission ID: %w", err)
+		}
+
+		// 2. Create commission record with pre-populated ID and initial status from core
+		record = &secondary.CommissionRecord{
+			ID:          nextID,
+			Title:       req.Title,
+			Description: req.Description,
+			Status:      string(corecommission.InitialStatus()),
+		}
+
+		if err := s.commissionRepo.Create(txCtx, record); err != nil {
+			return fmt.Errorf("failed to create commission: %w", err)
+		}
+		return nil
+	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate commission ID: %w", err)
+		return nil, err
 	}
 
-	// 4. Create commission record with pre-populated ID and initial status from core
-	record := &secondary.CommissionRecord{
-		ID:          nextID,
-		Title:       req.Title,
-		Description: req.Description,
-		Status:      string(corecommission.InitialStatus()),
-	}
-
-	if err := s.commissionRepo.Create(ctx, record); err != nil {
-		return nil, fmt.Errorf("failed to create commission: %w", err)
-	}
-
-	// 5. Return response
 	return &primary.CreateCommissionResponse{
 		CommissionID: record.ID,
 		Commission:   s.recordToCommission(record),

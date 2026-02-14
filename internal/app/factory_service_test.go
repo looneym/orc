@@ -121,7 +121,7 @@ func (m *mockFactoryRepoForService) CountCommissions(ctx context.Context, factor
 
 func newTestFactoryService() (*FactoryServiceImpl, *mockFactoryRepoForService) {
 	repo := newMockFactoryRepoForService()
-	service := NewFactoryService(repo)
+	service := NewFactoryService(repo, &mockTransactor{})
 	return service, repo
 }
 

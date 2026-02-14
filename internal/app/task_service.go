@@ -15,6 +15,7 @@ type TaskServiceImpl struct {
 	taskRepo     secondary.TaskRepository
 	tagRepo      secondary.TagRepository
 	shipmentRepo secondary.ShipmentRepository
+	transactor   secondary.Transactor
 }
 
 // NewTaskService creates a new TaskService with injected dependencies.
@@ -22,11 +23,13 @@ func NewTaskService(
 	taskRepo secondary.TaskRepository,
 	tagRepo secondary.TagRepository,
 	shipmentRepo secondary.ShipmentRepository,
+	transactor secondary.Transactor,
 ) *TaskServiceImpl {
 	return &TaskServiceImpl{
 		taskRepo:     taskRepo,
 		tagRepo:      tagRepo,
 		shipmentRepo: shipmentRepo,
+		transactor:   transactor,
 	}
 }
 
@@ -60,12 +63,6 @@ func (s *TaskServiceImpl) CreateTask(ctx context.Context, req primary.CreateTask
 		}
 	}
 
-	// Get next ID
-	nextID, err := s.taskRepo.GetNextID(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate task ID: %w", err)
-	}
-
 	// Serialize depends_on as JSON
 	var dependsOnJSON string
 	if len(req.DependsOn) > 0 {
@@ -76,20 +73,34 @@ func (s *TaskServiceImpl) CreateTask(ctx context.Context, req primary.CreateTask
 		dependsOnJSON = string(data)
 	}
 
-	// Create record
-	record := &secondary.TaskRecord{
-		ID:           nextID,
-		ShipmentID:   req.ShipmentID,
-		CommissionID: req.CommissionID,
-		Title:        req.Title,
-		Description:  req.Description,
-		Type:         req.Type,
-		Status:       "open",
-		DependsOn:    dependsOnJSON,
-	}
+	var nextID string
+	err = s.transactor.WithImmediateTx(ctx, func(txCtx context.Context) error {
+		// Get next ID
+		var err error
+		nextID, err = s.taskRepo.GetNextID(txCtx)
+		if err != nil {
+			return fmt.Errorf("failed to generate task ID: %w", err)
+		}
 
-	if err := s.taskRepo.Create(ctx, record); err != nil {
-		return nil, fmt.Errorf("failed to create task: %w", err)
+		// Create record
+		record := &secondary.TaskRecord{
+			ID:           nextID,
+			ShipmentID:   req.ShipmentID,
+			CommissionID: req.CommissionID,
+			Title:        req.Title,
+			Description:  req.Description,
+			Type:         req.Type,
+			Status:       "open",
+			DependsOn:    dependsOnJSON,
+		}
+
+		if err := s.taskRepo.Create(txCtx, record); err != nil {
+			return fmt.Errorf("failed to create task: %w", err)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 
 	// Fetch created task

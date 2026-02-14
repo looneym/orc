@@ -94,7 +94,7 @@ func (m *mockTagRepository) GetEntityTag(ctx context.Context, entityID, entityTy
 
 func newTestTagService() (*TagServiceImpl, *mockTagRepository) {
 	tagRepo := newMockTagRepository()
-	service := NewTagService(tagRepo)
+	service := NewTagService(tagRepo, &mockTransactor{})
 	return service, tagRepo
 }
 

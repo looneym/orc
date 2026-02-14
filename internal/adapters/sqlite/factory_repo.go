@@ -8,6 +8,7 @@ import (
 	"time"
 
 	corefactory "github.com/example/orc/internal/core/factory"
+	"github.com/example/orc/internal/db"
 	"github.com/example/orc/internal/ports/secondary"
 )
 
@@ -21,6 +22,14 @@ func NewFactoryRepository(db *sql.DB) *FactoryRepository {
 	return &FactoryRepository{db: db}
 }
 
+// conn returns the context-carried transaction if present, otherwise r.db.
+func (r *FactoryRepository) conn(ctx context.Context) db.DBTX {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
+	return r.db
+}
+
 // Create persists a new factory.
 func (r *FactoryRepository) Create(ctx context.Context, factory *secondary.FactoryRecord) error {
 	if factory.ID == "" {
@@ -30,7 +39,7 @@ func (r *FactoryRepository) Create(ctx context.Context, factory *secondary.Facto
 		factory.Status = "active"
 	}
 
-	_, err := r.db.ExecContext(ctx,
+	_, err := r.conn(ctx).ExecContext(ctx,
 		"INSERT INTO factories (id, name, status) VALUES (?, ?, ?)",
 		factory.ID, factory.Name, factory.Status,
 	)
@@ -184,7 +193,7 @@ func (r *FactoryRepository) Delete(ctx context.Context, id string) error {
 // GetNextID returns the next available factory ID.
 func (r *FactoryRepository) GetNextID(ctx context.Context) (string, error) {
 	var maxID int
-	err := r.db.QueryRowContext(ctx,
+	err := r.conn(ctx).QueryRowContext(ctx,
 		"SELECT COALESCE(MAX(CAST(SUBSTR(id, 6) AS INTEGER)), 0) FROM factories",
 	).Scan(&maxID)
 	if err != nil {

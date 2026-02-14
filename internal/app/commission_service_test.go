@@ -154,7 +154,7 @@ func newTestService(agentType secondary.AgentType) (*CommissionServiceImpl, *moc
 	agentProvider := newMockAgentProvider(agentType)
 	executor := newMockEffectExecutor()
 
-	service := NewCommissionService(commissionRepo, agentProvider, executor)
+	service := NewCommissionService(commissionRepo, agentProvider, executor, &mockTransactor{})
 	return service, commissionRepo, executor
 }
 

@@ -12,16 +12,19 @@ import (
 type TomeServiceImpl struct {
 	tomeRepo    secondary.TomeRepository
 	noteService primary.NoteService
+	transactor  secondary.Transactor
 }
 
 // NewTomeService creates a new TomeService with injected dependencies.
 func NewTomeService(
 	tomeRepo secondary.TomeRepository,
 	noteService primary.NoteService,
+	transactor secondary.Transactor,
 ) *TomeServiceImpl {
 	return &TomeServiceImpl{
 		tomeRepo:    tomeRepo,
 		noteService: noteService,
+		transactor:  transactor,
 	}
 }
 
@@ -36,23 +39,31 @@ func (s *TomeServiceImpl) CreateTome(ctx context.Context, req primary.CreateTome
 		return nil, fmt.Errorf("commission %s not found", req.CommissionID)
 	}
 
-	// Get next ID
-	nextID, err := s.tomeRepo.GetNextID(ctx)
+	var nextID string
+	err = s.transactor.WithImmediateTx(ctx, func(txCtx context.Context) error {
+		// Get next ID
+		var err error
+		nextID, err = s.tomeRepo.GetNextID(txCtx)
+		if err != nil {
+			return fmt.Errorf("failed to generate tome ID: %w", err)
+		}
+
+		// Create record - tomes go directly under commissions
+		record := &secondary.TomeRecord{
+			ID:           nextID,
+			CommissionID: req.CommissionID,
+			Title:        req.Title,
+			Description:  req.Description,
+			Status:       "open",
+		}
+
+		if err := s.tomeRepo.Create(txCtx, record); err != nil {
+			return fmt.Errorf("failed to create tome: %w", err)
+		}
+		return nil
+	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate tome ID: %w", err)
-	}
-
-	// Create record - tomes go directly under commissions
-	record := &secondary.TomeRecord{
-		ID:           nextID,
-		CommissionID: req.CommissionID,
-		Title:        req.Title,
-		Description:  req.Description,
-		Status:       "open",
-	}
-
-	if err := s.tomeRepo.Create(ctx, record); err != nil {
-		return nil, fmt.Errorf("failed to create tome: %w", err)
+		return nil, err
 	}
 
 	// Fetch created tome

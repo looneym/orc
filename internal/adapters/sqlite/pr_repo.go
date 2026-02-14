@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/example/orc/internal/db"
 	"github.com/example/orc/internal/ports/secondary"
 )
 
@@ -18,6 +19,14 @@ type PRRepository struct {
 // NewPRRepository creates a new SQLite PR repository.
 func NewPRRepository(db *sql.DB) *PRRepository {
 	return &PRRepository{db: db}
+}
+
+// conn returns the context-carried transaction if present, otherwise r.db.
+func (r *PRRepository) conn(ctx context.Context) db.DBTX {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
+	return r.db
 }
 
 // Create persists a new pull request.
@@ -43,7 +52,7 @@ func (r *PRRepository) Create(ctx context.Context, pr *secondary.PRRecord) error
 		status = "open"
 	}
 
-	_, err := r.db.ExecContext(ctx,
+	_, err := r.conn(ctx).ExecContext(ctx,
 		`INSERT INTO prs (id, shipment_id, repo_id, commission_id, number, title, description, branch, target_branch, url, status)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		pr.ID, pr.ShipmentID, pr.RepoID, pr.CommissionID, number, pr.Title, description, pr.Branch, targetBranch, url, status,
@@ -284,7 +293,7 @@ func (r *PRRepository) Delete(ctx context.Context, id string) error {
 // GetNextID returns the next available PR ID.
 func (r *PRRepository) GetNextID(ctx context.Context) (string, error) {
 	var maxID int
-	err := r.db.QueryRowContext(ctx,
+	err := r.conn(ctx).QueryRowContext(ctx,
 		"SELECT COALESCE(MAX(CAST(SUBSTR(id, 4) AS INTEGER)), 0) FROM prs",
 	).Scan(&maxID)
 	if err != nil {

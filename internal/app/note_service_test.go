@@ -187,7 +187,7 @@ func (m *mockNoteRepository) CloseWithReason(ctx context.Context, id, reason, by
 
 func newTestNoteService() (*NoteServiceImpl, *mockNoteRepository) {
 	noteRepo := newMockNoteRepository()
-	service := NewNoteService(noteRepo)
+	service := NewNoteService(noteRepo, &mockTransactor{})
 	return service, noteRepo
 }
 
@@ -544,7 +544,7 @@ func TestGetNotesByContainer_Tome(t *testing.T) {
 
 func TestSetNoteInFlight_Success(t *testing.T) {
 	noteRepo := newMockNoteRepository()
-	service := NewNoteService(noteRepo)
+	service := NewNoteService(noteRepo, &mockTransactor{})
 	ctx := context.Background()
 
 	// Create an open note
@@ -570,7 +570,7 @@ func TestSetNoteInFlight_Success(t *testing.T) {
 
 func TestSetNoteInFlight_AlreadyClosed(t *testing.T) {
 	noteRepo := newMockNoteRepository()
-	service := NewNoteService(noteRepo)
+	service := NewNoteService(noteRepo, &mockTransactor{})
 	ctx := context.Background()
 
 	// Create a closed note
@@ -591,7 +591,7 @@ func TestSetNoteInFlight_AlreadyClosed(t *testing.T) {
 
 func TestSetNoteInFlight_AlreadyInFlight(t *testing.T) {
 	noteRepo := newMockNoteRepository()
-	service := NewNoteService(noteRepo)
+	service := NewNoteService(noteRepo, &mockTransactor{})
 	ctx := context.Background()
 
 	// Create an in_flight note
@@ -612,7 +612,7 @@ func TestSetNoteInFlight_AlreadyInFlight(t *testing.T) {
 
 func TestSetNoteInFlight_NotFound(t *testing.T) {
 	noteRepo := newMockNoteRepository()
-	service := NewNoteService(noteRepo)
+	service := NewNoteService(noteRepo, &mockTransactor{})
 	ctx := context.Background()
 
 	err := service.SetNoteInFlight(ctx, "NOTE-999")

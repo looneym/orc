@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/example/orc/internal/db"
 	"github.com/example/orc/internal/ports/secondary"
 )
 
@@ -18,6 +19,14 @@ type RepoRepository struct {
 // NewRepoRepository creates a new SQLite repository repository.
 func NewRepoRepository(db *sql.DB) *RepoRepository {
 	return &RepoRepository{db: db}
+}
+
+// conn returns the context-carried transaction if present, otherwise r.db.
+func (r *RepoRepository) conn(ctx context.Context) db.DBTX {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
+	return r.db
 }
 
 // Create persists a new repository.
@@ -36,7 +45,7 @@ func (r *RepoRepository) Create(ctx context.Context, repo *secondary.RepoRecord)
 		defaultBranch = "main"
 	}
 
-	_, err := r.db.ExecContext(ctx,
+	_, err := r.conn(ctx).ExecContext(ctx,
 		"INSERT INTO repos (id, name, url, local_path, default_branch, status) VALUES (?, ?, ?, ?, ?, ?)",
 		repo.ID, repo.Name, url, localPath, defaultBranch, "active",
 	)
@@ -217,7 +226,7 @@ func (r *RepoRepository) Delete(ctx context.Context, id string) error {
 // GetNextID returns the next available repository ID.
 func (r *RepoRepository) GetNextID(ctx context.Context) (string, error) {
 	var maxID int
-	err := r.db.QueryRowContext(ctx,
+	err := r.conn(ctx).QueryRowContext(ctx,
 		"SELECT COALESCE(MAX(CAST(SUBSTR(id, 6) AS INTEGER)), 0) FROM repos",
 	).Scan(&maxID)
 	if err != nil {

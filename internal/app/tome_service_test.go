@@ -259,7 +259,7 @@ func (m *mockNoteServiceForTome) SetNoteInFlight(ctx context.Context, noteID str
 func newTestTomeService() (*TomeServiceImpl, *mockTomeRepository, *mockNoteServiceForTome) {
 	tomeRepo := newMockTomeRepository()
 	noteService := newMockNoteServiceForTome()
-	service := NewTomeService(tomeRepo, noteService)
+	service := NewTomeService(tomeRepo, noteService, &mockTransactor{})
 	return service, tomeRepo, noteService
 }
 

@@ -6,6 +6,16 @@ import (
 	"github.com/example/orc/internal/ports/secondary"
 )
 
+// mockTransactor implements secondary.Transactor for testing.
+// It simply executes the function directly without any transaction wrapping.
+type mockTransactor struct{}
+
+func (m *mockTransactor) WithImmediateTx(ctx context.Context, fn func(ctx context.Context) error) error {
+	return fn(ctx)
+}
+
+var _ secondary.Transactor = (*mockTransactor)(nil)
+
 // Ensure mockWorkspaceAdapter implements the interface
 var _ secondary.WorkspaceAdapter = (*mockWorkspaceAdapter)(nil)
 

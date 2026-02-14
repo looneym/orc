@@ -105,7 +105,7 @@ func TestRepoService_CreateRepo(t *testing.T) {
 
 	t.Run("creates repository with valid name", func(t *testing.T) {
 		repo := newMockRepoRepository()
-		svc := NewRepoService(repo)
+		svc := NewRepoService(repo, &mockTransactor{})
 
 		resp, err := svc.CreateRepo(ctx, primary.CreateRepoRequest{
 			Name:          "my-repo",
@@ -126,7 +126,7 @@ func TestRepoService_CreateRepo(t *testing.T) {
 
 	t.Run("fails with empty name", func(t *testing.T) {
 		repo := newMockRepoRepository()
-		svc := NewRepoService(repo)
+		svc := NewRepoService(repo, &mockTransactor{})
 
 		_, err := svc.CreateRepo(ctx, primary.CreateRepoRequest{
 			Name: "",
@@ -139,7 +139,7 @@ func TestRepoService_CreateRepo(t *testing.T) {
 
 	t.Run("fails with duplicate name", func(t *testing.T) {
 		repo := newMockRepoRepository()
-		svc := NewRepoService(repo)
+		svc := NewRepoService(repo, &mockTransactor{})
 
 		// Create first repo
 		_, err := svc.CreateRepo(ctx, primary.CreateRepoRequest{Name: "duplicate"})
@@ -156,7 +156,7 @@ func TestRepoService_CreateRepo(t *testing.T) {
 
 	t.Run("uses default branch when not specified", func(t *testing.T) {
 		repo := newMockRepoRepository()
-		svc := NewRepoService(repo)
+		svc := NewRepoService(repo, &mockTransactor{})
 
 		resp, err := svc.CreateRepo(ctx, primary.CreateRepoRequest{
 			Name: "no-branch",
@@ -176,7 +176,7 @@ func TestRepoService_ArchiveRepo(t *testing.T) {
 
 	t.Run("archives active repository", func(t *testing.T) {
 		repo := newMockRepoRepository()
-		svc := NewRepoService(repo)
+		svc := NewRepoService(repo, &mockTransactor{})
 
 		// Create a repo
 		resp, _ := svc.CreateRepo(ctx, primary.CreateRepoRequest{Name: "to-archive"})
@@ -195,7 +195,7 @@ func TestRepoService_ArchiveRepo(t *testing.T) {
 
 	t.Run("fails to archive already archived repository", func(t *testing.T) {
 		repo := newMockRepoRepository()
-		svc := NewRepoService(repo)
+		svc := NewRepoService(repo, &mockTransactor{})
 
 		// Create and archive a repo
 		resp, _ := svc.CreateRepo(ctx, primary.CreateRepoRequest{Name: "already-archived"})
@@ -214,7 +214,7 @@ func TestRepoService_RestoreRepo(t *testing.T) {
 
 	t.Run("restores archived repository", func(t *testing.T) {
 		repo := newMockRepoRepository()
-		svc := NewRepoService(repo)
+		svc := NewRepoService(repo, &mockTransactor{})
 
 		// Create and archive a repo
 		resp, _ := svc.CreateRepo(ctx, primary.CreateRepoRequest{Name: "to-restore"})
@@ -234,7 +234,7 @@ func TestRepoService_RestoreRepo(t *testing.T) {
 
 	t.Run("fails to restore active repository", func(t *testing.T) {
 		repo := newMockRepoRepository()
-		svc := NewRepoService(repo)
+		svc := NewRepoService(repo, &mockTransactor{})
 
 		// Create a repo (starts as active)
 		resp, _ := svc.CreateRepo(ctx, primary.CreateRepoRequest{Name: "already-active"})
@@ -252,7 +252,7 @@ func TestRepoService_DeleteRepo(t *testing.T) {
 	t.Run("deletes repository with no active PRs", func(t *testing.T) {
 		repo := newMockRepoRepository()
 		repo.hasActivePRs = false
-		svc := NewRepoService(repo)
+		svc := NewRepoService(repo, &mockTransactor{})
 
 		// Create a repo
 		resp, _ := svc.CreateRepo(ctx, primary.CreateRepoRequest{Name: "to-delete"})
@@ -266,7 +266,7 @@ func TestRepoService_DeleteRepo(t *testing.T) {
 	t.Run("fails to delete repository with active PRs", func(t *testing.T) {
 		repo := newMockRepoRepository()
 		repo.hasActivePRs = true
-		svc := NewRepoService(repo)
+		svc := NewRepoService(repo, &mockTransactor{})
 
 		// Create a repo
 		resp, _ := svc.CreateRepo(ctx, primary.CreateRepoRequest{Name: "has-prs"})
@@ -283,7 +283,7 @@ func TestRepoService_GetRepoByName(t *testing.T) {
 
 	t.Run("finds repository by name", func(t *testing.T) {
 		repo := newMockRepoRepository()
-		svc := NewRepoService(repo)
+		svc := NewRepoService(repo, &mockTransactor{})
 
 		// Create a repo
 		_, _ = svc.CreateRepo(ctx, primary.CreateRepoRequest{Name: "find-me"})
@@ -299,7 +299,7 @@ func TestRepoService_GetRepoByName(t *testing.T) {
 
 	t.Run("returns error for non-existent name", func(t *testing.T) {
 		repo := newMockRepoRepository()
-		svc := NewRepoService(repo)
+		svc := NewRepoService(repo, &mockTransactor{})
 
 		_, err := svc.GetRepoByName(ctx, "non-existent")
 		if err == nil {

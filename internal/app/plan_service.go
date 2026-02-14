@@ -11,13 +11,15 @@ import (
 
 // PlanServiceImpl implements the PlanService interface.
 type PlanServiceImpl struct {
-	planRepo secondary.PlanRepository
+	planRepo   secondary.PlanRepository
+	transactor secondary.Transactor
 }
 
 // NewPlanService creates a new PlanService with injected dependencies.
-func NewPlanService(planRepo secondary.PlanRepository) *PlanServiceImpl {
+func NewPlanService(planRepo secondary.PlanRepository, transactor secondary.Transactor) *PlanServiceImpl {
 	return &PlanServiceImpl{
-		planRepo: planRepo,
+		planRepo:   planRepo,
+		transactor: transactor,
 	}
 }
 
@@ -50,25 +52,33 @@ func (s *PlanServiceImpl) CreatePlan(ctx context.Context, req primary.CreatePlan
 		return nil, fmt.Errorf("task %s already has an active plan", req.TaskID)
 	}
 
-	// Get next ID
-	nextID, err := s.planRepo.GetNextID(ctx)
+	var nextID string
+	err = s.transactor.WithImmediateTx(ctx, func(txCtx context.Context) error {
+		// Get next ID
+		var err error
+		nextID, err = s.planRepo.GetNextID(txCtx)
+		if err != nil {
+			return fmt.Errorf("failed to generate plan ID: %w", err)
+		}
+
+		// Create record
+		record := &secondary.PlanRecord{
+			ID:           nextID,
+			CommissionID: req.CommissionID,
+			TaskID:       req.TaskID,
+			Title:        req.Title,
+			Description:  req.Description,
+			Content:      req.Content,
+			Status:       "draft",
+		}
+
+		if err := s.planRepo.Create(txCtx, record); err != nil {
+			return fmt.Errorf("failed to create plan: %w", err)
+		}
+		return nil
+	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate plan ID: %w", err)
-	}
-
-	// Create record
-	record := &secondary.PlanRecord{
-		ID:           nextID,
-		CommissionID: req.CommissionID,
-		TaskID:       req.TaskID,
-		Title:        req.Title,
-		Description:  req.Description,
-		Content:      req.Content,
-		Status:       "draft",
-	}
-
-	if err := s.planRepo.Create(ctx, record); err != nil {
-		return nil, fmt.Errorf("failed to create plan: %w", err)
+		return nil, err
 	}
 
 	// Fetch created plan

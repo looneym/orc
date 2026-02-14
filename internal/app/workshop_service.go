@@ -24,6 +24,7 @@ type WorkshopServiceImpl struct {
 	tmuxAdapter      secondary.TMuxAdapter
 	workspaceAdapter secondary.WorkspaceAdapter
 	executor         EffectExecutor
+	transactor       secondary.Transactor
 }
 
 // NewWorkshopService creates a new WorkshopService with injected dependencies.
@@ -35,6 +36,7 @@ func NewWorkshopService(
 	tmuxAdapter secondary.TMuxAdapter,
 	workspaceAdapter secondary.WorkspaceAdapter,
 	executor EffectExecutor,
+	transactor secondary.Transactor,
 ) *WorkshopServiceImpl {
 	return &WorkshopServiceImpl{
 		factoryRepo:      factoryRepo,
@@ -44,6 +46,7 @@ func NewWorkshopService(
 		tmuxAdapter:      tmuxAdapter,
 		workspaceAdapter: workspaceAdapter,
 		executor:         executor,
+		transactor:       transactor,
 	}
 }
 
@@ -79,8 +82,14 @@ func (s *WorkshopServiceImpl) CreateWorkshop(ctx context.Context, req primary.Cr
 		Name:      req.Name, // May be empty - repo will use name pool
 		Status:    "active",
 	}
-	if err := s.workshopRepo.Create(ctx, record); err != nil {
-		return nil, fmt.Errorf("failed to create workshop: %w", err)
+	err = s.transactor.WithImmediateTx(ctx, func(txCtx context.Context) error {
+		if err := s.workshopRepo.Create(txCtx, record); err != nil {
+			return fmt.Errorf("failed to create workshop: %w", err)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 
 	return &primary.CreateWorkshopResponse{
@@ -98,18 +107,25 @@ func (s *WorkshopServiceImpl) getOrCreateDefaultFactory(ctx context.Context) (*s
 	}
 
 	// Create default factory
-	id, err := s.factoryRepo.GetNextID(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate factory ID: %w", err)
-	}
+	var record *secondary.FactoryRecord
+	err = s.transactor.WithImmediateTx(ctx, func(txCtx context.Context) error {
+		id, err := s.factoryRepo.GetNextID(txCtx)
+		if err != nil {
+			return fmt.Errorf("failed to generate factory ID: %w", err)
+		}
 
-	record := &secondary.FactoryRecord{
-		ID:     id,
-		Name:   "default",
-		Status: "active",
-	}
-	if err := s.factoryRepo.Create(ctx, record); err != nil {
-		return nil, fmt.Errorf("failed to create default factory: %w", err)
+		record = &secondary.FactoryRecord{
+			ID:     id,
+			Name:   "default",
+			Status: "active",
+		}
+		if err := s.factoryRepo.Create(txCtx, record); err != nil {
+			return fmt.Errorf("failed to create default factory: %w", err)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 
 	return record, nil
