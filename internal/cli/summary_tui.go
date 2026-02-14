@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"fmt"
 	"math/rand/v2"
 	"os"
@@ -13,6 +14,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
+
+	"github.com/example/orc/internal/ports/secondary"
 )
 
 // clearStatusMsg is sent after a timer to auto-clear transient status messages.
@@ -47,8 +50,9 @@ type parsedLine struct {
 
 // summaryModel is the Bubble Tea model for the interactive summary TUI.
 type summaryModel struct {
-	cmd  *cobra.Command
-	opts summaryOpts
+	cmd         *cobra.Command
+	opts        summaryOpts
+	eventWriter secondary.EventWriter
 
 	// Parsed lines from rendered content
 	lines []parsedLine
@@ -144,10 +148,11 @@ var statusMsgStyle = lipgloss.NewStyle().
 	Bold(true)
 
 // runSummaryTUI launches the interactive Bubble Tea TUI for summary.
-func runSummaryTUI(cmd *cobra.Command, opts summaryOpts) error {
+func runSummaryTUI(cmd *cobra.Command, opts summaryOpts, eventWriter secondary.EventWriter) error {
 	m := summaryModel{
 		cmd:            cmd,
 		opts:           opts,
+		eventWriter:    eventWriter,
 		expanded:       make(map[string]bool),
 		isUtilsSession: isInsideUtilsSession(),
 		animRand:       rand.New(rand.NewPCG(uint64(time.Now().UnixNano()), 0)),
@@ -156,6 +161,15 @@ func runSummaryTUI(cmd *cobra.Command, opts summaryOpts) error {
 	p := tea.NewProgram(m, tea.WithAltScreen())
 	_, err := p.Run()
 	return err
+}
+
+// emitEvent emits an operational event from the summary TUI.
+// Errors are silently ignored — event emission should never disrupt the UI.
+func (m summaryModel) emitEvent(level, message string, data map[string]string) {
+	if m.eventWriter == nil {
+		return
+	}
+	_ = m.eventWriter.EmitOperational(context.Background(), "summary-tui", level, message, data)
 }
 
 // Init returns the initial command to fetch summary data.
@@ -679,7 +693,7 @@ func (m summaryModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tuiExecMsg:
 		// Launch vim with temp vimrc for backslash-quit binding
-		c := exec.Command("vim", "-R", "-u", msg.vimrcPath, msg.tmpPath)
+		c := exec.Command("vim", "-R", "-N", "-u", msg.vimrcPath, msg.tmpPath)
 		tmpPath := msg.tmpPath
 		vimrcPath := msg.vimrcPath
 		return m, tea.ExecProcess(c, func(err error) tea.Msg {
@@ -719,6 +733,7 @@ func (m summaryModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		switch msg.String() {
 		case "q", "ctrl+c", "esc":
+			m.emitEvent("info", "tui closed", map[string]string{"action": "quit", "key": msg.String()})
 			if m.isUtilsSession {
 				detachUtilsSession()
 			}
@@ -744,6 +759,11 @@ func (m summaryModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			entityID := m.cursorEntityID()
 			if entityID != "" && isExpandable(entityID) {
 				m.expanded[entityID] = !m.expanded[entityID]
+				action := "collapse"
+				if m.expanded[entityID] {
+					action = "expand"
+				}
+				m.emitEvent("debug", action, map[string]string{"action": action, "entity_id": entityID})
 				m.viewport.SetContent(m.renderContent())
 				m.ensureCursorVisible()
 			}
@@ -752,6 +772,7 @@ func (m summaryModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "y":
 			entityID := m.cursorEntityID()
 			if entityID != "" {
+				m.emitEvent("info", "yank", map[string]string{"action": "yank", "entity_id": entityID})
 				return m, yankToClipboard(entityID)
 			}
 			return m, nil
@@ -759,6 +780,7 @@ func (m summaryModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "f":
 			entityID := m.cursorEntityID()
 			if entityID != "" && isFocusable(entityID) {
+				m.emitEvent("info", "focus", map[string]string{"action": "focus", "entity_id": entityID})
 				cmd := setStatusMsg(&m, fmt.Sprintf("Focusing %s...", entityID))
 				_ = cmd // timer will fire but fetchSummary will also run
 				return m, focusEntity(entityID)
@@ -768,17 +790,20 @@ func (m summaryModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "o":
 			entityID := m.cursorEntityID()
 			if entityID != "" {
+				m.emitEvent("info", "vim open", map[string]string{"action": "open", "entity_id": entityID})
 				return m, m.openInVim(entityID)
 			}
 			return m, nil
 
 		case "r":
+			m.emitEvent("info", "refresh", map[string]string{"action": "refresh"})
 			// Start starfield animation, then refresh with fresh data
 			return m, m.startAnimation()
 
 		case "c":
 			entityID := m.cursorEntityID()
 			if entityID != "" && isCloseable(entityID) {
+				m.emitEvent("info", "close", map[string]string{"action": "close", "entity_id": entityID})
 				m.confirming = true
 				m.confirmEntityID = entityID
 				m.statusMsg = fmt.Sprintf("Close %s? [y/n]", entityID)
@@ -789,6 +814,7 @@ func (m summaryModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.isUtilsSession {
 				entityID := m.cursorEntityID()
 				if entityID != "" {
+					m.emitEvent("info", "goblin send", map[string]string{"action": "goblin", "entity_id": entityID})
 					return m, sendToGoblin(entityID)
 				}
 			}

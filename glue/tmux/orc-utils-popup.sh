@@ -33,6 +33,7 @@ if ! tmux -L "$SOCKET" has-session -t "$SESSION" 2>/dev/null; then
 
     # Mark this as a utils session so orc summary --tui can detect it
     tmux -L "$SOCKET" set-environment -t "$SESSION" ORC_UTILS_SESSION 1
+    tmux -L "$SOCKET" set-environment -t "$SESSION" ORC_BENCH_NAME "$BENCH_NAME"
 
     # Any click/double-click on status bar inside utils → detach (closes popup)
     tmux -L "$SOCKET" bind-key -T root DoubleClick1Status detach-client

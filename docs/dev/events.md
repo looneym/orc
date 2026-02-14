@@ -58,6 +58,7 @@ Defined in `internal/core/event/sources.go`:
 | `SourceTmuxApply` | `tmux-apply` | TMux session lifecycle |
 | `SourceDeployGlue` | `deploy-glue` | Glue deployment traces |
 | `SourceWorkbench` | `workbench` | Workbench operations |
+| `SourceSummaryTUI` | `summary-tui` | Interactive summary TUI key actions |
 
 **When to add new sources**: If you're implementing a new subsystem or mode that warrants isolated filtering, add a new source constant. Sources enable targeted debugging (e.g., `orc events tail --source poll`).
 

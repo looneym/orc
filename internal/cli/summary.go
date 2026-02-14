@@ -107,7 +107,7 @@ Examples:
 				if !term.IsTerminal(fd) {
 					return fmt.Errorf("--tui requires a TTY (interactive terminal)")
 				}
-				return runSummaryTUI(cmd, opts)
+				return runSummaryTUI(cmd, opts, wire.EventWriter())
 			}
 			output, err := runSummaryOnce(cmd, opts)
 			if err != nil {

@@ -11,6 +11,7 @@ const (
 	SourceTmuxApply  = "tmux-apply"
 	SourceDeployGlue = "deploy-glue"
 	SourceWorkbench  = "workbench"
+	SourceSummaryTUI = "summary-tui"
 )
 
 // Level constants for operational events.
