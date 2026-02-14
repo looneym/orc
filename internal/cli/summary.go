@@ -69,6 +69,7 @@ type summaryOpts struct {
 	debugMode            bool
 	expandAllCommissions bool
 	tuiMode              bool
+	focusedEntityID      string // entity ID currently focused (for TUI auto-expand)
 }
 
 // SummaryCmd returns the summary command
@@ -107,6 +108,10 @@ Examples:
 				if !term.IsTerminal(fd) {
 					return fmt.Errorf("--tui requires a TTY (interactive terminal)")
 				}
+				// Get focused entity for TUI auto-expand
+				cwd, _ := os.Getwd()
+				cfg, _ := MigrateGoblinConfigIfNeeded(cmd.Context(), cwd)
+				opts.focusedEntityID = GetCurrentFocus(cfg)
 				return runSummaryTUI(cmd, opts, wire.EventWriter())
 			}
 			output, err := runSummaryOnce(cmd, opts)

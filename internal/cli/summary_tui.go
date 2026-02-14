@@ -285,11 +285,13 @@ func (m *summaryModel) initExpandState() {
 		if !isExpandable(entityID) {
 			continue
 		}
-		// If not yet in the map, set default: COMM entities expanded, others
-		// expanded if they have children that are already visible (i.e., the
-		// summary server chose to expand them, meaning they are focused).
+		// If not yet in the map, set default: COMM entities and the focused
+		// entity are expanded; others expanded if children are already visible
+		// (i.e., the summary server chose to expand them).
 		if _, exists := m.expanded[entityID]; !exists {
 			if entityPrefix(entityID) == "COMM" {
+				m.expanded[entityID] = true
+			} else if entityID == m.opts.focusedEntityID {
 				m.expanded[entityID] = true
 			} else {
 				// Check if this entity has children rendered (next entity has greater depth)
@@ -350,6 +352,21 @@ func (m *summaryModel) ensureCursorVisible() {
 	} else if visibleIdx >= m.viewport.YOffset+m.viewport.Height {
 		m.viewport.SetYOffset(visibleIdx - m.viewport.Height + 1)
 	}
+}
+
+// nextVisibleCursor finds the next visible entity index in the given direction.
+// direction should be +1 (down) or -1 (up). Returns the current cursor if no
+// visible entity exists in that direction.
+func (m summaryModel) nextVisibleCursor(direction int) int {
+	hidden := m.hiddenLines()
+	candidate := m.cursor + direction
+	for candidate >= 0 && candidate < len(m.entityIndices) {
+		if !hidden[m.entityIndices[candidate]] {
+			return candidate
+		}
+		candidate += direction
+	}
+	return m.cursor
 }
 
 // entityPrefix returns the prefix part of an entity ID (e.g., "SHIP" from "SHIP-412").
@@ -699,6 +716,18 @@ func (m summaryModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.cursor < 0 {
 				m.cursor = 0
 			}
+			// Ensure cursor is on a visible (non-hidden) entity
+			if m.cursor >= 0 && m.cursor < len(m.entityIndices) {
+				hidden := m.hiddenLines()
+				if hidden[m.entityIndices[m.cursor]] {
+					// Try moving up to find a visible entity, then down
+					next := m.nextVisibleCursor(-1)
+					if next == m.cursor {
+						next = m.nextVisibleCursor(1)
+					}
+					m.cursor = next
+				}
+			}
 			if m.ready {
 				m.viewport.SetContent(m.renderContent())
 				m.ensureCursorVisible()
@@ -789,22 +818,24 @@ func (m summaryModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 
 		case "j", "down":
-			if m.cursor < len(m.entityIndices)-1 {
-				m.cursor++
+			next := m.nextVisibleCursor(1)
+			if next != m.cursor {
+				m.cursor = next
 				m.viewport.SetContent(m.renderContent())
 				m.ensureCursorVisible()
 			}
 			return m, nil
 
 		case "k", "up":
-			if m.cursor > 0 {
-				m.cursor--
+			next := m.nextVisibleCursor(-1)
+			if next != m.cursor {
+				m.cursor = next
 				m.viewport.SetContent(m.renderContent())
 				m.ensureCursorVisible()
 			}
 			return m, nil
 
-		case "enter":
+		case "enter", "l":
 			entityID := m.cursorEntityID()
 			if entityID != "" && isExpandable(entityID) {
 				m.expanded[entityID] = !m.expanded[entityID]
@@ -1036,7 +1067,7 @@ func (m summaryModel) renderStatusBar() string {
 		formatHint("c", "close", entityHasAction(entityID, "close")) + "  " +
 		formatHint("g", "goblin", m.isUtilsSession && entityHasAction(entityID, "goblin")) + "  " +
 		formatHint("r", "refresh", true) + "  " +
-		formatHint("enter", "expand", true) + "  " +
+		formatHint("l", "expand", true) + "  " +
 		formatHint("q", "quit", true)
 
 	return statusBarStyle.Width(m.width).Render(hints)
