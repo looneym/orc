@@ -353,8 +353,8 @@ func renderWorkshopBenches(w *strings.Builder, workshopID, currentWorkbenchID st
 			prefix = "└── "
 		}
 
-		// Build workbench line with optional focus indicator
-		line := fmt.Sprintf("👹 %s", wb.Name)
+		// Build workbench line: BENCH-xxx ID first so the TUI entity parser picks it up
+		line := fmt.Sprintf("%s 👹 %s", color.New(color.FgHiBlack).Sprint(wb.ID), wb.Name)
 		if wb.ID == currentWorkbenchID {
 			line = color.New(color.FgHiMagenta).Sprint(line)
 		}

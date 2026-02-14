@@ -63,6 +63,19 @@ When adding a new entity that requires persistence (e.g., CycleWorkOrder):
 
 **Hard rule:** Repository tests are NOT optional. Every `*_repo.go` MUST have a corresponding `*_repo_test.go`.
 
+## Add TUI Action
+
+When adding a new action to the summary TUI (e.g., adding "archive" for shipments):
+
+- [ ] Add action to `entityActionMatrix` in `summary_tui.go` for each eligible entity type
+- [ ] Add key handler in the `Update` switch block — guard with `entityHasAction(id, "action")`
+- [ ] Add status bar hint in `renderStatusBar` — use `formatHint("key", "label", entityHasAction(...))`
+- [ ] Add action to `allActions` slice in `TestEntityActionMatrixCompleteness`
+- [ ] Update the matrix table in `docs/dev/tui.md`
+- [ ] Run: `make test && make lint`
+
+See [docs/dev/tui.md](tui.md) for full entity-action matrix and key reference.
+
 ## Emit Operational Events
 
 When adding operational event emission to a new subsystem:

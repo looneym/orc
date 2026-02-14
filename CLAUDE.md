@@ -33,7 +33,7 @@ ORC uses two databases. `orc` (installed) hits production (`~/.orc/orc.db`). `or
 
 ## Pre-Commit Checks (Enforced by Hook)
 
-All commits must pass `make lint` (check-test-presence, check-coverage, schema-check, check-skills, golangci-lint, go-arch-lint). Emergency bypass: `git commit --no-verify` (audited). Before merging to master, run `/docs-doctor`. See [docs/dev/git-hooks.md](docs/dev/git-hooks.md) for full details on what each hook checks and why.
+All commits must pass `make lint` (check-test-presence, check-coverage, schema-check, check-skills, check-tui-actions, golangci-lint, go-arch-lint). Emergency bypass: `git commit --no-verify` (audited). Before merging to master, run `/docs-doctor`. See [docs/dev/git-hooks.md](docs/dev/git-hooks.md) for full details on what each hook checks and why.
 
 ## Architecture Boundaries
 
@@ -57,6 +57,8 @@ Run `make lint` to verify. See [docs/architecture.md](docs/architecture.md) for 
 - Calling tmux directly from app (use a port; adapter executes tmux)
 - Claiming checks passed without running them (run and report explicitly)
 - Running Atlas commands manually (use Makefile targets: `make schema-diff`, `make schema-apply`)
+- Adding a TUI action without updating `entityActionMatrix` (the matrix is the single source of truth for entity-action eligibility — see [docs/dev/tui.md](docs/dev/tui.md))
+- Using standalone boolean gate functions instead of `entityHasAction(id, "action")` for TUI keybind guards
 
 ## Shipment & Task Lifecycles
 
@@ -77,6 +79,7 @@ See [docs/common-workflows.md](docs/common-workflows.md).
 - [docs/dev/deployment.md](docs/dev/deployment.md) -- Deployment workflow and checks
 - [docs/dev/glue.md](docs/dev/glue.md) -- Skills and hooks system
 - [docs/dev/events.md](docs/dev/events.md) -- Event system — operational events, debugging with orc events
+- [docs/dev/tui.md](docs/dev/tui.md) -- TUI entity-action matrix, key bindings, how to extend
 
 ### General
 - [docs/getting-started.md](docs/getting-started.md) -- Setup and first-run

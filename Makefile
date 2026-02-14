@@ -1,4 +1,4 @@
-.PHONY: install install-orc install-dev-shim dev build test lint lint-fix schema-check check-test-presence check-coverage check-skills init install-hooks clean help deploy-glue schema-diff schema-apply schema-inspect setup-workbench schema-diff-workbench schema-apply-workbench bootstrap bootstrap-dev bootstrap-test bootstrap-shell uninstall
+.PHONY: install install-orc install-dev-shim dev build test lint lint-fix schema-check check-test-presence check-coverage check-skills check-tui-actions init install-hooks clean help deploy-glue schema-diff schema-apply schema-inspect setup-workbench schema-diff-workbench schema-apply-workbench bootstrap bootstrap-dev bootstrap-test bootstrap-shell uninstall
 
 # Go binary location (handles empty GOBIN)
 GOBIN := $(shell go env GOPATH)/bin
@@ -89,8 +89,8 @@ test:
 # Linting
 #---------------------------------------------------------------------------
 
-# Run all linters (golangci-lint + architecture + schema-check + test checks + skills)
-lint: schema-check check-test-presence check-coverage check-skills
+# Run all linters (golangci-lint + architecture + schema-check + test checks + skills + TUI actions)
+lint: schema-check check-test-presence check-coverage check-skills check-tui-actions
 	@echo "Running golangci-lint..."
 	@command -v golangci-lint >/dev/null 2>&1 || { echo "golangci-lint not installed. Run: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest"; exit 1; }
 	@golangci-lint run ./...
@@ -131,6 +131,10 @@ check-coverage:
 # Check skills have valid frontmatter and are documented
 check-skills:
 	@./scripts/check-skills.sh
+
+# Check TUI entity-action matrix consistency (handlers, hints, docs)
+check-tui-actions:
+	@./scripts/check-tui-actions.sh
 
 # Run golangci-lint with auto-fix
 lint-fix:
