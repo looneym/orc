@@ -11,13 +11,15 @@ import (
 
 // RepoServiceImpl implements the RepoService interface.
 type RepoServiceImpl struct {
-	repoRepo secondary.RepoRepository
+	repoRepo   secondary.RepoRepository
+	transactor secondary.Transactor
 }
 
 // NewRepoService creates a new RepoService with injected dependencies.
-func NewRepoService(repoRepo secondary.RepoRepository) *RepoServiceImpl {
+func NewRepoService(repoRepo secondary.RepoRepository, transactor secondary.Transactor) *RepoServiceImpl {
 	return &RepoServiceImpl{
-		repoRepo: repoRepo,
+		repoRepo:   repoRepo,
+		transactor: transactor,
 	}
 }
 
@@ -38,29 +40,37 @@ func (s *RepoServiceImpl) CreateRepo(ctx context.Context, req primary.CreateRepo
 		return nil, err
 	}
 
-	// Get next ID
-	nextID, err := s.repoRepo.GetNextID(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate repository ID: %w", err)
-	}
-
 	// Set default branch
 	defaultBranch := req.DefaultBranch
 	if defaultBranch == "" {
 		defaultBranch = "main"
 	}
 
-	// Build record
-	record := &secondary.RepoRecord{
-		ID:            nextID,
-		Name:          req.Name,
-		URL:           req.URL,
-		LocalPath:     req.LocalPath,
-		DefaultBranch: defaultBranch,
-	}
+	var nextID string
+	err = s.transactor.WithImmediateTx(ctx, func(txCtx context.Context) error {
+		// Get next ID
+		var err error
+		nextID, err = s.repoRepo.GetNextID(txCtx)
+		if err != nil {
+			return fmt.Errorf("failed to generate repository ID: %w", err)
+		}
 
-	if err := s.repoRepo.Create(ctx, record); err != nil {
-		return nil, fmt.Errorf("failed to create repository: %w", err)
+		// Build record
+		record := &secondary.RepoRecord{
+			ID:            nextID,
+			Name:          req.Name,
+			URL:           req.URL,
+			LocalPath:     req.LocalPath,
+			DefaultBranch: defaultBranch,
+		}
+
+		if err := s.repoRepo.Create(txCtx, record); err != nil {
+			return fmt.Errorf("failed to create repository: %w", err)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 
 	// Fetch created repository

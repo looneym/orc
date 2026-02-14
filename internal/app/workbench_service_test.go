@@ -313,7 +313,7 @@ func newTestWorkbenchService() (*WorkbenchServiceImpl, *mockWorkbenchRepository,
 	executor := newMockEffectExecutor()
 	workspaceAdapter := newMockWorkspaceAdapter()
 
-	service := NewWorkbenchService(workbenchRepo, workshopRepo, repoRepo, agentProvider, executor, workspaceAdapter)
+	service := NewWorkbenchService(workbenchRepo, workshopRepo, repoRepo, agentProvider, executor, workspaceAdapter, &mockTransactor{})
 	return service, workbenchRepo, workshopRepo, repoRepo, executor, workspaceAdapter
 }
 

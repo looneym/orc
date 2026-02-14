@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/example/orc/internal/db"
 	"github.com/example/orc/internal/ports/secondary"
 )
 
@@ -18,6 +19,14 @@ type WorkshopEventRepository struct {
 // NewWorkshopEventRepository creates a new SQLite workshop event repository.
 func NewWorkshopEventRepository(db *sql.DB) *WorkshopEventRepository {
 	return &WorkshopEventRepository{db: db}
+}
+
+// conn returns the context-carried transaction if present, otherwise r.db.
+func (r *WorkshopEventRepository) conn(ctx context.Context) db.DBTX {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
+	return r.db
 }
 
 // Create persists a new audit event.
@@ -45,7 +54,7 @@ func (r *WorkshopEventRepository) Create(ctx context.Context, event *secondary.A
 		newValue = sql.NullString{String: event.NewValue, Valid: true}
 	}
 
-	_, err := r.db.ExecContext(ctx,
+	_, err := r.conn(ctx).ExecContext(ctx,
 		`INSERT INTO workshop_events (id, workshop_id, actor_id, source, version, entity_type, entity_id, action, field_name, old_value, new_value) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		event.ID,
 		workshopID,
@@ -216,7 +225,7 @@ func (r *WorkshopEventRepository) List(ctx context.Context, filters secondary.Au
 func (r *WorkshopEventRepository) GetNextID(ctx context.Context) (string, error) {
 	var maxID int
 	prefixLen := len("WE-") + 1
-	err := r.db.QueryRowContext(ctx,
+	err := r.conn(ctx).QueryRowContext(ctx,
 		fmt.Sprintf("SELECT COALESCE(MAX(CAST(SUBSTR(id, %d) AS INTEGER)), 0) FROM workshop_events", prefixLen),
 	).Scan(&maxID)
 	if err != nil {

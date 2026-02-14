@@ -10,13 +10,15 @@ import (
 
 // NoteServiceImpl implements the NoteService interface.
 type NoteServiceImpl struct {
-	noteRepo secondary.NoteRepository
+	noteRepo   secondary.NoteRepository
+	transactor secondary.Transactor
 }
 
 // NewNoteService creates a new NoteService with injected dependencies.
-func NewNoteService(noteRepo secondary.NoteRepository) *NoteServiceImpl {
+func NewNoteService(noteRepo secondary.NoteRepository, transactor secondary.Transactor) *NoteServiceImpl {
 	return &NoteServiceImpl{
-		noteRepo: noteRepo,
+		noteRepo:   noteRepo,
+		transactor: transactor,
 	}
 }
 
@@ -31,33 +33,41 @@ func (s *NoteServiceImpl) CreateNote(ctx context.Context, req primary.CreateNote
 		return nil, fmt.Errorf("commission %s not found", req.CommissionID)
 	}
 
-	// Get next ID
-	nextID, err := s.noteRepo.GetNextID(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate note ID: %w", err)
-	}
-
-	// Build record with container assignment
-	record := &secondary.NoteRecord{
-		ID:           nextID,
-		CommissionID: req.CommissionID,
-		Title:        req.Title,
-		Content:      req.Content,
-		Type:         req.Type,
-	}
-
-	// Set appropriate container FK based on container type
-	if req.ContainerID != "" {
-		switch req.ContainerType {
-		case "shipment":
-			record.ShipmentID = req.ContainerID
-		case "tome":
-			record.TomeID = req.ContainerID
+	var nextID string
+	err = s.transactor.WithImmediateTx(ctx, func(txCtx context.Context) error {
+		// Get next ID
+		var err error
+		nextID, err = s.noteRepo.GetNextID(txCtx)
+		if err != nil {
+			return fmt.Errorf("failed to generate note ID: %w", err)
 		}
-	}
 
-	if err := s.noteRepo.Create(ctx, record); err != nil {
-		return nil, fmt.Errorf("failed to create note: %w", err)
+		// Build record with container assignment
+		record := &secondary.NoteRecord{
+			ID:           nextID,
+			CommissionID: req.CommissionID,
+			Title:        req.Title,
+			Content:      req.Content,
+			Type:         req.Type,
+		}
+
+		// Set appropriate container FK based on container type
+		if req.ContainerID != "" {
+			switch req.ContainerType {
+			case "shipment":
+				record.ShipmentID = req.ContainerID
+			case "tome":
+				record.TomeID = req.ContainerID
+			}
+		}
+
+		if err := s.noteRepo.Create(txCtx, record); err != nil {
+			return fmt.Errorf("failed to create note: %w", err)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 
 	// Fetch created note

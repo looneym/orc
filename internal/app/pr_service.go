@@ -13,13 +13,15 @@ import (
 type PRServiceImpl struct {
 	prRepo          secondary.PRRepository
 	shipmentService primary.ShipmentService
+	transactor      secondary.Transactor
 }
 
 // NewPRService creates a new PRService with injected dependencies.
-func NewPRService(prRepo secondary.PRRepository, shipmentService primary.ShipmentService) *PRServiceImpl {
+func NewPRService(prRepo secondary.PRRepository, shipmentService primary.ShipmentService, transactor secondary.Transactor) *PRServiceImpl {
 	return &PRServiceImpl{
 		prRepo:          prRepo,
 		shipmentService: shipmentService,
+		transactor:      transactor,
 	}
 }
 
@@ -62,12 +64,6 @@ func (s *PRServiceImpl) CreatePR(ctx context.Context, req primary.CreatePRReques
 		return nil, err
 	}
 
-	// Get next ID
-	nextID, err := s.prRepo.GetNextID(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate PR ID: %w", err)
-	}
-
 	// Get commission ID from shipment
 	shipment, err := s.shipmentService.GetShipment(ctx, req.ShipmentID)
 	if err != nil {
@@ -80,23 +76,37 @@ func (s *PRServiceImpl) CreatePR(ctx context.Context, req primary.CreatePRReques
 		status = "draft"
 	}
 
-	// Build record
-	record := &secondary.PRRecord{
-		ID:           nextID,
-		ShipmentID:   req.ShipmentID,
-		RepoID:       req.RepoID,
-		CommissionID: shipment.CommissionID,
-		Number:       req.Number,
-		Title:        req.Title,
-		Description:  req.Description,
-		Branch:       req.Branch,
-		TargetBranch: req.TargetBranch,
-		URL:          req.URL,
-		Status:       status,
-	}
+	var nextID string
+	err = s.transactor.WithImmediateTx(ctx, func(txCtx context.Context) error {
+		// Get next ID
+		var err error
+		nextID, err = s.prRepo.GetNextID(txCtx)
+		if err != nil {
+			return fmt.Errorf("failed to generate PR ID: %w", err)
+		}
 
-	if err := s.prRepo.Create(ctx, record); err != nil {
-		return nil, fmt.Errorf("failed to create PR: %w", err)
+		// Build record
+		record := &secondary.PRRecord{
+			ID:           nextID,
+			ShipmentID:   req.ShipmentID,
+			RepoID:       req.RepoID,
+			CommissionID: shipment.CommissionID,
+			Number:       req.Number,
+			Title:        req.Title,
+			Description:  req.Description,
+			Branch:       req.Branch,
+			TargetBranch: req.TargetBranch,
+			URL:          req.URL,
+			Status:       status,
+		}
+
+		if err := s.prRepo.Create(txCtx, record); err != nil {
+			return fmt.Errorf("failed to create PR: %w", err)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 
 	// Fetch created PR

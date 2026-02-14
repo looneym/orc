@@ -5,8 +5,10 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log"
 	"time"
 
+	"github.com/example/orc/internal/db"
 	"github.com/example/orc/internal/ports/secondary"
 )
 
@@ -22,6 +24,14 @@ func NewTomeRepository(db *sql.DB, eventWriter secondary.EventWriter) *TomeRepos
 	return &TomeRepository{db: db, eventWriter: eventWriter}
 }
 
+// conn returns the context-carried transaction if present, otherwise r.db.
+func (r *TomeRepository) conn(ctx context.Context) db.DBTX {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
+	return r.db
+}
+
 // Create persists a new tome.
 func (r *TomeRepository) Create(ctx context.Context, tome *secondary.TomeRecord) error {
 	var desc sql.NullString
@@ -29,7 +39,7 @@ func (r *TomeRepository) Create(ctx context.Context, tome *secondary.TomeRecord)
 		desc = sql.NullString{String: tome.Description, Valid: true}
 	}
 
-	_, err := r.db.ExecContext(ctx,
+	_, err := r.conn(ctx).ExecContext(ctx,
 		"INSERT INTO tomes (id, commission_id, title, description, status) VALUES (?, ?, ?, ?, ?)",
 		tome.ID, tome.CommissionID, tome.Title, desc, "open",
 	)
@@ -39,7 +49,9 @@ func (r *TomeRepository) Create(ctx context.Context, tome *secondary.TomeRecord)
 
 	// Log create operation
 	if r.eventWriter != nil {
-		_ = r.eventWriter.EmitAuditCreate(ctx, "tome", tome.ID)
+		if err := r.eventWriter.EmitAuditCreate(ctx, "tome", tome.ID); err != nil {
+			log.Printf("event: EmitAuditCreate tome %s: %v", tome.ID, err)
+		}
 	}
 
 	return nil
@@ -221,7 +233,7 @@ func (r *TomeRepository) Unpin(ctx context.Context, id string) error {
 // GetNextID returns the next available tome ID.
 func (r *TomeRepository) GetNextID(ctx context.Context) (string, error) {
 	var maxID int
-	err := r.db.QueryRowContext(ctx,
+	err := r.conn(ctx).QueryRowContext(ctx,
 		"SELECT COALESCE(MAX(CAST(SUBSTR(id, 6) AS INTEGER)), 0) FROM tomes",
 	).Scan(&maxID)
 	if err != nil {

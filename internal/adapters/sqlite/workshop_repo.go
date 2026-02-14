@@ -8,6 +8,7 @@ import (
 	"time"
 
 	coreworkshop "github.com/example/orc/internal/core/workshop"
+	"github.com/example/orc/internal/db"
 	"github.com/example/orc/internal/ports/secondary"
 )
 
@@ -21,11 +22,21 @@ func NewWorkshopRepository(db *sql.DB) *WorkshopRepository {
 	return &WorkshopRepository{db: db}
 }
 
+// conn returns the context-carried transaction if present, otherwise r.db.
+func (r *WorkshopRepository) conn(ctx context.Context) db.DBTX {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
+	return r.db
+}
+
 // Create persists a new workshop.
 func (r *WorkshopRepository) Create(ctx context.Context, workshop *secondary.WorkshopRecord) error {
+	c := r.conn(ctx)
+
 	// Verify factory exists
 	var exists int
-	err := r.db.QueryRowContext(ctx,
+	err := c.QueryRowContext(ctx,
 		"SELECT COUNT(*) FROM factories WHERE id = ?", workshop.FactoryID,
 	).Scan(&exists)
 	if err != nil {
@@ -37,7 +48,7 @@ func (r *WorkshopRepository) Create(ctx context.Context, workshop *secondary.Wor
 
 	// Generate workshop ID by finding max existing ID
 	var maxID int
-	err = r.db.QueryRowContext(ctx,
+	err = c.QueryRowContext(ctx,
 		"SELECT COALESCE(MAX(CAST(SUBSTR(id, 6) AS INTEGER)), 0) FROM workshops",
 	).Scan(&maxID)
 	if err != nil {
@@ -51,7 +62,7 @@ func (r *WorkshopRepository) Create(ctx context.Context, workshop *secondary.Wor
 	if name == "" {
 		// Count existing workshops to get next name
 		var count int
-		err = r.db.QueryRowContext(ctx,
+		err = c.QueryRowContext(ctx,
 			"SELECT COUNT(*) FROM workshops",
 		).Scan(&count)
 		if err != nil {
@@ -65,7 +76,7 @@ func (r *WorkshopRepository) Create(ctx context.Context, workshop *secondary.Wor
 		status = "active"
 	}
 
-	_, err = r.db.ExecContext(ctx,
+	_, err = c.ExecContext(ctx,
 		"INSERT INTO workshops (id, factory_id, name, status) VALUES (?, ?, ?, ?)",
 		id, workshop.FactoryID, name, status,
 	)
@@ -206,7 +217,7 @@ func (r *WorkshopRepository) Delete(ctx context.Context, id string) error {
 // GetNextID returns the next available workshop ID.
 func (r *WorkshopRepository) GetNextID(ctx context.Context) (string, error) {
 	var maxID int
-	err := r.db.QueryRowContext(ctx,
+	err := r.conn(ctx).QueryRowContext(ctx,
 		"SELECT COALESCE(MAX(CAST(SUBSTR(id, 6) AS INTEGER)), 0) FROM workshops",
 	).Scan(&maxID)
 	if err != nil {

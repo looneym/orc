@@ -8,6 +8,7 @@ import (
 
 	"github.com/example/orc/internal/core/event"
 	"github.com/example/orc/internal/ctxutil"
+	"github.com/example/orc/internal/db"
 	"github.com/example/orc/internal/ports/secondary"
 )
 
@@ -17,22 +18,26 @@ type EventWriterAdapter struct {
 	workshopEventRepo    secondary.WorkshopEventRepository
 	operationalEventRepo secondary.OperationalEventRepository
 	workbenchRepo        secondary.WorkbenchRepository
+	transactor           secondary.Transactor
 	versionString        string
 }
 
 // NewEventWriterAdapter creates a new EventWriterAdapter.
 // workbenchRepo is used to resolve workshop from workbench actors.
+// transactor wraps writes in BEGIN IMMEDIATE when not already in a transaction.
 // versionString is stamped on every event for forward compatibility.
 func NewEventWriterAdapter(
 	workshopEventRepo secondary.WorkshopEventRepository,
 	operationalEventRepo secondary.OperationalEventRepository,
 	workbenchRepo secondary.WorkbenchRepository,
+	transactor secondary.Transactor,
 	versionString string,
 ) *EventWriterAdapter {
 	return &EventWriterAdapter{
 		workshopEventRepo:    workshopEventRepo,
 		operationalEventRepo: operationalEventRepo,
 		workbenchRepo:        workbenchRepo,
+		transactor:           transactor,
 		versionString:        versionString,
 	}
 }
@@ -54,6 +59,16 @@ func (w *EventWriterAdapter) EmitAuditDelete(ctx context.Context, entityType, en
 
 // EmitOperational emits an operational event.
 func (w *EventWriterAdapter) EmitOperational(ctx context.Context, source, level, message string, data map[string]string) error {
+	// If not already in a transaction, wrap in BEGIN IMMEDIATE
+	if w.transactor != nil && db.TxFromContext(ctx) == nil {
+		return w.transactor.WithImmediateTx(ctx, func(txCtx context.Context) error {
+			return w.emitOperationalInner(txCtx, source, level, message, data)
+		})
+	}
+	return w.emitOperationalInner(ctx, source, level, message, data)
+}
+
+func (w *EventWriterAdapter) emitOperationalInner(ctx context.Context, source, level, message string, data map[string]string) error {
 	actorID := ctxutil.ActorFromContext(ctx)
 	workshopID := w.resolveWorkshop(ctx, actorID)
 
@@ -88,6 +103,16 @@ func (w *EventWriterAdapter) EmitOperational(ctx context.Context, source, level,
 
 // writeAudit writes an audit event with common logic.
 func (w *EventWriterAdapter) writeAudit(ctx context.Context, entityType, entityID, action, fieldName, oldValue, newValue string) error {
+	// If not already in a transaction, wrap in BEGIN IMMEDIATE
+	if w.transactor != nil && db.TxFromContext(ctx) == nil {
+		return w.transactor.WithImmediateTx(ctx, func(txCtx context.Context) error {
+			return w.writeAuditInner(txCtx, entityType, entityID, action, fieldName, oldValue, newValue)
+		})
+	}
+	return w.writeAuditInner(ctx, entityType, entityID, action, fieldName, oldValue, newValue)
+}
+
+func (w *EventWriterAdapter) writeAuditInner(ctx context.Context, entityType, entityID, action, fieldName, oldValue, newValue string) error {
 	actorID := ctxutil.ActorFromContext(ctx)
 	workshopID := w.resolveWorkshop(ctx, actorID)
 

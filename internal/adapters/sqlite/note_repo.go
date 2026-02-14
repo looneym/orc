@@ -5,8 +5,10 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log"
 	"time"
 
+	"github.com/example/orc/internal/db"
 	"github.com/example/orc/internal/ports/secondary"
 )
 
@@ -20,6 +22,14 @@ type NoteRepository struct {
 // eventWriter is optional - if nil, no audit logging is performed.
 func NewNoteRepository(db *sql.DB, eventWriter secondary.EventWriter) *NoteRepository {
 	return &NoteRepository{db: db, eventWriter: eventWriter}
+}
+
+// conn returns the context-carried transaction if present, otherwise r.db.
+func (r *NoteRepository) conn(ctx context.Context) db.DBTX {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
+	return r.db
 }
 
 // Create persists a new note.
@@ -45,7 +55,7 @@ func (r *NoteRepository) Create(ctx context.Context, note *secondary.NoteRecord)
 		status = note.Status
 	}
 
-	_, err := r.db.ExecContext(ctx,
+	_, err := r.conn(ctx).ExecContext(ctx,
 		"INSERT INTO notes (id, commission_id, title, content, type, status, shipment_id, tome_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
 		note.ID, note.CommissionID, note.Title, content, noteType, status, shipmentID, tomeID,
 	)
@@ -55,7 +65,9 @@ func (r *NoteRepository) Create(ctx context.Context, note *secondary.NoteRecord)
 
 	// Log create operation
 	if r.eventWriter != nil {
-		_ = r.eventWriter.EmitAuditCreate(ctx, "note", note.ID)
+		if err := r.eventWriter.EmitAuditCreate(ctx, "note", note.ID); err != nil {
+			log.Printf("event: EmitAuditCreate note %s: %v", note.ID, err)
+		}
 	}
 
 	return nil
@@ -289,7 +301,7 @@ func (r *NoteRepository) Unpin(ctx context.Context, id string) error {
 // GetNextID returns the next available note ID.
 func (r *NoteRepository) GetNextID(ctx context.Context) (string, error) {
 	var maxID int
-	err := r.db.QueryRowContext(ctx,
+	err := r.conn(ctx).QueryRowContext(ctx,
 		"SELECT COALESCE(MAX(CAST(SUBSTR(id, 6) AS INTEGER)), 0) FROM notes",
 	).Scan(&maxID)
 	if err != nil {

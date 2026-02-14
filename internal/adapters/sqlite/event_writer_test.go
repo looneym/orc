@@ -20,7 +20,7 @@ func TestEventWriterAdapter_EmitAuditCreate(t *testing.T) {
 	eventRepo := sqlite.NewWorkshopEventRepository(db)
 	opRepo := sqlite.NewOperationalEventRepository(db)
 	benchRepo := sqlite.NewWorkbenchRepository(db, nil)
-	writer := sqlite.NewEventWriterAdapter(eventRepo, opRepo, benchRepo, "abc123")
+	writer := sqlite.NewEventWriterAdapter(eventRepo, opRepo, benchRepo, nil, "abc123")
 
 	ctx := ctxutil.WithActorID(context.Background(), "IMP-BENCH-014")
 
@@ -68,7 +68,7 @@ func TestEventWriterAdapter_EmitAuditUpdate(t *testing.T) {
 	eventRepo := sqlite.NewWorkshopEventRepository(db)
 	opRepo := sqlite.NewOperationalEventRepository(db)
 	benchRepo := sqlite.NewWorkbenchRepository(db, nil)
-	writer := sqlite.NewEventWriterAdapter(eventRepo, opRepo, benchRepo, "abc123")
+	writer := sqlite.NewEventWriterAdapter(eventRepo, opRepo, benchRepo, nil, "abc123")
 
 	ctx := ctxutil.WithActorID(context.Background(), "IMP-BENCH-014")
 
@@ -110,7 +110,7 @@ func TestEventWriterAdapter_EmitAuditDelete(t *testing.T) {
 	eventRepo := sqlite.NewWorkshopEventRepository(db)
 	opRepo := sqlite.NewOperationalEventRepository(db)
 	benchRepo := sqlite.NewWorkbenchRepository(db, nil)
-	writer := sqlite.NewEventWriterAdapter(eventRepo, opRepo, benchRepo, "abc123")
+	writer := sqlite.NewEventWriterAdapter(eventRepo, opRepo, benchRepo, nil, "abc123")
 
 	ctx := ctxutil.WithActorID(context.Background(), "IMP-BENCH-014")
 
@@ -138,7 +138,7 @@ func TestEventWriterAdapter_EmitAuditCreate_NoWorkshop(t *testing.T) {
 	eventRepo := sqlite.NewWorkshopEventRepository(db)
 	opRepo := sqlite.NewOperationalEventRepository(db)
 	benchRepo := sqlite.NewWorkbenchRepository(db, nil)
-	writer := sqlite.NewEventWriterAdapter(eventRepo, opRepo, benchRepo, "abc123")
+	writer := sqlite.NewEventWriterAdapter(eventRepo, opRepo, benchRepo, nil, "abc123")
 
 	// No actor in context — workshop cannot be resolved
 	ctx := context.Background()
@@ -167,7 +167,7 @@ func TestEventWriterAdapter_EmitOperational(t *testing.T) {
 	eventRepo := sqlite.NewWorkshopEventRepository(db)
 	opRepo := sqlite.NewOperationalEventRepository(db)
 	benchRepo := sqlite.NewWorkbenchRepository(db, nil)
-	writer := sqlite.NewEventWriterAdapter(eventRepo, opRepo, benchRepo, "abc123")
+	writer := sqlite.NewEventWriterAdapter(eventRepo, opRepo, benchRepo, nil, "abc123")
 
 	ctx := ctxutil.WithActorID(context.Background(), "IMP-BENCH-014")
 
@@ -215,7 +215,7 @@ func TestEventWriterAdapter_EmitOperational_NoWorkshop(t *testing.T) {
 	eventRepo := sqlite.NewWorkshopEventRepository(db)
 	opRepo := sqlite.NewOperationalEventRepository(db)
 	benchRepo := sqlite.NewWorkbenchRepository(db, nil)
-	writer := sqlite.NewEventWriterAdapter(eventRepo, opRepo, benchRepo, "abc123")
+	writer := sqlite.NewEventWriterAdapter(eventRepo, opRepo, benchRepo, nil, "abc123")
 
 	// No actor — operational events should still persist (workshopID will be empty)
 	ctx := context.Background()
@@ -243,7 +243,7 @@ func TestEventWriterAdapter_EmitOperational_NilData(t *testing.T) {
 
 	eventRepo := sqlite.NewWorkshopEventRepository(db)
 	opRepo := sqlite.NewOperationalEventRepository(db)
-	writer := sqlite.NewEventWriterAdapter(eventRepo, opRepo, nil, "abc123")
+	writer := sqlite.NewEventWriterAdapter(eventRepo, opRepo, nil, nil, "abc123")
 
 	ctx := context.Background()
 

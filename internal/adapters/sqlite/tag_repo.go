@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/example/orc/internal/db"
 	"github.com/example/orc/internal/ports/secondary"
 )
 
@@ -20,6 +21,14 @@ func NewTagRepository(db *sql.DB) *TagRepository {
 	return &TagRepository{db: db}
 }
 
+// conn returns the context-carried transaction if present, otherwise r.db.
+func (r *TagRepository) conn(ctx context.Context) db.DBTX {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
+	return r.db
+}
+
 // Create persists a new tag.
 func (r *TagRepository) Create(ctx context.Context, tag *secondary.TagRecord) error {
 	var desc sql.NullString
@@ -27,7 +36,7 @@ func (r *TagRepository) Create(ctx context.Context, tag *secondary.TagRecord) er
 		desc = sql.NullString{String: tag.Description, Valid: true}
 	}
 
-	_, err := r.db.ExecContext(ctx,
+	_, err := r.conn(ctx).ExecContext(ctx,
 		"INSERT INTO tags (id, name, description) VALUES (?, ?, ?)",
 		tag.ID, tag.Name, desc,
 	)
@@ -146,7 +155,7 @@ func (r *TagRepository) Delete(ctx context.Context, id string) error {
 // GetNextID returns the next available tag ID.
 func (r *TagRepository) GetNextID(ctx context.Context) (string, error) {
 	var maxID int
-	err := r.db.QueryRowContext(ctx,
+	err := r.conn(ctx).QueryRowContext(ctx,
 		"SELECT COALESCE(MAX(CAST(SUBSTR(id, 5) AS INTEGER)), 0) FROM tags",
 	).Scan(&maxID)
 	if err != nil {

@@ -12,12 +12,14 @@ import (
 // FactoryServiceImpl implements the FactoryService interface.
 type FactoryServiceImpl struct {
 	factoryRepo secondary.FactoryRepository
+	transactor  secondary.Transactor
 }
 
 // NewFactoryService creates a new FactoryService with injected dependencies.
-func NewFactoryService(factoryRepo secondary.FactoryRepository) *FactoryServiceImpl {
+func NewFactoryService(factoryRepo secondary.FactoryRepository, transactor secondary.Transactor) *FactoryServiceImpl {
 	return &FactoryServiceImpl{
 		factoryRepo: factoryRepo,
+		transactor:  transactor,
 	}
 }
 
@@ -36,20 +38,27 @@ func (s *FactoryServiceImpl) CreateFactory(ctx context.Context, req primary.Crea
 		return nil, result.Error()
 	}
 
-	// 3. Generate ID
-	id, err := s.factoryRepo.GetNextID(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate factory ID: %w", err)
-	}
+	var record *secondary.FactoryRecord
+	err = s.transactor.WithImmediateTx(ctx, func(txCtx context.Context) error {
+		// 3. Generate ID
+		id, err := s.factoryRepo.GetNextID(txCtx)
+		if err != nil {
+			return fmt.Errorf("failed to generate factory ID: %w", err)
+		}
 
-	// 4. Create factory record
-	record := &secondary.FactoryRecord{
-		ID:     id,
-		Name:   req.Name,
-		Status: "active",
-	}
-	if err := s.factoryRepo.Create(ctx, record); err != nil {
-		return nil, fmt.Errorf("failed to create factory: %w", err)
+		// 4. Create factory record
+		record = &secondary.FactoryRecord{
+			ID:     id,
+			Name:   req.Name,
+			Status: "active",
+		}
+		if err := s.factoryRepo.Create(txCtx, record); err != nil {
+			return fmt.Errorf("failed to create factory: %w", err)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 
 	return &primary.CreateFactoryResponse{

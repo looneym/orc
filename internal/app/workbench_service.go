@@ -23,6 +23,7 @@ type WorkbenchServiceImpl struct {
 	executor         EffectExecutor
 	gitService       *GitService
 	workspaceAdapter secondary.WorkspaceAdapter
+	transactor       secondary.Transactor
 }
 
 // NewWorkbenchService creates a new WorkbenchService with injected dependencies.
@@ -33,6 +34,7 @@ func NewWorkbenchService(
 	agentProvider secondary.AgentIdentityProvider,
 	executor EffectExecutor,
 	workspaceAdapter secondary.WorkspaceAdapter,
+	transactor secondary.Transactor,
 ) *WorkbenchServiceImpl {
 	return &WorkbenchServiceImpl{
 		workbenchRepo:    workbenchRepo,
@@ -42,6 +44,7 @@ func NewWorkbenchService(
 		executor:         executor,
 		gitService:       NewGitService(),
 		workspaceAdapter: workspaceAdapter,
+		transactor:       transactor,
 	}
 }
 
@@ -62,44 +65,53 @@ func (s *WorkbenchServiceImpl) CreateWorkbench(ctx context.Context, req primary.
 		return nil, result.Error()
 	}
 
-	// 3. Get next workbench ID to extract number for auto-generated name
-	nextID, err := s.workbenchRepo.GetNextID(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get next workbench ID: %w", err)
-	}
-	benchNumber := coreworkbench.ParseWorkbenchNumber(nextID)
+	var record *secondary.WorkbenchRecord
+	var workbenchPath string
 
-	// 5. Auto-generate name if not provided (requires RepoID)
-	name := req.Name
-	if name == "" {
-		if req.RepoID == "" {
-			return nil, fmt.Errorf("name is required when repo_id is not provided")
-		}
-		repo, err := s.repoRepo.GetByID(ctx, req.RepoID)
+	err = s.transactor.WithImmediateTx(ctx, func(txCtx context.Context) error {
+		// 3. Get next workbench ID to extract number for auto-generated name
+		nextID, err := s.workbenchRepo.GetNextID(txCtx)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get repo for name generation: %w", err)
+			return fmt.Errorf("failed to get next workbench ID: %w", err)
 		}
-		name = fmt.Sprintf("%s-%03d", repo.Name, benchNumber)
-	}
+		benchNumber := coreworkbench.ParseWorkbenchNumber(nextID)
 
-	// 6. Compute workbench path (deterministic: ~/wb/<name>)
-	workbenchPath := coreworkbench.ComputePath(name)
+		// 5. Auto-generate name if not provided (requires RepoID)
+		name := req.Name
+		if name == "" {
+			if req.RepoID == "" {
+				return fmt.Errorf("name is required when repo_id is not provided")
+			}
+			repo, err := s.repoRepo.GetByID(txCtx, req.RepoID)
+			if err != nil {
+				return fmt.Errorf("failed to get repo for name generation: %w", err)
+			}
+			name = fmt.Sprintf("%s-%03d", repo.Name, benchNumber)
+		}
 
-	// 7. Generate home branch name
-	homeBranch := GenerateHomeBranchName(UserInitials, name)
+		// 6. Compute workbench path (deterministic: ~/wb/<name>)
+		workbenchPath = coreworkbench.ComputePath(name)
 
-	// 8. Create workbench record in DB
-	record := &secondary.WorkbenchRecord{
-		Name:          name,
-		WorkshopID:    req.WorkshopID,
-		RepoID:        req.RepoID,
-		WorktreePath:  workbenchPath,
-		Status:        "active",
-		HomeBranch:    homeBranch,
-		CurrentBranch: homeBranch,
-	}
-	if err := s.workbenchRepo.Create(ctx, record); err != nil {
-		return nil, fmt.Errorf("failed to create workbench: %w", err)
+		// 7. Generate home branch name
+		homeBranch := GenerateHomeBranchName(UserInitials, name)
+
+		// 8. Create workbench record in DB
+		record = &secondary.WorkbenchRecord{
+			Name:          name,
+			WorkshopID:    req.WorkshopID,
+			RepoID:        req.RepoID,
+			WorktreePath:  workbenchPath,
+			Status:        "active",
+			HomeBranch:    homeBranch,
+			CurrentBranch: homeBranch,
+		}
+		if err := s.workbenchRepo.Create(txCtx, record); err != nil {
+			return fmt.Errorf("failed to create workbench: %w", err)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 
 	// 9. Create worktree/directory and config immediately (not deferred to infra apply)

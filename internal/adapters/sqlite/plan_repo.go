@@ -5,8 +5,10 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log"
 	"time"
 
+	"github.com/example/orc/internal/db"
 	"github.com/example/orc/internal/ports/secondary"
 )
 
@@ -22,6 +24,14 @@ func NewPlanRepository(db *sql.DB, eventWriter secondary.EventWriter) *PlanRepos
 	return &PlanRepository{db: db, eventWriter: eventWriter}
 }
 
+// conn returns the context-carried transaction if present, otherwise r.db.
+func (r *PlanRepository) conn(ctx context.Context) db.DBTX {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
+	return r.db
+}
+
 // Create persists a new plan.
 func (r *PlanRepository) Create(ctx context.Context, plan *secondary.PlanRecord) error {
 	var desc sql.NullString
@@ -34,7 +44,7 @@ func (r *PlanRepository) Create(ctx context.Context, plan *secondary.PlanRecord)
 		content = sql.NullString{String: plan.Content, Valid: true}
 	}
 
-	_, err := r.db.ExecContext(ctx,
+	_, err := r.conn(ctx).ExecContext(ctx,
 		"INSERT INTO plans (id, task_id, commission_id, title, description, content, status) VALUES (?, ?, ?, ?, ?, ?, ?)",
 		plan.ID, plan.TaskID, plan.CommissionID, plan.Title, desc, content, "draft",
 	)
@@ -44,7 +54,9 @@ func (r *PlanRepository) Create(ctx context.Context, plan *secondary.PlanRecord)
 
 	// Log create operation
 	if r.eventWriter != nil {
-		_ = r.eventWriter.EmitAuditCreate(ctx, "plan", plan.ID)
+		if err := r.eventWriter.EmitAuditCreate(ctx, "plan", plan.ID); err != nil {
+			log.Printf("event: EmitAuditCreate plan %s: %v", plan.ID, err)
+		}
 	}
 
 	return nil
@@ -250,7 +262,7 @@ func (r *PlanRepository) Unpin(ctx context.Context, id string) error {
 // GetNextID returns the next available plan ID.
 func (r *PlanRepository) GetNextID(ctx context.Context) (string, error) {
 	var maxID int
-	err := r.db.QueryRowContext(ctx,
+	err := r.conn(ctx).QueryRowContext(ctx,
 		"SELECT COALESCE(MAX(CAST(SUBSTR(id, 6) AS INTEGER)), 0) FROM plans",
 	).Scan(&maxID)
 	if err != nil {

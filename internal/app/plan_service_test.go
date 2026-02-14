@@ -176,7 +176,7 @@ func (m *mockPlanRepository) TaskExists(ctx context.Context, taskID string) (boo
 
 func newTestPlanService() (*PlanServiceImpl, *mockPlanRepository) {
 	planRepo := newMockPlanRepository()
-	service := NewPlanService(planRepo)
+	service := NewPlanService(planRepo, &mockTransactor{})
 	return service, planRepo
 }
 

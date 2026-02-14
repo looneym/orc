@@ -5,9 +5,11 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log"
 	"time"
 
 	corecommission "github.com/example/orc/internal/core/commission"
+	"github.com/example/orc/internal/db"
 	"github.com/example/orc/internal/ports/secondary"
 )
 
@@ -21,6 +23,14 @@ type CommissionRepository struct {
 // eventWriter is optional - if nil, no audit logging is performed.
 func NewCommissionRepository(db *sql.DB, eventWriter secondary.EventWriter) *CommissionRepository {
 	return &CommissionRepository{db: db, eventWriter: eventWriter}
+}
+
+// conn returns the context-carried transaction if present, otherwise r.db.
+func (r *CommissionRepository) conn(ctx context.Context) db.DBTX {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
+	return r.db
 }
 
 // Create persists a new commission.
@@ -43,7 +53,7 @@ func (r *CommissionRepository) Create(ctx context.Context, commission *secondary
 		workshopID = sql.NullString{String: commission.WorkshopID, Valid: true}
 	}
 
-	_, err := r.db.ExecContext(ctx,
+	_, err := r.conn(ctx).ExecContext(ctx,
 		"INSERT INTO commissions (id, workshop_id, title, description, status) VALUES (?, ?, ?, ?, ?)",
 		commission.ID, workshopID, commission.Title, desc, commission.Status,
 	)
@@ -53,7 +63,9 @@ func (r *CommissionRepository) Create(ctx context.Context, commission *secondary
 
 	// Log create operation
 	if r.eventWriter != nil {
-		_ = r.eventWriter.EmitAuditCreate(ctx, "commission", commission.ID)
+		if err := r.eventWriter.EmitAuditCreate(ctx, "commission", commission.ID); err != nil {
+			log.Printf("event: EmitAuditCreate commission %s: %v", commission.ID, err)
+		}
 	}
 
 	return nil
@@ -221,7 +233,7 @@ func (r *CommissionRepository) Delete(ctx context.Context, id string) error {
 // COMM-XXX format where XXX is extracted from position 6 (COMM- is 5 chars + dash)
 func (r *CommissionRepository) GetNextID(ctx context.Context) (string, error) {
 	var maxID int
-	err := r.db.QueryRowContext(ctx,
+	err := r.conn(ctx).QueryRowContext(ctx,
 		"SELECT COALESCE(MAX(CAST(SUBSTR(id, 6) AS INTEGER)), 0) FROM commissions",
 	).Scan(&maxID)
 	if err != nil {

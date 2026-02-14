@@ -171,7 +171,8 @@ func initServices() {
 	workshopEventRepo := sqlite.NewWorkshopEventRepository(database)
 	operationalEventRepo := sqlite.NewOperationalEventRepository(database)
 	workbenchRepo := sqlite.NewWorkbenchRepository(database, nil) // nil EventWriter: circular dependency (EventWriter needs workbenchRepo)
-	eventWriter := sqlite.NewEventWriterAdapter(workshopEventRepo, operationalEventRepo, workbenchRepo, version.Commit)
+	transactor := sqlite.NewTransactor(database)
+	eventWriter := sqlite.NewEventWriterAdapter(workshopEventRepo, operationalEventRepo, workbenchRepo, transactor, version.Commit)
 	eventWriterInstance = eventWriter
 
 	// Create repository adapters (secondary ports) - sqlite adapters with injected DB
@@ -191,52 +192,52 @@ func initServices() {
 	executor := app.NewEffectExecutor(commissionRepo, tmuxAdapter, workspaceAdapter)
 
 	// Create services (primary ports implementation)
-	commissionService = app.NewCommissionService(commissionRepo, agentProvider, executor)
+	commissionService = app.NewCommissionService(commissionRepo, agentProvider, executor, transactor)
 
 	// Create shipment and task services
 	shipmentRepo = sqlite.NewShipmentRepository(database, eventWriter)
 	taskRepo := sqlite.NewTaskRepository(database, eventWriter)
 	tagRepo := sqlite.NewTagRepository(database)
-	taskService = app.NewTaskService(taskRepo, tagRepo, shipmentRepo)
+	taskService = app.NewTaskService(taskRepo, tagRepo, shipmentRepo, transactor)
 
 	// Create note and tome services
 	noteRepo := sqlite.NewNoteRepository(database, eventWriter)
 	tomeRepo := sqlite.NewTomeRepository(database, eventWriter)
-	noteService = app.NewNoteService(noteRepo)
+	noteService = app.NewNoteService(noteRepo, transactor)
 
 	// Create tome and shipment services
-	tomeService = app.NewTomeService(tomeRepo, noteService)
-	shipmentService = app.NewShipmentService(shipmentRepo, taskRepo, noteService)
+	tomeService = app.NewTomeService(tomeRepo, noteService, transactor)
+	shipmentService = app.NewShipmentService(shipmentRepo, taskRepo, noteService, transactor)
 
 	// Create plan repository
 	planRepo := sqlite.NewPlanRepository(database, eventWriter)
 
 	// Create tag service
-	tagService = app.NewTagService(tagRepo)
+	tagService = app.NewTagService(tagRepo, transactor)
 
 	// Create repo and PR services
 	repoRepo := sqlite.NewRepoRepository(database)
 	prRepo := sqlite.NewPRRepository(database)
-	repoService = app.NewRepoService(repoRepo)
-	prService = app.NewPRService(prRepo, shipmentService)
+	repoService = app.NewRepoService(repoRepo, transactor)
+	prService = app.NewPRService(prRepo, shipmentService, transactor)
 
 	// Create factory, workshop, and workbench services
 	factoryRepo := sqlite.NewFactoryRepository(database)
 	workshopRepo := sqlite.NewWorkshopRepository(database)
 	// workbenchRepo already created early for EventWriter (with nil EventWriter due to circular dependency)
-	factoryService = app.NewFactoryService(factoryRepo)
-	workshopService = app.NewWorkshopService(factoryRepo, workshopRepo, workbenchRepo, repoRepo, tmuxService, workspaceAdapter, executor)
-	workbenchService = app.NewWorkbenchService(workbenchRepo, workshopRepo, repoRepo, agentProvider, executor, workspaceAdapter)
+	factoryService = app.NewFactoryService(factoryRepo, transactor)
+	workshopService = app.NewWorkshopService(factoryRepo, workshopRepo, workbenchRepo, repoRepo, tmuxService, workspaceAdapter, executor, transactor)
+	workbenchService = app.NewWorkbenchService(workbenchRepo, workshopRepo, repoRepo, agentProvider, executor, workspaceAdapter, transactor)
 
 	// Create plan service
-	planService = app.NewPlanService(planRepo)
+	planService = app.NewPlanService(planRepo, transactor)
 
 	// Create event service (unified audit + operational events)
 	eventService = app.NewEventService(workshopEventRepo, operationalEventRepo)
 
 	// Create hook event service for hook invocation tracking
 	hookEventRepo := sqlite.NewHookEventRepository(database)
-	hookEventService = app.NewHookEventService(hookEventRepo)
+	hookEventService = app.NewHookEventService(hookEventRepo, transactor)
 
 	// Create orchestration services
 	commissionOrchestrationService = app.NewCommissionOrchestrationService(commissionService, agentProvider)

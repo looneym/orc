@@ -501,6 +501,7 @@ func newTestWorkshopService() (*WorkshopServiceImpl, *mockWorkshopRepository, *m
 		tmuxAdapter,
 		workspaceAdapter,
 		executor,
+		&mockTransactor{},
 	)
 	return service, workshopRepo, factoryRepo, tmuxAdapter
 }

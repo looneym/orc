@@ -5,8 +5,10 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log"
 	"time"
 
+	"github.com/example/orc/internal/db"
 	"github.com/example/orc/internal/ports/secondary"
 )
 
@@ -20,6 +22,14 @@ type TaskRepository struct {
 // eventWriter is optional - if nil, no audit logging is performed.
 func NewTaskRepository(db *sql.DB, eventWriter secondary.EventWriter) *TaskRepository {
 	return &TaskRepository{db: db, eventWriter: eventWriter}
+}
+
+// conn returns the context-carried transaction if present, otherwise r.db.
+func (r *TaskRepository) conn(ctx context.Context) db.DBTX {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
+	return r.db
 }
 
 // scanTask scans a task row into a TaskRecord.
@@ -96,7 +106,7 @@ func (r *TaskRepository) Create(ctx context.Context, task *secondary.TaskRecord)
 		status = "open"
 	}
 
-	_, err := r.db.ExecContext(ctx,
+	_, err := r.conn(ctx).ExecContext(ctx,
 		"INSERT INTO tasks (id, shipment_id, commission_id, title, description, type, status, depends_on) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
 		task.ID, shipmentID, task.CommissionID, task.Title, desc, taskType, status, dependsOn,
 	)
@@ -106,7 +116,9 @@ func (r *TaskRepository) Create(ctx context.Context, task *secondary.TaskRecord)
 
 	// Log create operation
 	if r.eventWriter != nil {
-		_ = r.eventWriter.EmitAuditCreate(ctx, "task", task.ID)
+		if err := r.eventWriter.EmitAuditCreate(ctx, "task", task.ID); err != nil {
+			log.Printf("event: EmitAuditCreate task %s: %v", task.ID, err)
+		}
 	}
 
 	return nil
@@ -225,7 +237,9 @@ func (r *TaskRepository) Delete(ctx context.Context, id string) error {
 
 	// Log delete operation
 	if r.eventWriter != nil {
-		_ = r.eventWriter.EmitAuditDelete(ctx, "task", id)
+		if err := r.eventWriter.EmitAuditDelete(ctx, "task", id); err != nil {
+			log.Printf("event: EmitAuditDelete task %s: %v", id, err)
+		}
 	}
 
 	return nil
@@ -270,7 +284,7 @@ func (r *TaskRepository) Unpin(ctx context.Context, id string) error {
 // GetNextID returns the next available task ID.
 func (r *TaskRepository) GetNextID(ctx context.Context) (string, error) {
 	var maxID int
-	err := r.db.QueryRowContext(ctx,
+	err := r.conn(ctx).QueryRowContext(ctx,
 		"SELECT COALESCE(MAX(CAST(SUBSTR(id, 6) AS INTEGER)), 0) FROM tasks",
 	).Scan(&maxID)
 	if err != nil {
@@ -355,7 +369,9 @@ func (r *TaskRepository) UpdateStatus(ctx context.Context, id, status string, se
 
 	// Log status change
 	if r.eventWriter != nil && oldStatus != status {
-		_ = r.eventWriter.EmitAuditUpdate(ctx, "task", id, "status", oldStatus, status)
+		if err := r.eventWriter.EmitAuditUpdate(ctx, "task", id, "status", oldStatus, status); err != nil {
+			log.Printf("event: EmitAuditUpdate task %s status %s->%s: %v", id, oldStatus, status, err)
+		}
 	}
 
 	return nil
@@ -510,7 +526,7 @@ func (r *TaskRepository) ListByTag(ctx context.Context, tagID string) ([]*second
 // GetNextEntityTagID returns the next available entity tag ID.
 func (r *TaskRepository) GetNextEntityTagID(ctx context.Context) (string, error) {
 	var maxID int
-	err := r.db.QueryRowContext(ctx,
+	err := r.conn(ctx).QueryRowContext(ctx,
 		"SELECT COALESCE(MAX(CAST(SUBSTR(id, 4) AS INTEGER)), 0) FROM entity_tags",
 	).Scan(&maxID)
 	if err != nil {

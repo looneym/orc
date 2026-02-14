@@ -5,9 +5,11 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log"
 	"path/filepath"
 	"time"
 
+	"github.com/example/orc/internal/db"
 	"github.com/example/orc/internal/ports/secondary"
 )
 
@@ -23,11 +25,21 @@ func NewWorkbenchRepository(db *sql.DB, eventWriter secondary.EventWriter) *Work
 	return &WorkbenchRepository{db: db, eventWriter: eventWriter}
 }
 
+// conn returns the context-carried transaction if present, otherwise r.db.
+func (r *WorkbenchRepository) conn(ctx context.Context) db.DBTX {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
+	return r.db
+}
+
 // Create persists a new workbench.
 func (r *WorkbenchRepository) Create(ctx context.Context, workbench *secondary.WorkbenchRecord) error {
+	c := r.conn(ctx)
+
 	// Verify workshop exists
 	var exists int
-	err := r.db.QueryRowContext(ctx,
+	err := c.QueryRowContext(ctx,
 		"SELECT COUNT(*) FROM workshops WHERE id = ?", workbench.WorkshopID,
 	).Scan(&exists)
 	if err != nil {
@@ -39,7 +51,7 @@ func (r *WorkbenchRepository) Create(ctx context.Context, workbench *secondary.W
 
 	// Generate workbench ID by finding max existing ID
 	var maxID int
-	err = r.db.QueryRowContext(ctx,
+	err = c.QueryRowContext(ctx,
 		"SELECT COALESCE(MAX(CAST(SUBSTR(id, 7) AS INTEGER)), 0) FROM workbenches",
 	).Scan(&maxID)
 	if err != nil {
@@ -66,7 +78,7 @@ func (r *WorkbenchRepository) Create(ctx context.Context, workbench *secondary.W
 		currentBranch = sql.NullString{String: workbench.CurrentBranch, Valid: true}
 	}
 
-	_, err = r.db.ExecContext(ctx,
+	_, err = c.ExecContext(ctx,
 		"INSERT INTO workbenches (id, workshop_id, name, repo_id, status, home_branch, current_branch) VALUES (?, ?, ?, ?, ?, ?, ?)",
 		id, workbench.WorkshopID, workbench.Name, repoID, status, homeBranch, currentBranch,
 	)
@@ -79,7 +91,9 @@ func (r *WorkbenchRepository) Create(ctx context.Context, workbench *secondary.W
 
 	// Log create operation
 	if r.eventWriter != nil {
-		_ = r.eventWriter.EmitAuditCreate(ctx, "workbench", id)
+		if err := r.eventWriter.EmitAuditCreate(ctx, "workbench", id); err != nil {
+			log.Printf("event: EmitAuditCreate workbench %s: %v", id, err)
+		}
 	}
 
 	return nil
@@ -429,7 +443,7 @@ func (r *WorkbenchRepository) GetByFocusedID(ctx context.Context, focusedID stri
 // GetNextID returns the next available workbench ID.
 func (r *WorkbenchRepository) GetNextID(ctx context.Context) (string, error) {
 	var maxID int
-	err := r.db.QueryRowContext(ctx,
+	err := r.conn(ctx).QueryRowContext(ctx,
 		"SELECT COALESCE(MAX(CAST(SUBSTR(id, 7) AS INTEGER)), 0) FROM workbenches",
 	).Scan(&maxID)
 	if err != nil {

@@ -11,42 +11,52 @@ import (
 // HookEventServiceImpl implements the HookEventService interface.
 type HookEventServiceImpl struct {
 	hookEventRepo secondary.HookEventRepository
+	transactor    secondary.Transactor
 }
 
 // NewHookEventService creates a new HookEventService with injected dependencies.
-func NewHookEventService(hookEventRepo secondary.HookEventRepository) *HookEventServiceImpl {
+func NewHookEventService(hookEventRepo secondary.HookEventRepository, transactor secondary.Transactor) *HookEventServiceImpl {
 	return &HookEventServiceImpl{
 		hookEventRepo: hookEventRepo,
+		transactor:    transactor,
 	}
 }
 
 // LogHookEvent logs a new hook invocation event.
 func (s *HookEventServiceImpl) LogHookEvent(ctx context.Context, req primary.LogHookEventRequest) (*primary.LogHookEventResponse, error) {
-	// Get next ID
-	nextID, err := s.hookEventRepo.GetNextID(ctx)
+	var nextID string
+	err := s.transactor.WithImmediateTx(ctx, func(txCtx context.Context) error {
+		// Get next ID
+		var err error
+		nextID, err = s.hookEventRepo.GetNextID(txCtx)
+		if err != nil {
+			return fmt.Errorf("failed to generate hook event ID: %w", err)
+		}
+
+		// Create record
+		record := &secondary.HookEventRecord{
+			ID:                  nextID,
+			WorkbenchID:         req.WorkbenchID,
+			HookType:            req.HookType,
+			PayloadJSON:         req.PayloadJSON,
+			Cwd:                 req.Cwd,
+			SessionID:           req.SessionID,
+			ShipmentID:          req.ShipmentID,
+			ShipmentStatus:      req.ShipmentStatus,
+			TaskCountIncomplete: req.TaskCountIncomplete,
+			Decision:            req.Decision,
+			Reason:              req.Reason,
+			DurationMs:          req.DurationMs,
+			Error:               req.Error,
+		}
+
+		if err := s.hookEventRepo.Create(txCtx, record); err != nil {
+			return fmt.Errorf("failed to log hook event: %w", err)
+		}
+		return nil
+	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate hook event ID: %w", err)
-	}
-
-	// Create record
-	record := &secondary.HookEventRecord{
-		ID:                  nextID,
-		WorkbenchID:         req.WorkbenchID,
-		HookType:            req.HookType,
-		PayloadJSON:         req.PayloadJSON,
-		Cwd:                 req.Cwd,
-		SessionID:           req.SessionID,
-		ShipmentID:          req.ShipmentID,
-		ShipmentStatus:      req.ShipmentStatus,
-		TaskCountIncomplete: req.TaskCountIncomplete,
-		Decision:            req.Decision,
-		Reason:              req.Reason,
-		DurationMs:          req.DurationMs,
-		Error:               req.Error,
-	}
-
-	if err := s.hookEventRepo.Create(ctx, record); err != nil {
-		return nil, fmt.Errorf("failed to log hook event: %w", err)
+		return nil, err
 	}
 
 	// Fetch created event

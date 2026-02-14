@@ -238,7 +238,7 @@ func TestPRService_CreatePR(t *testing.T) {
 			Status:       "in-progress",
 		}
 
-		svc := NewPRService(prRepo, shipmentSvc)
+		svc := NewPRService(prRepo, shipmentSvc, &mockTransactor{})
 
 		resp, err := svc.CreatePR(ctx, primary.CreatePRRequest{
 			ShipmentID: "SHIP-001",
@@ -271,7 +271,7 @@ func TestPRService_CreatePR(t *testing.T) {
 			Status:       "in-progress",
 		}
 
-		svc := NewPRService(prRepo, shipmentSvc)
+		svc := NewPRService(prRepo, shipmentSvc, &mockTransactor{})
 
 		resp, err := svc.CreatePR(ctx, primary.CreatePRRequest{
 			ShipmentID: "SHIP-001",
@@ -293,7 +293,7 @@ func TestPRService_CreatePR(t *testing.T) {
 		prRepo := newMockPRRepository()
 		prRepo.shipmentExists["SHIP-001"] = false
 
-		svc := NewPRService(prRepo, newMockShipmentServiceForPR())
+		svc := NewPRService(prRepo, newMockShipmentServiceForPR(), &mockTransactor{})
 
 		_, err := svc.CreatePR(ctx, primary.CreatePRRequest{
 			ShipmentID: "SHIP-001",
@@ -313,7 +313,7 @@ func TestPRService_CreatePR(t *testing.T) {
 		prRepo.shipmentStatus["SHIP-001"] = "paused"
 		prRepo.repoExists["REPO-001"] = true
 
-		svc := NewPRService(prRepo, newMockShipmentServiceForPR())
+		svc := NewPRService(prRepo, newMockShipmentServiceForPR(), &mockTransactor{})
 
 		_, err := svc.CreatePR(ctx, primary.CreatePRRequest{
 			ShipmentID: "SHIP-001",
@@ -334,7 +334,7 @@ func TestPRService_CreatePR(t *testing.T) {
 		prRepo.repoExists["REPO-001"] = true
 		prRepo.shipmentHasPR["SHIP-001"] = true
 
-		svc := NewPRService(prRepo, newMockShipmentServiceForPR())
+		svc := NewPRService(prRepo, newMockShipmentServiceForPR(), &mockTransactor{})
 
 		_, err := svc.CreatePR(ctx, primary.CreatePRRequest{
 			ShipmentID: "SHIP-001",
@@ -361,7 +361,7 @@ func TestPRService_MergePR(t *testing.T) {
 		}
 
 		shipmentSvc := newMockShipmentServiceForPR()
-		svc := NewPRService(prRepo, shipmentSvc)
+		svc := NewPRService(prRepo, shipmentSvc, &mockTransactor{})
 
 		err := svc.MergePR(ctx, "PR-001")
 		if err != nil {
@@ -388,7 +388,7 @@ func TestPRService_MergePR(t *testing.T) {
 			Status:     "approved",
 		}
 
-		svc := NewPRService(prRepo, newMockShipmentServiceForPR())
+		svc := NewPRService(prRepo, newMockShipmentServiceForPR(), &mockTransactor{})
 
 		err := svc.MergePR(ctx, "PR-001")
 		if err != nil {
@@ -408,7 +408,7 @@ func TestPRService_MergePR(t *testing.T) {
 			Status: "draft",
 		}
 
-		svc := NewPRService(prRepo, newMockShipmentServiceForPR())
+		svc := NewPRService(prRepo, newMockShipmentServiceForPR(), &mockTransactor{})
 
 		err := svc.MergePR(ctx, "PR-001")
 		if err == nil {
@@ -427,7 +427,7 @@ func TestPRService_ClosePR(t *testing.T) {
 			Status: "open",
 		}
 
-		svc := NewPRService(prRepo, newMockShipmentServiceForPR())
+		svc := NewPRService(prRepo, newMockShipmentServiceForPR(), &mockTransactor{})
 
 		err := svc.ClosePR(ctx, "PR-001")
 		if err != nil {
@@ -447,7 +447,7 @@ func TestPRService_ClosePR(t *testing.T) {
 			Status: "merged",
 		}
 
-		svc := NewPRService(prRepo, newMockShipmentServiceForPR())
+		svc := NewPRService(prRepo, newMockShipmentServiceForPR(), &mockTransactor{})
 
 		err := svc.ClosePR(ctx, "PR-001")
 		if err == nil {
@@ -466,7 +466,7 @@ func TestPRService_OpenPR(t *testing.T) {
 			Status: "draft",
 		}
 
-		svc := NewPRService(prRepo, newMockShipmentServiceForPR())
+		svc := NewPRService(prRepo, newMockShipmentServiceForPR(), &mockTransactor{})
 
 		err := svc.OpenPR(ctx, "PR-001")
 		if err != nil {
@@ -486,7 +486,7 @@ func TestPRService_OpenPR(t *testing.T) {
 			Status: "open",
 		}
 
-		svc := NewPRService(prRepo, newMockShipmentServiceForPR())
+		svc := NewPRService(prRepo, newMockShipmentServiceForPR(), &mockTransactor{})
 
 		err := svc.OpenPR(ctx, "PR-001")
 		if err == nil {

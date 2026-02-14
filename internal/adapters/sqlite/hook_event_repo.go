@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/example/orc/internal/db"
 	"github.com/example/orc/internal/ports/secondary"
 )
 
@@ -18,6 +19,14 @@ type HookEventRepository struct {
 // NewHookEventRepository creates a new SQLite hook event repository.
 func NewHookEventRepository(db *sql.DB) *HookEventRepository {
 	return &HookEventRepository{db: db}
+}
+
+// conn returns the context-carried transaction if present, otherwise r.db.
+func (r *HookEventRepository) conn(ctx context.Context) db.DBTX {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
+	return r.db
 }
 
 // Create persists a new hook event.
@@ -53,7 +62,7 @@ func (r *HookEventRepository) Create(ctx context.Context, event *secondary.HookE
 		errStr = sql.NullString{String: event.Error, Valid: true}
 	}
 
-	_, err := r.db.ExecContext(ctx,
+	_, err := r.conn(ctx).ExecContext(ctx,
 		`INSERT INTO hook_events (id, workbench_id, hook_type, payload_json, cwd, session_id, shipment_id, shipment_status, task_count_incomplete, decision, reason, duration_ms, error) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		event.ID,
 		event.WorkbenchID,
@@ -236,7 +245,7 @@ func (r *HookEventRepository) List(ctx context.Context, filters secondary.HookEv
 func (r *HookEventRepository) GetNextID(ctx context.Context) (string, error) {
 	var maxID int
 	prefixLen := len("HEV-") + 1
-	err := r.db.QueryRowContext(ctx,
+	err := r.conn(ctx).QueryRowContext(ctx,
 		fmt.Sprintf("SELECT COALESCE(MAX(CAST(SUBSTR(id, %d) AS INTEGER)), 0) FROM hook_events", prefixLen),
 	).Scan(&maxID)
 	if err != nil {

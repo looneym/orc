@@ -5,8 +5,10 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log"
 	"time"
 
+	"github.com/example/orc/internal/db"
 	"github.com/example/orc/internal/ports/secondary"
 )
 
@@ -20,6 +22,14 @@ type ShipmentRepository struct {
 // eventWriter is optional - if nil, no audit logging is performed.
 func NewShipmentRepository(db *sql.DB, eventWriter secondary.EventWriter) *ShipmentRepository {
 	return &ShipmentRepository{db: db, eventWriter: eventWriter}
+}
+
+// conn returns the context-carried transaction if present, otherwise r.db.
+func (r *ShipmentRepository) conn(ctx context.Context) db.DBTX {
+	if tx := db.TxFromContext(ctx); tx != nil {
+		return tx
+	}
+	return r.db
 }
 
 // Create persists a new shipment.
@@ -40,7 +50,7 @@ func (r *ShipmentRepository) Create(ctx context.Context, shipment *secondary.Shi
 	// All new shipments start as draft - shipments go directly under commissions
 	status := "draft"
 
-	_, err := r.db.ExecContext(ctx,
+	_, err := r.conn(ctx).ExecContext(ctx,
 		"INSERT INTO shipments (id, commission_id, title, description, status, repo_id, branch) VALUES (?, ?, ?, ?, ?, ?, ?)",
 		shipment.ID, shipment.CommissionID, shipment.Title, desc, status, repoID, branch,
 	)
@@ -50,7 +60,9 @@ func (r *ShipmentRepository) Create(ctx context.Context, shipment *secondary.Shi
 
 	// Log create operation
 	if r.eventWriter != nil {
-		_ = r.eventWriter.EmitAuditCreate(ctx, "shipment", shipment.ID)
+		if err := r.eventWriter.EmitAuditCreate(ctx, "shipment", shipment.ID); err != nil {
+			log.Printf("event: EmitAuditCreate shipment %s: %v", shipment.ID, err)
+		}
 	}
 
 	return nil
@@ -253,7 +265,7 @@ func (r *ShipmentRepository) Unpin(ctx context.Context, id string) error {
 // GetNextID returns the next available shipment ID.
 func (r *ShipmentRepository) GetNextID(ctx context.Context) (string, error) {
 	var maxID int
-	err := r.db.QueryRowContext(ctx,
+	err := r.conn(ctx).QueryRowContext(ctx,
 		"SELECT COALESCE(MAX(CAST(SUBSTR(id, 6) AS INTEGER)), 0) FROM shipments",
 	).Scan(&maxID)
 	if err != nil {

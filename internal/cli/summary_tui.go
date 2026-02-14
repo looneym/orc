@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"fmt"
+	"log"
 	"math/rand/v2"
 	"os"
 	"os/exec"
@@ -215,7 +216,9 @@ func (m summaryModel) emitEvent(level, message string, data map[string]string) {
 	if m.eventWriter == nil {
 		return
 	}
-	_ = m.eventWriter.EmitOperational(context.Background(), "summary-tui", level, message, data)
+	if err := m.eventWriter.EmitOperational(context.Background(), "summary-tui", level, message, data); err != nil {
+		log.Printf("event: EmitOperational summary-tui %s: %v", level, err)
+	}
 }
 
 // resolveWorkshopSession discovers the workshop tmux session name from the cwd context.

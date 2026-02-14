@@ -79,7 +79,7 @@ func (m *mockHookEventRepository) GetNextID(ctx context.Context) (string, error)
 
 func newTestHookEventService() (*HookEventServiceImpl, *mockHookEventRepository) {
 	repo := newMockHookEventRepository()
-	service := NewHookEventService(repo)
+	service := NewHookEventService(repo, &mockTransactor{})
 	return service, repo
 }
 
