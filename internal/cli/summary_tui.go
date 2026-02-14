@@ -424,6 +424,19 @@ func focusEntity(entityID string) tea.Cmd {
 	}
 }
 
+// clearFocus runs orc focus --clear to remove focus from the current entity.
+func clearFocus() tea.Cmd {
+	return func() tea.Msg {
+		orcBin, err := os.Executable()
+		if err != nil {
+			orcBin = "orc"
+		}
+		cmd := exec.Command(orcBin, "focus", "--clear")
+		err = cmd.Run()
+		return focusResultMsg{entityID: "", err: err}
+	}
+}
+
 // closeEntity runs the appropriate orc complete command for an entity.
 func closeEntity(entityID string) tea.Cmd {
 	return func() tea.Msg {
@@ -748,7 +761,13 @@ func (m summaryModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmd := setStatusMsg(&m, fmt.Sprintf("Focus error: %v", msg.err))
 			return m, cmd
 		}
-		m.statusMsg = fmt.Sprintf("Focused %s", msg.entityID)
+		// Update tracked focus for toggle behavior
+		m.opts.focusedEntityID = msg.entityID
+		if msg.entityID == "" {
+			m.statusMsg = "Focus cleared"
+		} else {
+			m.statusMsg = fmt.Sprintf("Focused %s", msg.entityID)
+		}
 		// Refresh tree data, repositioning cursor on the focused entity
 		return m, m.fetchSummary(msg.entityID)
 
@@ -860,9 +879,14 @@ func (m summaryModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "f":
 			entityID := m.cursorEntityID()
 			if entityID != "" && entityHasAction(entityID, "focus") {
+				// Toggle: unfocus if already focused, focus otherwise
+				if entityID == m.opts.focusedEntityID {
+					m.emitEvent("info", "unfocus", map[string]string{"action": "unfocus", "entity_id": entityID})
+					m.statusMsg = fmt.Sprintf("Unfocusing %s...", entityID)
+					return m, clearFocus()
+				}
 				m.emitEvent("info", "focus", map[string]string{"action": "focus", "entity_id": entityID})
-				cmd := setStatusMsg(&m, fmt.Sprintf("Focusing %s...", entityID))
-				_ = cmd // timer will fire but fetchSummary will also run
+				m.statusMsg = fmt.Sprintf("Focusing %s...", entityID)
 				return m, focusEntity(entityID)
 			}
 			return m, nil
