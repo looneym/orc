@@ -20,6 +20,13 @@ func NewAdapter(socket string) *Adapter {
 	return &Adapter{server: &tmuxpkg.Server{Socket: socket}}
 }
 
+// NewParentAdapter creates a TMux adapter that always targets the default server
+// by stripping the TMUX env var from child processes. Use this when running inside
+// a nested tmux session (e.g., a desk popup) and you need to reach the parent server.
+func NewParentAdapter() *Adapter {
+	return &Adapter{server: &tmuxpkg.Server{ClearTMUX: true}}
+}
+
 // SessionExists checks if a TMux session exists.
 func (a *Adapter) SessionExists(ctx context.Context, name string) bool {
 	return a.server.SessionExists(name)
@@ -203,6 +210,36 @@ func (a *Adapter) SetWindowOption(ctx context.Context, target, option, value str
 func (a *Adapter) SetupGoblinPane(ctx context.Context, sessionName, windowName string) error {
 	target := sessionName + ":" + windowName
 	return a.server.SetupGoblinPane(target)
+}
+
+// ShowEnvironment queries a tmux environment variable from the server (no session target).
+func (a *Adapter) ShowEnvironment(ctx context.Context, key string) (string, error) {
+	return a.server.ShowEnvironment(key)
+}
+
+// ListAllPanes lists panes across all sessions/windows with a filter and format string.
+func (a *Adapter) ListAllPanes(ctx context.Context, filter, format string) (string, error) {
+	return a.server.ListAllPanes(filter, format)
+}
+
+// GetPaneOption reads a tmux pane option via display-message.
+func (a *Adapter) GetPaneOption(ctx context.Context, paneID, option string) (string, error) {
+	return a.server.GetPaneOption(paneID, option)
+}
+
+// SendKeysLiteral sends text literally to a pane (with -l flag, no key interpretation).
+func (a *Adapter) SendKeysLiteral(ctx context.Context, target, text string) error {
+	return a.server.SendKeysLiteral(target, text)
+}
+
+// NewWindow creates a new window in a session with a name and optional command.
+func (a *Adapter) NewWindow(ctx context.Context, sessionName, windowName, command string) error {
+	return a.server.NewWindow(sessionName, windowName, command)
+}
+
+// DetachClient detaches the current tmux client.
+func (a *Adapter) DetachClient(ctx context.Context) error {
+	return a.server.DetachClient()
 }
 
 // IsOrcSession returns true if the current tmux session has ORC_WORKSHOP_ID set.

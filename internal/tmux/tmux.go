@@ -13,6 +13,11 @@ import (
 // An empty Socket means the default server.
 type Server struct {
 	Socket string
+
+	// ClearTMUX, when true, strips the TMUX environment variable from child
+	// processes so that commands always target the default tmux server, even
+	// when running inside a nested tmux session (e.g., a desk popup).
+	ClearTMUX bool
 }
 
 // DefaultServer returns a Server targeting the default tmux socket.
@@ -25,7 +30,17 @@ func (srv *Server) cmd(args ...string) *exec.Cmd {
 	if srv.Socket != "" {
 		args = append([]string{"-L", srv.Socket}, args...)
 	}
-	return exec.Command("tmux", args...)
+	c := exec.Command("tmux", args...)
+	if srv.ClearTMUX {
+		var env []string
+		for _, e := range os.Environ() {
+			if !strings.HasPrefix(e, "TMUX=") {
+				env = append(env, e)
+			}
+		}
+		c.Env = env
+	}
+	return c
 }
 
 // FactorySocket derives a tmux socket name from a factory name.
@@ -960,6 +975,100 @@ func (srv *Server) enrichWindow(sessionName, windowName string) error {
 	_ = srv.SetWindowOption(target, "@orc_enriched", "1")
 
 	return nil
+}
+
+// ShowEnvironment queries a tmux environment variable from the server (no session target).
+// This targets the global/server-level environment, useful inside desk popups.
+// Returns the value, or error if not found.
+func (srv *Server) ShowEnvironment(key string) (string, error) {
+	output, err := srv.cmd("show-environment", key).Output()
+	if err != nil {
+		return "", err
+	}
+	// Output format: "KEY=value\n"
+	line := strings.TrimSpace(string(output))
+	if strings.HasPrefix(line, key+"=") {
+		return strings.TrimPrefix(line, key+"="), nil
+	}
+	return "", fmt.Errorf("env var %s not found", key)
+}
+
+// ShowEnvironment queries a tmux environment variable from the default server.
+func ShowEnvironment(key string) (string, error) {
+	return DefaultServer().ShowEnvironment(key)
+}
+
+// ListAllPanes lists panes across all sessions/windows with a filter and format string.
+// filter is a tmux filter expression (e.g., "#{==:#{@pane_role},goblin}").
+// format is a tmux format string (e.g., "#{pane_id}").
+// Returns the raw output string.
+func (srv *Server) ListAllPanes(filter, format string) (string, error) {
+	output, err := srv.cmd("list-panes", "-a", "-f", filter, "-F", format).Output()
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(output)), nil
+}
+
+// ListAllPanes lists panes across all sessions/windows on the default server.
+func ListAllPanes(filter, format string) (string, error) {
+	return DefaultServer().ListAllPanes(filter, format)
+}
+
+// GetPaneOption reads a tmux pane option via display-message.
+// option should include the format syntax, e.g., "#{@pane_role}".
+func (srv *Server) GetPaneOption(paneID, option string) (string, error) {
+	output, err := srv.cmd("display-message", "-t", paneID, "-p", option).Output()
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(output)), nil
+}
+
+// GetPaneOption reads a tmux pane option on the default server.
+func GetPaneOption(paneID, option string) (string, error) {
+	return DefaultServer().GetPaneOption(paneID, option)
+}
+
+// SendKeysLiteral sends text literally to a pane (with -l flag, no key interpretation).
+func (srv *Server) SendKeysLiteral(target, text string) error {
+	return srv.cmd("send-keys", "-t", target, "-l", text).Run()
+}
+
+// SendKeysLiteral sends text literally to a pane on the default server.
+func SendKeysLiteral(target, text string) error {
+	return DefaultServer().SendKeysLiteral(target, text)
+}
+
+// NewWindow creates a new window in a session with a name and optional command.
+// If sessionName is empty, the window is created in the current session.
+func (srv *Server) NewWindow(sessionName, windowName, command string) error {
+	args := []string{"new-window"}
+	if sessionName != "" {
+		args = append(args, "-t", sessionName)
+	}
+	if windowName != "" {
+		args = append(args, "-n", windowName)
+	}
+	if command != "" {
+		args = append(args, command)
+	}
+	return srv.cmd(args...).Run()
+}
+
+// NewWindow creates a new window in a session on the default server.
+func NewWindow(sessionName, windowName, command string) error {
+	return DefaultServer().NewWindow(sessionName, windowName, command)
+}
+
+// DetachClient detaches the current tmux client.
+func (srv *Server) DetachClient() error {
+	return srv.cmd("detach-client").Run()
+}
+
+// DetachClient detaches the current tmux client on the default server.
+func DetachClient() error {
+	return DefaultServer().DetachClient()
 }
 
 // DeskServerInfo describes a discovered desk tmux server.

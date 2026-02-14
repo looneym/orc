@@ -1,12 +1,16 @@
 package cli
 
 import (
+	"context"
 	"math/rand/v2"
+	"os/exec"
 	"strings"
 	"testing"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+
+	"github.com/example/orc/internal/ports/secondary"
 )
 
 func TestTreeDepth(t *testing.T) {
@@ -518,12 +522,9 @@ func TestStatusBarDuringAnimation(t *testing.T) {
 }
 
 func TestDeskModeQuitBehavior(t *testing.T) {
-	m := summaryModel{
-		expanded:      make(map[string]bool),
-		entityIndices: []int{},
-		isDeskSession: true,
-		detachFn:      func() {}, // no-op: avoid real tmux detach-client in tests
-	}
+	m := newSafeTestModel()
+	m.entityIndices = []int{}
+	m.isDeskSession = true
 
 	t.Run("q in desk mode returns nil cmd (detach)", func(t *testing.T) {
 		_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'q'}})
@@ -642,3 +643,116 @@ func newTestRand() *rand.Rand {
 
 // Verify time import is used (compile-time check)
 var _ = time.Second
+
+// noopFns returns no-op function fields for tests, ensuring no real side effects.
+func noopFns() (
+	func(string) error,
+	func(...string) ([]byte, error),
+	func(...string) *exec.Cmd,
+	func(string) *exec.Cmd,
+	func(string, string) *exec.Cmd,
+) {
+	return func(string) error { return nil },
+		func(...string) ([]byte, error) { return nil, nil },
+		func(args ...string) *exec.Cmd { return exec.Command("true") },
+		func(string) *exec.Cmd { return exec.Command("true") },
+		func(string, string) *exec.Cmd { return exec.Command("true") }
+}
+
+// newSafeTestModel creates a summaryModel with all side-effect fields set to no-ops.
+// Tests can override specific fields after creation.
+func newSafeTestModel() summaryModel {
+	noop := &noopTMuxAdapter{}
+	clip, orc, orcExec, editor, vim := noopFns()
+	return summaryModel{
+		expanded:      make(map[string]bool),
+		tmuxAdapter:   noop,
+		parentTmux:    noop,
+		clipboardFn:   clip,
+		orcCommandFn:  orc,
+		orcExecCmdFn:  orcExec,
+		editorCmdFn:   editor,
+		vimReadOnlyFn: vim,
+		animRand:      newTestRand(),
+	}
+}
+
+// noopTMuxAdapter is a no-op TMuxAdapter for tests, ensuring no real tmux side effects.
+type noopTMuxAdapter struct{}
+
+func (n *noopTMuxAdapter) SessionExists(_ context.Context, _ string) bool { return false }
+func (n *noopTMuxAdapter) KillSession(_ context.Context, _ string) error  { return nil }
+func (n *noopTMuxAdapter) GetSessionInfo(_ context.Context, _ string) (string, error) {
+	return "", nil
+}
+func (n *noopTMuxAdapter) WindowExists(_ context.Context, _, _ string) bool { return false }
+func (n *noopTMuxAdapter) KillWindow(_ context.Context, _, _ string) error  { return nil }
+func (n *noopTMuxAdapter) SendKeys(_ context.Context, _, _ string) error    { return nil }
+func (n *noopTMuxAdapter) GetPaneCount(_ context.Context, _, _ string) int  { return 0 }
+func (n *noopTMuxAdapter) GetPaneCommand(_ context.Context, _, _ string, _ int) string {
+	return ""
+}
+func (n *noopTMuxAdapter) GetPaneStartPath(_ context.Context, _, _ string, _ int) string {
+	return ""
+}
+func (n *noopTMuxAdapter) GetPaneStartCommand(_ context.Context, _, _ string, _ int) string {
+	return ""
+}
+func (n *noopTMuxAdapter) CapturePaneContent(_ context.Context, _ string, _ int) (string, error) {
+	return "", nil
+}
+func (n *noopTMuxAdapter) SplitVertical(_ context.Context, _, _ string) error   { return nil }
+func (n *noopTMuxAdapter) SplitHorizontal(_ context.Context, _, _ string) error { return nil }
+func (n *noopTMuxAdapter) JoinPane(_ context.Context, _, _ string, _ bool, _ int) error {
+	return nil
+}
+func (n *noopTMuxAdapter) AttachInstructions(_ string) string                    { return "" }
+func (n *noopTMuxAdapter) SelectWindow(_ context.Context, _ string, _ int) error { return nil }
+func (n *noopTMuxAdapter) RenameWindow(_ context.Context, _, _ string) error     { return nil }
+func (n *noopTMuxAdapter) RespawnPane(_ context.Context, _ string, _ ...string) error {
+	return nil
+}
+func (n *noopTMuxAdapter) RenameSession(_ context.Context, _, _ string) error { return nil }
+func (n *noopTMuxAdapter) ConfigureStatusBar(_ context.Context, _ string, _ secondary.StatusBarConfig) error {
+	return nil
+}
+func (n *noopTMuxAdapter) DisplayPopup(_ context.Context, _, _ string, _ secondary.PopupConfig) error {
+	return nil
+}
+func (n *noopTMuxAdapter) ConfigureSessionBindings(_ context.Context, _ string, _ []secondary.KeyBinding) error {
+	return nil
+}
+func (n *noopTMuxAdapter) ConfigureSessionPopupBindings(_ context.Context, _ string, _ []secondary.PopupKeyBinding) error {
+	return nil
+}
+func (n *noopTMuxAdapter) GetCurrentSessionName(_ context.Context) string { return "" }
+func (n *noopTMuxAdapter) SetEnvironment(_ context.Context, _, _, _ string) error {
+	return nil
+}
+func (n *noopTMuxAdapter) GetEnvironment(_ context.Context, _, _ string) (string, error) {
+	return "", nil
+}
+func (n *noopTMuxAdapter) ListSessions(_ context.Context) ([]string, error) { return nil, nil }
+func (n *noopTMuxAdapter) FindSessionByWorkshopID(_ context.Context, _ string) string {
+	return ""
+}
+func (n *noopTMuxAdapter) ListWindows(_ context.Context, _ string) ([]string, error) {
+	return nil, nil
+}
+func (n *noopTMuxAdapter) GetWindowOption(_ context.Context, _, _ string) string { return "" }
+func (n *noopTMuxAdapter) SetWindowOption(_ context.Context, _, _, _ string) error {
+	return nil
+}
+func (n *noopTMuxAdapter) SetupGoblinPane(_ context.Context, _, _ string) error { return nil }
+func (n *noopTMuxAdapter) ShowEnvironment(_ context.Context, _ string) (string, error) {
+	return "", nil
+}
+func (n *noopTMuxAdapter) ListAllPanes(_ context.Context, _, _ string) (string, error) {
+	return "", nil
+}
+func (n *noopTMuxAdapter) GetPaneOption(_ context.Context, _, _ string) (string, error) {
+	return "", nil
+}
+func (n *noopTMuxAdapter) SendKeysLiteral(_ context.Context, _, _ string) error { return nil }
+func (n *noopTMuxAdapter) NewWindow(_ context.Context, _, _, _ string) error    { return nil }
+func (n *noopTMuxAdapter) DetachClient(_ context.Context) error                 { return nil }

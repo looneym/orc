@@ -85,4 +85,12 @@ type TMuxAdapter interface {
 
 	// Goblin window setup
 	SetupGoblinPane(ctx context.Context, sessionName, windowName string) error
+
+	// TUI operations
+	ShowEnvironment(ctx context.Context, key string) (string, error)
+	ListAllPanes(ctx context.Context, filter, format string) (string, error)
+	GetPaneOption(ctx context.Context, paneID, option string) (string, error)
+	SendKeysLiteral(ctx context.Context, target, text string) error
+	NewWindow(ctx context.Context, sessionName, windowName, command string) error
+	DetachClient(ctx context.Context) error
 }

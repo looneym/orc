@@ -479,6 +479,24 @@ func (m *mockTMuxAdapter) SetWindowOption(ctx context.Context, target, option, v
 func (m *mockTMuxAdapter) SetupGoblinPane(ctx context.Context, sessionName, windowName string) error {
 	return nil
 }
+func (m *mockTMuxAdapter) ShowEnvironment(ctx context.Context, key string) (string, error) {
+	return "", nil
+}
+func (m *mockTMuxAdapter) ListAllPanes(ctx context.Context, filter, format string) (string, error) {
+	return "", nil
+}
+func (m *mockTMuxAdapter) GetPaneOption(ctx context.Context, paneID, option string) (string, error) {
+	return "", nil
+}
+func (m *mockTMuxAdapter) SendKeysLiteral(ctx context.Context, target, text string) error {
+	return nil
+}
+func (m *mockTMuxAdapter) NewWindow(ctx context.Context, sessionName, windowName, command string) error {
+	return nil
+}
+func (m *mockTMuxAdapter) DetachClient(ctx context.Context) error {
+	return nil
+}
 
 // ============================================================================
 // Test Helper

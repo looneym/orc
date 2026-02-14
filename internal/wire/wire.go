@@ -38,6 +38,7 @@ var (
 	hookEventService               primary.HookEventService
 	commissionOrchestrationService *app.CommissionOrchestrationService
 	tmuxService                    secondary.TMuxAdapter
+	parentTmuxService              secondary.TMuxAdapter
 	shipmentRepo                   secondary.ShipmentRepository
 	eventWriterInstance            secondary.EventWriter
 	once                           sync.Once
@@ -145,6 +146,13 @@ func TMuxAdapter() secondary.TMuxAdapter {
 	return tmuxService
 }
 
+// ParentTMuxAdapter returns an adapter that always targets the default tmux server
+// by stripping the TMUX env var. Use when running inside a nested session (e.g., desk popup).
+func ParentTMuxAdapter() secondary.TMuxAdapter {
+	once.Do(initServices)
+	return parentTmuxService
+}
+
 // ShipmentRepository returns the singleton ShipmentRepository instance.
 func ShipmentRepository() secondary.ShipmentRepository {
 	once.Do(initServices)
@@ -178,8 +186,9 @@ func initServices() {
 	// Create repository adapters (secondary ports) - sqlite adapters with injected DB
 	commissionRepo := sqlite.NewCommissionRepository(database, eventWriter)
 	agentProvider := persistence.NewAgentIdentityProvider()
-	tmuxAdapter := tmuxadapter.NewAdapter("") // default factory → default tmux server
-	tmuxService = tmuxAdapter                 // Store for getter
+	tmuxAdapter := tmuxadapter.NewAdapter("")          // default factory → default tmux server
+	tmuxService = tmuxAdapter                          // Store for getter
+	parentTmuxService = tmuxadapter.NewParentAdapter() // always targets default server (strips TMUX env)
 
 	// Create workspace adapter (needed by effect executor and workshop service)
 	home, _ := os.UserHomeDir()
