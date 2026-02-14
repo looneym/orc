@@ -21,7 +21,6 @@ type Shipment struct {
 	RepoID              sql.NullString // REPO-xxx - linked repository for branch ownership
 	Branch              sql.NullString // Owned branch (e.g., ml/SHIP-001-feature-name)
 	Pinned              bool
-	SpecNoteID          sql.NullString // NOTE-xxx - spec note that generated this shipment
 	CreatedAt           time.Time
 	UpdatedAt           time.Time
 	CompletedAt         sql.NullTime

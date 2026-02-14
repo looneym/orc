@@ -63,7 +63,6 @@ type CreateShipmentRequest struct {
 	Description  string
 	RepoID       string // Optional - link shipment to a repository for branch ownership
 	Branch       string // Optional - override auto-generated branch name
-	SpecNoteID   string // Optional: NOTE-xxx - spec note that generated this shipment
 }
 
 // CreateShipmentResponse contains the result of creating a shipment.
@@ -92,7 +91,6 @@ type Shipment struct {
 	RepoID              string // Linked repository for branch ownership
 	Branch              string // Owned branch (e.g., ml/SHIP-001-feature-name)
 	Pinned              bool
-	SpecNoteID          string // Spec note that generated this shipment (NOTE-xxx)
 	CreatedAt           string
 	UpdatedAt           string
 	CompletedAt         string

@@ -37,17 +37,12 @@ func (r *ShipmentRepository) Create(ctx context.Context, shipment *secondary.Shi
 		branch = sql.NullString{String: shipment.Branch, Valid: true}
 	}
 
-	var specNoteID sql.NullString
-	if shipment.SpecNoteID != "" {
-		specNoteID = sql.NullString{String: shipment.SpecNoteID, Valid: true}
-	}
-
 	// All new shipments start as draft - shipments go directly under commissions
 	status := "draft"
 
 	_, err := r.db.ExecContext(ctx,
-		"INSERT INTO shipments (id, commission_id, title, description, status, repo_id, branch, spec_note_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-		shipment.ID, shipment.CommissionID, shipment.Title, desc, status, repoID, branch, specNoteID,
+		"INSERT INTO shipments (id, commission_id, title, description, status, repo_id, branch) VALUES (?, ?, ?, ?, ?, ?, ?)",
+		shipment.ID, shipment.CommissionID, shipment.Title, desc, status, repoID, branch,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create shipment: %w", err)
@@ -68,7 +63,6 @@ func (r *ShipmentRepository) GetByID(ctx context.Context, id string) (*secondary
 		assignedWorkbenchID sql.NullString
 		repoID              sql.NullString
 		branch              sql.NullString
-		specNoteID          sql.NullString
 		pinned              bool
 		createdAt           time.Time
 		updatedAt           time.Time
@@ -77,9 +71,9 @@ func (r *ShipmentRepository) GetByID(ctx context.Context, id string) (*secondary
 
 	record := &secondary.ShipmentRecord{}
 	err := r.db.QueryRowContext(ctx,
-		"SELECT id, commission_id, title, description, status, assigned_workbench_id, repo_id, branch, pinned, created_at, updated_at, completed_at, spec_note_id FROM shipments WHERE id = ?",
+		"SELECT id, commission_id, title, description, status, assigned_workbench_id, repo_id, branch, pinned, created_at, updated_at, completed_at FROM shipments WHERE id = ?",
 		id,
-	).Scan(&record.ID, &record.CommissionID, &record.Title, &desc, &record.Status, &assignedWorkbenchID, &repoID, &branch, &pinned, &createdAt, &updatedAt, &completedAt, &specNoteID)
+	).Scan(&record.ID, &record.CommissionID, &record.Title, &desc, &record.Status, &assignedWorkbenchID, &repoID, &branch, &pinned, &createdAt, &updatedAt, &completedAt)
 
 	if err == sql.ErrNoRows {
 		return nil, fmt.Errorf("shipment %s not found", id)
@@ -96,7 +90,6 @@ func (r *ShipmentRepository) GetByID(ctx context.Context, id string) (*secondary
 	if branch.Valid {
 		record.Branch = branch.String
 	}
-	record.SpecNoteID = specNoteID.String
 	record.Pinned = pinned
 	record.CreatedAt = createdAt.Format(time.RFC3339)
 	record.UpdatedAt = updatedAt.Format(time.RFC3339)
@@ -109,7 +102,7 @@ func (r *ShipmentRepository) GetByID(ctx context.Context, id string) (*secondary
 
 // List retrieves shipments matching the given filters.
 func (r *ShipmentRepository) List(ctx context.Context, filters secondary.ShipmentFilters) ([]*secondary.ShipmentRecord, error) {
-	query := "SELECT id, commission_id, title, description, status, assigned_workbench_id, repo_id, branch, pinned, created_at, updated_at, completed_at, spec_note_id FROM shipments WHERE 1=1"
+	query := "SELECT id, commission_id, title, description, status, assigned_workbench_id, repo_id, branch, pinned, created_at, updated_at, completed_at FROM shipments WHERE 1=1"
 	args := []any{}
 
 	if filters.CommissionID != "" {
@@ -137,7 +130,6 @@ func (r *ShipmentRepository) List(ctx context.Context, filters secondary.Shipmen
 			assignedWorkbenchID sql.NullString
 			repoID              sql.NullString
 			branch              sql.NullString
-			specNoteID          sql.NullString
 			pinned              bool
 			createdAt           time.Time
 			updatedAt           time.Time
@@ -145,7 +137,7 @@ func (r *ShipmentRepository) List(ctx context.Context, filters secondary.Shipmen
 		)
 
 		record := &secondary.ShipmentRecord{}
-		err := rows.Scan(&record.ID, &record.CommissionID, &record.Title, &desc, &record.Status, &assignedWorkbenchID, &repoID, &branch, &pinned, &createdAt, &updatedAt, &completedAt, &specNoteID)
+		err := rows.Scan(&record.ID, &record.CommissionID, &record.Title, &desc, &record.Status, &assignedWorkbenchID, &repoID, &branch, &pinned, &createdAt, &updatedAt, &completedAt)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan shipment: %w", err)
 		}
@@ -158,7 +150,6 @@ func (r *ShipmentRepository) List(ctx context.Context, filters secondary.Shipmen
 		if branch.Valid {
 			record.Branch = branch.String
 		}
-		record.SpecNoteID = specNoteID.String
 		record.Pinned = pinned
 		record.CreatedAt = createdAt.Format(time.RFC3339)
 		record.UpdatedAt = updatedAt.Format(time.RFC3339)
@@ -274,7 +265,7 @@ func (r *ShipmentRepository) GetNextID(ctx context.Context) (string, error) {
 
 // GetByWorkbench retrieves shipments assigned to a workbench.
 func (r *ShipmentRepository) GetByWorkbench(ctx context.Context, workbenchID string) ([]*secondary.ShipmentRecord, error) {
-	query := "SELECT id, commission_id, title, description, status, assigned_workbench_id, repo_id, branch, pinned, created_at, updated_at, completed_at, spec_note_id FROM shipments WHERE assigned_workbench_id = ?"
+	query := "SELECT id, commission_id, title, description, status, assigned_workbench_id, repo_id, branch, pinned, created_at, updated_at, completed_at FROM shipments WHERE assigned_workbench_id = ?"
 	rows, err := r.db.QueryContext(ctx, query, workbenchID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get shipments by workbench: %w", err)
@@ -288,7 +279,6 @@ func (r *ShipmentRepository) GetByWorkbench(ctx context.Context, workbenchID str
 			assignedWorkbenchID sql.NullString
 			repoID              sql.NullString
 			branch              sql.NullString
-			specNoteID          sql.NullString
 			pinned              bool
 			createdAt           time.Time
 			updatedAt           time.Time
@@ -296,7 +286,7 @@ func (r *ShipmentRepository) GetByWorkbench(ctx context.Context, workbenchID str
 		)
 
 		record := &secondary.ShipmentRecord{}
-		err := rows.Scan(&record.ID, &record.CommissionID, &record.Title, &desc, &record.Status, &assignedWorkbenchID, &repoID, &branch, &pinned, &createdAt, &updatedAt, &completedAt, &specNoteID)
+		err := rows.Scan(&record.ID, &record.CommissionID, &record.Title, &desc, &record.Status, &assignedWorkbenchID, &repoID, &branch, &pinned, &createdAt, &updatedAt, &completedAt)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan shipment: %w", err)
 		}
@@ -309,7 +299,6 @@ func (r *ShipmentRepository) GetByWorkbench(ctx context.Context, workbenchID str
 		if branch.Valid {
 			record.Branch = branch.String
 		}
-		record.SpecNoteID = specNoteID.String
 		record.Pinned = pinned
 		record.CreatedAt = createdAt.Format(time.RFC3339)
 		record.UpdatedAt = updatedAt.Format(time.RFC3339)

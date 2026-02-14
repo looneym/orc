@@ -136,7 +136,6 @@ type ShipmentRecord struct {
 	RepoID              string // Empty string means null - FK to repos table
 	Branch              string // Empty string means null - owned branch (e.g., ml/SHIP-001-feature-name)
 	Pinned              bool
-	SpecNoteID          string // Empty string means null - spec note that generated this shipment (NOTE-xxx)
 	CreatedAt           string
 	UpdatedAt           string
 	CompletedAt         string // Empty string means null

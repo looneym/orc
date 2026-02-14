@@ -279,13 +279,15 @@ func (m *mockTaskRepositoryForShipment) GetNextEntityTagID(ctx context.Context) 
 
 // mockNoteServiceForShipment implements primary.NoteService for testing.
 type mockNoteServiceForShipment struct {
-	closedNotes map[string]string // noteID -> reason
-	closeErr    error
+	closedNotes    map[string]string // noteID -> reason
+	closeErr       error
+	containerNotes map[string][]*primary.Note // "containerType:containerID" -> notes
 }
 
 func newMockNoteServiceForShipment() *mockNoteServiceForShipment {
 	return &mockNoteServiceForShipment{
-		closedNotes: make(map[string]string),
+		closedNotes:    make(map[string]string),
+		containerNotes: make(map[string][]*primary.Note),
 	}
 }
 
@@ -317,8 +319,9 @@ func (m *mockNoteServiceForShipment) UnpinNote(_ context.Context, _ string) erro
 	return nil
 }
 
-func (m *mockNoteServiceForShipment) GetNotesByContainer(_ context.Context, _, _ string) ([]*primary.Note, error) {
-	return nil, nil
+func (m *mockNoteServiceForShipment) GetNotesByContainer(_ context.Context, containerType, containerID string) ([]*primary.Note, error) {
+	key := containerType + ":" + containerID
+	return m.containerNotes[key], nil
 }
 
 func (m *mockNoteServiceForShipment) CloseNote(_ context.Context, req primary.CloseNoteRequest) error {
@@ -847,67 +850,7 @@ func TestDeleteShipment_Success(t *testing.T) {
 }
 
 // ============================================================================
-// CreateShipment with SpecNoteID Tests
-// ============================================================================
-
-func TestCreateShipment_WithSpecNoteID(t *testing.T) {
-	shipmentRepo := newMockShipmentRepository()
-	taskRepo := newMockTaskRepositoryForShipment()
-	noteService := newMockNoteServiceForShipment()
-	service := NewShipmentService(shipmentRepo, taskRepo, noteService)
-	ctx := context.Background()
-
-	req := primary.CreateShipmentRequest{
-		CommissionID: "COMM-001",
-		Title:        "Shipment from Spec",
-		SpecNoteID:   "NOTE-001",
-	}
-
-	resp, err := service.CreateShipment(ctx, req)
-
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-
-	// Verify SpecNoteID was stored
-	record := shipmentRepo.shipments[resp.ShipmentID]
-	if record.SpecNoteID != "NOTE-001" {
-		t.Errorf("expected SpecNoteID 'NOTE-001', got '%s'", record.SpecNoteID)
-	}
-
-	// Verify it's returned in response
-	if resp.Shipment.SpecNoteID != "NOTE-001" {
-		t.Errorf("expected Shipment.SpecNoteID 'NOTE-001', got '%s'", resp.Shipment.SpecNoteID)
-	}
-}
-
-func TestCreateShipment_WithoutSpecNoteID(t *testing.T) {
-	shipmentRepo := newMockShipmentRepository()
-	taskRepo := newMockTaskRepositoryForShipment()
-	noteService := newMockNoteServiceForShipment()
-	service := NewShipmentService(shipmentRepo, taskRepo, noteService)
-	ctx := context.Background()
-
-	req := primary.CreateShipmentRequest{
-		CommissionID: "COMM-001",
-		Title:        "Shipment without Spec",
-	}
-
-	resp, err := service.CreateShipment(ctx, req)
-
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-
-	// Verify SpecNoteID is empty
-	record := shipmentRepo.shipments[resp.ShipmentID]
-	if record.SpecNoteID != "" {
-		t.Errorf("expected empty SpecNoteID, got '%s'", record.SpecNoteID)
-	}
-}
-
-// ============================================================================
-// CompleteShipment with SpecNoteID Tests
+// CompleteShipment Spec Note Tests
 // ============================================================================
 
 func TestCompleteShipment_ClosesSpecNote(t *testing.T) {
@@ -917,13 +860,22 @@ func TestCompleteShipment_ClosesSpecNote(t *testing.T) {
 	service := NewShipmentService(shipmentRepo, taskRepo, noteService)
 	ctx := context.Background()
 
-	// Create a shipment with a SpecNoteID
+	// Create a shipment
 	shipmentRepo.shipments["SHIP-001"] = &secondary.ShipmentRecord{
 		ID:           "SHIP-001",
 		CommissionID: "COMM-001",
 		Title:        "Test Shipment",
 		Status:       "draft",
-		SpecNoteID:   "NOTE-001",
+	}
+
+	// Attach a type=spec note to the shipment's container
+	noteService.containerNotes["shipment:SHIP-001"] = []*primary.Note{
+		{
+			ID:         "NOTE-001",
+			Type:       "spec",
+			Status:     "open",
+			ShipmentID: "SHIP-001",
+		},
 	}
 
 	err := service.CompleteShipment(ctx, "SHIP-001", true)
@@ -949,7 +901,7 @@ func TestCompleteShipment_WithoutSpecNote(t *testing.T) {
 	service := NewShipmentService(shipmentRepo, taskRepo, noteService)
 	ctx := context.Background()
 
-	// Create a shipment without SpecNoteID
+	// Create a shipment with no notes attached
 	shipmentRepo.shipments["SHIP-001"] = &secondary.ShipmentRecord{
 		ID:           "SHIP-001",
 		CommissionID: "COMM-001",
