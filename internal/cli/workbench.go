@@ -251,9 +251,9 @@ Examples:
 			fmt.Printf("  Name: %s\n", workbench.Name)
 			fmt.Printf("  Path: %s\n", workbench.Path)
 
-			// Kill utils tmux server for this workbench (no-op if not running)
-			if err := wire.KillUtilsServer(workbench.Name); err == nil {
-				fmt.Printf("  Killed utils server for %s\n", workbench.Name)
+			// Kill desk tmux server for this workbench (no-op if not running)
+			if err := wire.KillDeskServer(workbench.Name); err == nil {
+				fmt.Printf("  Killed desk server for %s\n", workbench.Name)
 			}
 
 			fmt.Printf("\nTo remove the worktree, run:\n")

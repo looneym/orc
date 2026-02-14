@@ -392,13 +392,12 @@ func AttachInstructions(sessionName string) string {
 	b.WriteString(fmt.Sprintf("Attach to session: tmux attach -t %s\n", sessionName))
 	b.WriteString("\n")
 	b.WriteString("Window Layout:\n")
-	b.WriteString("  Window 1 (orc): ORC orchestrator (claude | vim | shell)\n")
-	b.WriteString("  Windows 2+: Workbench workspaces (vim | claude IMP | shell)\n")
+	b.WriteString("  Each window has a single goblin pane (orc connect)\n")
 	b.WriteString("\n")
 	b.WriteString("TMux Commands:\n")
 	b.WriteString("  Switch windows: Ctrl+b then window number (1, 2, 3...)\n")
-	b.WriteString("  Switch panes: Ctrl+b then arrow keys\n")
 	b.WriteString("  Detach session: Ctrl+b then d\n")
+	b.WriteString("  Open desk: Double-click status bar or Ctrl+b then u\n")
 	b.WriteString("  List windows: Ctrl+b then w\n")
 
 	return b.String()
@@ -522,25 +521,25 @@ func BindContextMenu(key, title string, items []MenuItem) error {
 // ApplyGlobalBindings sets up ORC's global tmux key bindings.
 // Safe to call repeatedly (idempotent). Silently ignores errors (tmux may not be running).
 func ApplyGlobalBindings() {
-	// Utils popup command — shared by double-click, prefix+u, and context menu
+	// Desk popup command — shared by double-click, prefix+u, and context menu
 	// Note: display-popup does NOT expand #{} formats in shell-command,
 	// so the script queries the main tmux server directly via TMUX env var.
-	utilsPopup := "$HOME/.orc/tmux/orc-utils-popup.sh"
-	utilsPopupArgs := []string{
+	deskPopup := "$HOME/.orc/tmux/orc-desk-popup.sh"
+	deskPopupArgs := []string{
 		"display-popup", "-E", "-w", "80%", "-h", "80%",
-		"-T", " ORC Utils ", utilsPopup,
+		"-T", " ORC Desk ", deskPopup,
 	}
 
-	// Double-click status bar → utils popup
-	_ = exec.Command("tmux", append([]string{"bind-key", "-T", "root", "DoubleClick1Status"}, utilsPopupArgs...)...).Run()
+	// Double-click status bar → desk popup
+	_ = exec.Command("tmux", append([]string{"bind-key", "-T", "root", "DoubleClick1Status"}, deskPopupArgs...)...).Run()
 
-	// prefix+u → utils popup
-	_ = exec.Command("tmux", append([]string{"bind-key", "-T", "prefix", "u"}, utilsPopupArgs...)...).Run()
+	// prefix+u → desk popup
+	_ = exec.Command("tmux", append([]string{"bind-key", "-T", "prefix", "u"}, deskPopupArgs...)...).Run()
 
 	// Right-click status bar → context menu
 	_ = BindContextMenu("MouseDown3Status", " ORC ", []MenuItem{
 		// ORC custom options
-		{Label: "Show Summary", Key: "s", Command: "display-popup -E -w 80% -h 80% -T ' ORC Utils ' '" + utilsPopup + "'"},
+		{Label: "Show Summary", Key: "s", Command: "display-popup -E -w 80% -h 80% -T ' ORC Desk ' '" + deskPopup + "'"},
 		{Label: "Archive Workbench", Key: "a", Command: "display-popup -E -w 80 -h 20 -T 'Archive Workbench' 'cd #{pane_current_path} && orc tmux archive-workbench'"},
 		// Separator
 		{Label: "", Key: "", Command: ""},
@@ -746,64 +745,6 @@ func MoveWindowAfter(sessionName, windowName, afterWindow string) error {
 	return cmd.Run()
 }
 
-// RefreshWorkbenchLayout relocates guest panes to a sibling -imps window
-func RefreshWorkbenchLayout(sessionName, workbenchWindow string) error {
-	// 1. List all panes in the workbench window
-	panes, err := ListPanes(sessionName, workbenchWindow)
-	if err != nil {
-		return fmt.Errorf("failed to list panes: %w", err)
-	}
-
-	// 2. Find guest panes (no PANE_ROLE)
-	var guestPanes []PaneInfo
-	for _, pane := range panes {
-		if !pane.HasRole {
-			guestPanes = append(guestPanes, pane)
-		}
-	}
-
-	// If no guests, nothing to do
-	if len(guestPanes) == 0 {
-		return nil
-	}
-
-	// 3. Create or find the -imps window
-	impsWindow := workbenchWindow + "-imps"
-	impsExists := WindowExists(sessionName, impsWindow)
-
-	if !impsExists {
-		// Create new window after the workbench window
-		// Break the first guest pane into a new window in the correct session.
-		// Without -t, break-pane creates the window in the CALLER's session, not the source pane's session.
-		firstGuest := guestPanes[0]
-		sessionTarget := exactSession(sessionName) + ":"
-		cmd := exec.Command("tmux", "break-pane", "-s", firstGuest.ID, "-t", sessionTarget, "-n", impsWindow)
-		if err := cmd.Run(); err != nil {
-			return fmt.Errorf("failed to create imps window: %w", err)
-		}
-
-		// Move it to be right after the workbench window
-		if err := MoveWindowAfter(sessionName, impsWindow, workbenchWindow); err != nil {
-			// Non-fatal - window was created, just not in ideal position
-			fmt.Printf("Warning: failed to position %s window: %v\n", impsWindow, err)
-		}
-
-		// Remove first guest from list (already relocated)
-		guestPanes = guestPanes[1:]
-	}
-
-	// 4. Relocate remaining guest panes to the imps window
-	impsTarget := exactTarget(sessionName, impsWindow)
-	for _, guest := range guestPanes {
-		// Use join-pane to move guest to imps window
-		if err := JoinPane(guest.ID, impsTarget, false, 0); err != nil {
-			fmt.Printf("Warning: failed to relocate pane %s: %v\n", guest.ID, err)
-		}
-	}
-
-	return nil
-}
-
 // SetPaneTitle sets the title of a pane using select-pane -T
 func SetPaneTitle(paneID, title string) error {
 	cmd := exec.Command("tmux", "select-pane", "-t", paneID, "-T", title)
@@ -838,35 +779,11 @@ func enrichWindow(sessionName, windowName string) error {
 		return fmt.Errorf("failed to list panes: %w", err)
 	}
 
-	// For workbench windows: pane 0=vim, pane 1=goblin, pane 2=shell
-	// For -imps windows: all panes are guests (skip enrichment)
-	isImpsWindow := strings.HasSuffix(windowName, "-imps")
-	if isImpsWindow {
-		return nil
-	}
-
 	for _, pane := range panes {
-		// Determine title based on PANE_ROLE if set, otherwise use index heuristic
-		var title string
 		if pane.HasRole {
-			title = fmt.Sprintf("%s [%s]", pane.RoleValue, windowName)
-		} else {
-			// Use index heuristic for pane title (gotmux standard layout)
-			switch pane.Index {
-			case 0:
-				title = fmt.Sprintf("vim [%s]", windowName)
-			case 1:
-				title = fmt.Sprintf("goblin [%s]", windowName)
-			case 2:
-				title = fmt.Sprintf("shell [%s]", windowName)
-			default:
-				// Unknown pane index, skip
-				continue
-			}
+			title := fmt.Sprintf("%s [%s]", pane.RoleValue, windowName)
+			_ = SetPaneTitle(pane.ID, title)
 		}
-
-		// Set pane title (cosmetic - doesn't require shell access)
-		_ = SetPaneTitle(pane.ID, title)
 	}
 
 	// Set window option @orc_enriched=1 to mark as enriched
@@ -876,16 +793,16 @@ func enrichWindow(sessionName, windowName string) error {
 	return nil
 }
 
-// UtilsServerInfo describes a discovered utils tmux server.
-type UtilsServerInfo struct {
-	Socket    string // socket name (e.g., "orc-45-utils")
+// DeskServerInfo describes a discovered desk tmux server.
+type DeskServerInfo struct {
+	Socket    string // socket name (e.g., "orc-45-desk")
 	BenchName string // workbench name derived from socket (e.g., "orc-45")
 	Alive     bool   // whether the server responds to commands
 }
 
-// ListUtilsServers scans the tmux socket directory for *-utils sockets
+// ListDeskServers scans the tmux socket directory for *-desk sockets
 // and probes each to determine if it's alive.
-func ListUtilsServers() ([]UtilsServerInfo, error) {
+func ListDeskServers() ([]DeskServerInfo, error) {
 	uid := os.Getuid()
 	socketDir := fmt.Sprintf("/tmp/tmux-%d", uid)
 
@@ -897,17 +814,17 @@ func ListUtilsServers() ([]UtilsServerInfo, error) {
 		return nil, fmt.Errorf("failed to read socket directory: %w", err)
 	}
 
-	var servers []UtilsServerInfo
+	var servers []DeskServerInfo
 	for _, entry := range entries {
 		name := entry.Name()
-		if !strings.HasSuffix(name, "-utils") {
+		if !strings.HasSuffix(name, "-desk") {
 			continue
 		}
 
-		benchName := strings.TrimSuffix(name, "-utils")
-		alive := isUtilsServerAlive(name)
+		benchName := strings.TrimSuffix(name, "-desk")
+		alive := isDeskServerAlive(name)
 
-		servers = append(servers, UtilsServerInfo{
+		servers = append(servers, DeskServerInfo{
 			Socket:    name,
 			BenchName: benchName,
 			Alive:     alive,
@@ -917,33 +834,33 @@ func ListUtilsServers() ([]UtilsServerInfo, error) {
 	return servers, nil
 }
 
-// isUtilsServerAlive probes a utils server socket to check if it responds.
-func isUtilsServerAlive(socket string) bool {
+// isDeskServerAlive probes a desk server socket to check if it responds.
+func isDeskServerAlive(socket string) bool {
 	cmd := exec.Command("tmux", "-L", socket, "list-sessions")
 	return cmd.Run() == nil
 }
 
-// KillUtilsServer kills a specific utils server by workbench name.
-func KillUtilsServer(benchName string) error {
-	socket := benchName + "-utils"
+// KillDeskServer kills a specific desk server by workbench name.
+func KillDeskServer(benchName string) error {
+	socket := benchName + "-desk"
 
 	// Verify socket exists
 	uid := os.Getuid()
 	socketPath := filepath.Join(fmt.Sprintf("/tmp/tmux-%d", uid), socket)
 	if _, err := os.Stat(socketPath); os.IsNotExist(err) {
-		return fmt.Errorf("utils server not found for workbench %q", benchName)
+		return fmt.Errorf("desk server not found for workbench %q", benchName)
 	}
 
 	cmd := exec.Command("tmux", "-L", socket, "kill-server")
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("failed to kill utils server %s: %w", socket, err)
+		return fmt.Errorf("failed to kill desk server %s: %w", socket, err)
 	}
 	return nil
 }
 
-// KillAllUtilsServers kills all discoverable utils servers.
-func KillAllUtilsServers() (int, error) {
-	servers, err := ListUtilsServers()
+// KillAllDeskServers kills all discoverable desk servers.
+func KillAllDeskServers() (int, error) {
+	servers, err := ListDeskServers()
 	if err != nil {
 		return 0, err
 	}

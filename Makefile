@@ -406,8 +406,8 @@ deploy-glue:
 		done; \
 		echo "✓ TMux scripts deployed to ~/.orc/tmux/"; \
 		if [ "$$TMUX_CHANGED" = "true" ]; then \
-			command -v orc >/dev/null 2>&1 && orc utils-sessions kill --all || true; \
-			echo "✓ Killed utils sessions (tmux scripts changed)"; \
+			command -v orc >/dev/null 2>&1 && orc desk kill --all || true; \
+			echo "✓ Killed desk sessions (tmux scripts changed)"; \
 		fi; \
 	fi; \
 	\

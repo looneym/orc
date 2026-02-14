@@ -198,13 +198,13 @@ Examples:
 				return err
 			}
 
-			// Kill utils servers for all workbenches in this workshop
+			// Kill desk servers for all workbenches in this workshop
 			workbenches, _ := wire.WorkbenchService().ListWorkbenches(ctx, primary.WorkbenchFilters{
 				WorkshopID: workshopID,
 			})
 			for _, wb := range workbenches {
-				if err := wire.KillUtilsServer(wb.Name); err == nil {
-					fmt.Printf("  Killed utils server for %s\n", wb.Name)
+				if err := wire.KillDeskServer(wb.Name); err == nil {
+					fmt.Printf("  Killed desk server for %s\n", wb.Name)
 				}
 			}
 

@@ -83,7 +83,7 @@ After user confirms, create a Claude Team and spawn one teammate per selected ch
 Spawn a teammate with this prompt:
 
 ```
-You are running the ORC infra integration check. Use orc-dev for all commands.
+You are running the ORC tmux integration check. Use orc-dev for all commands.
 
 Follow these steps exactly:
 
@@ -99,28 +99,28 @@ Follow these steps exactly:
    orc-dev workbench create --workshop WORK-xxx --repo-id REPO-001
    Capture workbench ID (BENCH-xxx).
 
-4. CHECK INFRASTRUCTURE PLAN
-   orc-dev infra plan WORK-xxx
-   Verify plan shows CREATE actions for workbench, tmux session, and tmux windows.
+4. APPLY TMUX SESSION
+   orc-dev tmux apply WORK-xxx --yes
+   Verify output shows session created with workbench window.
 
-5. APPLY INFRASTRUCTURE
-   orc-dev infra apply WORK-xxx --yes
-   Verify output shows workbenches and tmux session created.
-
-6. VERIFY FILESYSTEM STATE
+5. VERIFY FILESYSTEM STATE
    ls -la ~/wb/BENCH-xxx-*/
    Confirm workbench directory exists.
 
-7. VERIFY TMUX STATE
-   tmux list-sessions | grep "Self-Test"
-   tmux list-windows -t "[TEST] Self-Test Workshop"
-   Confirm session and window exist.
+6. VERIFY TMUX STATE
+   tmux has-session -t "=[TEST] Self-Test Workshop" 2>/dev/null && echo "OK" || echo "FAIL"
+   tmux list-windows -t "=[TEST] Self-Test Workshop"
+   Confirm session and window exist with single goblin pane.
+
+7. VERIFY SINGLE PANE
+   PANE_COUNT=$(tmux list-panes -t "=[TEST] Self-Test Workshop" | wc -l | tr -d ' ')
+   [ "$PANE_COUNT" -eq 1 ] && echo "OK: 1 pane" || echo "FAIL: expected 1 pane, got $PANE_COUNT"
 
 8. ARCHIVE AND CLEANUP
+   tmux kill-session -t "=[TEST] Self-Test Workshop" 2>/dev/null
    orc-dev workbench archive BENCH-xxx
    orc-dev workshop archive WORK-xxx
-   orc-dev infra apply WORK-xxx --yes
-   Verify worktree directory removed and tmux window removed.
+   Verify worktree directory removed and tmux session killed.
 
 9. DELETE DB ENTITIES
    orc-dev factory delete FACT-xxx --force
@@ -134,7 +134,7 @@ Report results as:
   If any step fails, attempt cleanup (archive then force delete) before reporting.
 
 Final summary format:
-  Infra Check: PASS or FAIL
+  TMux Check: PASS or FAIL
   Details: [list of per-step results]
 ```
 
@@ -167,9 +167,9 @@ Follow these steps exactly:
    orc-dev workbench create --workshop WORK-xxx --repo-id REPO-001
    Capture workbench ID (BENCH-xxx).
 
-5. APPLY INFRASTRUCTURE
-   orc-dev infra apply WORK-xxx --yes
-   Verify infrastructure is created.
+5. APPLY TMUX SESSION
+   orc-dev tmux apply WORK-xxx --yes
+   Verify tmux session is created.
 
 6. RUN SUMMARY
    orc-dev summary
@@ -177,17 +177,18 @@ Follow these steps exactly:
    This is the success criterion: reaching this point means the hello flow works.
 
 7. CLEANUP
+   # Kill tmux session first
+   tmux kill-session -t "=Hello Workshop $TEST_SUFFIX" 2>/dev/null
    # Archive in correct order
    orc-dev workbench archive BENCH-xxx
    orc-dev workshop archive WORK-xxx
-   orc-dev infra apply WORK-xxx --yes
    orc-dev commission archive COMM-xxx
    # Delete remaining DB entities
    orc-dev factory delete FACT-xxx --force
 
 Report results as:
   [PASS] or [FAIL] for each step with details.
-  If any step fails, attempt cleanup (archive + infra apply) before reporting.
+  If any step fails, attempt cleanup (kill session, archive entities) before reporting.
 
 Final summary format:
   Hello Check: PASS or FAIL

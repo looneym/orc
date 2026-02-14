@@ -95,15 +95,11 @@ func tmuxApplyCmd() *cobra.Command {
 		Long: `Compare desired tmux state (from DB) with actual tmux state and reconcile.
 
 This is the single command for creating, updating, and maintaining workshop
-tmux sessions. It replaces the old 'start' and 'refresh' commands.
+tmux sessions.
 
 Actions performed:
 - Create session if it doesn't exist
-- Add windows for missing workbenches
-- Relocate guest panes to -imps windows
-- Prune dead panes in -imps windows
-- Kill empty -imps windows (all panes dead)
-- Reconcile layout (main-vertical, 50% main-pane-width)
+- Add windows for missing workbenches (single goblin pane each)
 - Apply ORC enrichment (bindings, pane titles)
 
 Without --yes, shows a plan and prompts for confirmation.
@@ -210,20 +206,10 @@ func printApplyPlan(plan *wire.ApplyPlan, workshopID string) {
 
 	// Show window summaries
 	for _, ws := range plan.WindowSummary {
-		if ws.IsImps {
-			if ws.DeadPanes == ws.PaneCount {
-				fmt.Printf("Window: %s (%d dead panes) -> KILL\n", ws.Name, ws.DeadPanes)
-			} else if ws.DeadPanes > 0 {
-				fmt.Printf("Window: %s (%d panes, %d dead) -> PRUNE\n", ws.Name, ws.PaneCount, ws.DeadPanes)
-			} else {
-				fmt.Printf("Window: %s (%d panes)\n", ws.Name, ws.PaneCount)
-			}
+		if ws.Healthy {
+			fmt.Printf("Window: %s (%d panes, healthy)\n", ws.Name, ws.PaneCount)
 		} else {
-			if ws.Healthy {
-				fmt.Printf("Window: %s (%d panes, healthy)\n", ws.Name, ws.PaneCount)
-			} else {
-				fmt.Printf("Window: %s (%d panes)\n", ws.Name, ws.PaneCount)
-			}
+			fmt.Printf("Window: %s (%d panes)\n", ws.Name, ws.PaneCount)
 		}
 	}
 
@@ -324,9 +310,9 @@ func archiveWorkbenchRunE(ctx context.Context, getwd func() (string, error), exe
 	}
 	fmt.Printf("✓ Workbench %s archived\n", workbench.ID)
 
-	// Kill utils tmux server for this workbench (no-op if not running)
-	if err := wire.KillUtilsServer(workbench.Name); err == nil {
-		fmt.Printf("  Killed utils server for %s\n", workbench.Name)
+	// Kill desk tmux server for this workbench (no-op if not running)
+	if err := wire.KillDeskServer(workbench.Name); err == nil {
+		fmt.Printf("  Killed desk server for %s\n", workbench.Name)
 	}
 	fmt.Println()
 

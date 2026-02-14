@@ -124,6 +124,7 @@ Skills deployed globally via the glue system.
 | orc-interview | Reusable interview primitive |
 | orc-help | Orientation to ORC skills |
 | orc-prime | Bootstrap ORC context for session start |
+| orc-desk | Open desk popup for note review |
 
 **Exploration:**
 | Skill | Description |
@@ -237,7 +238,7 @@ orc workbench rename BENCH-XXX new-name
 - Creates git worktree automatically
 - Writes config.json to .orc/ subdirectory (reference only)
 - Writes .orc-commission marker for context detection
-- Opens in TMux with 3-pane IMP layout: vim | claude | shell
+- Opens in TMux as a single-pane window with goblin (coordinator agent)
 
 ### 4. Actor Model (Goblin, IMP)
 **Concept**: Two-actor model with complementary roles
@@ -260,15 +261,18 @@ orc workbench rename BENCH-XXX new-name
 **One TMux session per workshop:**
 ```
 TMux Session: "Workshop Name" (orc-WORK-XXX)
-├── Window 0: Goblin in BENCH-001 (claude | vim | shell)
-├── Window 1: Workbench BENCH-002 (vim | claude | shell)
-└── Window 2: Workbench BENCH-003 (vim | claude | shell)
+├── Window 0: Goblin in BENCH-001 (single pane)
+├── Window 1: Workbench BENCH-002 (single pane)
+└── Window 2: Workbench BENCH-003 (single pane)
 ```
+
+Each workbench window has a single goblin pane running `orc connect`. Shell and vim
+access is provided by the desk popup (per-workbench overlay on a separate tmux server).
 
 **Features:**
 - Workbench directories contain `.orc-config.json` for context detection
-- All panes CD into workbench directory
-- Easy context switching between coordination and implementation
+- Single goblin pane per window (no multi-pane layout reconciliation)
+- Desk popup provides shell, vim+fugitive, and interactive TUI dashboard
 
 **Agent Starting Pattern:**
 ORC uses **direct prompt injection** when starting Claude agents in TMux:
@@ -452,7 +456,7 @@ orc task complete TASK-001
 2. **Two-Actor Model** - Goblin (coordinator) + IMP (worker via Claude Teams)
 4. **Git Worktree Native** - First-class support for isolated workspaces
 5. **Simple Lifecycles** - 4-status shipments, 3-status tasks, all manual transitions
-6. **TMux Integration** - Smug-based session management with guest pane support
+6. **TMux Integration** - Gotmux-based session management with desk popup overlay
 7. **Skills System** - Claude Code skills for workflow automation
 8. **Immediate Infrastructure** - Workbench creation is atomic (DB + worktree + config in one shot)
 

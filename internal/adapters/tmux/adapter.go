@@ -212,12 +212,6 @@ func ApplyGlobalBindings() {
 	tmuxpkg.ApplyGlobalBindings()
 }
 
-// RefreshWorkbenchLayout relocates guest panes (no PANE_ROLE) to a sibling -imps window.
-// Non-destructive - guest processes keep running, just moved to a separate window.
-func RefreshWorkbenchLayout(sessionName, workbenchWindow string) error {
-	return tmuxpkg.RefreshWorkbenchLayout(sessionName, workbenchWindow)
-}
-
 // EnrichSession applies ORC enrichment to all windows in a session.
 // This includes setting PANE_ROLE env vars, pane titles, and window options.
 func EnrichSession(sessionName string) error {
@@ -238,22 +232,22 @@ func NewGotmuxAdapter() (*GotmuxAdapter, error) {
 	return tmuxpkg.NewGotmuxAdapter()
 }
 
-// UtilsServerInfo re-exports the utils server info type.
-type UtilsServerInfo = tmuxpkg.UtilsServerInfo
+// DeskServerInfo re-exports the desk server info type.
+type DeskServerInfo = tmuxpkg.DeskServerInfo
 
-// ListUtilsServers scans for *-utils tmux server sockets.
-func ListUtilsServers() ([]UtilsServerInfo, error) {
-	return tmuxpkg.ListUtilsServers()
+// ListDeskServers scans for *-desk tmux server sockets.
+func ListDeskServers() ([]DeskServerInfo, error) {
+	return tmuxpkg.ListDeskServers()
 }
 
-// KillUtilsServer kills a specific utils server by workbench name.
-func KillUtilsServer(benchName string) error {
-	return tmuxpkg.KillUtilsServer(benchName)
+// KillDeskServer kills a specific desk server by workbench name.
+func KillDeskServer(benchName string) error {
+	return tmuxpkg.KillDeskServer(benchName)
 }
 
-// KillAllUtilsServers kills all discoverable utils servers.
-func KillAllUtilsServers() (int, error) {
-	return tmuxpkg.KillAllUtilsServers()
+// KillAllDeskServers kills all discoverable desk servers.
+func KillAllDeskServers() (int, error) {
+	return tmuxpkg.KillAllDeskServers()
 }
 
 // Ensure Adapter implements the interface

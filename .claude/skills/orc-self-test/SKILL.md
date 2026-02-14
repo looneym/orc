@@ -103,29 +103,30 @@ This prevents tmux from matching partial names against other sessions.
 
 ### 5. Verify Pane Structure
 
+Each workbench window should have exactly 1 pane (the goblin pane).
+
 ```bash
 # Use exact session targeting to avoid cross-session interference
 # List panes with session:window qualification
-PANES=$(tmux list-panes -t "=$SESSION_NAME" -F "#{pane_index}:#{pane_current_path}")
+PANES=$(tmux list-panes -t "=$SESSION_NAME:$WORKBENCH_NAME" -F "#{pane_index}:#{pane_current_path}")
 
 echo "Panes found:"
 echo "$PANES"
 
 PANE_COUNT=$(echo "$PANES" | wc -l | tr -d ' ')
-if [ "$PANE_COUNT" -ne 3 ]; then
-  echo "[FAIL] Expected 3 panes, found $PANE_COUNT"
+if [ "$PANE_COUNT" -ne 1 ]; then
+  echo "[FAIL] Expected 1 pane (goblin), found $PANE_COUNT"
   exit 1
 fi
-echo "[PASS] Found 3 panes"
+echo "[PASS] Found 1 pane (single goblin pane)"
 
-# Verify all panes are in workbench directory
-while IFS=: read -r idx path; do
-  if [ "$path" != "$WORKBENCH_PATH" ]; then
-    echo "[FAIL] Pane $idx in wrong directory: $path (expected: $WORKBENCH_PATH)"
-    exit 1
-  fi
-done <<< "$PANES"
-echo "[PASS] All panes in correct directory"
+# Verify pane is in workbench directory
+PANE_PATH=$(echo "$PANES" | head -1 | cut -d: -f2)
+if [ "$PANE_PATH" != "$WORKBENCH_PATH" ]; then
+  echo "[FAIL] Pane in wrong directory: $PANE_PATH (expected: $WORKBENCH_PATH)"
+  exit 1
+fi
+echo "[PASS] Pane in correct directory"
 ```
 
 ### 6. Verify Pane Options (@pane_role, @bench_id, @workshop_id)
@@ -135,135 +136,49 @@ read by tmux format strings). Verify using `#{@pane_role}`, `#{@bench_id}`,
 and `#{@workshop_id}` format strings.
 
 ```bash
-# Get pane indices (respects pane-base-index setting)
-PANE_INDICES=$(tmux list-panes -t "=$SESSION_NAME" -F "#{pane_index}")
+# Get pane index for the single goblin pane
+PANE_IDX=$(tmux list-panes -t "=$SESSION_NAME:$WORKBENCH_NAME" -F "#{pane_index}" | head -1)
+TARGET="=$SESSION_NAME:$WORKBENCH_NAME.$PANE_IDX"
 
-# Expected roles in order: vim, goblin, shell
-# Use case statement instead of bash array (more reliable in all contexts)
-IDX=0
+# Check @pane_role is "goblin"
+ROLE=$(tmux display-message -t "$TARGET" -p '#{@pane_role}')
+if [ "$ROLE" != "goblin" ]; then
+  echo "[FAIL] Pane: expected @pane_role=goblin, got '$ROLE'"
+  exit 1
+fi
+echo "[PASS] Pane: @pane_role=$ROLE"
 
-while read -r pane_idx; do
-  TARGET="=$SESSION_NAME.$pane_idx"
+# Check @bench_id
+BENCH=$(tmux display-message -t "$TARGET" -p '#{@bench_id}')
+if [ -z "$BENCH" ]; then
+  echo "[FAIL] Pane: @bench_id not set"
+  exit 1
+fi
+if [ "$BENCH" != "$WORKBENCH_ID" ]; then
+  echo "[FAIL] Pane: expected @bench_id=$WORKBENCH_ID, got '$BENCH'"
+  exit 1
+fi
+echo "[PASS] Pane: @bench_id=$BENCH"
 
-  # Check @pane_role
-  ROLE=$(tmux display-message -t "$TARGET" -p '#{@pane_role}')
-  case $IDX in
-    0) EXPECTED="vim" ;;
-    1) EXPECTED="goblin" ;;
-    2) EXPECTED="shell" ;;
-  esac
+# Check @workshop_id
+WS=$(tmux display-message -t "$TARGET" -p '#{@workshop_id}')
+if [ -z "$WS" ]; then
+  echo "[FAIL] Pane: @workshop_id not set"
+  exit 1
+fi
+if [ "$WS" != "$WORKSHOP_ID" ]; then
+  echo "[FAIL] Pane: expected @workshop_id=$WORKSHOP_ID, got '$WS'"
+  exit 1
+fi
+echo "[PASS] Pane: @workshop_id=$WS"
 
-  if [ "$ROLE" != "$EXPECTED" ]; then
-    echo "[FAIL] Pane $pane_idx: expected @pane_role=$EXPECTED, got '$ROLE'"
-    exit 1
-  fi
-  echo "[PASS] Pane $pane_idx: @pane_role=$ROLE"
-
-  # Check @bench_id
-  BENCH=$(tmux display-message -t "$TARGET" -p '#{@bench_id}')
-  if [ -z "$BENCH" ]; then
-    echo "[FAIL] Pane $pane_idx: @bench_id not set"
-    exit 1
-  fi
-  if [ "$BENCH" != "$WORKBENCH_ID" ]; then
-    echo "[FAIL] Pane $pane_idx: expected @bench_id=$WORKBENCH_ID, got '$BENCH'"
-    exit 1
-  fi
-  echo "[PASS] Pane $pane_idx: @bench_id=$BENCH"
-
-  # Check @workshop_id
-  WS=$(tmux display-message -t "$TARGET" -p '#{@workshop_id}')
-  if [ -z "$WS" ]; then
-    echo "[FAIL] Pane $pane_idx: @workshop_id not set"
-    exit 1
-  fi
-  if [ "$WS" != "$WORKSHOP_ID" ]; then
-    echo "[FAIL] Pane $pane_idx: expected @workshop_id=$WORKSHOP_ID, got '$WS'"
-    exit 1
-  fi
-  echo "[PASS] Pane $pane_idx: @workshop_id=$WS"
-
-  IDX=$((IDX + 1))
-done <<< "$PANE_INDICES"
-
-echo "[PASS] All pane options set correctly (@pane_role, @bench_id, @workshop_id)"
+echo "[PASS] All pane options set correctly (@pane_role=goblin, @bench_id, @workshop_id)"
 ```
 
-### 7. Verify Vim Width (50% main-pane-width)
+### 7. Test Idempotency
 
 ```bash
-# Get the vim pane width and total window width
-WINDOW_WIDTH=$(tmux display-message -t "=$SESSION_NAME" -p '#{window_width}')
-VIM_PANE_WIDTH=$(tmux list-panes -t "=$SESSION_NAME" -F '#{pane_width}' | head -1)
-
-# Check vim pane is approximately 50% of window width (within 2 columns tolerance)
-HALF_WIDTH=$((WINDOW_WIDTH / 2))
-DIFF=$((VIM_PANE_WIDTH - HALF_WIDTH))
-if [ "$DIFF" -lt 0 ]; then DIFF=$((-DIFF)); fi
-
-if [ "$DIFF" -le 2 ]; then
-  echo "[PASS] Vim pane width ~50% ($VIM_PANE_WIDTH of $WINDOW_WIDTH)"
-else
-  echo "[FAIL] Vim pane width not ~50%: $VIM_PANE_WIDTH of $WINDOW_WIDTH (diff: $DIFF)"
-  exit 1
-fi
-```
-
-### 8. Test Guest Pane Relocation via Apply
-
-```bash
-# Create a guest pane (no @pane_role) in the test session
-tmux split-window -t "=$SESSION_NAME" -h "sleep 30"
-
-PANE_COUNT_BEFORE=$(tmux list-panes -t "=$SESSION_NAME" | wc -l | tr -d ' ')
-if [ "$PANE_COUNT_BEFORE" -ne 4 ]; then
-  echo "[FAIL] Expected 4 panes after guest split, found $PANE_COUNT_BEFORE"
-  exit 1
-fi
-echo "[PASS] Guest pane created (4 panes total)"
-
-# Run apply again -- it should relocate guest panes
-orc-dev tmux apply "$WORKSHOP_ID" --yes
-
-# Verify guest pane relocated (back to 3 in main window)
-PANE_COUNT_AFTER=$(tmux list-panes -t "=$SESSION_NAME:$WORKBENCH_NAME" | wc -l | tr -d ' ')
-if [ "$PANE_COUNT_AFTER" -ne 3 ]; then
-  echo "[FAIL] Expected 3 panes after apply, found $PANE_COUNT_AFTER"
-  exit 1
-fi
-echo "[PASS] Guest pane relocated (3 panes remain in workbench window)"
-
-# Verify -imps window exists
-IMPS_WINDOW="${WORKBENCH_NAME}-imps"
-if ! tmux list-windows -t "=$SESSION_NAME" -F "#{window_name}" | grep -q "^${IMPS_WINDOW}$"; then
-  echo "[FAIL] IMPs window not created"
-  exit 1
-fi
-echo "[PASS] IMPs window exists: $IMPS_WINDOW"
-```
-
-### 9. Test Dead Pane Pruning
-
-```bash
-# Kill the sleep process in the -imps window to create a dead pane
-tmux send-keys -t "=$SESSION_NAME:$IMPS_WINDOW" C-c
-sleep 1
-
-# Run apply again -- it should detect and prune the dead pane (or kill the -imps window)
-orc-dev tmux apply "$WORKSHOP_ID" --yes
-
-# The -imps window should be gone (it only had the one dead pane)
-if tmux list-windows -t "=$SESSION_NAME" -F "#{window_name}" | grep -q "^${IMPS_WINDOW}$"; then
-  echo "[FAIL] -imps window still exists after pruning"
-  exit 1
-fi
-echo "[PASS] Dead pane pruned, empty -imps window killed"
-```
-
-### 10. Test Idempotency
-
-```bash
-# Run apply again -- should be a no-op (except enrichment and layout reconciliation)
+# Run apply again -- should be a no-op (except enrichment)
 orc-dev tmux apply "$WORKSHOP_ID" --yes
 
 # Verify session still exists and has correct pane count
@@ -273,22 +188,21 @@ if ! tmux has-session -t "=$SESSION_NAME" 2>/dev/null; then
 fi
 
 PANE_COUNT=$(tmux list-panes -t "=$SESSION_NAME:$WORKBENCH_NAME" | wc -l | tr -d ' ')
-if [ "$PANE_COUNT" -ne 3 ]; then
-  echo "[FAIL] Expected 3 panes after idempotent apply, found $PANE_COUNT"
+if [ "$PANE_COUNT" -ne 1 ]; then
+  echo "[FAIL] Expected 1 pane after idempotent apply, found $PANE_COUNT"
   exit 1
 fi
 
-# Re-verify pane roles survived
-ROLES=$(tmux list-panes -t "=$SESSION_NAME:$WORKBENCH_NAME" -F '#{@pane_role}')
-ROLE_COUNT=$(echo "$ROLES" | grep -c -E '^(vim|goblin|shell)$')
-if [ "$ROLE_COUNT" -ne 3 ]; then
-  echo "[FAIL] Pane roles not preserved after idempotent apply"
+# Re-verify pane role survived
+ROLE=$(tmux list-panes -t "=$SESSION_NAME:$WORKBENCH_NAME" -F '#{@pane_role}' | head -1)
+if [ "$ROLE" != "goblin" ]; then
+  echo "[FAIL] Pane role not preserved after idempotent apply (got '$ROLE')"
   exit 1
 fi
-echo "[PASS] Idempotent apply preserved session, panes, and roles"
+echo "[PASS] Idempotent apply preserved session, pane, and goblin role"
 ```
 
-### 11. Verify Auto-Enrichment
+### 8. Verify Auto-Enrichment
 
 `orc tmux apply` applies enrichment automatically. Verify the `@orc_enriched`
 window option was set on the workbench window.
@@ -304,7 +218,7 @@ else
 fi
 ```
 
-### 12. Cleanup
+### 9. Cleanup
 
 **IMPORTANT**: Run cleanup even if tests fail. Always use exact session matching.
 
@@ -346,17 +260,12 @@ ORC Self-Test Results
 [PASS] Config file exists
 [PASS] Config correct
 [PASS] TMux session created (via apply)
-[PASS] Found 3 panes
-[PASS] All panes in correct directory
-[PASS] @pane_role options set (vim, goblin, shell)
-[PASS] @bench_id options set on all panes
-[PASS] @workshop_id options set on all panes
-[PASS] Vim pane width ~50%
-[PASS] Guest pane created
-[PASS] Guest pane relocated (via apply)
-[PASS] IMPs window created
-[PASS] Dead pane pruned, empty -imps window killed
-[PASS] Idempotent apply preserved session, panes, and roles
+[PASS] Found 1 pane (single goblin pane)
+[PASS] Pane in correct directory
+[PASS] @pane_role=goblin set correctly
+[PASS] @bench_id set correctly
+[PASS] @workshop_id set correctly
+[PASS] Idempotent apply preserved session, pane, and goblin role
 [PASS] Auto-enrichment applied (@orc_enriched=1)
 [PASS] TMux session killed
 [PASS] Worktree cleaned up
@@ -402,9 +311,10 @@ If ANY step fails, you MUST still run cleanup:
 - Gotmux creates tmux sessions programmatically
 - `orc tmux apply WORK-xxx --yes` is the single command for session lifecycle
 - `apply` uses plan/execute pattern: compares desired (DB) vs actual (tmux) state
+- Each workbench window has a single goblin pane (no multi-pane layout)
 - `respawn-pane -k` sets pane root process at creation time (no SendKeys)
-- `@pane_role` tmux pane option is authoritative for pane identity
+- `@pane_role` tmux pane option is authoritative for pane identity (only "goblin" role)
 - `@bench_id` and `@workshop_id` tmux pane options provide workbench context
 - Shell env vars (`PANE_ROLE`, `BENCH_ID`, `WORKSHOP_ID`) are NOT used -- all identity is via tmux pane options
 - `apply` auto-applies enrichment (no separate `orc tmux enrich` step needed)
-- Guest pane relocation and dead pane pruning handled automatically by `apply`
+- Desk popup provides shell, vim+fugitive, and TUI dashboard (separate tmux server per workbench)

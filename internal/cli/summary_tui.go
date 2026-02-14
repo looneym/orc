@@ -15,7 +15,9 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
 
+	orccontext "github.com/example/orc/internal/context"
 	"github.com/example/orc/internal/ports/secondary"
+	"github.com/example/orc/internal/wire"
 )
 
 // clearStatusMsg is sent after a timer to auto-clear transient status messages.
@@ -82,8 +84,12 @@ type summaryModel struct {
 	// Error from data fetch
 	err error
 
-	// Whether we're inside a utils tmux session
-	isUtilsSession bool
+	// Whether we're inside a desk tmux session
+	isDeskSession bool
+
+	// Workshop tmux session name (default server), for goblin communication.
+	// Resolved from cwd workbench context at startup. Empty if unavailable.
+	workshopSession string
 
 	// Close confirmation state
 	confirming      bool   // true when waiting for y/n confirmation
@@ -122,6 +128,17 @@ type goblinResultMsg struct {
 
 // closeResultMsg carries the result of closing/completing an entity.
 type closeResultMsg struct {
+	entityID string
+	err      error
+}
+
+// noteCreateDoneMsg is sent when the note create editor exits.
+type noteCreateDoneMsg struct {
+	err error
+}
+
+// deskReviewResultMsg carries the result of opening a desk review window.
+type deskReviewResultMsg struct {
 	entityID string
 	err      error
 }
@@ -178,12 +195,13 @@ func entityHasAction(entityID, action string) bool {
 // runSummaryTUI launches the interactive Bubble Tea TUI for summary.
 func runSummaryTUI(cmd *cobra.Command, opts summaryOpts, eventWriter secondary.EventWriter) error {
 	m := summaryModel{
-		cmd:            cmd,
-		opts:           opts,
-		eventWriter:    eventWriter,
-		expanded:       make(map[string]bool),
-		isUtilsSession: isInsideUtilsSession(),
-		animRand:       rand.New(rand.NewPCG(uint64(time.Now().UnixNano()), 0)),
+		cmd:             cmd,
+		opts:            opts,
+		eventWriter:     eventWriter,
+		expanded:        make(map[string]bool),
+		isDeskSession:   isInsideDeskSession(),
+		workshopSession: resolveWorkshopSession(),
+		animRand:        rand.New(rand.NewPCG(uint64(time.Now().UnixNano()), 0)),
 	}
 
 	p := tea.NewProgram(m, tea.WithAltScreen())
@@ -198,6 +216,21 @@ func (m summaryModel) emitEvent(level, message string, data map[string]string) {
 		return
 	}
 	_ = m.eventWriter.EmitOperational(context.Background(), "summary-tui", level, message, data)
+}
+
+// resolveWorkshopSession discovers the workshop tmux session name from the cwd context.
+// Returns empty string if not in a workbench directory or no tmux session found.
+func resolveWorkshopSession() string {
+	benchID := orccontext.GetContextWorkbenchID()
+	if benchID == "" {
+		return ""
+	}
+	ctx := context.Background()
+	wb, err := wire.WorkbenchService().GetWorkbench(ctx, benchID)
+	if err != nil || wb.WorkshopID == "" {
+		return ""
+	}
+	return wire.TMuxAdapter().FindSessionByWorkshopID(ctx, wb.WorkshopID)
 }
 
 // Init returns the initial command to fetch summary data.
@@ -461,15 +494,15 @@ func closeEntity(entityID string) tea.Cmd {
 	}
 }
 
-// sendToGoblin sends an entity ID to the goblin pane in the parent tmux server
+// sendToGoblinByBenchID sends an entity ID to the goblin pane in the parent tmux server
 // by finding the pane with @pane_role=goblin scoped to the current bench via @bench_id.
 // The parent server is the default tmux server; we reach it by unsetting TMUX
-// so that the tmux CLI doesn't target the utils server socket.
-func (m summaryModel) sendToGoblin(entityID string) tea.Cmd {
+// so that the tmux CLI doesn't target the desk server socket.
+func (m summaryModel) sendToGoblinByBenchID(entityID string) tea.Cmd {
 	return func() tea.Msg {
-		// Read ORC_BENCH_ID from the utils tmux server environment.
-		// This env var was set by orc-utils-popup.sh from the parent pane's @bench_id.
-		// We do NOT unset TMUX here — show-environment should target the utils server.
+		// Read ORC_BENCH_ID from the desk tmux server environment.
+		// This env var was set by orc-desk-popup.sh from the parent pane's @bench_id.
+		// We do NOT unset TMUX here — show-environment should target the desk server.
 		benchID := ""
 		if envOut, err := exec.Command("tmux", "show-environment", "ORC_BENCH_ID").Output(); err == nil {
 			// Output format: "ORC_BENCH_ID=BENCH-044\n"
@@ -500,7 +533,7 @@ func (m summaryModel) sendToGoblin(entityID string) tea.Cmd {
 		listCmd := exec.Command("tmux", "list-panes", "-a",
 			"-f", filter,
 			"-F", "#{pane_id}")
-		// Unset TMUX so the tmux CLI targets the default server, not the utils server.
+		// Unset TMUX so the tmux CLI targets the default server, not the desk server.
 		listCmd.Env = envWithoutTMUX()
 		out, err := listCmd.Output()
 		if err != nil {
@@ -539,7 +572,7 @@ func (m summaryModel) sendToGoblin(entityID string) tea.Cmd {
 }
 
 // envWithoutTMUX returns the current environment with the TMUX variable removed,
-// so that tmux CLI commands target the default server instead of the utils server.
+// so that tmux CLI commands target the default server instead of the desk server.
 func envWithoutTMUX() []string {
 	var env []string
 	for _, e := range os.Environ() {
@@ -548,6 +581,231 @@ func envWithoutTMUX() []string {
 		}
 	}
 	return env
+}
+
+// isShipment returns whether an entity is a shipment (eligible for workflow triggers).
+func isShipment(entityID string) bool {
+	return entityPrefix(entityID) == "SHIP"
+}
+
+// workflowResultMsg carries the result of a workflow trigger (ship-run/ship-deploy clipboard copy).
+type workflowResultMsg struct {
+	action string // "ship-run" or "ship-deploy"
+	err    error
+}
+
+// triggerWorkflow copies a skill slash command to clipboard for pasting into a goblin pane.
+// ship-run and ship-deploy are Claude Code glue skills, not CLI commands,
+// so the TUI copies the invocation command for the user to paste.
+func triggerWorkflow(action, entityID string) tea.Cmd {
+	return func() tea.Msg {
+		var command string
+		switch action {
+		case "ship-run":
+			command = "/ship-run " + entityID
+		case "ship-deploy":
+			command = "/ship-deploy"
+		default:
+			return workflowResultMsg{action: action, err: fmt.Errorf("unknown workflow: %s", action)}
+		}
+		cmd := exec.Command("pbcopy")
+		cmd.Stdin = strings.NewReader(command)
+		err := cmd.Run()
+		return workflowResultMsg{action: action, err: err}
+	}
+}
+
+// noteParentFlag returns the CLI flag name and entity ID for attaching a note to a parent entity.
+// Returns ("", "") if the entity type doesn't support child notes.
+func noteParentFlag(entityID string) (string, string) {
+	switch entityPrefix(entityID) {
+	case "SHIP":
+		return "--shipment", entityID
+	case "TOME":
+		return "--tome", entityID
+	default:
+		return "", ""
+	}
+}
+
+// hasNoteParent returns whether an entity type supports child notes.
+func hasNoteParent(entityID string) bool {
+	flag, _ := noteParentFlag(entityID)
+	return flag != ""
+}
+
+// createNoteForEntity launches an interactive orc note create via tea.ExecProcess.
+// Uses $EDITOR to compose the note title interactively.
+func createNoteForEntity(entityID string) tea.Cmd {
+	return func() tea.Msg {
+		// Create a temp file for the user to type a note title
+		tmpFile, err := os.CreateTemp("", "orc-note-*.txt")
+		if err != nil {
+			return noteCreateDoneMsg{err: err}
+		}
+		tmpPath := tmpFile.Name()
+		if _, err := tmpFile.WriteString(""); err != nil {
+			tmpFile.Close()
+			return noteCreateDoneMsg{err: err}
+		}
+		tmpFile.Close()
+
+		return noteEditorMsg{tmpPath: tmpPath, entityID: entityID}
+	}
+}
+
+// noteEditorMsg triggers a tea.ExecProcess to open $EDITOR for composing a note title.
+type noteEditorMsg struct {
+	tmpPath  string
+	entityID string
+}
+
+// noteEditorDoneMsg is sent after the editor exits.
+type noteEditorDoneMsg struct {
+	tmpPath  string
+	entityID string
+	err      error
+}
+
+// goblinSendResultMsg carries the result of sending text to a goblin pane.
+type goblinSendResultMsg struct {
+	benchName string
+	err       error
+}
+
+// goblinEditorMsg triggers an editor to compose a message for the goblin pane.
+type goblinEditorMsg struct {
+	tmpPath     string
+	sessionName string
+	benchName   string
+}
+
+// goblinEditorDoneMsg is sent after the editor exits.
+type goblinEditorDoneMsg struct {
+	tmpPath     string
+	sessionName string
+	benchName   string
+	err         error
+}
+
+// findGoblinPane finds the pane ID of the goblin pane in a workbench window.
+// Queries the workshop tmux session (default server) for the workbench window,
+// then finds the pane with @pane_role=goblin.
+func findGoblinPane(sessionName, windowName string) (string, error) {
+	// List panes in the workbench window
+	target := "=" + sessionName + ":" + windowName
+	out, err := exec.Command("tmux", "list-panes", "-t", target, "-F", "#{pane_id}").Output()
+	if err != nil {
+		return "", fmt.Errorf("window %s not found in session %s", windowName, sessionName)
+	}
+
+	paneIDs := strings.Split(strings.TrimSpace(string(out)), "\n")
+	for _, paneID := range paneIDs {
+		if paneID == "" {
+			continue
+		}
+		// Check @pane_role
+		roleOut, err := exec.Command("tmux", "display-message", "-t", paneID, "-p", "#{@pane_role}").Output()
+		if err == nil && strings.TrimSpace(string(roleOut)) == "goblin" {
+			return paneID, nil
+		}
+	}
+
+	// Fallback: single-pane window (from task #2 simplification) — use pane 0
+	if len(paneIDs) == 1 && paneIDs[0] != "" {
+		return paneIDs[0], nil
+	}
+
+	return "", fmt.Errorf("no goblin pane found in %s:%s", sessionName, windowName)
+}
+
+// sendToGoblin sends text to a goblin pane via tmux send-keys.
+// The text is sent literally (no Enter) so the user can review before executing.
+func sendToGoblin(sessionName, benchName, text string) tea.Cmd {
+	return func() tea.Msg {
+		paneID, err := findGoblinPane(sessionName, benchName)
+		if err != nil {
+			return goblinSendResultMsg{benchName: benchName, err: err}
+		}
+
+		// Send text literally (without Enter), so goblin operator can review
+		cmd := exec.Command("tmux", "send-keys", "-t", paneID, "-l", text)
+		if err := cmd.Run(); err != nil {
+			return goblinSendResultMsg{benchName: benchName, err: fmt.Errorf("send-keys failed: %w", err)}
+		}
+		return goblinSendResultMsg{benchName: benchName, err: nil}
+	}
+}
+
+// composeGoblinMessage opens an editor to compose a message, then sends it to the goblin pane.
+func (m summaryModel) composeGoblinMessage() tea.Cmd {
+	sessionName := m.workshopSession
+	benchName := currentBenchName()
+	if sessionName == "" || benchName == "" {
+		return nil
+	}
+	return func() tea.Msg {
+		tmpFile, err := os.CreateTemp("", "orc-goblin-*.txt")
+		if err != nil {
+			return goblinSendResultMsg{benchName: benchName, err: err}
+		}
+		tmpPath := tmpFile.Name()
+		tmpFile.Close()
+		return goblinEditorMsg{tmpPath: tmpPath, sessionName: sessionName, benchName: benchName}
+	}
+}
+
+// currentBenchName returns the workbench name from the cwd context.
+// The workbench name is the tmux window name in the workshop session.
+func currentBenchName() string {
+	benchID := orccontext.GetContextWorkbenchID()
+	if benchID == "" {
+		return ""
+	}
+	ctx := context.Background()
+	wb, err := wire.WorkbenchService().GetWorkbench(ctx, benchID)
+	if err != nil {
+		return ""
+	}
+	return wb.Name
+}
+
+// isReviewable returns whether an entity can be opened for desk review.
+// Only notes are reviewable (editable content).
+func isReviewable(entityID string) bool {
+	return entityPrefix(entityID) == "NOTE"
+}
+
+// openDeskReview creates an ephemeral review window in the desk tmux server.
+// The window runs `orc desk review NOTE-xxx` and auto-closes on exit.
+// If not inside a desk session, falls back to running the review inline via tea.ExecProcess.
+func (m summaryModel) openDeskReview(entityID string) tea.Cmd {
+	orcBin, err := os.Executable()
+	if err != nil {
+		orcBin = "orc"
+	}
+
+	if !m.isDeskSession {
+		// Not in a desk session — run review inline via tea.ExecProcess
+		c := exec.Command(orcBin, "desk", "review", entityID)
+		return tea.ExecProcess(c, func(err error) tea.Msg {
+			return deskReviewResultMsg{entityID: entityID, err: err}
+		})
+	}
+
+	// Inside a desk session — create ephemeral review window
+	return func() tea.Msg {
+		windowName := "review:" + entityID
+
+		// Create a new window in the desk session running the review command.
+		// remain-on-exit is OFF (default), so the window closes when the command exits.
+		reviewCmd := fmt.Sprintf("%s desk review %s", orcBin, entityID)
+		err := exec.Command("tmux", "new-window", "-n", windowName, reviewCmd).Run()
+		if err != nil {
+			return deskReviewResultMsg{entityID: entityID, err: fmt.Errorf("failed to create review window: %w", err)}
+		}
+		return deskReviewResultMsg{entityID: entityID, err: nil}
+	}
 }
 
 // openInVim launches vim -R with entity show output via tea.ExecProcess.
@@ -788,6 +1046,125 @@ func (m summaryModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Refresh tree data, repositioning cursor on the closed entity
 		return m, m.fetchSummary(msg.entityID)
 
+	case workflowResultMsg:
+		if msg.err != nil {
+			m.statusMsg = fmt.Sprintf("Clipboard error: %v", msg.err)
+		} else {
+			m.statusMsg = fmt.Sprintf("Copied /%s command — paste into goblin pane", msg.action)
+		}
+		return m, nil
+
+	case goblinSendResultMsg:
+		if msg.err != nil {
+			m.statusMsg = fmt.Sprintf("Goblin error: %v", msg.err)
+		} else {
+			m.statusMsg = fmt.Sprintf("Sent to %s goblin", msg.benchName)
+		}
+		return m, nil
+
+	case deskReviewResultMsg:
+		if msg.err != nil {
+			m.statusMsg = fmt.Sprintf("Review error: %v", msg.err)
+			return m, nil
+		}
+		if m.isDeskSession {
+			m.statusMsg = fmt.Sprintf("Opened review window for %s", msg.entityID)
+		} else {
+			m.statusMsg = fmt.Sprintf("Review complete: %s", msg.entityID)
+		}
+		// Refresh tree to reflect any content changes
+		return m, m.fetchSummary(msg.entityID)
+
+	case goblinEditorMsg:
+		// Launch editor for composing goblin message
+		editor := os.Getenv("EDITOR")
+		if editor == "" {
+			editor = "vim"
+		}
+		c := exec.Command(editor, msg.tmpPath)
+		tmpPath := msg.tmpPath
+		sessionName := msg.sessionName
+		benchName := msg.benchName
+		return m, tea.ExecProcess(c, func(err error) tea.Msg {
+			return goblinEditorDoneMsg{tmpPath: tmpPath, sessionName: sessionName, benchName: benchName, err: err}
+		})
+
+	case goblinEditorDoneMsg:
+		defer os.Remove(msg.tmpPath)
+		if msg.err != nil {
+			m.statusMsg = fmt.Sprintf("Editor error: %v", msg.err)
+			return m, nil
+		}
+		content, err := os.ReadFile(msg.tmpPath)
+		if err != nil {
+			m.statusMsg = fmt.Sprintf("Read error: %v", err)
+			return m, nil
+		}
+		text := strings.TrimSpace(string(content))
+		if text == "" {
+			m.statusMsg = "Send canceled (empty message)"
+			return m, nil
+		}
+		return m, sendToGoblin(msg.sessionName, msg.benchName, text)
+
+	case noteEditorMsg:
+		// Launch editor for note title
+		editor := os.Getenv("EDITOR")
+		if editor == "" {
+			editor = "vim"
+		}
+		c := exec.Command(editor, msg.tmpPath)
+		tmpPath := msg.tmpPath
+		entityID := msg.entityID
+		return m, tea.ExecProcess(c, func(err error) tea.Msg {
+			return noteEditorDoneMsg{tmpPath: tmpPath, entityID: entityID, err: err}
+		})
+
+	case noteEditorDoneMsg:
+		defer os.Remove(msg.tmpPath)
+		if msg.err != nil {
+			m.statusMsg = fmt.Sprintf("Editor error: %v", msg.err)
+			return m, nil
+		}
+		// Read the title from the temp file
+		content, err := os.ReadFile(msg.tmpPath)
+		if err != nil {
+			m.statusMsg = fmt.Sprintf("Read error: %v", err)
+			return m, nil
+		}
+		title := strings.TrimSpace(string(content))
+		if title == "" {
+			m.statusMsg = "Note canceled (empty title)"
+			return m, nil
+		}
+		// Shell out to orc note create
+		entityID := msg.entityID
+		return m, func() tea.Msg {
+			orcBin, errBin := os.Executable()
+			if errBin != nil {
+				orcBin = "orc"
+			}
+			args := []string{"note", "create", title}
+			if flag, id := noteParentFlag(entityID); flag != "" {
+				args = append(args, flag, id)
+			}
+			out, errRun := exec.Command(orcBin, args...).CombinedOutput()
+			if errRun != nil {
+				return noteCreateDoneMsg{err: fmt.Errorf("%s: %s", errRun, strings.TrimSpace(string(out)))}
+			}
+			return noteCreateDoneMsg{err: nil}
+		}
+
+	case noteCreateDoneMsg:
+		if msg.err != nil {
+			m.statusMsg = fmt.Sprintf("Note error: %v", msg.err)
+			return m, nil
+		}
+		m.statusMsg = "Note created"
+		// Refresh tree to show the new note
+		entityID := m.cursorEntityID()
+		return m, m.fetchSummary(entityID)
+
 	case tuiExecMsg:
 		// Launch vim with temp vimrc for backslash-quit binding
 		c := exec.Command("vim", "-R", "-N", "-u", msg.vimrcPath, msg.tmpPath)
@@ -831,8 +1208,8 @@ func (m summaryModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "q", "ctrl+c", "esc":
 			m.emitEvent("info", "tui closed", map[string]string{"action": "quit", "key": msg.String()})
-			if m.isUtilsSession {
-				detachUtilsSession()
+			if m.isDeskSession {
+				detachDeskSession()
 			}
 			return m, tea.Quit
 
@@ -899,11 +1276,6 @@ func (m summaryModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, nil
 
-		case "r":
-			m.emitEvent("info", "refresh", map[string]string{"action": "refresh"})
-			// Start starfield animation, then refresh with fresh data
-			return m, m.startAnimation()
-
 		case "c":
 			entityID := m.cursorEntityID()
 			if entityID != "" && entityHasAction(entityID, "close") {
@@ -914,13 +1286,54 @@ func (m summaryModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, nil
 
-		case "g":
+		case "n":
 			entityID := m.cursorEntityID()
-			if m.isUtilsSession && entityID != "" && entityHasAction(entityID, "goblin") {
-				m.emitEvent("info", "goblin send", map[string]string{"action": "goblin", "entity_id": entityID})
-				return m, m.sendToGoblin(entityID)
+			if entityID != "" && hasNoteParent(entityID) {
+				return m, createNoteForEntity(entityID)
 			}
 			return m, nil
+
+		case "R":
+			entityID := m.cursorEntityID()
+			if entityID != "" && isShipment(entityID) {
+				m.statusMsg = "Copying /ship-run command..."
+				return m, triggerWorkflow("ship-run", entityID)
+			}
+			return m, nil
+
+		case "D":
+			entityID := m.cursorEntityID()
+			if entityID != "" && isShipment(entityID) {
+				m.statusMsg = "Copying /ship-deploy command..."
+				return m, triggerWorkflow("ship-deploy", entityID)
+			}
+			return m, nil
+
+		case "d":
+			entityID := m.cursorEntityID()
+			if entityID != "" && isReviewable(entityID) {
+				m.statusMsg = fmt.Sprintf("Opening review for %s...", entityID)
+				return m, m.openDeskReview(entityID)
+			}
+			return m, nil
+
+		case "g":
+			// Send freeform text to goblin pane (opens editor)
+			if m.workshopSession != "" {
+				return m, m.composeGoblinMessage()
+			}
+			// Fallback: send entity ID to goblin via bench ID injection (desk session)
+			entityID := m.cursorEntityID()
+			if m.isDeskSession && entityID != "" && entityHasAction(entityID, "goblin") {
+				m.emitEvent("info", "goblin send", map[string]string{"action": "goblin", "entity_id": entityID})
+				return m, m.sendToGoblinByBenchID(entityID)
+			}
+			return m, nil
+
+		case "r":
+			m.emitEvent("info", "refresh", map[string]string{"action": "refresh"})
+			// Start starfield animation, then refresh with fresh data
+			return m, m.startAnimation()
 		}
 
 	case tea.WindowSizeMsg:
@@ -1089,7 +1502,11 @@ func (m summaryModel) renderStatusBar() string {
 		formatHint("o", "open", entityHasAction(entityID, "open")) + "  " +
 		formatHint("f", "focus", entityHasAction(entityID, "focus")) + "  " +
 		formatHint("c", "close", entityHasAction(entityID, "close")) + "  " +
-		formatHint("g", "goblin", m.isUtilsSession && entityHasAction(entityID, "goblin")) + "  " +
+		formatHint("n", "note", hasNoteParent(entityID)) + "  " +
+		formatHint("d", "review", isReviewable(entityID)) + "  " +
+		formatHint("R", "run", isShipment(entityID)) + "  " +
+		formatHint("D", "deploy", isShipment(entityID)) + "  " +
+		formatHint("g", "goblin", m.workshopSession != "" || (m.isDeskSession && entityHasAction(entityID, "goblin"))) + "  " +
 		formatHint("r", "refresh", true) + "  " +
 		formatHint("l", "expand", true) + "  " +
 		formatHint("q", "quit", true)
@@ -1117,17 +1534,17 @@ func (m summaryModel) View() string {
 	return m.viewport.View() + "\n" + m.renderStatusBar()
 }
 
-// isInsideUtilsSession checks if we're running inside an ORC utils tmux session
-// by querying the ORC_UTILS_SESSION environment variable set by orc-utils-popup.sh.
-func isInsideUtilsSession() bool {
-	out, err := exec.Command("tmux", "show-environment", "ORC_UTILS_SESSION").Output()
+// isInsideDeskSession checks if we're running inside an ORC desk tmux session
+// by querying the ORC_DESK_SESSION environment variable set by orc-desk-popup.sh.
+func isInsideDeskSession() bool {
+	out, err := exec.Command("tmux", "show-environment", "ORC_DESK_SESSION").Output()
 	if err != nil {
 		return false
 	}
-	return strings.Contains(string(out), "ORC_UTILS_SESSION=")
+	return strings.Contains(string(out), "ORC_DESK_SESSION=")
 }
 
-// detachUtilsSession detaches the tmux client, which closes the utils popup.
-func detachUtilsSession() {
+// detachDeskSession detaches the tmux client, which closes the desk popup.
+func detachDeskSession() {
 	_ = exec.Command("tmux", "detach-client").Run()
 }

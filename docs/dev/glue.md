@@ -30,7 +30,7 @@ glue/
 ├── hooks.json              # Hook configuration
 │
 ├── tmux/                   # TMux integration
-│   └── orc-utils-popup.sh
+│   └── orc-desk-popup.sh
 │
 └── README.md
 ```

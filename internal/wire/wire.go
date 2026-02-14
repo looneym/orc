@@ -279,12 +279,6 @@ func CommissionAdapterWithOutput(out io.Writer) *cliadapter.CommissionAdapter {
 	return cliadapter.NewCommissionAdapter(commissionService, out)
 }
 
-// RefreshWorkbenchLayout relocates guest panes to a sibling -imps window.
-func RefreshWorkbenchLayout(sessionName, workbenchWindow string) error {
-	once.Do(initServices)
-	return tmuxadapter.RefreshWorkbenchLayout(sessionName, workbenchWindow)
-}
-
 // EnrichSession applies ORC enrichment to all windows in a session.
 func EnrichSession(sessionName string) error {
 	once.Do(initServices)
@@ -305,20 +299,20 @@ func NewGotmuxAdapter() (*GotmuxAdapter, error) {
 	return tmuxadapter.NewGotmuxAdapter()
 }
 
-// UtilsServerInfo re-exports the utils server info type.
-type UtilsServerInfo = tmuxadapter.UtilsServerInfo
+// DeskServerInfo re-exports the desk server info type.
+type DeskServerInfo = tmuxadapter.DeskServerInfo
 
-// ListUtilsServers scans for *-utils tmux server sockets.
-func ListUtilsServers() ([]UtilsServerInfo, error) {
-	return tmuxadapter.ListUtilsServers()
+// ListDeskServers scans for *-desk tmux server sockets.
+func ListDeskServers() ([]DeskServerInfo, error) {
+	return tmuxadapter.ListDeskServers()
 }
 
-// KillUtilsServer kills a specific utils server by workbench name.
-func KillUtilsServer(benchName string) error {
-	return tmuxadapter.KillUtilsServer(benchName)
+// KillDeskServer kills a specific desk server by workbench name.
+func KillDeskServer(benchName string) error {
+	return tmuxadapter.KillDeskServer(benchName)
 }
 
-// KillAllUtilsServers kills all discoverable utils servers.
-func KillAllUtilsServers() (int, error) {
-	return tmuxadapter.KillAllUtilsServers()
+// KillAllDeskServers kills all discoverable desk servers.
+func KillAllDeskServers() (int, error) {
+	return tmuxadapter.KillAllDeskServers()
 }
