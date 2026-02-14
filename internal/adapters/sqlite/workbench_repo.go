@@ -5,6 +5,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log"
 	"path/filepath"
 	"time"
 
@@ -79,7 +80,9 @@ func (r *WorkbenchRepository) Create(ctx context.Context, workbench *secondary.W
 
 	// Log create operation
 	if r.eventWriter != nil {
-		_ = r.eventWriter.EmitAuditCreate(ctx, "workbench", id)
+		if err := r.eventWriter.EmitAuditCreate(ctx, "workbench", id); err != nil {
+			log.Printf("event: EmitAuditCreate workbench %s: %v", id, err)
+		}
 	}
 
 	return nil

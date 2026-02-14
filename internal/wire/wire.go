@@ -171,7 +171,8 @@ func initServices() {
 	workshopEventRepo := sqlite.NewWorkshopEventRepository(database)
 	operationalEventRepo := sqlite.NewOperationalEventRepository(database)
 	workbenchRepo := sqlite.NewWorkbenchRepository(database, nil) // nil EventWriter: circular dependency (EventWriter needs workbenchRepo)
-	eventWriter := sqlite.NewEventWriterAdapter(workshopEventRepo, operationalEventRepo, workbenchRepo, version.Commit)
+	transactor := sqlite.NewTransactor(database)
+	eventWriter := sqlite.NewEventWriterAdapter(workshopEventRepo, operationalEventRepo, workbenchRepo, transactor, version.Commit)
 	eventWriterInstance = eventWriter
 
 	// Create repository adapters (secondary ports) - sqlite adapters with injected DB
