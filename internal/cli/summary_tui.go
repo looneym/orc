@@ -88,6 +88,10 @@ type summaryModel struct {
 	// Whether we're inside a desk tmux session
 	isDeskSession bool
 
+	// detachFn detaches the tmux client (closes desk popup).
+	// Defaults to detachDeskSession(). Injectable for testing.
+	detachFn func()
+
 	// Workshop tmux session name (default server), for goblin communication.
 	// Resolved from cwd workbench context at startup. Empty if unavailable.
 	workshopSession string
@@ -201,6 +205,7 @@ func runSummaryTUI(cmd *cobra.Command, opts summaryOpts, eventWriter secondary.E
 		eventWriter:     eventWriter,
 		expanded:        make(map[string]bool),
 		isDeskSession:   isInsideDeskSession(),
+		detachFn:        detachDeskSession,
 		workshopSession: resolveWorkshopSession(),
 		animRand:        rand.New(rand.NewPCG(uint64(time.Now().UnixNano()), 0)),
 	}
@@ -1182,7 +1187,7 @@ func (m summaryModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "q", "esc":
 			if m.isDeskSession {
 				m.emitEvent("info", "desk detached", map[string]string{"action": "detach", "key": msg.String()})
-				detachDeskSession()
+				m.detachFn()
 				return m, nil
 			}
 			m.emitEvent("info", "tui closed", map[string]string{"action": "quit", "key": msg.String()})

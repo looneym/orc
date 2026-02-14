@@ -15,6 +15,20 @@ import (
 	"github.com/example/orc/internal/wire"
 )
 
+// resolveFactorySocket looks up the factory for a workshop and derives the tmux socket.
+// Returns "" for the default factory (maps to default tmux server).
+func resolveFactorySocket(ctx context.Context, workshopID string) string {
+	workshop, err := wire.WorkshopService().GetWorkshop(ctx, workshopID)
+	if err != nil || workshop.FactoryID == "" {
+		return "" // can't resolve → default server (safe fallback)
+	}
+	factory, err := wire.FactoryService().GetFactory(ctx, workshop.FactoryID)
+	if err != nil {
+		return "" // can't resolve → default server (safe fallback)
+	}
+	return wire.FactorySocket(factory.Name)
+}
+
 // TmuxCmd returns the tmux command
 func TmuxCmd() *cobra.Command {
 	cmd := &cobra.Command{
@@ -56,8 +70,9 @@ Examples:
 				return fmt.Errorf("workshop not found: %s", workshopID)
 			}
 
-			// 2. Find tmux session by name
-			gotmuxAdapter, err := wire.NewGotmuxAdapter()
+			// 2. Resolve factory socket and find tmux session
+			socket := resolveFactorySocket(ctx, workshopID)
+			gotmuxAdapter, err := wire.NewGotmuxAdapterWithSocket(socket)
 			if err != nil {
 				return fmt.Errorf("failed to create tmux adapter: %w", err)
 			}
@@ -66,8 +81,8 @@ Examples:
 				return fmt.Errorf("no tmux session found for %s\nRun: orc tmux apply %s", workshopID, workshopID)
 			}
 
-			// 3. Attach to session
-			return attachToSession(workshop.Name)
+			// 3. Attach to session (with socket if non-default)
+			return attachToSession(workshop.Name, socket)
 		},
 	}
 
@@ -75,14 +90,19 @@ Examples:
 }
 
 // attachToSession replaces the current process with tmux attach.
-func attachToSession(sessionName string) error {
+// If socket is non-empty, targets that specific tmux server.
+func attachToSession(sessionName, socket string) error {
 	tmuxPath, err := exec.LookPath("tmux")
 	if err != nil {
 		return fmt.Errorf("tmux not found: %w", err)
 	}
 
 	// Use exec to replace current process
-	args := []string{"tmux", "attach-session", "-t", sessionName}
+	args := []string{"tmux"}
+	if socket != "" {
+		args = append(args, "-L", socket)
+	}
+	args = append(args, "attach-session", "-t", sessionName)
 	return syscall.Exec(tmuxPath, args, os.Environ())
 }
 
@@ -147,8 +167,9 @@ Examples:
 				return fmt.Errorf("workshop %s has no active workbenches", workshopID)
 			}
 
-			// 4. Create gotmux adapter and compute plan
-			gotmuxAdapter, err := wire.NewGotmuxAdapter()
+			// 4. Create gotmux adapter (socket-aware) and compute plan
+			socket := resolveFactorySocket(ctx, workshopID)
+			gotmuxAdapter, err := wire.NewGotmuxAdapterWithSocket(socket)
 			if err != nil {
 				return fmt.Errorf("failed to create gotmux adapter: %w", err)
 			}

@@ -522,6 +522,7 @@ func TestDeskModeQuitBehavior(t *testing.T) {
 		expanded:      make(map[string]bool),
 		entityIndices: []int{},
 		isDeskSession: true,
+		detachFn:      func() {}, // no-op: avoid real tmux detach-client in tests
 	}
 
 	t.Run("q in desk mode returns nil cmd (detach)", func(t *testing.T) {

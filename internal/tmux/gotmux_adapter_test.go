@@ -6,7 +6,7 @@ import (
 )
 
 func TestNewGotmuxAdapter(t *testing.T) {
-	adapter, err := NewGotmuxAdapter()
+	adapter, err := NewGotmuxAdapter("")
 	if err != nil {
 		t.Fatalf("failed to create adapter: %v", err)
 	}
@@ -16,12 +16,43 @@ func TestNewGotmuxAdapter(t *testing.T) {
 	}
 
 	if adapter.tmux == nil {
-		t.Fatal("adapter.tmux should not be nil")
+		t.Fatal("adapter.tmux should not be nil for default socket")
+	}
+
+	if adapter.server == nil {
+		t.Fatal("adapter.server should not be nil")
+	}
+
+	if adapter.server.Socket != "" {
+		t.Errorf("default adapter should have empty socket, got %q", adapter.server.Socket)
+	}
+}
+
+func TestNewGotmuxAdapter_CustomSocket(t *testing.T) {
+	adapter, err := NewGotmuxAdapter("orc-test-factory")
+	if err != nil {
+		t.Fatalf("failed to create adapter with custom socket: %v", err)
+	}
+
+	if adapter == nil {
+		t.Fatal("adapter should not be nil")
+	}
+
+	if adapter.tmux != nil {
+		t.Error("custom socket adapter should have nil tmux (gotmux doesn't support custom sockets)")
+	}
+
+	if adapter.server == nil {
+		t.Fatal("adapter.server should not be nil")
+	}
+
+	if adapter.server.Socket != "orc-test-factory" {
+		t.Errorf("expected socket 'orc-test-factory', got %q", adapter.server.Socket)
 	}
 }
 
 func TestSessionExists(t *testing.T) {
-	adapter, err := NewGotmuxAdapter()
+	adapter, err := NewGotmuxAdapter("")
 	if err != nil {
 		t.Fatalf("failed to create adapter: %v", err)
 	}
@@ -34,7 +65,7 @@ func TestSessionExists(t *testing.T) {
 }
 
 func TestAttachInstructions(t *testing.T) {
-	adapter, err := NewGotmuxAdapter()
+	adapter, err := NewGotmuxAdapter("")
 	if err != nil {
 		t.Fatalf("failed to create adapter: %v", err)
 	}
@@ -61,8 +92,20 @@ func TestAttachInstructions(t *testing.T) {
 	}
 }
 
+func TestAttachInstructions_CustomSocket(t *testing.T) {
+	adapter, err := NewGotmuxAdapter("orc-phoenix")
+	if err != nil {
+		t.Fatalf("failed to create adapter: %v", err)
+	}
+
+	instructions := adapter.AttachInstructions("test-session")
+	if !strings.Contains(instructions, "-L orc-phoenix") {
+		t.Error("AttachInstructions with custom socket should include -L flag")
+	}
+}
+
 func TestPlanApply_NewSession(t *testing.T) {
-	adapter, err := NewGotmuxAdapter()
+	adapter, err := NewGotmuxAdapter("")
 	if err != nil {
 		t.Fatalf("failed to create adapter: %v", err)
 	}
@@ -107,7 +150,7 @@ func TestPlanApply_NewSession(t *testing.T) {
 }
 
 func TestPlanApply_EmptyWorkbenches(t *testing.T) {
-	adapter, err := NewGotmuxAdapter()
+	adapter, err := NewGotmuxAdapter("")
 	if err != nil {
 		t.Fatalf("failed to create adapter: %v", err)
 	}
@@ -127,7 +170,7 @@ func TestPlanApply_EmptyWorkbenches(t *testing.T) {
 }
 
 func TestPlanApply_SingleWorkbench(t *testing.T) {
-	adapter, err := NewGotmuxAdapter()
+	adapter, err := NewGotmuxAdapter("")
 	if err != nil {
 		t.Fatalf("failed to create adapter: %v", err)
 	}
@@ -155,7 +198,7 @@ func TestPlanApply_SingleWorkbench(t *testing.T) {
 }
 
 func TestPlanApply_ActionFields(t *testing.T) {
-	adapter, err := NewGotmuxAdapter()
+	adapter, err := NewGotmuxAdapter("")
 	if err != nil {
 		t.Fatalf("failed to create adapter: %v", err)
 	}
@@ -244,5 +287,96 @@ func TestApplyActionTypes(t *testing.T) {
 		if validTypes[ApplyActionType(removed)] {
 			t.Errorf("removed action type %s should not exist", removed)
 		}
+	}
+}
+
+// --- Server and FactorySocket tests ---
+
+func TestDefaultServer(t *testing.T) {
+	srv := DefaultServer()
+	if srv == nil {
+		t.Fatal("DefaultServer() should not return nil")
+	}
+	if srv.Socket != "" {
+		t.Errorf("DefaultServer should have empty socket, got %q", srv.Socket)
+	}
+}
+
+func TestServer_SessionExists_NonExistent(t *testing.T) {
+	srv := DefaultServer()
+	if srv.SessionExists("nonexistent-session-test-99999") {
+		t.Error("SessionExists should return false for non-existent session")
+	}
+}
+
+func TestServer_CustomSocket_SessionExists(t *testing.T) {
+	srv := &Server{Socket: "orc-test-nonexistent"}
+	// A non-existent socket server should report no sessions
+	if srv.SessionExists("any-session") {
+		t.Error("SessionExists on non-existent socket should return false")
+	}
+}
+
+func TestFactorySocket(t *testing.T) {
+	tests := []struct {
+		name     string
+		factory  string
+		expected string
+	}{
+		{"default factory", "default", ""},
+		{"default factory uppercase", "Default", ""},
+		{"default factory mixed case", "DEFAULT", ""},
+		{"custom factory", "phoenix-dev", "orc-phoenix-dev"},
+		{"factory with spaces", "My Factory", "orc-my-factory"},
+		{"factory with leading/trailing spaces", "  staging  ", "orc-staging"},
+		{"simple factory", "prod", "orc-prod"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := FactorySocket(tt.factory)
+			if got != tt.expected {
+				t.Errorf("FactorySocket(%q) = %q, want %q", tt.factory, got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestSession_SrvDefaultsToDefaultServer(t *testing.T) {
+	// A Session created without a server should default to DefaultServer
+	s := &Session{Name: "test"}
+	srv := s.srv()
+	if srv == nil {
+		t.Fatal("Session.srv() should not return nil")
+	}
+	if srv.Socket != "" {
+		t.Errorf("Session.srv() should default to empty socket, got %q", srv.Socket)
+	}
+}
+
+func TestSession_SrvUsesExplicitServer(t *testing.T) {
+	customSrv := &Server{Socket: "orc-custom"}
+	s := &Session{Name: "test", server: customSrv}
+	srv := s.srv()
+	if srv != customSrv {
+		t.Error("Session.srv() should return the explicit server")
+	}
+	if srv.Socket != "orc-custom" {
+		t.Errorf("expected socket 'orc-custom', got %q", srv.Socket)
+	}
+}
+
+func TestGotmuxAdapter_Server(t *testing.T) {
+	adapter, err := NewGotmuxAdapter("")
+	if err != nil {
+		t.Fatalf("failed to create adapter: %v", err)
+	}
+
+	srv := adapter.Server()
+	if srv == nil {
+		t.Fatal("Server() should not return nil")
+	}
+	if srv.Socket != "" {
+		t.Errorf("expected empty socket, got %q", srv.Socket)
 	}
 }

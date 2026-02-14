@@ -178,8 +178,8 @@ func initServices() {
 	// Create repository adapters (secondary ports) - sqlite adapters with injected DB
 	commissionRepo := sqlite.NewCommissionRepository(database, eventWriter)
 	agentProvider := persistence.NewAgentIdentityProvider()
-	tmuxAdapter := tmuxadapter.NewAdapter()
-	tmuxService = tmuxAdapter // Store for getter
+	tmuxAdapter := tmuxadapter.NewAdapter("") // default factory → default tmux server
+	tmuxService = tmuxAdapter                 // Store for getter
 
 	// Create workspace adapter (needed by effect executor and workshop service)
 	home, _ := os.UserHomeDir()
@@ -295,9 +295,20 @@ type DesiredWorkbench = tmuxadapter.DesiredWorkbench
 // ApplyPlan re-exports the reconciliation plan type.
 type ApplyPlan = tmuxadapter.ApplyPlan
 
-// NewGotmuxAdapter creates a new gotmux adapter for programmatic tmux lifecycle management.
+// NewGotmuxAdapter creates a new gotmux adapter for the default tmux server.
 func NewGotmuxAdapter() (*GotmuxAdapter, error) {
-	return tmuxadapter.NewGotmuxAdapter()
+	return tmuxadapter.NewGotmuxAdapter("")
+}
+
+// NewGotmuxAdapterWithSocket creates a gotmux adapter targeting a specific tmux socket.
+// An empty socket means the default server; a non-empty socket targets that server.
+func NewGotmuxAdapterWithSocket(socket string) (*GotmuxAdapter, error) {
+	return tmuxadapter.NewGotmuxAdapter(socket)
+}
+
+// FactorySocket derives a tmux socket name from a factory name.
+func FactorySocket(factoryName string) string {
+	return tmuxadapter.FactorySocket(factoryName)
 }
 
 // DeskServerInfo re-exports the desk server info type.
