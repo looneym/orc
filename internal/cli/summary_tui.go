@@ -2,16 +2,34 @@ package cli
 
 import (
 	"fmt"
+	"math/rand/v2"
 	"os"
 	"os/exec"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
 )
+
+// clearStatusMsg is sent after a timer to auto-clear transient status messages.
+type clearStatusMsg struct{}
+
+// animTickMsg advances the starfield animation by one frame.
+type animTickMsg struct{}
+
+// animNumFrames is the total number of animation frames (8 frames at 125ms = 1s).
+const animNumFrames = 8
+
+// animFrameDuration is the time between animation frames.
+const animFrameDuration = 125 * time.Millisecond
+
+// sparkleChars are the characters used in the starfield animation,
+// ordered from brightest (near wave front) to dimmest.
+var sparkleChars = []string{"✨", "★", "✦", "✧", "·"}
 
 // ansiPattern matches ANSI escape sequences for stripping during entity ID parsing.
 var ansiPattern = regexp.MustCompile(`\x1b\[[0-9;]*[a-zA-Z]`)
@@ -24,6 +42,7 @@ var entityIDPattern = regexp.MustCompile(`\b(SHIP|TASK|NOTE|COMM|WORK|BENCH|TOME
 type parsedLine struct {
 	text     string // original line with ANSI codes preserved
 	entityID string // extracted entity ID, empty for decorative lines
+	depth    int    // tree indentation depth (0 = top-level, 1 = first-level child, etc.)
 }
 
 // summaryModel is the Bubble Tea model for the interactive summary TUI.
@@ -61,6 +80,15 @@ type summaryModel struct {
 
 	// Whether we're inside a utils tmux session
 	isUtilsSession bool
+
+	// Close confirmation state
+	confirming      bool   // true when waiting for y/n confirmation
+	confirmEntityID string // entity ID pending close confirmation
+
+	// Starfield animation state
+	animating bool       // whether the animation is currently playing
+	animFrame int        // current frame index (0..animNumFrames-1)
+	animRand  *rand.Rand // deterministic RNG for star positions
 }
 
 // summaryContentMsg carries the rendered summary content after async fetch.
@@ -78,6 +106,18 @@ type yankResultMsg struct {
 
 // focusResultMsg carries the result of an orc focus operation.
 type focusResultMsg struct {
+	entityID string
+	err      error
+}
+
+// goblinResultMsg carries the result of sending an entity ID to the goblin pane.
+type goblinResultMsg struct {
+	entityID string
+	err      error
+}
+
+// closeResultMsg carries the result of closing/completing an entity.
+type closeResultMsg struct {
 	entityID string
 	err      error
 }
@@ -110,6 +150,7 @@ func runSummaryTUI(cmd *cobra.Command, opts summaryOpts) error {
 		opts:           opts,
 		expanded:       make(map[string]bool),
 		isUtilsSession: isInsideUtilsSession(),
+		animRand:       rand.New(rand.NewPCG(uint64(time.Now().UnixNano()), 0)),
 	}
 
 	p := tea.NewProgram(m, tea.WithAltScreen())
@@ -133,7 +174,8 @@ func (m summaryModel) fetchSummary(entityID string) tea.Cmd {
 	}
 }
 
-// parseLines splits rendered content into tagged lines, identifying entity lines.
+// parseLines splits rendered content into tagged lines, identifying entity lines
+// and computing tree depth from indentation.
 func parseLines(content string) ([]parsedLine, []int) {
 	rawLines := strings.Split(content, "\n")
 	// Remove trailing empty line from Split (content typically ends with \n)
@@ -150,13 +192,76 @@ func parseLines(content string) ([]parsedLine, []int) {
 		if match := entityIDPattern.FindString(stripped); match != "" {
 			entityID = match
 		}
-		lines[i] = parsedLine{text: line, entityID: entityID}
+		lines[i] = parsedLine{text: line, entityID: entityID, depth: treeDepth(stripped)}
 		if entityID != "" {
 			entityIndices = append(entityIndices, i)
 		}
 	}
 
 	return lines, entityIndices
+}
+
+// treeDepth computes the indentation depth from tree-drawing characters.
+// Each "├── ", "└── ", "│   ", or "    " prefix segment adds one level.
+func treeDepth(stripped string) int {
+	depth := 0
+	pos := 0
+	for pos < len(stripped) {
+		if strings.HasPrefix(stripped[pos:], "├── ") ||
+			strings.HasPrefix(stripped[pos:], "└── ") {
+			depth++
+			pos += len("├── ")
+		} else if strings.HasPrefix(stripped[pos:], "│   ") {
+			depth++
+			pos += len("│   ")
+		} else if strings.HasPrefix(stripped[pos:], "    ") {
+			depth++
+			pos += 4
+		} else {
+			break
+		}
+	}
+	return depth
+}
+
+// isExpandable returns whether an entity type can have children in the tree.
+func isExpandable(entityID string) bool {
+	switch entityPrefix(entityID) {
+	case "COMM", "SHIP", "TOME":
+		return true
+	default:
+		return false
+	}
+}
+
+// initExpandState sets initial expand/collapse state for entities after loading data.
+// Focused entities (those the summary server expanded) start expanded; others collapsed.
+func (m *summaryModel) initExpandState() {
+	// Detect which entities have children by checking depth relationships
+	for i, idx := range m.entityIndices {
+		entityID := m.lines[idx].entityID
+		if !isExpandable(entityID) {
+			continue
+		}
+		// If not yet in the map, set default: COMM entities expanded, others
+		// expanded if they have children that are already visible (i.e., the
+		// summary server chose to expand them, meaning they are focused).
+		if _, exists := m.expanded[entityID]; !exists {
+			if entityPrefix(entityID) == "COMM" {
+				m.expanded[entityID] = true
+			} else {
+				// Check if this entity has children rendered (next entity has greater depth)
+				hasChildren := false
+				if i+1 < len(m.entityIndices) {
+					nextIdx := m.entityIndices[i+1]
+					if m.lines[nextIdx].depth > m.lines[idx].depth {
+						hasChildren = true
+					}
+				}
+				m.expanded[entityID] = hasChildren
+			}
+		}
+	}
 }
 
 // cursorEntityID returns the entity ID under the cursor, or empty string.
@@ -187,12 +292,21 @@ func (m summaryModel) findEntityCursorIndex(entityID string) int {
 }
 
 // ensureCursorVisible adjusts the viewport offset so the cursor line is visible.
+// Uses the visible line offset rather than the raw line index when collapse filtering is active.
 func (m *summaryModel) ensureCursorVisible() {
 	lineIdx := m.cursorLineIndex()
-	if lineIdx < m.viewport.YOffset {
-		m.viewport.SetYOffset(lineIdx)
-	} else if lineIdx >= m.viewport.YOffset+m.viewport.Height {
-		m.viewport.SetYOffset(lineIdx - m.viewport.Height + 1)
+	// Count visible lines up to the cursor line to get the effective offset
+	visibleIdx := 0
+	hidden := m.hiddenLines()
+	for i := 0; i < lineIdx; i++ {
+		if !hidden[i] {
+			visibleIdx++
+		}
+	}
+	if visibleIdx < m.viewport.YOffset {
+		m.viewport.SetYOffset(visibleIdx)
+	} else if visibleIdx >= m.viewport.YOffset+m.viewport.Height {
+		m.viewport.SetYOffset(visibleIdx - m.viewport.Height + 1)
 	}
 }
 
@@ -208,6 +322,16 @@ func entityPrefix(id string) string {
 func isFocusable(entityID string) bool {
 	switch entityPrefix(entityID) {
 	case "COMM", "SHIP", "TOME", "NOTE":
+		return true
+	default:
+		return false
+	}
+}
+
+// isCloseable returns whether an entity type can be closed/completed.
+func isCloseable(entityID string) bool {
+	switch entityPrefix(entityID) {
+	case "TASK", "SHIP":
 		return true
 	default:
 		return false
@@ -261,6 +385,78 @@ func focusEntity(entityID string) tea.Cmd {
 	}
 }
 
+// closeEntity runs the appropriate orc complete command for an entity.
+func closeEntity(entityID string) tea.Cmd {
+	return func() tea.Msg {
+		orcBin, err := os.Executable()
+		if err != nil {
+			orcBin = "orc"
+		}
+		var subcmd string
+		switch entityPrefix(entityID) {
+		case "TASK":
+			subcmd = "task"
+		case "SHIP":
+			subcmd = "shipment"
+		default:
+			return closeResultMsg{entityID: entityID, err: fmt.Errorf("cannot close %s", entityID)}
+		}
+		cmd := exec.Command(orcBin, subcmd, "complete", entityID)
+		if out, err := cmd.CombinedOutput(); err != nil {
+			return closeResultMsg{entityID: entityID, err: fmt.Errorf("%s: %s", err, strings.TrimSpace(string(out)))}
+		}
+		return closeResultMsg{entityID: entityID}
+	}
+}
+
+// sendToGoblin sends an entity ID to the goblin pane in the parent tmux server
+// by finding the pane with @pane_role=goblin and using send-keys.
+// The parent server is the default tmux server; we reach it by unsetting TMUX
+// so that the tmux CLI doesn't target the utils server socket.
+func sendToGoblin(entityID string) tea.Cmd {
+	return func() tea.Msg {
+		// Find the goblin pane on the default (parent) tmux server.
+		// list-panes -a with a format filter finds panes with @pane_role=goblin.
+		listCmd := exec.Command("tmux", "list-panes", "-a",
+			"-f", "#{==:#{@pane_role},goblin}",
+			"-F", "#{pane_id}")
+		// Unset TMUX so the tmux CLI targets the default server, not the utils server.
+		listCmd.Env = envWithoutTMUX()
+		out, err := listCmd.Output()
+		if err != nil {
+			return goblinResultMsg{entityID: entityID, err: fmt.Errorf("find goblin pane: %w", err)}
+		}
+		paneID := strings.TrimSpace(string(out))
+		if paneID == "" {
+			return goblinResultMsg{entityID: entityID, err: fmt.Errorf("no goblin pane found")}
+		}
+		// If multiple goblin panes, take the first one
+		if lines := strings.Split(paneID, "\n"); len(lines) > 1 {
+			paneID = lines[0]
+		}
+
+		// Send the entity ID followed by Space to separate from existing input
+		sendCmd := exec.Command("tmux", "send-keys", "-t", paneID, entityID, "Space")
+		sendCmd.Env = envWithoutTMUX()
+		if err := sendCmd.Run(); err != nil {
+			return goblinResultMsg{entityID: entityID, err: fmt.Errorf("send-keys to goblin: %w", err)}
+		}
+		return goblinResultMsg{entityID: entityID}
+	}
+}
+
+// envWithoutTMUX returns the current environment with the TMUX variable removed,
+// so that tmux CLI commands target the default server instead of the utils server.
+func envWithoutTMUX() []string {
+	var env []string
+	for _, e := range os.Environ() {
+		if !strings.HasPrefix(e, "TMUX=") {
+			env = append(env, e)
+		}
+	}
+	return env
+}
+
 // openInVim launches vim -R with entity show output via tea.ExecProcess.
 func (m summaryModel) openInVim(entityID string) tea.Cmd {
 	showCmd := entityShowCommand(entityID)
@@ -279,41 +475,154 @@ func (m summaryModel) openInVim(entityID string) tea.Cmd {
 			return yankResultMsg{err: fmt.Errorf("orc %s show %s: %w", showCmd, entityID, err)}
 		}
 
-		// Write to temp file
-		tmpFile, err := os.CreateTemp("", fmt.Sprintf("orc-%s-*.txt", entityID))
+		// Write entity content to deterministic path for clean vim title
+		tmpPath := fmt.Sprintf("/tmp/%s.txt", entityID)
+		if err := os.WriteFile(tmpPath, out, 0o600); err != nil {
+			return yankResultMsg{err: err}
+		}
+
+		// Write temp vimrc with backslash-quit mapping (avoids shell escaping issues with --cmd)
+		vimrcFile, err := os.CreateTemp("", "orc-vimrc-*.vim")
 		if err != nil {
 			return yankResultMsg{err: err}
 		}
-		tmpPath := tmpFile.Name()
-		if _, err := tmpFile.Write(out); err != nil {
-			tmpFile.Close()
+		vimrcPath := vimrcFile.Name()
+		if _, err := vimrcFile.WriteString("nnoremap \\\\ :q!<CR>\n"); err != nil {
+			vimrcFile.Close()
 			return yankResultMsg{err: err}
 		}
-		tmpFile.Close()
+		vimrcFile.Close()
 
-		// Return an exec command that will be handled by the tea runtime
-		return tuiExecMsg{tmpPath: tmpPath}
+		return tuiExecMsg{tmpPath: tmpPath, vimrcPath: vimrcPath}
 	}
 }
 
 // tuiExecMsg triggers a tea.ExecProcess to open vim.
 type tuiExecMsg struct {
-	tmpPath string
+	tmpPath   string
+	vimrcPath string
 }
 
 // tuiExecDoneMsg is sent when vim exits.
 type tuiExecDoneMsg struct {
-	tmpPath string
-	err     error
+	tmpPath   string
+	vimrcPath string
+	err       error
+}
+
+// setStatusMsg sets a transient status message and returns a tea.Cmd that will
+// auto-clear it after 2 seconds.
+func setStatusMsg(m *summaryModel, msg string) tea.Cmd {
+	m.statusMsg = msg
+	return tea.Tick(2*time.Second, func(time.Time) tea.Msg {
+		return clearStatusMsg{}
+	})
+}
+
+// startAnimation begins the starfield refresh animation sequence.
+func (m *summaryModel) startAnimation() tea.Cmd {
+	m.animating = true
+	m.animFrame = 0
+	return tea.Tick(animFrameDuration, func(time.Time) tea.Msg {
+		return animTickMsg{}
+	})
+}
+
+// renderAnimationFrame overlays sparkle characters onto the current rendered content
+// using the wave-front algorithm from the original starfield rain effect.
+func (m summaryModel) renderAnimationFrame() string {
+	base := m.renderContent()
+	if m.width <= 0 || m.height <= 2 {
+		return base
+	}
+
+	// Split into lines for character overlay
+	displayLines := strings.Split(base, "\n")
+	h := len(displayLines)
+	if h == 0 {
+		return base
+	}
+
+	// Strip ANSI from each line for safe rune-level overlay
+	runeLines := make([][]rune, len(displayLines))
+	for i, line := range displayLines {
+		runeLines[i] = []rune(ansiPattern.ReplaceAllString(line, ""))
+	}
+
+	// Wave front sweeps from top to bottom
+	waveFront := (m.animFrame + 1) * h / animNumFrames
+	starsPerFrame := max(m.width/10, 6) + m.animFrame*2
+
+	for range starsPerFrame {
+		// Cluster stars around the wave front (+-3 rows)
+		row := waveFront + m.animRand.IntN(7) - 3
+		if row < 0 || row >= h {
+			continue
+		}
+		lineWidth := len(runeLines[row])
+		if lineWidth <= 0 {
+			continue
+		}
+		col := m.animRand.IntN(lineWidth)
+
+		// Brighter characters near wave front, dimmer further away
+		dist := row - waveFront
+		if dist < 0 {
+			dist = -dist
+		}
+		charIdx := dist
+		if charIdx >= len(sparkleChars) {
+			charIdx = len(sparkleChars) - 1
+		}
+
+		sparkle := []rune(sparkleChars[charIdx])
+		if len(sparkle) > 0 {
+			runeLines[row][col] = sparkle[0]
+		}
+	}
+
+	// Rebuild the display string
+	var b strings.Builder
+	for i, runes := range runeLines {
+		b.WriteString(string(runes))
+		if i < len(runeLines)-1 {
+			b.WriteByte('\n')
+		}
+	}
+	return b.String()
 }
 
 // Update handles messages and returns the updated model.
 func (m summaryModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case clearStatusMsg:
+		m.statusMsg = ""
+		return m, nil
+
+	case animTickMsg:
+		if !m.animating {
+			return m, nil
+		}
+		m.animFrame++
+		if m.animFrame >= animNumFrames {
+			// Animation complete — stop animating and fetch fresh data
+			m.animating = false
+			m.animFrame = 0
+			entityID := m.cursorEntityID()
+			m.viewport.SetContent(m.renderContent())
+			return m, m.fetchSummary(entityID)
+		}
+		// Render next animation frame
+		m.viewport.SetContent(m.renderAnimationFrame())
+		return m, tea.Tick(animFrameDuration, func(time.Time) tea.Msg {
+			return animTickMsg{}
+		})
+
 	case summaryContentMsg:
 		m.err = msg.err
 		if msg.err == nil {
 			m.lines, m.entityIndices = parseLines(msg.content)
+			m.initExpandState()
 			// Reposition cursor on target entity if specified
 			if msg.entityID != "" {
 				if idx := m.findEntityCursorIndex(msg.entityID); idx >= 0 {
@@ -336,42 +645,77 @@ func (m summaryModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case yankResultMsg:
 		if msg.err != nil {
-			m.statusMsg = fmt.Sprintf("Error: %v", msg.err)
-		} else {
-			m.statusMsg = fmt.Sprintf("Copied %s", msg.entityID)
+			cmd := setStatusMsg(&m, fmt.Sprintf("Error: %v", msg.err))
+			return m, cmd
 		}
-		return m, nil
+		cmd := setStatusMsg(&m, fmt.Sprintf("Copied %s", msg.entityID))
+		return m, cmd
 
 	case focusResultMsg:
 		if msg.err != nil {
-			m.statusMsg = fmt.Sprintf("Focus error: %v", msg.err)
-			return m, nil
+			cmd := setStatusMsg(&m, fmt.Sprintf("Focus error: %v", msg.err))
+			return m, cmd
 		}
 		m.statusMsg = fmt.Sprintf("Focused %s", msg.entityID)
 		// Refresh tree data, repositioning cursor on the focused entity
 		return m, m.fetchSummary(msg.entityID)
 
+	case goblinResultMsg:
+		if msg.err != nil {
+			cmd := setStatusMsg(&m, fmt.Sprintf("Goblin error: %v", msg.err))
+			return m, cmd
+		}
+		cmd := setStatusMsg(&m, fmt.Sprintf("Sent %s to goblin", msg.entityID))
+		return m, cmd
+
+	case closeResultMsg:
+		if msg.err != nil {
+			cmd := setStatusMsg(&m, fmt.Sprintf("Close error: %v", msg.err))
+			return m, cmd
+		}
+		m.statusMsg = fmt.Sprintf("Closed %s", msg.entityID)
+		// Refresh tree data, repositioning cursor on the closed entity
+		return m, m.fetchSummary(msg.entityID)
+
 	case tuiExecMsg:
-		// Launch vim with the temp file
-		c := exec.Command("vim", "-R",
-			"--cmd", `nnoremap \\ :q!<CR>`,
-			msg.tmpPath)
+		// Launch vim with temp vimrc for backslash-quit binding
+		c := exec.Command("vim", "-R", "-u", msg.vimrcPath, msg.tmpPath)
 		tmpPath := msg.tmpPath
+		vimrcPath := msg.vimrcPath
 		return m, tea.ExecProcess(c, func(err error) tea.Msg {
-			return tuiExecDoneMsg{tmpPath: tmpPath, err: err}
+			return tuiExecDoneMsg{tmpPath: tmpPath, vimrcPath: vimrcPath, err: err}
 		})
 
 	case tuiExecDoneMsg:
-		// Clean up temp file
+		// Clean up both temp files
 		os.Remove(msg.tmpPath)
+		os.Remove(msg.vimrcPath)
 		if msg.err != nil {
-			m.statusMsg = fmt.Sprintf("vim error: %v", msg.err)
+			cmd := setStatusMsg(&m, fmt.Sprintf("vim error: %v", msg.err))
+			return m, cmd
 		}
 		return m, nil
 
 	case tea.KeyMsg:
-		// Clear transient status message on any keypress
-		m.statusMsg = ""
+		// Ignore key input during animation
+		if m.animating {
+			return m, nil
+		}
+
+		// Handle close confirmation mode: y confirms, anything else cancels
+		if m.confirming {
+			if msg.String() == "y" {
+				entityID := m.confirmEntityID
+				m.confirming = false
+				m.confirmEntityID = ""
+				m.statusMsg = fmt.Sprintf("Closing %s...", entityID)
+				return m, closeEntity(entityID)
+			}
+			m.confirming = false
+			m.confirmEntityID = ""
+			m.statusMsg = ""
+			return m, nil
+		}
 
 		switch msg.String() {
 		case "q", "ctrl+c", "esc":
@@ -396,6 +740,15 @@ func (m summaryModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, nil
 
+		case "enter":
+			entityID := m.cursorEntityID()
+			if entityID != "" && isExpandable(entityID) {
+				m.expanded[entityID] = !m.expanded[entityID]
+				m.viewport.SetContent(m.renderContent())
+				m.ensureCursorVisible()
+			}
+			return m, nil
+
 		case "y":
 			entityID := m.cursorEntityID()
 			if entityID != "" {
@@ -406,7 +759,8 @@ func (m summaryModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "f":
 			entityID := m.cursorEntityID()
 			if entityID != "" && isFocusable(entityID) {
-				m.statusMsg = fmt.Sprintf("Focusing %s...", entityID)
+				cmd := setStatusMsg(&m, fmt.Sprintf("Focusing %s...", entityID))
+				_ = cmd // timer will fire but fetchSummary will also run
 				return m, focusEntity(entityID)
 			}
 			return m, nil
@@ -419,10 +773,26 @@ func (m summaryModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 
 		case "r":
-			// Manual refresh, preserving cursor on current entity
+			// Start starfield animation, then refresh with fresh data
+			return m, m.startAnimation()
+
+		case "c":
 			entityID := m.cursorEntityID()
-			m.statusMsg = "Refreshing..."
-			return m, m.fetchSummary(entityID)
+			if entityID != "" && isCloseable(entityID) {
+				m.confirming = true
+				m.confirmEntityID = entityID
+				m.statusMsg = fmt.Sprintf("Close %s? [y/n]", entityID)
+			}
+			return m, nil
+
+		case "g":
+			if m.isUtilsSession {
+				entityID := m.cursorEntityID()
+				if entityID != "" {
+					return m, sendToGoblin(entityID)
+				}
+			}
+			return m, nil
 		}
 
 	case tea.WindowSizeMsg:
@@ -450,7 +820,87 @@ func (m summaryModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
+// hiddenLines computes a set of line indices that should be hidden because
+// their parent entity is collapsed. A line is hidden if any ancestor entity
+// in the tree is collapsed.
+func (m summaryModel) hiddenLines() map[int]bool {
+	hidden := make(map[int]bool)
+
+	// Build a stack of collapsed entity depths. When we encounter an entity
+	// at depth D that is collapsed, all subsequent lines at depth > D are
+	// hidden until we see a line at depth <= D.
+	type collapseFrame struct {
+		depth int
+	}
+	var stack []collapseFrame
+
+	for _, idx := range m.entityIndices {
+		line := m.lines[idx]
+		depth := line.depth
+
+		// Pop frames that no longer apply (we've returned to same or shallower depth)
+		for len(stack) > 0 && depth <= stack[len(stack)-1].depth {
+			stack = stack[:len(stack)-1]
+		}
+
+		// If currently inside a collapsed subtree, this entity is hidden
+		if len(stack) > 0 {
+			hidden[idx] = true
+			// If this entity is also collapsed and expandable, push it
+			// (its children are also hidden transitively)
+			if isExpandable(line.entityID) && !m.expanded[line.entityID] {
+				stack = append(stack, collapseFrame{depth: depth})
+			}
+			continue
+		}
+
+		// Not hidden — check if this entity is collapsed
+		if isExpandable(line.entityID) && !m.expanded[line.entityID] {
+			stack = append(stack, collapseFrame{depth: depth})
+		}
+	}
+
+	// Now also hide decorative lines (non-entity lines) that fall within
+	// collapsed ranges. Walk all lines and hide those between collapsed parent
+	// and next sibling/shallower line.
+	for i := range m.lines {
+		if m.lines[i].entityID != "" {
+			continue // entity lines are handled above
+		}
+		// Find the nearest preceding entity line
+		parentDepth := -1
+		parentCollapsed := false
+		for j := i - 1; j >= 0; j-- {
+			if m.lines[j].entityID != "" {
+				parentDepth = m.lines[j].depth
+				parentCollapsed = hidden[j]
+				break
+			}
+		}
+		// If the nearest entity parent is hidden, hide this decorative line too
+		if parentCollapsed {
+			hidden[i] = true
+			continue
+		}
+		// Also hide decorative lines that are deeper than a collapsed entity above them
+		if parentDepth >= 0 && m.lines[i].depth > parentDepth {
+			// Check if the entity at parentDepth is collapsed
+			for j := i - 1; j >= 0; j-- {
+				if m.lines[j].entityID != "" && m.lines[j].depth == parentDepth {
+					if isExpandable(m.lines[j].entityID) && !m.expanded[m.lines[j].entityID] {
+						hidden[i] = true
+					}
+					break
+				}
+			}
+		}
+	}
+
+	return hidden
+}
+
 // renderContent builds the display string with cursor indicator on the selected entity line.
+// Lines belonging to collapsed subtrees are filtered out.
 func (m summaryModel) renderContent() string {
 	if len(m.lines) == 0 {
 		return ""
@@ -461,15 +911,22 @@ func (m summaryModel) renderContent() string {
 		cursorLine = m.entityIndices[m.cursor]
 	}
 
+	hidden := m.hiddenLines()
+
 	var b strings.Builder
+	first := true
 	for i, line := range m.lines {
+		if hidden[i] {
+			continue
+		}
+		if !first {
+			b.WriteByte('\n')
+		}
+		first = false
 		if i == cursorLine {
 			b.WriteString(cursorStyle.Render(line.text))
 		} else {
 			b.WriteString(line.text)
-		}
-		if i < len(m.lines)-1 {
-			b.WriteByte('\n')
 		}
 	}
 	return b.String()
@@ -477,6 +934,18 @@ func (m summaryModel) renderContent() string {
 
 // renderStatusBar builds the context-sensitive status bar based on the entity under cursor.
 func (m summaryModel) renderStatusBar() string {
+	// During animation, show a minimal status bar
+	if m.animating {
+		bar := statusMsgStyle.Render("✨ Refreshing...")
+		return statusBarStyle.Width(m.width).Render(bar)
+	}
+
+	// If in close confirmation mode, show the prompt
+	if m.confirming {
+		bar := statusMsgStyle.Render(fmt.Sprintf("Close %s? [y/n]", m.confirmEntityID))
+		return statusBarStyle.Width(m.width).Render(bar)
+	}
+
 	// If there's a transient status message, show it prominently
 	if m.statusMsg != "" {
 		bar := statusMsgStyle.Render(m.statusMsg)
@@ -497,8 +966,20 @@ func (m summaryModel) renderStatusBar() string {
 		formatHint("o", "open in vim") + "  " +
 		formatHint("r", "refresh")
 
+	if isExpandable(entityID) {
+		hints += "  " + formatHint("enter", "expand/collapse")
+	}
+
+	if isCloseable(entityID) {
+		hints += "  " + formatHint("c", "close")
+	}
+
 	if isFocusable(entityID) {
 		hints += "  " + formatHint("f", "focus")
+	}
+
+	if m.isUtilsSession {
+		hints += "  " + formatHint("g", "goblin")
 	}
 
 	hints += "  " + formatHint("q", "quit")
